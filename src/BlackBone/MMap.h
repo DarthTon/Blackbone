@@ -21,7 +21,8 @@ enum eLoadFlags
     CreateLdrRef    = 0x02,     // Create module references for native loader
     WipeHeader      = 0x04,     // Wipe image PE headers
     UnlinkVAD       = 0x10,     // Unlink image VAD from process VAD tree
-    RebaseProcess   = 0x20,     // If target image is an .exe file, process base address will be replaced with mapped module value
+    MapInHighMem    = 0x20,     // Try to map image in address space beyond 4GB limit
+    RebaseProcess   = 0x40,     // If target image is an .exe file, process base address will be replaced with mapped module value
 
     NoExceptions    = 0x01000,   // Do not create custom exception handler
     PartialExcept   = 0x02000,   // Only create Inverted function table, without VEH
@@ -182,9 +183,17 @@ private:
     bool UnlinkVad( const MemBlock& imageMem );
 
     /// <summary>
+    /// Allocates memory region beyond 4GB limit
+    /// </summary>
+    /// <param name="imageMem">Image data</param>
+    /// <param name="size">Block size</param>
+    /// <returns>true on success</returns>
+    bool AllocateInHighMem( MemBlock& imageMem, size_t size );
+
+    /// <summary>
     /// Return existing or load missing dependency
     /// </summary>
-    /// <param name="pImage">Currently napped image data</param>
+    /// <param name="pImage">Currently mapped image data</param>
     /// <param name="path">Dependency path</param>
     /// <returns></returns>
     const ModuleData* FindOrMapDependency( ImageContext* pImage, std::wstring& path );
@@ -202,6 +211,12 @@ private:
     /// <param name="characteristics">Section characteristics</param>
     /// <returns>Memory protection value</returns>
     DWORD GetSectionProt( DWORD characteristics );
+
+    /// <summary>
+    /// Gets VadPurge handle.
+    /// </summary>
+    /// <returns>Driver object handle, INVALID_HANDLE_VALUE if failed</returns>
+    HANDLE GetDriverHandle();
 
 private:
     vecImageCtx     _images;        // Mapped images

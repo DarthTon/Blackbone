@@ -4,8 +4,9 @@
 #include "Utils.h"
 #include "DynImport.h"
 
-#include "../../../DarkMMap/VADPurge/VADPurgeDef.h"
+#include "VADPurgeDef.h"
 
+#include <random>
 #include <VersionHelpers.h>
 
 namespace blackbone
@@ -41,6 +42,10 @@ const ModuleData* MMap::MapImage( const std::wstring& path, int flags /*= NoFlag
     // No need to support exceptions if DEP is disabled
     if (_process.core().DEP() == false)
         flags |= NoExceptions;
+
+    // Ignore MapInHighMem for native x64 process
+    if (!_process.core().isWow64())
+        flags &= ~MapInHighMem;
 
     // Map module and all dependencies
     auto mod = FindOrMapModule( path, flags );
@@ -92,9 +97,21 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path, int flags /*=
     // Check if already loaded
     if (auto hMod = _process.modules().GetModule( path, LdrList, pImage->PEImage.mType() ))
         return hMod;
-    
+
+    // Try to map image in high memory range
+    if (flags & MapInHighMem)
+    {
+        if (AllocateInHighMem( pImage->imgMem, pImage->PEImage.imageSize() ) == false)
+            pImage->imgMem = _process.memory().Allocate( pImage->PEImage.imageSize( ), 
+                                                         PAGE_EXECUTE_READWRITE, pImage->PEImage.imageBase() );
+    }
     // Try to map image at it's original ASRL-aware base
-    pImage->imgMem = _process.memory().Allocate( pImage->PEImage.imageSize(), PAGE_EXECUTE_READWRITE, pImage->PEImage.imageBase() );
+    else
+    {
+        pImage->imgMem = _process.memory().Allocate( pImage->PEImage.imageSize(), 
+                                                     PAGE_EXECUTE_READWRITE, pImage->PEImage.imageBase() );
+    }
+
     if (!pImage->imgMem.valid())
         return nullptr;
 
@@ -837,6 +854,96 @@ bool MMap::UnlinkVad( const MemBlock& imageMem )
 
     return false;
 }
+
+/// <summary>
+/// Allocates memory region beyond 4GB limit
+/// </summary>
+/// <param name="imageMem">Image data</param>
+/// <param name="size">Block size</param>
+/// <returns>true on success</returns>
+bool MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
+{
+    HANDLE hFile = GetDriverHandle();
+
+    if (hFile != INVALID_HANDLE_VALUE)
+    {
+        ptr_t ptr = 0;
+
+        // Align on page boundary
+        size = Align( size, 0x1000 );
+
+        //
+        // Get random address 
+        //
+        bool found = true;
+        static std::vector<std::pair<ptr_t, size_t>> usedBlocks;
+        static std::random_device rd;
+        std::uniform_int_distribution<ptr_t> dist( 0x100000, 0x7FFFFFFF );
+
+        // Make sure address is unused
+        for (ptr = dist( rd ) * 0x1000; found; ptr = dist( rd ) * 0x1000)
+        {
+            found = false;
+
+            for (auto& entry : usedBlocks)
+                if (ptr >= entry.first && ptr < entry.first + entry.second)
+                {
+                    found = true;
+                    break;
+                }
+        }
+
+        PURGE_DATA data = { _process.core().pid(), 1, { ptr, size } };
+        DWORD junk = 0;
+
+        BOOL ret = DeviceIoControl( hFile, static_cast<DWORD>(IOCTL_VADPURGE_ENABLECHANGE), &data, sizeof(data), NULL, 0, &junk, NULL );
+        CloseHandle( hFile );
+
+        // Change protection and save address
+        if(ret == TRUE)
+        {
+            usedBlocks.emplace_back( std::make_pair(ptr, size) );
+
+            imageMem = MemBlock( &_process.memory(), ptr, size, PAGE_READWRITE, false );
+            _process.memory( ).Protect( ptr, size, PAGE_READWRITE );
+            return true;
+        }
+    }
+
+    return false;
+}
+
+/// <summary>
+/// Gets VadPurge handle.
+/// </summary>
+/// <returns>Driver object handle, INVALID_HANDLE_VALUE if failed</returns>
+HANDLE MMap::GetDriverHandle()
+{
+    HANDLE hFile = CreateFile( _T( "\\\\.\\VadPurge" ), GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
+
+    // Load missing driver
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        std::wstring drvPath = Utils::GetExeDirectory() + L"\\";
+
+        if (IsWindows8Point1OrGreater())
+            drvPath += L"VadPurge81.sys";
+        else if (IsWindows8OrGreater())
+            drvPath += L"VadPurge8.sys";
+        else if (IsWindows7OrGreater())
+            drvPath += L"VadPurge7.sys";
+
+        NTSTATUS status = Utils::LoadDriver( L"VadPurge", drvPath );
+
+        if (status != ERROR_SUCCESS && status != STATUS_IMAGE_ALREADY_LOADED)
+            return false;
+
+        hFile = CreateFile( _T( "\\\\.\\VadPurge" ), GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
+    }
+
+    return hFile;
+}
+
 
 /// <summary>
 /// Transform section characteristics into memory protection flags
