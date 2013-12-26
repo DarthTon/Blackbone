@@ -876,7 +876,6 @@ bool MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
         // Get random address 
         //
         bool found = true;
-        static std::vector<std::pair<ptr_t, size_t>> usedBlocks;
         static std::random_device rd;
         std::uniform_int_distribution<ptr_t> dist( 0x100000, 0x7FFFFFFF );
 
@@ -885,7 +884,7 @@ bool MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
         {
             found = false;
 
-            for (auto& entry : usedBlocks)
+            for (auto& entry : _usedBlocks)
                 if (ptr >= entry.first && ptr < entry.first + entry.second)
                 {
                     found = true;
@@ -902,7 +901,7 @@ bool MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
         // Change protection and save address
         if(ret == TRUE)
         {
-            usedBlocks.emplace_back( std::make_pair(ptr, size) );
+            _usedBlocks.emplace_back( std::make_pair( ptr, size ) );
 
             imageMem = MemBlock( &_process.memory(), ptr, size, PAGE_READWRITE, false );
             _process.memory( ).Protect( ptr, size, PAGE_READWRITE );

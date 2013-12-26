@@ -81,7 +81,7 @@ public:
     /// <summary>
     /// Reset local data
     /// </summary>
-    inline void reset() { _images.clear(); _pAContext.Free(); }
+    inline void reset() { _images.clear(); _pAContext.Free(); _usedBlocks.clear(); }
 
 private:
 
@@ -222,6 +222,8 @@ private:
     vecImageCtx     _images;        // Mapped images
     class Process&  _process;       // Target process manager
     MemBlock        _pAContext;     // SxS activation context memory address
+
+    std::vector<std::pair<ptr_t, size_t>> _usedBlocks;   // Used memory blocks 
 };
 
 }
