@@ -177,8 +177,7 @@ public:
     /// Get highest possible valid address value
     /// </summary>
     /// <returns>Address value</returns>
-    inline ptr_t maxAddr() const { return _wowBarrier.targetWow64 ? 0x7FFFFFFF : 0x7FFFFFFFFFF; }
-
+    inline ptr_t maxAddr() const { return /*_wowBarrier.targetWow64 ?*/ 0x7FFFFFFF0000; }
 private:
 
     /// <summary>

@@ -12,7 +12,6 @@
 template <>
 struct std::hash< std::pair<std::wstring, blackbone::eModType> >
 {
-private:
 
 public:
     size_t operator()( const std::pair<std::wstring, blackbone::eModType>& value ) const
@@ -72,6 +71,17 @@ public:
                                  const wchar_t* baseModule = L"" );
 
     /// <summary>
+    /// Get module by base address
+    /// </summary>
+    /// <param name="modBase">Module base address</param>
+    /// <param name="type">Module type. 32 bit or 64 bit</param>
+    /// <param name="search">Saerch type.</param>
+    /// <returns>Module data. nullptr if not found</returns>
+    const ModuleData* GetModule( module_t modBase,
+                                 eModSeachType search = LdrList,
+                                 eModType type = mt_default );
+
+    /// <summary>
     /// Get process main module
     /// </summary>
     /// <returns>Module data. nullptr if not found</returns>
@@ -83,6 +93,12 @@ public:
     /// <param name="search">Search method</param>
     /// <returns>Module list</returns>
     const ProcessModules::mapModules& GetAllModules( eModSeachType search = LdrList);
+
+    /// <summary>
+    /// Get list of manually mapped modules
+    /// </summary>
+    /// <param name="mods">List of modules</param>
+    void GetManualModules( ProcessModules::mapModules& mods );
 
     /// <summary>
     /// Get export address. Forwarded exports will be automatically resolved if forward module is present
@@ -161,7 +177,7 @@ public:
 private:
     ProcessModules( const ProcessModules& ) = delete;
     ProcessModules operator =(const ProcessModules&) = delete;
- 
+
 private:
     class Process&       _proc;
     class ProcessMemory& _memory;

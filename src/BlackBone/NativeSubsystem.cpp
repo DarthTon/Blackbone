@@ -398,7 +398,11 @@ size_t Native::EnumSections( listModules& result )
 
     for (ptr_t memptr = minAddr(); memptr < maxAddr(); memptr = mbi.BaseAddress + mbi.RegionSize)
     {
-        if (VirtualQueryExT( memptr, &mbi ) != STATUS_SUCCESS)
+        auto status = VirtualQueryExT( memptr, &mbi );
+
+        if (status == STATUS_INVALID_PARAMETER)
+            break;
+        else if (status != STATUS_SUCCESS)
             continue;
 
         // Filter non-section regions
@@ -408,7 +412,7 @@ size_t Native::EnumSections( listModules& result )
         uint8_t buf[0x1000] = { 0 };
         _UNICODE_STRING_T<DWORD64>* ustr = (decltype(ustr))(buf + 0x800);
 
-        auto status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof(buf) / 2 );
+        status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof(buf) / 2 );
 
         // Get additional 
         if (status == STATUS_SUCCESS)
@@ -419,7 +423,8 @@ size_t Native::EnumSections( listModules& result )
             IMAGE_NT_HEADERS32 *phdrNt32 = nullptr;
             IMAGE_NT_HEADERS64 *phdrNt64 = nullptr;
 
-            ReadProcessMemoryT( mbi.AllocationBase, buf, 0x800 );
+            if (ReadProcessMemoryT( mbi.AllocationBase, buf, 0x800 ) != STATUS_SUCCESS)
+                continue;
 
             phdrNt32 = reinterpret_cast<PIMAGE_NT_HEADERS32>(buf + phdrDos->e_lfanew);
             phdrNt64 = reinterpret_cast<PIMAGE_NT_HEADERS64>(phdrNt32);
@@ -462,13 +467,18 @@ size_t Native::EnumSections( listModules& result )
 size_t Native::EnumPEHeaders( listModules& result )
 {
     MEMORY_BASIC_INFORMATION64 mbi = { 0 };
+    uint8_t buf[0x1000];
     ptr_t lastBase = 0;
 
     result.clear();
 
     for (ptr_t memptr = minAddr(); memptr < maxAddr(); memptr = mbi.BaseAddress + mbi.RegionSize)
     {
-        if (VirtualQueryExT( memptr, &mbi ) != STATUS_SUCCESS)
+        auto status = VirtualQueryExT( memptr, &mbi );
+
+        if (status == STATUS_INVALID_PARAMETER)
+            break;
+        else if (status != STATUS_SUCCESS)
             continue;
 
         // Filter regions
@@ -482,12 +492,12 @@ size_t Native::EnumPEHeaders( listModules& result )
 
         ModuleData data;
 
-        uint8_t buf[0x2000];
         IMAGE_DOS_HEADER* phdrDos = reinterpret_cast<PIMAGE_DOS_HEADER>(buf);
         IMAGE_NT_HEADERS32 *phdrNt32 = nullptr;
         IMAGE_NT_HEADERS64 *phdrNt64 = nullptr;
 
-        ReadProcessMemoryT( mbi.AllocationBase, buf, 0x2000 );
+        if(ReadProcessMemoryT( mbi.AllocationBase, buf, 0x1000 ) != STATUS_SUCCESS)
+            continue;
 
         phdrNt32 = reinterpret_cast<PIMAGE_NT_HEADERS32>(buf + phdrDos->e_lfanew);
         phdrNt64 = reinterpret_cast<PIMAGE_NT_HEADERS64>(phdrNt32);
@@ -513,7 +523,7 @@ size_t Native::EnumPEHeaders( listModules& result )
 
         // Try to get section name
         _UNICODE_STRING_T<DWORD64>* ustr = (decltype(ustr))buf;
-        auto status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof(buf) );
+        status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof(buf) );
 
         if (status == STATUS_SUCCESS)
         {
@@ -522,7 +532,10 @@ size_t Native::EnumPEHeaders( listModules& result )
         }
         else
         {
-            data.fullPath = std::wstring( L"Unknown_at_" ) + std::to_wstring( data.baseAddress );
+            wchar_t buf[64];
+            wsprintf( buf, L"Unknown_0x%I64x", data.baseAddress );
+
+            data.fullPath = buf;
             data.name = data.fullPath;
         }
 

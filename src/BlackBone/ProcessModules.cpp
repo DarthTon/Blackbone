@@ -86,22 +86,60 @@ const ModuleData* ProcessModules::GetModule( std::wstring& name,
 }
 
 /// <summary>
-/// Get process main module
+/// Get module by base address
 /// </summary>
+/// <param name="modBase">Module base address</param>
+/// <param name="type">Module type. 32 bit or 64 bit</param>
+/// <param name="search">Saerch type.</param>
 /// <returns>Module data. nullptr if not found</returns>
-const ModuleData* ProcessModules::GetMainModule()
+const ModuleData* ProcessModules::GetModule( module_t modBase, 
+                                             eModSeachType search /*= LdrList*/, 
+                                             eModType type /*= mt_default */ )
 {
+    // Detect module type
+    if (type == mt_default)
+        type = _core.native()->GetWow64Barrier().targetWow64 ? mt_mod32 : mt_mod64;
+
+    std::lock_guard<std::mutex> lg( _modGuard );
+
+    auto compFn = [modBase]( const mapModules::value_type& val )
+    { 
+        return (val.second.baseAddress == modBase); 
+    };
+
+    auto iter = std::find_if( _modules.begin( ), _modules.end( ), compFn );
+
+    if (iter != _modules.end())
+        return &iter->second;
+
+    // Enum all process modules
     Native::listModules modules;
-    _core.native()->EnumModules( modules );
+    _core.native()->EnumModules( modules, search, type );
 
     // Update local cache
     for (auto& mod : modules)
         _modules.emplace( std::make_pair( std::make_pair( mod.name, mod.type ), mod ) );
 
-    if (!_modules.empty( ))
-        return &_modules.begin()->second;
+    iter = std::find_if( _modules.begin(), _modules.end(), compFn );
+
+    if (iter != _modules.end())
+        return &iter->second;
     else
         return nullptr;
+}
+
+/// <summary>
+/// Get process main module
+/// </summary>
+/// <returns>Module data. nullptr if not found</returns>
+const ModuleData* ProcessModules::GetMainModule()
+{
+    _PEB64 peb;
+
+    if (_proc.core().peb( &peb ) == 0)
+        return nullptr;
+
+    return GetModule( peb.ImageBaseAddress );
 }
 
 /// <summary>
@@ -116,7 +154,19 @@ const ProcessModules::mapModules& ProcessModules::GetAllModules( eModSeachType s
 
     _core.native()->EnumModules( modules, search, mt );
 
-    _modules.clear();
+    std::lock_guard<std::mutex> lg( _modGuard );
+
+    //
+    // Remove non-manual modules
+    //
+    auto iter = _modules.begin();
+    while (iter != _modules.end( ))
+    {
+        if (!iter->second.manual) 
+            iter = _modules.erase( iter );
+
+        else ++iter;
+    }
 
     // Update local cache
     for (auto& mod : modules)
@@ -134,6 +184,19 @@ const ProcessModules::mapModules& ProcessModules::GetAllModules( eModSeachType s
     }
 
     return _modules;
+}
+
+/// <summary>
+/// Get list of manually mapped modules
+/// </summary>
+/// <param name="mods">List of modules</param>
+void ProcessModules::GetManualModules( ProcessModules::mapModules& mods )
+{
+    mods.clear();
+
+    for (auto& mod: _modules)
+        if (mod.second.manual)
+            mods.emplace( mod );
 }
 
 /// <summary>
@@ -355,9 +418,9 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
 /// <returns>true on success</returns>
 bool ProcessModules::Unload( const ModuleData* hMod )
 {
-    uint64_t res = 0;
+    /*uint64_t res = 0;
     AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    AsmJitHelper ah( a );*/
 
     // Module not present or is manually mapped
     if (hMod == nullptr ||  hMod->manual || !ValidateModule( hMod->baseAddress ))
@@ -371,10 +434,13 @@ bool ProcessModules::Unload( const ModuleData* hMod )
     if (pUnload.procAddress == 0)
         return nullptr;
 
-    ah.GenCall( static_cast<size_t>(pUnload.procAddress), { static_cast<size_t>(hMod->baseAddress) } );
-    a.ret();
+    /*ah.GenCall( static_cast<size_t>(pUnload.procAddress), { static_cast<size_t>(hMod->baseAddress) } );
+    a.ret();*/
 
-    _proc.remote().ExecInNewThread( a.make(), a.getCodeSize(), res );
+    _proc.remote().ExecDirect( pUnload.procAddress, hMod->baseAddress );
+
+    // Remove module from cache
+    _modules.erase( std::make_pair( hMod->name, hMod->type ) );
 
     return true;
 }
