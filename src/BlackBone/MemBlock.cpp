@@ -131,25 +131,28 @@ NTSTATUS MemBlock::Protect( DWORD protection, size_t offset /*= 0*/, size_t size
 /// Free memory
 /// </summary>
 /// <param name="size">Size of memory chunk to free. If 0 - whole block is freed</param>
-void MemBlock::Free( size_t size /*=0 */ )
+NTSTATUS MemBlock::Free( size_t size /*=0 */ )
 {
     if (_ptr != 0)
     {
-        _memory->Free( _ptr, size );
+        size = Align( size, 0x1000 );
+        if (_memory->Free( _ptr, size ) != STATUS_SUCCESS)
+            return LastNtStatus();
 
         if(size == 0)
         {
-            _ptr = 0;
+            _ptr  = 0;
             _size = 0;
+            _protection = 0;
         }
         else
         {
-            _ptr += size;
+            _ptr  += size;
             _size -= size;
         }
-
-        _protection = 0;
     }
+
+    return STATUS_SUCCESS;
 }
 
 /// <summary>

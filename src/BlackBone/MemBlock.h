@@ -95,7 +95,7 @@ public:
     /// Free memory
     /// </summary>
     /// <param name="size">Size of memory chunk to free. If 0 - whole block is freed</param>
-    void Free( size_t size = 0 );
+    NTSTATUS Free( size_t size = 0 );
 
     /// <summary>
     /// Read data

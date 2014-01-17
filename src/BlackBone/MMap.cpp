@@ -66,8 +66,11 @@ const ModuleData* MMap::MapImage( const std::wstring& path, int flags /*= NoFlag
                 return nullptr;
 
             // Wipe header
-            if (img->flags & WipeHeader)
-                img->imgMem.Free( img->PEImage.headersSize() );
+            if (img->flags & WipeHeader)           
+            {
+                if (img->imgMem.Free( img->PEImage.headersSize() ) != STATUS_SUCCESS)
+                    img->imgMem.Protect( PAGE_NOACCESS, 0, img->PEImage.headersSize() );
+            }
 
             img->initialized = true;
         }
