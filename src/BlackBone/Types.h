@@ -33,6 +33,7 @@ struct Wow64Barrier
     WoW64Type type;
     bool sourceWow64;
     bool targetWow64;
+    bool x86OS;
 };
 
 // Module type

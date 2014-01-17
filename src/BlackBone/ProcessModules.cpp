@@ -418,10 +418,6 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
 /// <returns>true on success</returns>
 bool ProcessModules::Unload( const ModuleData* hMod )
 {
-    /*uint64_t res = 0;
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );*/
-
     // Module not present or is manually mapped
     if (hMod == nullptr ||  hMod->manual || !ValidateModule( hMod->baseAddress ))
     {
@@ -434,10 +430,20 @@ bool ProcessModules::Unload( const ModuleData* hMod )
     if (pUnload.procAddress == 0)
         return nullptr;
 
-    /*ah.GenCall( static_cast<size_t>(pUnload.procAddress), { static_cast<size_t>(hMod->baseAddress) } );
-    a.ret();*/
+    // Special case for unloading 64 bit modules from WOW64 process
+    if (_proc.core().isWow64() && hMod->type == mt_mod64)
+    {
+        uint64_t res = 0;
+        AsmJit::Assembler a;
+        AsmJitHelper ah( a );
 
-    _proc.remote().ExecDirect( pUnload.procAddress, hMod->baseAddress );
+        ah.GenCall( static_cast<size_t>(pUnload.procAddress), { static_cast<size_t>(hMod->baseAddress) } );
+        a.ret();
+
+        _proc.remote().ExecInNewThread( a.make(), a.getCodeSize(), res );
+    }
+    else
+        _proc.remote().ExecDirect( pUnload.procAddress, hMod->baseAddress );
 
     // Remove module from cache
     _modules.erase( std::make_pair( hMod->name, hMod->type ) );

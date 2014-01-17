@@ -18,6 +18,7 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
         _wowBarrier.sourceWow64 = true;
         _wowBarrier.targetWow64 = true;
         _wowBarrier.type = wow_32_32;
+        _wowBarrier.x86OS = true;
     }
     else
     {
@@ -445,9 +446,17 @@ size_t Native::EnumSections( listModules& result )
                 data.type = mt_mod64;
             }
 
-            data.baseAddress = mbi.AllocationBase;
-            data.fullPath = Utils::ToLower( (const wchar_t*)ustr->Buffer );
+            // Hack for x86 OS
+            if (_wowBarrier.x86OS == true)
+            {
+                _UNICODE_STRING_T<DWORD>* ustr32 = reinterpret_cast<_UNICODE_STRING_T<DWORD>*>(ustr);
+                data.fullPath = Utils::ToLower( (const wchar_t*)ustr32->Buffer );
+            }
+            else
+                data.fullPath = Utils::ToLower( (const wchar_t*)ustr->Buffer );
+
             data.name = Utils::StripPath( data.fullPath );
+            data.baseAddress = mbi.AllocationBase;
             data.manual = false;
 
             result.emplace_back( data );
@@ -496,7 +505,7 @@ size_t Native::EnumPEHeaders( listModules& result )
         IMAGE_NT_HEADERS32 *phdrNt32 = nullptr;
         IMAGE_NT_HEADERS64 *phdrNt64 = nullptr;
 
-        if(ReadProcessMemoryT( mbi.AllocationBase, buf, 0x1000 ) != STATUS_SUCCESS)
+        if (ReadProcessMemoryT( mbi.AllocationBase, buf, 0x1000 ) != STATUS_SUCCESS)
             continue;
 
         phdrNt32 = reinterpret_cast<PIMAGE_NT_HEADERS32>(buf + phdrDos->e_lfanew);
@@ -527,7 +536,15 @@ size_t Native::EnumPEHeaders( listModules& result )
 
         if (status == STATUS_SUCCESS)
         {
-            data.fullPath = Utils::ToLower( (const wchar_t*)ustr->Buffer );
+            // Hack for x86 OS
+            if (_wowBarrier.x86OS == true)
+            {
+                _UNICODE_STRING_T<DWORD>* ustr32 = reinterpret_cast<_UNICODE_STRING_T<DWORD>*>(ustr);
+                data.fullPath = Utils::ToLower( (const wchar_t*)ustr32->Buffer );
+            }
+            else
+                data.fullPath = Utils::ToLower( (const wchar_t*)ustr->Buffer );
+
             data.name = Utils::StripPath( data.fullPath );
         }
         else
