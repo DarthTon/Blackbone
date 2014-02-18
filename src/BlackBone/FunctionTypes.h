@@ -201,4 +201,7 @@ typedef decltype(&NtQueryInformationProcess) fnNtQueryInformationProcess;
 // NtQueryInformationThread
 typedef decltype(&NtQueryInformationThread) fnNtQueryInformationThread;
 
+// NtQueryObject
+typedef decltype(&NtQueryObject) fnNtQueryObject;
+
 }

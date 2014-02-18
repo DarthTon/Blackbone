@@ -30,10 +30,11 @@ MemBlock ProcessMemory::Allocate( size_t size, DWORD protection /*= PAGE_EXECUTE
 /// </summary>
 /// <param name="pAddr">Memory address to release.</param>
 /// <param name="size">Region size</param>
+/// <param name="freeType">Release/decommit</param>
 /// <returns>Status</returns>
-NTSTATUS ProcessMemory::Free( ptr_t pAddr, size_t size /*= 0*/ )
+NTSTATUS ProcessMemory::Free( ptr_t pAddr, size_t size /*= 0*/, DWORD freeType /*= MEM_RELEASE*/ )
 {
-    return _core.native()->VirualFreeExT( pAddr, size, MEM_RELEASE );
+    return _core.native()->VirualFreeExT( pAddr, size, freeType );
 }
 
 /// <summary>

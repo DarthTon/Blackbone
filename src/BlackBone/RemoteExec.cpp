@@ -561,9 +561,9 @@ void RemoteExec::reset()
 
     _hWorkThd = Thread( (HANDLE)NULL, &_proc.core() );
 
-    _userCode.Free();
-    _userData.Free();
-    _workerCode.Free();
+    _userCode.Reset();
+    _userData.Reset();
+    _workerCode.Reset();
 
     _apcPatched = false;
 }

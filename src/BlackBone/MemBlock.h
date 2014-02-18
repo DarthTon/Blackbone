@@ -146,6 +146,11 @@ public:
     }
 
     /// <summary>
+    /// Try to free memory and reset pointers
+    /// </summary>
+    void Reset();
+
+    /// <summary>
     /// Memory will not be deallocated upon object destruction
     /// </summary>
     inline void Release() const  { _own = false; }

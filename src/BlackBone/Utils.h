@@ -17,6 +17,13 @@ public:
     static std::wstring UTF8ToWstring( const std::string& str );
 
     /// <summary>
+    /// Convert UTF-8 string to wide char one
+    /// </summary>
+    /// <param name="str">UTF-8 string</param>
+    /// <returns>wide char string</returns>
+    static std::string Utils::WstringToUTF8( const std::wstring& str );
+
+    /// <summary>
     /// Convert ANSI string to wide char one
     /// </summary>
     /// <param name="input">ANSI string.</param>

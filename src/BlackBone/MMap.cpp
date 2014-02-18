@@ -197,7 +197,6 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path, int flags /*=
     return pMod;
 }
 
-
 /// <summary>
 /// Map pure IL image
 /// Not supported yet
@@ -276,13 +275,14 @@ bool MMap::CopyImage( ImageContext* pImage )
     for( auto& section : sections)
     {
         // Skip discardable sections
-        if (!(section.Characteristics & (IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE)))
-            continue;
+        if (section.Characteristics & (IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE) &&
+             !(section.Characteristics & IMAGE_SCN_MEM_DISCARDABLE))
+        {
+            uint8_t* pSource = reinterpret_cast<uint8_t*>(pImage->PEImage.ResolveRVAToVA( section.VirtualAddress ));
 
-        uint8_t* pSource = reinterpret_cast<uint8_t*>(pImage->PEImage.ResolveRVAToVA( section.VirtualAddress ));
-
-        if (pImage->imgMem.Write( section.VirtualAddress, section.Misc.VirtualSize, pSource ) != STATUS_SUCCESS)
-            return false;
+            if (pImage->imgMem.Write( section.VirtualAddress, section.Misc.VirtualSize, pSource ) != STATUS_SUCCESS)
+                return false;
+        } 
     }
 
     return true;
@@ -299,8 +299,14 @@ bool MMap::ProtectImageMemory( ImageContext* pImage )
     for (auto& section : pImage->PEImage.sections())
     {
         auto prot = GetSectionProt( section.Characteristics );
-        if (pImage->imgMem.Protect( prot, section.VirtualAddress, section.Misc.VirtualSize ) != STATUS_SUCCESS)
-            return false;
+        if (prot != PAGE_NOACCESS)
+        {
+            if (pImage->imgMem.Protect( prot, section.VirtualAddress, section.Misc.VirtualSize ) != STATUS_SUCCESS)
+                return false;
+        }
+        // Decommit pages with NO_ACCESS protection
+        else
+            _process.memory().Free( pImage->imgMem.ptr() + section.VirtualAddress, section.Misc.VirtualSize, MEM_DECOMMIT );
     }
 
     return true;
@@ -956,7 +962,11 @@ DWORD MMap::GetSectionProt( DWORD characteristics )
 {
     DWORD dwResult = PAGE_NOACCESS;
 
-    if(characteristics & IMAGE_SCN_MEM_EXECUTE) 
+    if (characteristics & IMAGE_SCN_MEM_DISCARDABLE)
+    {
+        dwResult = PAGE_NOACCESS;
+    }
+    else if(characteristics & IMAGE_SCN_MEM_EXECUTE) 
     {
         if(characteristics & IMAGE_SCN_MEM_WRITE)
             dwResult = PAGE_EXECUTE_READWRITE;

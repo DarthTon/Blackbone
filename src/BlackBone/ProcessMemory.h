@@ -28,8 +28,9 @@ public:
     /// </summary>
     /// <param name="pAddr">Memory address to release.</param>
     /// <param name="size">Region size</param>
+    /// <param name="freeType">Release/decommit</param>
     /// <returns>Status</returns>
-    NTSTATUS Free( ptr_t pAddr, size_t size = 0 );
+    NTSTATUS Free( ptr_t pAddr, size_t size = 0, DWORD freeType = MEM_RELEASE );
 
     /// <summary>
     /// Get memory region info

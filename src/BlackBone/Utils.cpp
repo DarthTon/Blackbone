@@ -21,6 +21,17 @@ std::wstring Utils::UTF8ToWstring( const std::string& str )
 }
 
 /// <summary>
+/// Convert wide char string to UTF-8
+/// </summary>
+/// <param name="str">Wide char string</param>
+/// <returns>UTF-8 string</returns>
+std::string Utils::WstringToUTF8( const std::wstring& str )
+{
+    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> conv;
+    return conv.to_bytes( str );
+}
+
+/// <summary>
 /// Convert ANSI string to wide char one
 /// </summary>
 /// <param name="input">ANSI string.</param>

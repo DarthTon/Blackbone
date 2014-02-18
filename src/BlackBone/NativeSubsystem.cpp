@@ -43,6 +43,7 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
 
     DynImport::load( "NtQueryInformationProcess", hNtdll );
     DynImport::load( "NtQueryInformationThread",  hNtdll );
+    DynImport::load( "NtQueryObject",             hNtdll );  
     DynImport::load( "NtQueryVirtualMemory",      hNtdll );
     DynImport::load( "NtCreateThreadEx",          hNtdll );
     DynImport::load( "NtLockVirtualMemory",       hNtdll );

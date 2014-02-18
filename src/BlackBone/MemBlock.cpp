@@ -184,4 +184,18 @@ NTSTATUS MemBlock::Write( size_t offset, size_t size, const void* pData )
     return _memory->Write( _ptr + offset, size, pData );
 }
 
+/// <summary>
+/// Try to free memory and reset pointers
+/// </summary>
+void MemBlock::Reset()
+{
+    Free();
+
+    _ptr = 0;
+    _size = 0;
+    _protection = 0;
+    _own = false;
+    _memory = nullptr;
+}
+
 }

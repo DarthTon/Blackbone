@@ -19,7 +19,7 @@ enum eLoadFlags
     NoFlags         = 0x00,     // No flags
     ManualImports   = 0x01,     // Manually map import libraries
     CreateLdrRef    = 0x02,     // Create module references for native loader
-    WipeHeader      = 0x04,     // Wipe image PE headers
+    WipeHeader      = 0x04,     // Wipe image PE headers    WipeRelocs      = 0x08,     // Wipe relocations section
     UnlinkVAD       = 0x10,     // Unlink image VAD from process VAD tree
     MapInHighMem    = 0x20,     // Try to map image in address space beyond 4GB limit
     RebaseProcess   = 0x40,     // If target image is an .exe file, process base address will be replaced with mapped module value
@@ -81,7 +81,7 @@ public:
     /// <summary>
     /// Reset local data
     /// </summary>
-    inline void reset() { _images.clear(); _pAContext.Free(); _usedBlocks.clear(); }
+    inline void reset() { _images.clear(); _pAContext.Reset(); _usedBlocks.clear(); }
 
 private:
 
