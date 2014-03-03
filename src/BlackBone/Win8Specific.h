@@ -65,10 +65,11 @@ namespace blackbone
         void * SwitchBackContext;
         _RTL_BALANCED_NODE BaseAddressIndexNode;
         _RTL_BALANCED_NODE MappingInfoIndexNode;
-        unsigned long OriginalBase;
-        union _LARGE_INTEGER LoadTime;
+        void * OriginalBase;
+        _LARGE_INTEGER LoadTime;
         unsigned long BaseNameHashValue;
         _LDR_DLL_LOAD_REASON LoadReason;
+        unsigned long ImplicitPathOptions;
     };
 
     typedef struct _RTL_INVERTED_FUNCTION_TABLE8

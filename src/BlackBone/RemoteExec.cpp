@@ -43,6 +43,9 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
         return dwResult;
 
     bool switchMode = (_proc.core().native()->GetWow64Barrier().type == wow_64_32);
+    auto pExitThread = _mods.GetExport( _mods.GetModule( L"ntdll.dll" ), "NtTerminateThread" ).procAddress;
+    if (pExitThread == 0)
+        return LastNtStatus( STATUS_NOT_FOUND );
 
     ah.GenPrologue( switchMode );
 
@@ -64,7 +67,7 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
     }
 
     ah.GenCall( _userCode.ptr<size_t>(), { } );
-    ah.ExitThreadWithStatus( _userData.ptr<size_t>() + INTRET_OFFSET );
+    ah.ExitThreadWithStatus( pExitThread, _userData.ptr<size_t>( ) + INTRET_OFFSET );
     
     // Execute code in newly created thread
     if (_userCode.Write( size, a.getCodeSize(), a.make() ) == STATUS_SUCCESS)
@@ -337,7 +340,8 @@ DWORD RemoteExec::CreateWorkerThread()
         }          
 
         auto proc = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt ), "NtDelayExecution" ).procAddress;
-        if (proc == 0)
+        auto pExitThread = _mods.GetExport( _mods.GetModule( L"ntdll.dll" ), "NtTerminateThread" ).procAddress;
+        if (proc == 0 || pExitThread == 0)
             return 0;
 
         /*
@@ -350,7 +354,7 @@ DWORD RemoteExec::CreateWorkerThread()
         ah.GenCall( static_cast<size_t>(proc), { TRUE, _workerCode.ptr<size_t>() } );
         a.jmp( l_loop );
 
-        ah.ExitThreadWithStatus( _userData.ptr<size_t>() );
+        ah.ExitThreadWithStatus( pExitThread, _userData.ptr<size_t>() );
 
         // Write code into process
         LARGE_INTEGER liDelay = { 0 };
@@ -530,6 +534,19 @@ NTSTATUS RemoteExec::CopyCode( PVOID pCode, size_t size )
 
     return STATUS_SUCCESS;
 }
+
+/// <summary>
+/// Generate return from function with event synchronization
+/// </summary>
+/// <param name="ah">Target assembly helper</param>
+/// <param name="retType">Function return type</param>
+void RemoteExec::AddReturnWithEvent( AsmHelperBase& ah, eReturnType retType /*= rt_int32 */ )
+{
+    size_t ptr = _userData.ptr<size_t>();
+    auto pSetEvent = _proc.modules().GetExport( _proc.modules().GetModule( L"ntdll.dll" ), "NtSetEvent" );
+    ah.SaveRetValAndSignalEvent( pSetEvent.procAddress, ptr + RET_OFFSET, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
+}
+
 
 /// <summary>
 /// Terminate existing worker thread

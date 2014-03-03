@@ -54,8 +54,8 @@ namespace blackbone
         virtual void GenPrologue( bool switchMode = false ) = 0;
         virtual void GenEpilogue( bool switchMode = false, int retSize = -1) = 0;
         virtual void GenCall( const AsmVariant&, const std::vector<AsmVariant>& args, eCalligConvention cc = cc_stdcall ) = 0;
-        virtual void ExitThreadWithStatus( size_t resultPtr ) = 0;
-        virtual void SaveRetValAndSignalEvent( size_t ResultPtr, size_t EventPtr, size_t errPtr, eReturnType rtype = rt_int32 ) = 0;
+        virtual void ExitThreadWithStatus( size_t pExitThread, size_t resultPtr ) = 0;
+        virtual void SaveRetValAndSignalEvent( size_t pSetEvent, size_t ResultPtr, size_t EventPtr, size_t errPtr, eReturnType rtype = rt_int32 ) = 0;
         virtual void SetTebPtr() = 0;
         virtual void EnableX64CallStack( bool state ) = 0;
 

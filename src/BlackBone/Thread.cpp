@@ -15,7 +15,7 @@ Thread::Thread( DWORD id, ProcessCore* core, DWORD access /*= DEFAULT_ACCESS*/ )
 Thread::Thread( HANDLE handle, ProcessCore* core )
     : _handle( handle )
     , _core( core )
-    , _id( GetThreadId( handle ) )
+    , _id( handle != NULL ? GetThreadId( handle ) : 0 )
 {
 }
 

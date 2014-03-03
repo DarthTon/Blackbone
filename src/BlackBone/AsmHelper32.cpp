@@ -121,8 +121,9 @@ void AsmHelper32::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
 /// <summary>
 /// Save eax value and terminate current thread
 /// </summary>
+/// <param name="pExitThread">NtTerminateThread address</param>
 /// <param name="resultPtr">Memry where eax value will be saved</param>
-void AsmHelper32::ExitThreadWithStatus( size_t resultPtr = 0 )
+void AsmHelper32::ExitThreadWithStatus( size_t pExitThread, size_t resultPtr = 0 )
 {
     if (resultPtr != 0)
     {
@@ -133,7 +134,7 @@ void AsmHelper32::ExitThreadWithStatus( size_t resultPtr = 0 )
     // NtTerminateThread( NULL, eax );
     a.push( AsmJit::eax );
     a.push( 0 );
-    a.mov( AsmJit::eax, reinterpret_cast<DWORD>(GetProcAddress( GetModuleHandleW( L"ntdll.dll" ), "NtTerminateThread" )) );
+    a.mov( AsmJit::eax, pExitThread );
     a.call( AsmJit::eax );
     
     GenEpilogue();
@@ -142,12 +143,16 @@ void AsmHelper32::ExitThreadWithStatus( size_t resultPtr = 0 )
 /// <summary>
 /// Save return value and signal thread return event
 /// </summary>
+/// <param name="pSetEvent">NtSetEvent address</param>
 /// <param name="ResultPtr">Result value memory location</param>
 /// <param name="EventPtr">Event memory location</param>
 /// <param name="errPtr">Error code memory location</param>
 /// <param name="rtype">Return type</param>
-void AsmHelper32::SaveRetValAndSignalEvent( size_t ResultPtr, size_t EventPtr, 
-                                             size_t errPtr, eReturnType rtype /*= rt_int32*/ )
+void AsmHelper32::SaveRetValAndSignalEvent( size_t pSetEvent,
+                                            size_t ResultPtr, 
+                                            size_t EventPtr, 
+                                            size_t errPtr, 
+                                            eReturnType rtype /*= rt_int32*/ )
 {
     a.mov( AsmJit::ecx, ResultPtr );
 
@@ -170,10 +175,12 @@ void AsmHelper32::SaveRetValAndSignalEvent( size_t ResultPtr, size_t EventPtr,
     a.mov( AsmJit::dword_ptr( AsmJit::eax ), AsmJit::edx );
 
     // SetEvent(hEvent)
+    // NtSetEvent(hEvent, NULL)
+    a.push( 0 );
     a.mov( AsmJit::eax, EventPtr );
     a.mov( AsmJit::eax, AsmJit::dword_ptr( AsmJit::eax ) );
     a.push( AsmJit::eax );
-    a.mov( AsmJit::eax, reinterpret_cast<DWORD>(&SetEvent) );
+    a.mov( AsmJit::eax, pSetEvent );
     a.call( AsmJit::eax );
 }
 

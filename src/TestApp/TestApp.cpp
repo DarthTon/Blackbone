@@ -143,7 +143,7 @@ void TestMMap()
     else
         std::wcout << L"Successfully mapped, unmapping\n";
 
-    //thisProc.mmap().UnmapAllModules();
+    thisProc.mmap().UnmapAllModules();
 }
 
 /*
@@ -152,11 +152,11 @@ void TestMMap()
 void TestRemoteCall()
 {
     std::wcout << L"Remote function call test\n";
-    std::wcout << L"Searching for csrss.exe... ";
+    std::wcout << L"Searching for explorer.exe... ";
 
     Process csrss;
     std::vector<DWORD> found;
-    Process::EnumByName( L"csrss.exe", found );
+    Process::EnumByName( L"explorer.exe", found );
 
     if (found.size() > 0)
     {
@@ -210,7 +210,7 @@ void TestRemoteCall()
 }
 
 int wmain( int /*argc*/, wchar_t* /*argv*/[] )
-{   
+{
     Process proc;
     proc.Attach( GetCurrentProcessId() );
 

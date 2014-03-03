@@ -36,17 +36,23 @@ public:
     /// <summary>
     /// Save rax value and terminate current thread
     /// </summary>
+    /// <param name="pExitThread">NtTerminateThread address</param>
     /// <param name="resultPtr">Memry where rax value will be saved</param>
-    virtual void ExitThreadWithStatus( size_t resultPtr = 0 );
+    virtual void ExitThreadWithStatus( uint64_t pExitThread, size_t resultPtr = 0 );
 
     /// <summary>
     /// Save return value and signal thread return event
     /// </summary>
+    /// <param name="pSetEvent">NtSetEvent address</param>
     /// <param name="ResultPtr">Result value memory location</param>
     /// <param name="EventPtr">Event memory location</param>
     /// <param name="errPtr">Error code memory location</param>
     /// <param name="rtype">Return type</param>
-    virtual void SaveRetValAndSignalEvent( size_t ResultPtr, size_t EventPtr, size_t lastStatusPtr, eReturnType rtype = rt_int32 );
+    virtual void SaveRetValAndSignalEvent( size_t pSetEvent, 
+                                           size_t ResultPtr, 
+                                           size_t EventPtr, 
+                                           size_t lastStatusPtr, 
+                                           eReturnType rtype = rt_int32 );
 
     /// <summary>
     /// Set stack reservation policy on call generation

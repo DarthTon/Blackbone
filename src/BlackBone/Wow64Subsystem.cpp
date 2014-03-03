@@ -32,7 +32,7 @@ NativeWow64::~NativeWow64()
 NTSTATUS NativeWow64::VirualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect )
 {
     DWORD64 size64 = dwSize;
-    static ptr_t ntavm = _local.GetProcAddress64( _local.getNTDLL64( ), "NtAllocateVirtualMemory" );;
+    static ptr_t ntavm = _local.GetProcAddress64( _local.getNTDLL64(), "NtAllocateVirtualMemory" );
     if (ntavm == 0)
         return STATUS_ORDINAL_NOT_FOUND;
 

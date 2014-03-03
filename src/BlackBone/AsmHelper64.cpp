@@ -106,8 +106,9 @@ void AsmHelper64::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
 /// <summary>
 /// Save rax value and terminate current thread
 /// </summary>
+/// <param name="pExitThread">NtTerminateThread address</param>
 /// <param name="resultPtr">Memry where rax value will be saved</param>
-void AsmHelper64::ExitThreadWithStatus( size_t resultPtr )
+void AsmHelper64::ExitThreadWithStatus( uint64_t pExitThread, size_t resultPtr )
 {
     if (resultPtr != 0)
     {
@@ -117,18 +118,23 @@ void AsmHelper64::ExitThreadWithStatus( size_t resultPtr )
 
     a.mov( AsmJit::rdx, AsmJit::rax );
     a.mov( AsmJit::rcx, 0 );
-    a.mov( AsmJit::r13, reinterpret_cast<DWORD64>(GetProcAddress( GetModuleHandleW( L"ntdll.dll" ), "NtTerminateThread" )) );
+    a.mov( AsmJit::r13, pExitThread );
     a.call( AsmJit::r13 );
 }
 
 /// <summary>
 /// Save return value and signal thread return event
 /// </summary>
+/// <param name="pSetEvent">NtSetEvent address</param>
 /// <param name="ResultPtr">Result value memory location</param>
 /// <param name="EventPtr">Event memory location</param>
 /// <param name="errPtr">Error code memory location</param>
 /// <param name="rtype">Return type</param>
-void AsmHelper64::SaveRetValAndSignalEvent( size_t ResultPtr, size_t EventPtr, size_t lastStatusPtr, eReturnType rtype /*= rt_int32*/ )
+void AsmHelper64::SaveRetValAndSignalEvent( size_t pSetEvent,
+                                            size_t ResultPtr,
+                                            size_t EventPtr, 
+                                            size_t lastStatusPtr, 
+                                            eReturnType rtype /*= rt_int32*/ )
 {
     a.mov( AsmJit::rcx, ResultPtr );
 
@@ -147,7 +153,7 @@ void AsmHelper64::SaveRetValAndSignalEvent( size_t ResultPtr, size_t EventPtr, s
     a.mov( AsmJit::rax, EventPtr );
     a.mov( AsmJit::rcx, AsmJit::dword_ptr( AsmJit::rax ) );
     a.mov( AsmJit::rdx, 0 );
-    a.mov( AsmJit::r13, reinterpret_cast<DWORD64>(GetProcAddress( GetModuleHandleW( L"ntdll.dll" ), "NtSetEvent" )) );
+    a.mov( AsmJit::r13, pSetEvent );
     a.call( AsmJit::r13 );
 }
 

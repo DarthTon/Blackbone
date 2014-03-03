@@ -38,17 +38,23 @@ public:
     /// <summary>
     /// Save eax value and terminate current thread
     /// </summary>
+    /// <param name="pExitThread">NtTerminateThread address</param>
     /// <param name="resultPtr">Memry where eax value will be saved</param>
-    virtual void ExitThreadWithStatus( size_t resultPtr );
+    virtual void ExitThreadWithStatus( size_t pExitThread, size_t resultPtr );
 
     /// <summary>
     /// Save return value and signal thread return event
     /// </summary>
+    /// <param name="pSetEvent">NtSetEvent address</param>
     /// <param name="ResultPtr">Result value memory location</param>
     /// <param name="EventPtr">Event memory location</param>
     /// <param name="errPtr">Error code memory location</param>
     /// <param name="rtype">Return type</param>
-    virtual void SaveRetValAndSignalEvent( size_t ResultPtr, size_t EventPtr, size_t errPtr, eReturnType rtype = rt_int32 );
+    virtual void SaveRetValAndSignalEvent( size_t pSetEvent, 
+                                           size_t ResultPtr, 
+                                           size_t EventPtr, 
+                                           size_t errPtr, 
+                                           eReturnType rtype = rt_int32 );
 
     /// <summary>
     /// Does nothing under x86
