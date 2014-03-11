@@ -601,28 +601,38 @@ bool MMap::InitializeCookie( ImageContext* pImage )
 {
     IMAGE_LOAD_CONFIG_DIRECTORY *pLC = reinterpret_cast<decltype(pLC)>(pImage->PEImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG ));
 
+    //
+    // Cookie generation based on MSVC++ compiler
+    //
     if (pLC && pLC->SecurityCookie)
     {
         FILETIME systime = { 0 };
         LARGE_INTEGER PerformanceCount = { 0 };
-        int cookie = 0;
+        uintptr_t cookie = 0;
 
-        //
-        // Cookie generation taken from bcryptprimitives.dll
-        //
         GetSystemTimeAsFileTime( &systime );
         QueryPerformanceCounter( &PerformanceCount );
 
-        cookie  = systime.dwHighDateTime ^ systime.dwLowDateTime ^ _process.remote().getWorker()->id();
-        cookie ^= _process.pid();
+        cookie = _process.pid() ^ _process.remote().getWorker()->id() ^ reinterpret_cast<uintptr_t>(&cookie);
+
+    #ifdef _M_AMD64
+        cookie ^= *reinterpret_cast<uint64_t*>(&systime);
+        cookie ^= (PerformanceCount.QuadPart << 32) ^ PerformanceCount.QuadPart;
+        cookie &= 0xFFFFFFFFFFFF;
+
+        if (cookie == 0x2B992DDFA232)
+            cookie++;
+    #else
+
+        cookie ^= systime.dwHighDateTime ^ systime.dwLowDateTime;
         cookie ^= PerformanceCount.LowPart;
         cookie ^= PerformanceCount.HighPart;
-        cookie ^= (unsigned int)&cookie;
 
         if (cookie == 0xBB40E64E)
-            cookie = 0xBB40E64F;
+            cookie++;
         else if (!(cookie & 0xFFFF0000))
             cookie |= (cookie | 0x4711) << 16;
+    #endif
 
         _process.memory().Write( REBASE( pLC->SecurityCookie, pImage->PEImage.imageBase(), pImage->imgMem.ptr<ptr_t>() ), cookie );
     }
