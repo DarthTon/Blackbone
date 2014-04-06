@@ -12,6 +12,10 @@ namespace blackbone
 Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
     : _hProcess( hProcess )
 {
+    SYSTEM_INFO info = { 0 };
+    GetNativeSystemInfo( &info );
+    _pageSize = info.dwPageSize;
+
     // x86 OS, emulate WOW64 processes
     if (x86OS)
     {

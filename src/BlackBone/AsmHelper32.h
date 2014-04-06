@@ -68,9 +68,7 @@ public:
     virtual void SetTebPtr()
     {
         // mov edx, fs:[0x18]   
-        a._emitDWord( 0x18158b64 );
-        a._emitWord( 0x00 );
-        a._emitByte( 0x00 );
+        a.mov( AsmJit::edx, AsmJit::dword_ptr_abs( reinterpret_cast<void*>(0x18), 0, AsmJit::SEGMENT_FS ) );
     }
 
 private:

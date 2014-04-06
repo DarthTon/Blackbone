@@ -230,7 +230,7 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize )
         if(Entries[i].ImageBase == ModuleBase)
         {
             // If Image has SAFESEH, RtlInsertInvertedFunctionTable is enough
-            if(Entries[i].ExceptionDirectorySize != 0)
+            if(Entries[i].SizeOfTable != 0)
                 return true;
 
             //
@@ -757,10 +757,22 @@ bool NtLdr::ScanPatterns( )
     if (IsWindows8Point1OrGreater())
     {
     #ifdef _M_AMD64
+        // RtlInsertInvertedFunctionTable
+        // 48 83 EC 20 8B F2 4C 8D 4C 24
+        PatternSearch ps1( "\x48\x83\xec\x20\x8b\xf2\x4c\x8d\x4c\x24" );
+        ps1.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+        {
+            _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xE);
+            _LdrpInvertedFunctionTable = (size_t)hNtdll + 0x129C50;//*reinterpret_cast<size_t*>(foundData.front() + 0x4A);
+            foundData.clear();
+        }
+
         // LdrpHandleTlsData
         // 44 8D 43 09 4C 8D 4C 24 38
-        PatternSearch ps( "\x44\x8d\x43\x09\x4c\x8d\x4c\x24\x38" );
-        ps.Search( pStart, scanSize, foundData );
+        PatternSearch ps2( "\x44\x8d\x43\x09\x4c\x8d\x4c\x24\x38" );
+        ps2.Search( pStart, scanSize, foundData );
 
         if (!foundData.empty())
             _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x43);

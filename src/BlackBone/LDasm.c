@@ -570,18 +570,18 @@ static unsigned char flags_table_ex[256] =
     /* 0FFF */    OP_INVALID,
 };
 
-unsigned char cflags(u8 op)
+unsigned char cflags( uint8_t op )
 {
     return flags_table[op];
 }
 
 
-unsigned char cflags_ex(u8 op)
+unsigned char cflags_ex( uint8_t op )
 {
     return flags_table_ex[op];
 }
 
-unsigned int __fastcall ldasm(void *code, ldasm_data *ld, u32 is64)
+unsigned int __fastcall ldasm( void *code, ldasm_data *ld, uint32_t is64 )
 /*
  Description:
  Disassemble one instruction
@@ -595,9 +595,9 @@ unsigned int __fastcall ldasm(void *code, ldasm_data *ld, u32 is64)
  length of instruction
  */
 {
-    u8 *p = (u8*)code;
-    u8 s,op,f;
-    u8 rexw,pr_66,pr_67;
+    uint8_t *p = (uint8_t*)code;
+    uint8_t s,op,f;
+    uint8_t rexw,pr_66,pr_67;
     
     s = rexw = pr_66 = pr_67 = 0;
     
@@ -606,7 +606,7 @@ unsigned int __fastcall ldasm(void *code, ldasm_data *ld, u32 is64)
         return 0;
     
     /* init output data */
-    memset(ld,0,sizeof(ldasm_data));
+    memset( ld, 0, sizeof(ldasm_data) );
     
     /* phase 1: parse prefixies */
     while (cflags(*p) & OP_PREFIX) {
@@ -638,7 +638,7 @@ unsigned int __fastcall ldasm(void *code, ldasm_data *ld, u32 is64)
     }
     
     /* phase 2: parse opcode */
-    ld->opcd_offset = (u8)(p - (u8*)code);
+    ld->opcd_offset = (uint8_t)(p - (uint8_t*)code);
     ld->opcd_size    = 1;
     op = *p++; s++;
     
@@ -665,9 +665,9 @@ unsigned int __fastcall ldasm(void *code, ldasm_data *ld, u32 is64)
     
     /* phase 3: parse ModR/M, SIB and DISP */
     if (f & OP_MODRM) {
-        u8    mod = (*p >> 6);
-        u8    ro    = (*p & 0x38) >> 3;  
-        u8    rm  = (*p & 7);
+        uint8_t    mod = (*p >> 6);
+        uint8_t    ro    = (*p & 0x38) >> 3;  
+        uint8_t    rm  = (*p & 7);
         
         ld->modrm = *p++; s++;
         ld->flags |= F_MODRM;
@@ -719,7 +719,7 @@ unsigned int __fastcall ldasm(void *code, ldasm_data *ld, u32 is64)
         }
         
         if (ld->disp_size) {
-            ld->disp_offset = (u8)(p - (u8 *)code);
+            ld->disp_offset = (uint8_t)(p - (uint8_t *)code);
             p += ld->disp_size;
             s += ld->disp_size;
             ld->flags |= F_DISP;
@@ -737,7 +737,7 @@ unsigned int __fastcall ldasm(void *code, ldasm_data *ld, u32 is64)
     
     if (ld->imm_size) {
         s += ld->imm_size;
-        ld->imm_offset = (u8)(p - (u8 *)code);
+        ld->imm_offset = (uint8_t)(p - (uint8_t *)code);
         ld->flags |= F_IMM;
         if (f & OP_RELATIVE)
             ld->flags |= F_RELATIVE;
@@ -751,18 +751,18 @@ unsigned int __fastcall ldasm(void *code, ldasm_data *ld, u32 is64)
 }
 
 // Get function size
-unsigned long __fastcall SizeOfProc(void *Proc)
+unsigned long __fastcall SizeOfProc( void *Proc )
 {
-    u32  Length;
-    u8*  pOpcode;
-    u32  Result = 0;
+    uint32_t  Length;
+    uint8_t*  pOpcode;
+    uint32_t  Result = 0;
     ldasm_data data = {0};
 
     do
     {
-        Length = ldasm((u8*)Proc, &data, is_x64);
+        Length = ldasm((uint8_t*)Proc, &data, is_x64);
 
-        pOpcode = (u8*)Proc + data.opcd_offset;
+        pOpcode = (uint8_t*)Proc + data.opcd_offset;
         Result += Length;
 
         if ((Length == 1) && (*pOpcode == 0xCC))
@@ -782,19 +782,19 @@ unsigned long __fastcall SizeOfProc(void *Proc)
 }
 
 // If function address is jmp - get jmp destination
-void* __fastcall ResolveJmp(void *Proc)
+void* __fastcall ResolveJmp( void *Proc )
 {
-    u32  Length;
-    u8*  pOpcode;
+    uint32_t  Length;
+    uint8_t*  pOpcode;
     ldasm_data data = { 0 };
 
-    Length = ldasm( (u8*)Proc, &data, is_x64 );
-    pOpcode = (u8*)Proc + data.opcd_offset;
+    Length = ldasm( (uint8_t*)Proc, &data, is_x64 );
+    pOpcode = (uint8_t*)Proc + data.opcd_offset;
 
     // Recursive unwind
     if (Length == 5 && data.opcd_size == 1 && *pOpcode == 0xE9)
     {
-        u32 delta = *(u32*)((size_t)Proc + data.opcd_size);
+        uint32_t delta = *(uint32_t*)((size_t)Proc + data.opcd_size);
         return ResolveJmp( (void*)((size_t)Proc + delta + Length) );
     }
 

@@ -1,7 +1,8 @@
 #ifndef _LDASM_
 #define _LDASM_
 
-#include "string.h"
+#include <stdint.h>
+#include <string.h>
 
 #ifdef _M_AMD64
     #define is_x64 1
@@ -23,24 +24,21 @@ extern "C"
 #define F_IMM           0x40
 #define F_RELATIVE      0x80
 
-typedef unsigned char u8;
-typedef unsigned long u32;
-
 typedef struct _ldasm_data
 {
-    u8  flags;
-    u8  rex;
-    u8  modrm;
-    u8  sib;
-    u8  opcd_offset;
-    u8  opcd_size;
-    u8  disp_offset;
-    u8  disp_size;
-    u8  imm_offset;
-    u8  imm_size;
+    uint8_t  flags;
+    uint8_t  rex;
+    uint8_t  modrm;
+    uint8_t  sib;
+    uint8_t  opcd_offset;
+    uint8_t  opcd_size;
+    uint8_t  disp_offset;
+    uint8_t  disp_size;
+    uint8_t  imm_offset;
+    uint8_t  imm_size;
 } ldasm_data;
 
-unsigned int  __fastcall ldasm( void *code, ldasm_data *ld, u32 is64 );
+unsigned int  __fastcall ldasm( void *code, ldasm_data *ld, uint32_t is64 );
 unsigned long __fastcall SizeOfProc( void *Proc );
 void*         __fastcall ResolveJmp( void *Proc );
 

@@ -24,10 +24,24 @@
 #define NAX Rax
 #define NSP Rsp
 #define NIP Rip
+
+#define BitScanForwardT     _BitScanForward64
+#define BitScanReverseT     _BitScanReverse64
+#define BitTestAndSetT      _bittestandset64
+#define BitTestAndResetT    _bittestandreset64
+
+#define SET_JUMP(_src,_dst) *(uintptr_t*)(_src) = 0x0000000025FF; *(uintptr_t*)((_src) + 6) = (uintptr_t)_dst;
 #else
 #define NAX Eax
 #define NSP Esp
 #define NIP Eip
+
+#define BitScanForwardT     _BitScanForward
+#define BitScanReverseT     _BitScanReverse
+#define BitTestAndSetT      _bittestandset
+#define BitTestAndResetT    _bittestandreset
+
+#define SET_JUMP(_src,_dst) *(uint8_t*)(_src) = 0xE9; *(uintptr_t*)((_src) + 1) = (uintptr_t)(_dst) - (uintptr_t)(_src) - 5
 #endif
 
 // Type-unsafe cast.

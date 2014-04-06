@@ -233,6 +233,10 @@ bool MMap::UnmapAllModules()
         if (!(pImage->flags & NoExceptions))
             DisableExceptions( pImage );
 
+        // Remove from loader
+        auto mod = _process.modules().GetModule( pImage->FileName );
+        _process.modules().Unlink( mod );
+
         // Free memory
         pImage->imgMem.Free();
 
@@ -742,7 +746,7 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
     bool switchMode = (_process.core().native()->GetWow64Barrier().type == wow_64_32);
     auto pCreateActx = _process.modules().GetExport( _process.modules().GetModule( L"kernel32.dll" ), "CreateActCtxW" );
     if (pCreateActx.procAddress == 0)
-        return nullptr;
+        return false;
 
     // CreateActCtx(&act)
     // Emulate Wow64

@@ -178,6 +178,12 @@ public:
     /// </summary>
     /// <returns>Address value</returns>
     inline ptr_t maxAddr() const { return /*_wowBarrier.targetWow64 ?*/ 0x7FFFFFFF0000; }
+
+    /// <summary>
+    /// Get page size
+    /// </summary>
+    /// <returns>Address value</returns>
+    inline uint32_t pageSize() const { return _pageSize; }
 private:
 
     /// <summary>
@@ -205,6 +211,7 @@ private:
 protected:
     HANDLE _hProcess;           // Process handle
     Wow64Barrier _wowBarrier;   // WOW64 barrier info
+    uint32_t _pageSize;
 };
 
 }

@@ -118,7 +118,7 @@ public:
         
         return _rax.v;
 #else
-        return 0;
+        return (DWORD64)STATUS_NOT_SUPPORTED;
 #endif	
     }
 
@@ -133,19 +133,20 @@ public:
     {
     #ifdef _M_IX86
         int argC = sizeof...(Args);
+        int i = 0;
         std::vector<DWORD64> vargs{ ((DWORD64)args)... };
 
-        DWORD64 _rcx = (argC > 0) ? argC--, vargs[sizeof...(Args)-argC] : 0;
-        DWORD64 _rdx = (argC > 0) ? argC--, vargs[sizeof...(Args)-argC] : 0;
-        DWORD64 _r8 = (argC > 0) ? argC--, vargs[sizeof...(Args)-argC] : 0;
-        DWORD64 _r9 = (argC > 0) ? argC--, vargs[sizeof...(Args)-argC] : 0;
+        DWORD64 _rcx = (i < argC) ? vargs[i++] : 0;
+        DWORD64 _rdx = (i < argC) ? vargs[i++] : 0;
+        DWORD64 _r8 = (i < argC) ? vargs[i++] : 0;
+        DWORD64 _r9 = (i < argC) ? vargs[i++] : 0;
         reg64 _rax;
         _rax.v = 0;
 
-        DWORD64 restArgs = (argC > 0) ? (DWORD64)&vargs[sizeof...(Args)-argC] : 0;
+        DWORD64 restArgs = (i < argC) ? (DWORD64)&vargs[i] : 0;
 	
 	    //conversion to QWORD for easier use in inline assembly
-	    DWORD64 _argC = argC;
+	    DWORD64 _argC = argC - i;
 	    DWORD back_esp = 0;
 
 	    __asm
@@ -193,7 +194,7 @@ public:
 		    ;//create stack space for spilling registers
 		    sub    esp, 0x28    
 
-            mov eax, _idx
+            mov eax, idx
             push _rcx
             X64_Pop( _R10 );
             EMIT( 0x0F ) EMIT( 0x05 );  // syscall
@@ -205,7 +206,7 @@ public:
 
 		    pop    edi
 
-		    //set return value
+		    ;//set return value
 		    X64_Push(_RAX);
 		    pop    _rax.dw[0]
 
@@ -216,7 +217,7 @@ public:
 
 	    return _rax.v;
     #else
-        return 0;
+        return STATUS_NOT_SUPPORTED;
     #endif
     }
 #pragma warning(default : 4409 4100)

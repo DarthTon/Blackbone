@@ -346,6 +346,11 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
             ip = ctx32.Eip;
             sp = ctx32.Esp;
         }
+        else
+        {
+            ip = ctx64.Rip;
+            sp = ctx64.Rsp;
+        }
         
         // Get stack frame pointer
         std::vector<std::pair<ptr_t, ptr_t>> results;

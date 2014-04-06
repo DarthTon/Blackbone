@@ -509,7 +509,7 @@ namespace blackbone
         PIMAGE_RUNTIME_FUNCTION_ENTRY ExceptionDirectory;
         PVOID ImageBase;
         ULONG ImageSize;
-        ULONG ExceptionDirectorySize;
+        ULONG SizeOfTable;
     } RTL_INVERTED_FUNCTION_TABLE_ENTRY, *PRTL_INVERTED_FUNCTION_TABLE_ENTRY;
 
     //

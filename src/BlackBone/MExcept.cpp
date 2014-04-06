@@ -277,7 +277,7 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
                     if (*pDec == 0)
                     {
                         *pDec = reinterpret_cast<size_t>(pFs->Handler) - reinterpret_cast<size_t>(pEntries[imageIndex].ImageBase);
-                        pEntries[imageIndex].ExceptionDirectorySize++;
+                        pEntries[imageIndex].SizeOfTable++;
                         newHandler = true;
 
                         break;
@@ -289,8 +289,8 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
 
                 // Sort handler addresses
                 if (newHandler)
-                    for (ULONG i = 0; i < pEntries[imageIndex].ExceptionDirectorySize; i++)
-                        for (ULONG j = pEntries[imageIndex].ExceptionDirectorySize - 1; j > i; j--)
+                    for (ULONG i = 0; i < pEntries[imageIndex].SizeOfTable; i++)
+                        for (ULONG j = pEntries[imageIndex].SizeOfTable - 1; j > i; j--)
                             if (pStart[j - 1] > pStart[j])
                             {
                                 tmp = pStart[j - 1];
