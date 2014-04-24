@@ -17,7 +17,7 @@ public:
     static std::wstring UTF8ToWstring( const std::string& str );
 
     /// <summary>
-    /// Convert UTF-8 string to wide char one
+    /// Convert wide string to UTF-8
     /// </summary>
     /// <param name="str">UTF-8 string</param>
     /// <returns>wide char string</returns>

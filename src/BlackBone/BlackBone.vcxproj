@@ -71,21 +71,25 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
+    <IncludePath>$(SolutionDir)contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
+    <IncludePath>$(SolutionDir)contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
+    <IncludePath>$(SolutionDir)contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
+    <IncludePath>$(SolutionDir)contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -131,7 +135,7 @@
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;BLACBONE_NO_TRACE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>
       </SDLCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -157,7 +161,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;BLACBONE_NO_TRACE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
@@ -172,6 +176,19 @@
     </ProjectReference>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\contrib\AsmJit\AssemblerX86X64.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\CodeGenerator.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\Compiler.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\CompilerX86X64.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\CpuInfo.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\Defs.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\DefsX86X64.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\Logger.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\MemoryManager.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\MemoryMarker.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\OperandX86X64.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\Platform.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\Util.cpp" />
     <ClCompile Include="AsmHelper32.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -184,21 +201,10 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="AsmJit\AssemblerX86X64.cpp" />
-    <ClCompile Include="AsmJit\CodeGenerator.cpp" />
-    <ClCompile Include="AsmJit\Compiler.cpp" />
-    <ClCompile Include="AsmJit\CompilerX86X64.cpp" />
-    <ClCompile Include="AsmJit\CpuInfo.cpp" />
-    <ClCompile Include="AsmJit\Defs.cpp" />
-    <ClCompile Include="AsmJit\DefsX86X64.cpp" />
-    <ClCompile Include="AsmJit\Logger.cpp" />
-    <ClCompile Include="AsmJit\MemoryManager.cpp" />
-    <ClCompile Include="AsmJit\MemoryMarker.cpp" />
-    <ClCompile Include="AsmJit\OperandX86X64.cpp" />
-    <ClCompile Include="AsmJit\Platform.cpp" />
-    <ClCompile Include="AsmJit\Util.cpp" />
     <ClCompile Include="AsmStack.hpp" />
+    <ClCompile Include="TraceHook.cpp" />
     <ClCompile Include="LDasm.c" />
+    <ClCompile Include="LocalHookBase.cpp" />
     <ClCompile Include="MExcept.cpp" />
     <ClCompile Include="MMap.cpp" />
     <ClCompile Include="FileProjection.cpp" />
@@ -230,6 +236,27 @@
     <ClCompile Include="x86Subsystem.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\contrib\AsmJit\ApiBegin.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\ApiEnd.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\AsmJit.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Assembler.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\AssemblerX86X64.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Build.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\CodeGenerator.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Compiler.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\CompilerX86X64.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Config.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\CpuInfo.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Defs.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\DefsX86X64.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Logger.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\MemoryManager.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\MemoryMarker.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Operand.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\OperandX86X64.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Platform.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Util.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Util_p.h" />
     <ClInclude Include="AsmHelper32.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
@@ -243,30 +270,19 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="AsmHelperBase.h" />
-    <ClInclude Include="AsmJit\ApiBegin.h" />
-    <ClInclude Include="AsmJit\ApiEnd.h" />
-    <ClInclude Include="AsmJit\AsmJit.h" />
-    <ClInclude Include="AsmJit\Assembler.h" />
-    <ClInclude Include="AsmJit\AssemblerX86X64.h" />
-    <ClInclude Include="AsmJit\Build.h" />
-    <ClInclude Include="AsmJit\CodeGenerator.h" />
-    <ClInclude Include="AsmJit\Compiler.h" />
-    <ClInclude Include="AsmJit\CompilerX86X64.h" />
-    <ClInclude Include="AsmJit\Config.h" />
-    <ClInclude Include="AsmJit\CpuInfo.h" />
-    <ClInclude Include="AsmJit\Defs.h" />
-    <ClInclude Include="AsmJit\DefsX86X64.h" />
-    <ClInclude Include="AsmJit\Logger.h" />
-    <ClInclude Include="AsmJit\MemoryManager.h" />
-    <ClInclude Include="AsmJit\MemoryMarker.h" />
-    <ClInclude Include="AsmJit\Operand.h" />
-    <ClInclude Include="AsmJit\OperandX86X64.h" />
-    <ClInclude Include="AsmJit\Platform.h" />
-    <ClInclude Include="AsmJit\Util.h" />
-    <ClInclude Include="AsmJit\Util_p.h" />
     <ClInclude Include="AsmVariant.hpp" />
     <ClInclude Include="DynImport.h" />
     <ClInclude Include="FunctionTypes.h" />
+    <ClInclude Include="HookHandlerCdecl.h" />
+    <ClInclude Include="HookHandlerFastcall.h" />
+    <ClInclude Include="HookHandlers.h" />
+    <ClInclude Include="HookHandlerStdcall.h" />
+    <ClInclude Include="HookHandlerThiscall.h" />
+    <ClInclude Include="TraceHook.h" />
+    <ClInclude Include="LocalHook.hpp" />
+    <ClInclude Include="LocalHookBase.h" />
+    <ClInclude Include="Trace.hpp" />
+    <ClInclude Include="VTableHook.hpp" />
     <ClInclude Include="Wow64Subsystem.h" />
     <ClInclude Include="Types.h" />
     <ClInclude Include="LDasm.h" />
@@ -303,6 +319,9 @@
       </ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="x86Subsystem.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\contrib\AsmJit\Regenerate.py" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

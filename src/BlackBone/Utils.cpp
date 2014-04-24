@@ -21,7 +21,7 @@ std::wstring Utils::UTF8ToWstring( const std::string& str )
 }
 
 /// <summary>
-/// Convert wide char string to UTF-8
+/// Convert wide string to UTF-8
 /// </summary>
 /// <param name="str">Wide char string</param>
 /// <returns>UTF-8 string</returns>

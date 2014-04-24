@@ -1,0 +1,7 @@
+The library included in this package has been compiled using the stdcall convention( to respect habits from previous versions). But, header file is now configured to use by default the DLL version in cdecl convention.
+
+If you want to use the static library BeaEngine.lib, just add this at the very beginning of your source code :
+
+#define BEA_ENGINE_STATIC
+#define BEA_USE_STDCALL
+#include "BeaEngine.h"

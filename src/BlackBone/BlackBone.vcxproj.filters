@@ -40,6 +40,9 @@
     <Filter Include="Subystem">
       <UniqueIdentifier>{7eb59189-daeb-47d1-9fa8-c9e246b22039}</UniqueIdentifier>
     </Filter>
+    <Filter Include="LocalHook">
+      <UniqueIdentifier>{d8e1ddde-63c1-40a4-b8c6-5285e4fad4ba}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="AsmHelper32.cpp">
@@ -102,9 +105,6 @@
     <ClCompile Include="MExcept.cpp">
       <Filter>ManualMap</Filter>
     </ClCompile>
-    <ClCompile Include="LDasm.c">
-      <Filter>AsmJit\Helpers</Filter>
-    </ClCompile>
     <ClCompile Include="NativeSubsystem.cpp">
       <Filter>Subystem</Filter>
     </ClCompile>
@@ -120,50 +120,59 @@
     <ClCompile Include="DynImport.cpp">
       <Filter>Misc</Filter>
     </ClCompile>
-    <ClCompile Include="AsmJit\AssemblerX86X64.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\CodeGenerator.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\Compiler.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\CompilerX86X64.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\CpuInfo.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\Defs.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\DefsX86X64.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\Logger.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\MemoryManager.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\MemoryMarker.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\OperandX86X64.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\Platform.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="AsmJit\Util.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
     <ClCompile Include="AsmStack.hpp">
       <Filter>AsmJit\Helpers</Filter>
     </ClCompile>
     <ClCompile Include="x86Subsystem.cpp">
       <Filter>Subystem</Filter>
+    </ClCompile>
+    <ClCompile Include="LocalHookBase.cpp">
+      <Filter>LocalHook</Filter>
+    </ClCompile>
+    <ClCompile Include="LDasm.c">
+      <Filter>AsmJit\Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="TraceHook.cpp">
+      <Filter>LocalHook</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\AssemblerX86X64.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\CodeGenerator.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\Compiler.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\CompilerX86X64.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\CpuInfo.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\Defs.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\DefsX86X64.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\Logger.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\MemoryManager.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\MemoryMarker.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\OperandX86X64.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\Platform.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\contrib\AsmJit\Util.cpp">
+      <Filter>AsmJit\Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -269,69 +278,6 @@
     <ClInclude Include="RemoteExec.h">
       <Filter>Process\RPC</Filter>
     </ClInclude>
-    <ClInclude Include="AsmJit\ApiBegin.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\ApiEnd.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\AsmJit.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Assembler.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\AssemblerX86X64.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Build.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\CodeGenerator.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Compiler.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\CompilerX86X64.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Config.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\CpuInfo.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Defs.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\DefsX86X64.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Logger.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\MemoryManager.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\MemoryMarker.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Operand.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\OperandX86X64.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Platform.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Util.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="AsmJit\Util_p.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
     <ClInclude Include="AsmVariant.hpp">
       <Filter>AsmJit\Helpers</Filter>
     </ClInclude>
@@ -341,5 +287,103 @@
     <ClInclude Include="FunctionTypes.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="HookHandlers.h">
+      <Filter>LocalHook</Filter>
+    </ClInclude>
+    <ClInclude Include="HookHandlerStdcall.h">
+      <Filter>LocalHook</Filter>
+    </ClInclude>
+    <ClInclude Include="HookHandlerThiscall.h">
+      <Filter>LocalHook</Filter>
+    </ClInclude>
+    <ClInclude Include="LocalHook.hpp">
+      <Filter>LocalHook</Filter>
+    </ClInclude>
+    <ClInclude Include="LocalHookBase.h">
+      <Filter>LocalHook</Filter>
+    </ClInclude>
+    <ClInclude Include="HookHandlerCdecl.h">
+      <Filter>LocalHook</Filter>
+    </ClInclude>
+    <ClInclude Include="HookHandlerFastcall.h">
+      <Filter>LocalHook</Filter>
+    </ClInclude>
+    <ClInclude Include="Trace.hpp">
+      <Filter>Misc</Filter>
+    </ClInclude>
+    <ClInclude Include="TraceHook.h">
+      <Filter>LocalHook</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\ApiBegin.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\ApiEnd.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\AsmJit.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Assembler.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\AssemblerX86X64.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Build.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\CodeGenerator.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Compiler.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\CompilerX86X64.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Config.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\CpuInfo.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Defs.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\DefsX86X64.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Logger.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\MemoryManager.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\MemoryMarker.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Operand.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\OperandX86X64.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Platform.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Util.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\AsmJit\Util_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="VTableHook.hpp">
+      <Filter>LocalHook</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\contrib\AsmJit\Regenerate.py">
+      <Filter>AsmJit\Core</Filter>
+    </None>
   </ItemGroup>
 </Project>
