@@ -193,6 +193,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
             a.mov( AsmJit::Mem( AsmJit::rsp, i * WordSize ), regs[i] );
 
         ah.GenCall( _userCode.ptr<size_t>(), { _userData.ptr<size_t>() } );
+        AddReturnWithEvent( ah, rt_int32, INTRET_OFFSET );
 
         // Restore registers
         for (int i = 0; i < count; i++)
@@ -207,11 +208,10 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         a.pushfd();
 
         ah.GenCall( _userCode.ptr<size_t>(), { _userData.ptr<size_t>() } );
+        AddReturnWithEvent( ah, rt_int32, INTRET_OFFSET );
 
         a.popfd();
         a.popad();
-
-        AddReturnWithEvent( ah );
 
         a.push( ctx.NIP );
         a.ret();
@@ -485,7 +485,8 @@ bool RemoteExec::PrepareCallAssembly( AsmJit::Assembler& a,
     // This variable contains address of buffer in which return value is copied
     if (retType == rt_struct)
     {
-        args.insert( args.begin(), AsmVariant( _userData.ptr<size_t>() + ARGS_OFFSET ) );
+        args.emplace( args.begin(), AsmVariant( _userData.ptr<size_t>() + ARGS_OFFSET ) );
+        args.front().new_imm_val = args.front().imm_val;
         args.front().type = AsmVariant::structRet;
     }
         
@@ -540,11 +541,12 @@ NTSTATUS RemoteExec::CopyCode( PVOID pCode, size_t size )
 /// </summary>
 /// <param name="ah">Target assembly helper</param>
 /// <param name="retType">Function return type</param>
-void RemoteExec::AddReturnWithEvent( AsmHelperBase& ah, eReturnType retType /*= rt_int32 */ )
+/// <param name="retOffset">Return value offset</param>
+void RemoteExec::AddReturnWithEvent( AsmHelperBase& ah, eReturnType retType /*= rt_int32 */, uint32_t retOffset /*= RET_OFFSET*/ )
 {
     size_t ptr = _userData.ptr<size_t>();
     auto pSetEvent = _proc.modules().GetExport( _proc.modules().GetModule( L"ntdll.dll" ), "NtSetEvent" );
-    ah.SaveRetValAndSignalEvent( pSetEvent.procAddress, ptr + RET_OFFSET, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
+    ah.SaveRetValAndSignalEvent( pSetEvent.procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
 }
 
 

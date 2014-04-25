@@ -137,8 +137,8 @@ protected:
     template<typename... TArgs>
     FuncArguments( Process& proc, TArgs&&... args )
         : _process( proc )
-        , _targs(args...) 
-        , _args( { static_cast<Args&&>(args)... } ) { }
+        , _targs( static_cast<Args&&>(args)... )
+        , _args( std::vector<AsmVariant>{ static_cast<Args&&>(args)... } ) { }
 
 private:
     FuncArguments( const FuncArguments& ) = delete;

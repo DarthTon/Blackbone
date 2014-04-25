@@ -3,6 +3,8 @@
 #include "AsmJit/Assembler.h"
 #include "AsmJit/MemoryManager.h"
 
+#include <memory>
+
 namespace blackbone
 {
     /// <summary>
@@ -10,9 +12,17 @@ namespace blackbone
     /// </summary>
     class AsmVariant
     {
+        friend class AsmHelper32;
+        friend class AsmHelper64;
+        friend class RemoteExec;
+
+        template<typename... Args>
+        friend class FuncArguments;
+
     public:
         enum eType
         {
+            noarg,          // void
             reg,            // register
             imm,            // immediate value (e.g. address)
             imm_double,     // double or long double
@@ -25,17 +35,17 @@ namespace blackbone
         };
 
     public:
-        AsmVariant( int _imm )
-            : AsmVariant( imm, sizeof(size_t), _imm ) { }
+        AsmVariant( void )
+            : AsmVariant( noarg, 0, 0 ) { }
 
-        AsmVariant( long _imm )
-            : AsmVariant( imm, sizeof(size_t), _imm ) { }
+        AsmVariant( int _imm )
+            : AsmVariant( imm, sizeof(_imm), static_cast<size_t>(_imm) ) { }
 
         AsmVariant( unsigned long _imm )
-            : AsmVariant( imm, sizeof(size_t), _imm ) { }
+            : AsmVariant( imm, sizeof(_imm), static_cast<size_t>(_imm) ) { }
 
         AsmVariant( size_t _imm )
-            : AsmVariant( imm, sizeof(size_t), _imm ) { }
+            : AsmVariant( imm, sizeof(_imm), _imm ) { }
         
         AsmVariant( char* ptr )
             : AsmVariant( dataPtr, strlen( ptr ) + 1, reinterpret_cast<size_t>(ptr) ) { }
@@ -128,6 +138,7 @@ namespace blackbone
             : AsmVariant( dataPtr, sizeof(T), reinterpret_cast<size_t>(&val) ) {}
 
         // Pass argument by value case
+        // Real RValue reference types are not supported because of ambiguity
         #pragma warning(disable : 4127)
         template <typename T>
         AsmVariant( T&& val )
@@ -140,8 +151,26 @@ namespace blackbone
                 imm_val = 0;
                 memcpy( &imm_val, &val, sizeof(T) );
             }
+            else
+            {
+                buf.reset( new uint8_t[sizeof(T)] );
+                imm_val = reinterpret_cast<size_t>(buf.get());
+                memcpy( buf.get(), &val, sizeof(T) );
+            }
         }
         #pragma warning(default : 4127)
+
+        AsmVariant( AsmVariant&& other )
+        {
+            type            = other.type;
+            size            = other.size;        
+            imm_val         = other.imm_val;
+            reg_val         = other.reg_val;
+            mem_val         = other.mem_val;
+            buf             = other.buf;
+            imm_double_val  = other.imm_double_val;
+            new_imm_val     = other.new_imm_val;
+        }
 
         //
         // Get floating point value as raw data
@@ -175,7 +204,7 @@ namespace blackbone
             , imm_val( val )
             , new_imm_val( 0 ) { }
 
-    public:
+    private:
         eType         type;             // Variable type
         size_t        size;             // Variable size
 
@@ -191,6 +220,9 @@ namespace blackbone
         };
 
         size_t        new_imm_val;      // Replaced immediate value for dataPtr type
+
+        // rvalue reference buffer
+        std::shared_ptr<uint8_t> buf;
     };
 
 }

@@ -83,7 +83,8 @@ public:
     /// </summary>
     /// <param name="ah">Target assembly helper</param>
     /// <param name="retType">Function return type</param>
-    void AddReturnWithEvent( AsmHelperBase& ah, eReturnType retType = rt_int32 );
+    /// <param name="retOffset">Return value offset</param>
+    void AddReturnWithEvent( AsmHelperBase& ah, eReturnType retType = rt_int32, uint32_t retOffset = RET_OFFSET );
 
     /// <summary>
     /// Retrieve last NTSTATUS code

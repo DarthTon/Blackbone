@@ -33,8 +33,7 @@ void TestRemoteCall()
         std::wcout << L"Searching for NtQueryVirtualMemory... ";
 
         auto hMainMod = explorer.modules().GetMainModule();
-        auto pRemote = explorer.modules().GetExport(
-            explorer.modules().GetModule( L"ntdll.dll" ), "NtQueryVirtualMemory" );
+        auto pRemote = explorer.modules().GetExport( explorer.modules().GetModule( L"ntdll.dll" ), "NtQueryVirtualMemory" );
 
         if (hMainMod && pRemote.procAddress)
         {
