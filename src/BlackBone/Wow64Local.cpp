@@ -224,6 +224,7 @@ DWORD64 Wow64Local::GetProcAddress64( DWORD64 hModule, const char* funcName )
             return 0;
     }
 
+    // It's actually an ANSI string
     _UNICODE_STRING_T<DWORD64> fName = { 0 };
     fName.Buffer = (DWORD64)funcName;
     fName.Length = (WORD)strlen( funcName );

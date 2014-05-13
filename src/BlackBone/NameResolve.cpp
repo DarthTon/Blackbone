@@ -309,7 +309,7 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
 
     DllName1.Buffer = wBuf;
     DllName1.Length = NULL;
-    DllName1.MaximumLength = ARRAYSIZE( wBuf );
+    DllName1.MaximumLength = sizeof( wBuf );
 
     // Use activation context
     if (actx != INVALID_HANDLE_VALUE)

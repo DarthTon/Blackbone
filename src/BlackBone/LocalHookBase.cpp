@@ -83,7 +83,7 @@ namespace blackbone
         {
             uint32_t len = ldasm( src, &ld, is_x64 );
 
-            // check instruction 
+            // Determine code end
             if (ld.flags & F_INVALID
                  || (len == 1 && (src[ld.opcd_offset] == 0xCC || src[ld.opcd_offset] == 0xC3))
                  || (len == 3 && src[ld.opcd_offset] == 0xC2)
@@ -99,13 +99,13 @@ namespace blackbone
             if (ld.flags & F_RELATIVE)
             {
             #ifdef _M_AMD64
-                if (_abs64( (size_t)(src + *((int*)(old + ld.opcd_size ))) - (size_t)old ) > UINT_MAX)
-                    // exit if jump is greater then 4GB
+                // exit if jump is greater then 2GB
+                if (_abs64( (uintptr_t)(src + *((int*)(old + ld.opcd_size))) - (uintptr_t)old ) > INT_MAX)
                     break;
                 else
                     *(uint32_t*)(old + ld.opcd_size) += (uint32_t)(src - old);
             #else
-                *(ptrdiff_t*)(old + ld.opcd_size) += src - old;
+                *(uintptr_t*)(old + ld.opcd_size) += src - old;
             #endif
             }
 
@@ -116,7 +116,7 @@ namespace blackbone
         } while (all_len < _origSize);
 
         // Failed to copy old code, use backup plan
-        if (all_len < _origSize /*|| _abs64( src - old ) >= UINT_MAX*/)
+        if (all_len < _origSize)
         {
             _type = HookType::InternalInline;
             memcpy( _origCode, ptr, _origSize );
