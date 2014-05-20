@@ -42,8 +42,9 @@ public:
     /// </summary>
     /// <param name="ModuleBase">Module base address</param>
     /// <param name="ImageSize">Size of image</param>
+    /// <param name="safeseh">Is set into true, if image has SAFESEH handlers</param>
     /// <returns>true on success</returns>
-    bool InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize );
+    bool InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, bool& safeseh );
 
     /// <summary>
     /// Unlink module from Ntdll loader

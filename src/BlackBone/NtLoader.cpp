@@ -183,8 +183,9 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
 /// </summary>
 /// <param name="ModuleBase">Module base address</param>
 /// <param name="ImageSize">Size of image</param>
+/// <param name="safeseh">Is set into true, if image has SAFESEH handlers</param>
 /// <returns>true on success</returns>
-bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize )
+bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, bool& safeseh )
 { 
     RTL_INVERTED_FUNCTION_TABLE7 table = { 0 };
     PRTL_INVERTED_FUNCTION_TABLE_ENTRY Entries = nullptr;
@@ -230,8 +231,8 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize )
         if(Entries[i].ImageBase == ModuleBase)
         {
             // If Image has SAFESEH, RtlInsertInvertedFunctionTable is enough
-            if(Entries[i].SizeOfTable != 0)
-                return true;
+            if (Entries[i].SizeOfTable != 0)
+                return safeseh = true;
 
             //
             // Create fake Exception directory
@@ -249,7 +250,7 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize )
                               - reinterpret_cast<size_t>(&table);
 
             return (_process.memory().Write( _LdrpInvertedFunctionTable + field_ofst,
-                GET_IMPORT( RtlEncodeSystemPointer )(pImgEntry) ) == STATUS_SUCCESS);
+                                             GET_IMPORT( RtlEncodeSystemPointer )(pImgEntry) ) == STATUS_SUCCESS);
         }
     }
 

@@ -364,7 +364,10 @@ bool MMap::RelocateImage( ImageContext* pImage )
         return true;
     }
 
-    pe::RelocData* fixrec = reinterpret_cast<pe::RelocData*>(pImage->PEImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_BASERELOC ));
+    auto start = pImage->PEImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_BASERELOC );
+    auto end = start + pImage->PEImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_BASERELOC );
+
+    pe::RelocData* fixrec = reinterpret_cast<pe::RelocData*>(start);
     if (fixrec == nullptr)
     {
         // TODO: return proper error code
@@ -373,7 +376,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
         return false;
     }
 
-    while (fixrec->BlockSize)
+    while ((size_t)fixrec < end && fixrec->BlockSize)
     {
         DWORD count = (fixrec->BlockSize - 8) >> 1;             // records count
 
@@ -580,9 +583,10 @@ bool MMap::EnableExceptions( ImageContext* pImage )
     else
         return false;
 #else
-    _process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->PEImage.imageSize() );
+    bool safeseh = false;
+    _process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->PEImage.imageSize(), safeseh );
 
-    if (pImage->flags & PartialExcept)
+    if ((pImage->flags & PartialExcept) || safeseh)
         return true;
     else
         return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->PEImage.imageSize() ) == STATUS_SUCCESS);
