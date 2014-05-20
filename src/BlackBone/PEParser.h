@@ -131,7 +131,7 @@ public:
     /// </summary>
     /// <param name="base">New image base</param>
     /// <returns>New entry point address</returns>
-    inline ptr_t entryPoint( module_t base ) const { return _epRVA + base; };
+    inline ptr_t entryPoint( module_t base ) const { return ((_epRVA != 0) ? (_epRVA + base) : 0); };
 
     /// <summary>
     /// Get image sections
