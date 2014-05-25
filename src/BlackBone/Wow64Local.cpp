@@ -27,8 +27,8 @@ void __declspec(naked, noinline) Wow64Local::memcpy64( DWORD64 /*dst*/, DWORD64 
     {
         X64_Start();
 
-        EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x7C ) EMIT( 0x24 ) EMIT( 0x04 )    // mov rdi, [rbp + 0x8]
-        EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x74 ) EMIT( 0x24 ) EMIT( 0x0C )    // mov rsi, [rbp + 0x10]
+        EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x7C ) EMIT( 0x24 ) EMIT( 0x04 )    // mov rdi, [rsp + 0x4]
+        EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x74 ) EMIT( 0x24 ) EMIT( 0x0C )    // mov rsi, [rsp + 0xC]
 
         mov ecx, [esp + 0x14]
         rep movsb
