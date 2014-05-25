@@ -25,42 +25,15 @@ void __declspec(naked, noinline) Wow64Local::memcpy64( DWORD64 /*dst*/, DWORD64 
 {
     __asm
     {
-        push ebp
-        mov ebp, esp
-        pushad
-
         X64_Start();
 
-        /*
-            mov rdi, QWORD PTR [rbp + 0x8]
-            mov rsi, QWORD PTR [rbp + 0x10]
-            mov ecx, DWORD PTR [rbp + 0x18]
+        EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x7C ) EMIT( 0x24 ) EMIT( 0x04 )    // mov rdi, [rbp + 0x8]
+        EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x74 ) EMIT( 0x24 ) EMIT( 0x0C )    // mov rsi, [rbp + 0x10]
 
-          loop1:
-            mov al, BYTE PTR [rsi]
-            mov BYTE PTR [rdi], al
-            add rsi, 0x1
-            add rdi, 0x1
-            sub ecx, 0x1
-            test ecx, ecx
-          jnz loop1
-        */
-        EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x7D ) EMIT( 0x08 )
-        EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x75 ) EMIT( 0x10 )
-        EMIT( 0x8B ) EMIT( 0x4D ) EMIT( 0x18 )
-        EMIT( 0x8A ) EMIT( 0x06 )
-        EMIT( 0x88 ) EMIT( 0x07 )
-        EMIT( 0x48 ) EMIT( 0x83 ) EMIT( 0xC6 ) EMIT( 0x01 )
-        EMIT( 0x48 ) EMIT( 0x83 ) EMIT( 0xC7 ) EMIT( 0x01 )
-        EMIT( 0x83 ) EMIT( 0xE9 ) EMIT( 0x01 )
-        EMIT( 0x85 ) EMIT( 0xC9 )
-        EMIT( 0x75 ) EMIT( 0xED )
+        mov ecx, [esp + 0x14]
+        rep movsb
 
         X64_End();
-
-        popad
-        mov esp, ebp
-        pop ebp
         retn 20
     }
 }
