@@ -185,18 +185,28 @@ NTSTATUS Native::WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer, siz
 NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, DWORD flags )
 {
     LastNtStatus( STATUS_SUCCESS );
-    OBJECT_ATTRIBUTES ob = { 0 };
-    ob.Length = sizeof(ob);
-    BOOLEAN bSuspend = (flags & CREATE_SUSPENDED) ? TRUE : FALSE;
+    NTSTATUS status = 0; 
+    auto pCreateThread = GET_IMPORT( NtCreateThreadEx );
 
-    NTSTATUS status = GET_IMPORT( NtCreateThreadEx )( &hThread, THREAD_ALL_ACCESS, &ob,
-                                                      _hProcess, (PTHREAD_START_ROUTINE)entry,
-                                                      reinterpret_cast<LPVOID>(arg), bSuspend, 
-                                                      0, 0x1000, 0x100000, NULL);
+    if (pCreateThread)
+    {
+        OBJECT_ATTRIBUTES ob = { 0 };
+        ob.Length = sizeof(ob);
+        BOOLEAN bSuspend = (flags & CREATE_SUSPENDED) ? TRUE : FALSE;
+
+        status = pCreateThread( &hThread, THREAD_ALL_ACCESS, &ob,
+                                _hProcess, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
+                                reinterpret_cast<LPVOID>(arg), bSuspend,
+                                0, 0x1000, 0x100000, NULL );
+    }
+    else
+    {
+        hThread = CreateRemoteThread( _hProcess, NULL, 0, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
+                                      reinterpret_cast<LPVOID>(arg), flags, NULL );
+        status = LastNtStatus();
+    }
+
     return status;
-
-    /*hThread = CreateRemoteThread( _hProcess, 0, 0, (LPTHREAD_START_ROUTINE)entry, (LPVOID)arg, flags, 0 );
-    return LastNtStatus();*/
 }
 
 /// <summary>

@@ -130,6 +130,9 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path, int flags /*=
     // Create Activation context for SxS
     // .exe files usually contain manifest under id of 1
     // .dll files have manifest under id of 2
+    if (pImage->FileImage.manifestID() == 0)
+        flags |= NoSxS;
+
     if (!(flags & NoSxS))
         CreateActx( path, pImage->FileImage.manifestID() );
 
@@ -892,7 +895,8 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
         _pAContext.Free();
 
         // SetLastError( err::mapping::CantCreateActx );
-        BLACBONE_TRACE( L"ManualMap: Failed to create activation context for image '%ls'. Status: 0x%x", _process.remote().GetLastStatus() );
+        BLACBONE_TRACE( L"ManualMap: Failed to create activation context for image '%ls'. Status: 0x%x", 
+                        path.c_str(), _process.remote().GetLastStatus() );
         return false;
     }
 

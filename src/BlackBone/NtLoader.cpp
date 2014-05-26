@@ -32,7 +32,9 @@ NtLdr::~NtLdr(void)
 bool NtLdr::Init()
 {
     FindLdrpHashTable();
-    FindLdrpModuleIndexBase();
+    if (IsWindows8OrGreater())
+        FindLdrpModuleIndexBase();
+
     FindLdrpModuleBase();
     ScanPatterns();
     FindLdrHeap();
@@ -834,8 +836,8 @@ bool NtLdr::ScanPatterns( )
     #endif
 
     }
-    // Win 7 and earlier
-    else
+    // Win 7
+    else if(IsWindows7OrGreater())
     {
     #ifdef _M_AMD64
         // LdrpHandleTlsData

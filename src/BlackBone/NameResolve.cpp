@@ -39,11 +39,13 @@ bool NameResolve::Initialize()
                             PAPI_SET_NAMESPACE_ENTRY,
                             PAPI_SET_VALUE_ARRAY,
                             PAPI_SET_VALUE_ENTRY >();
-    else
+    else if (IsWindows7OrGreater())
         return InitializeP< PAPI_SET_NAMESPACE_ARRAY_V2, 
                             PAPI_SET_NAMESPACE_ENTRY_V2,
                             PAPI_SET_VALUE_ARRAY_V2,
                             PAPI_SET_VALUE_ENTRY_V2 >();
+    else
+        return true;
 }
 
 /// <summary>
@@ -179,8 +181,10 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
                 wchar_t sys_path[255] = { 0 };
                 dwSize = 255;
 
-                res = RegGetValueW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs",
-                                    L"DllDirectory", RRF_RT_ANY, &dwType, sys_path, &dwSize );
+                res = SHRegGetValueW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs",
+                                      L"DllDirectory", RRF_RT_ANY, &dwType, sys_path, &dwSize );
+                /*res = RegGetValueW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs",
+                                    L"DllDirectory", RRF_RT_ANY, &dwType, sys_path, &dwSize );*/
 
                 if (res == ERROR_SUCCESS)
                 {
