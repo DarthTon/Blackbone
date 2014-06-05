@@ -21,7 +21,7 @@ public:
     /// </summary>
     /// <param name="str">UTF-8 string</param>
     /// <returns>wide char string</returns>
-    static std::string Utils::WstringToUTF8( const std::wstring& str );
+    static std::string WstringToUTF8( const std::wstring& str );
 
     /// <summary>
     /// Convert ANSI string to wide char one

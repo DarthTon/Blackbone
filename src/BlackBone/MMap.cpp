@@ -1048,9 +1048,9 @@ HANDLE MMap::GetDriverHandle()
         NTSTATUS status = Utils::LoadDriver( L"VadPurge", drvPath );
 
         if (status != ERROR_SUCCESS && status != STATUS_IMAGE_ALREADY_LOADED)
-            return false;
+            return INVALID_HANDLE_VALUE;
 
-        hFile = CreateFile( _T( "\\\\.\\VadPurge" ), GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
+        hFile = CreateFileW( L"\\\\.\\VadPurge", GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
     }
 
     return hFile;

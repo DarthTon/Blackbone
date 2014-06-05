@@ -521,10 +521,12 @@ DWORD RemoteHook::OnAccessViolation( const DEBUG_EVENT& DebugEv )
         auto hook = _hooks[_retHooks[addr]];
 
         if(hook.flags & hf_returnHook)
+        {
             if (hook.onReturn.classFn.classPtr && hook.onReturn.classFn.ptr != nullptr)
                 hook.onReturn.classFn.ptr( hook.onExecute.classFn.classPtr, context );
             else if (hook.onReturn.freeFn != nullptr)
-                hook.onReturn.freeFn( context );        
+                hook.onReturn.freeFn( context );
+        }
 
         // Under AMD64there is no need to update IP, because exception is thrown before actual return.
         // Return address still must be fixed though.

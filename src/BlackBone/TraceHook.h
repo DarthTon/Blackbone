@@ -157,7 +157,6 @@ private:
     PVOID       _pExptHandler = nullptr;        // Exception handler
     mapContext  _contexts;                      // Hook contexts
     uintptr_t   _breakPtr = 0x2000;             // Exception pointer generator
-    uintptr_t   _lastCtx = 0;
 };
 
 }

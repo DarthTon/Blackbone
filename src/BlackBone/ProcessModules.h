@@ -16,8 +16,8 @@ struct std::hash< std::pair<std::wstring, blackbone::eModType> >
 public:
     size_t operator()( const std::pair<std::wstring, blackbone::eModType>& value ) const
     {
-        const hash<std::wstring> ah;
-        return ah( value.first ) ^ value.second;
+        hash<std::wstring> sh;
+        return sh( value.first ) ^ value.second;
     }
 };
 
