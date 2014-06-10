@@ -1,3 +1,4 @@
+#include "../BlackBone/Config.h"
 #include "Tests.h"
 
 /*
@@ -5,6 +6,7 @@
 */
 void TestRemoteHook()
 {
+#ifdef COMPILER_MSVC
     struct HookClass
     {
         void HookFn( RemoteContext& context )
@@ -75,4 +77,5 @@ void TestRemoteHook()
         std::wcout << L"Not found, aborting\n";
 
     std::wcout << std::endl;
+#endif
 }

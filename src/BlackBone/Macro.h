@@ -1,4 +1,5 @@
 #pragma once
+#include "Config.h"
 
 // Architecture-dependent pointer size
 #define WordSize sizeof(void*)
@@ -20,7 +21,7 @@
 #define RESET_BIT(v, b) v &= ~(1ull << b)
 
 // Register aliases
-#ifdef _M_AMD64
+#ifdef USE64
 #define NAX Rax
 #define NSP Rsp
 #define NIP Rip
@@ -46,11 +47,14 @@
 #define SET_JUMP(_src,_dst) *(uint8_t*)(_src) = 0xE9; *(uintptr_t*)((_src) + 1) = (uintptr_t)(_dst) - (uintptr_t)(_src) - 5
 #endif
 
+template<int s> 
+struct CompileTimeSizeOf;
+
 // Type-unsafe cast.
 template<typename _Tgt, typename _Src>
 inline _Tgt brutal_cast( const _Src& src )
 {
-    static_assert(sizeof(_Tgt) == sizeof(_Src), "Operand size mismatch");
+    static_assert(sizeof( _Tgt ) == sizeof( _Src ), "Operand size mismatch");
     union _u { _Src s; _Tgt t; } u;
     u.s = src;
     return u.t;

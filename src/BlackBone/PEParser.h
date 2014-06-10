@@ -1,8 +1,12 @@
 #pragma once
 
+#include "Config.h"
 #include "Winheaders.h"
 #include "Types.h"
+
+#ifdef COMPILER_MSVC
 #include "ImageNET.h"
+#endif // COMPILER_MSVC
 
 #include <string>
 #include <memory>
@@ -10,6 +14,7 @@
 #include <map>
 #include <unordered_map>
 #include <set>
+#include <list>
 
 namespace blackbone
 {
@@ -158,11 +163,13 @@ public:
     /// <returns>Image type</returns>
     inline eModType mType() const { return _is64 ? mt_mod64 : mt_mod32; }
 
+#ifdef COMPILER_MSVC
     /// <summary>
     /// .NET image parser
     /// </summary>
     /// <returns>.NET image parser</returns>
     ImageNET& net() { return _netImage; }
+#endif
 
 private:
     bool        _isPlainData = false;       // File mapped as plain data file
@@ -180,7 +187,10 @@ private:
     vecSections _sections;                  // Section info
     mapImports  _imports;                   // Import functions
     mapImports  _delayImports;              // Import functions
+
+#ifdef COMPILER_MSVC
     ImageNET    _netImage;                  // .net image info
+#endif
 };
 
 }

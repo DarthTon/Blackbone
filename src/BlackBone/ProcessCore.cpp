@@ -1,12 +1,19 @@
+#include "Config.h"
 #include "ProcessCore.h"
+#include "DynImport.h"
 #include "Macro.h"
 
 namespace blackbone
 {
 
+#ifdef COMPILER_GCC
+#define PROCESS_DEP_ENABLE  0x00000001
+#endif
+
 ProcessCore::ProcessCore()
     : _native( nullptr )
 {
+    DynImport::load( "GetProcessDEPPolicy", L"kernel32.dll" );
 }
 
 ProcessCore::~ProcessCore()
@@ -63,8 +70,8 @@ NTSTATUS ProcessCore::Open( DWORD pid, DWORD access )
             DWORD flags = 0;
             BOOL perm = 0;
 
-            if (GetProcessDEPPolicy( _hProcess, &flags, &perm ))
-                _dep = static_cast<bool>(flags & PROCESS_DEP_ENABLE);
+            if (GET_IMPORT(GetProcessDEPPolicy)( _hProcess, &flags, &perm ))
+                _dep = (flags & PROCESS_DEP_ENABLE) != 0;
         }
 
         return STATUS_SUCCESS;

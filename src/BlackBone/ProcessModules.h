@@ -1,30 +1,32 @@
 #pragma once
 
+#include "Config.h"
 #include "Winheaders.h"
 #include "PEParser.h"
+#include "Utils.h"
 
 #include <string>
 #include <map>
 #include <unordered_map>
 #include <algorithm>
-#include <mutex>
 
-template <>
-struct std::hash< std::pair<std::wstring, blackbone::eModType> >
+namespace std
 {
-
-public:
-    size_t operator()( const std::pair<std::wstring, blackbone::eModType>& value ) const
+    template <>
+    struct hash < struct pair<wstring, blackbone::eModType> >
     {
-        hash<std::wstring> sh;
-        return sh( value.first ) ^ value.second;
-    }
-};
+    public:
+        size_t operator()( const pair<wstring, blackbone::eModType>& value ) const
+        {
+            hash<wstring> sh;
+            return sh( value.first ) ^ value.second;
+        }
+    };
+}
 
 
 namespace blackbone
 {
-
 
 struct exportData
 {
@@ -116,6 +118,7 @@ public:
     /// <returns>Module info. nullptr if failed</returns>
     const ModuleData* Inject( const std::wstring& path );
 
+#ifdef COMPILER_MSVC
     /// <summary>
     /// Inject pure IL image.
     /// </summary>
@@ -130,6 +133,7 @@ public:
                        const std::wstring& netAssemblyMethod, 
                        const std::wstring& netAssemblyArgs, 
                        DWORD& returnCode );
+#endif
 
     /// <summary>
     /// Unload specific module from target process. Can't be used to unload manually mapped modules
@@ -183,9 +187,9 @@ private:
     class ProcessMemory& _memory;
     class ProcessCore&   _core;
 
-    mapModules _modules;    // Fast lookup cache
-    std::mutex _modGuard;   // Module guard        
-    bool _ldrPatched;       // Win7 loader patch flag
+    mapModules _modules;            // Fast lookup cache
+    CriticalSection _modGuard;      // Module guard        
+    bool _ldrPatched;               // Win7 loader patch flag
 };
 
 };

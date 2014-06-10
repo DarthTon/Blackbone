@@ -14,7 +14,7 @@ public:
     AsmStackAllocator( intptr_t baseval = 0x28 )
         : disp_ofst( sizeof(size_t) )
     {
-#ifdef _M_AMD64
+#ifdef USE64
         disp_ofst = baseval;
 #else
         UNREFERENCED_PARAMETER( baseval );
@@ -31,7 +31,7 @@ public:
         // Align on word length
         size = Align( size, sizeof(size_t) );
 
-#ifdef _M_AMD64
+#ifdef USE64
         auto val = AsmJit::Mem( AsmJit::nsp, disp_ofst, size );
 #else
         auto val = AsmJit::Mem( AsmJit::nbp, -disp_ofst - size, size );
@@ -51,7 +51,7 @@ public:
     {
         for (int i = 0; i < count; i++)
         {
-#ifdef _M_AMD64
+#ifdef USE64
             arr[i] = AsmJit::Mem( AsmJit::nsp, disp_ofst, size );
 #else
             arr[i] = AsmJit::Mem( AsmJit::nbp, -disp_ofst - size, size );

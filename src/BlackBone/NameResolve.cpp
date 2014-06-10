@@ -58,7 +58,7 @@ bool blackbone::NameResolve::InitializeP()
     if (!_apiSchema.empty())
         return true;
 
-    PEB_T *ppeb = reinterpret_cast<PEB_T*>(NtCurrentTeb()->ProcessEnvironmentBlock);
+    PEB_T *ppeb = reinterpret_cast<PEB_T*>(reinterpret_cast<TEB_T*>(NtCurrentTeb())->ProcessEnvironmentBlock);
     T1 pSetMap = reinterpret_cast<T1>(ppeb->ApiSetMap);
 
     for (DWORD i = 0; i < pSetMap->Count; i++)
@@ -162,7 +162,7 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
     //
     HKEY hKey = NULL;
     LRESULT res = 0;
-    res = RegOpenKey( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs", &hKey );
+    res = RegOpenKeyW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs", &hKey );
 
     if (res == 0)
     {
@@ -174,17 +174,17 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
             DWORD dwSize = 255;
             DWORD dwType = 0;
 
-            res = RegEnumValue( hKey, i, value_name, &dwSize, NULL, &dwType, reinterpret_cast<LPBYTE>(value_data), &dwSize );
+            res = RegEnumValueW( hKey, i, value_name, &dwSize, NULL, &dwType, reinterpret_cast<LPBYTE>(value_data), &dwSize );
 
             if (_wcsicmp( value_data, filename.c_str() ) == 0)
             {
                 wchar_t sys_path[255] = { 0 };
                 dwSize = 255;
 
-                res = SHRegGetValueW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs",
-                                      L"DllDirectory", RRF_RT_ANY, &dwType, sys_path, &dwSize );
-                /*res = RegGetValueW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs",
-                                    L"DllDirectory", RRF_RT_ANY, &dwType, sys_path, &dwSize );*/
+                /*res = SHRegGetValueW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs",
+                                      L"DllDirectory", RRF_RT_ANY, &dwType, sys_path, &dwSize );*/
+                res = RegGetValueW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs",
+                                    L"DllDirectory", RRF_RT_ANY, &dwType, sys_path, &dwSize );
 
                 if (res == ERROR_SUCCESS)
                 {
@@ -227,7 +227,7 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
     //
     // 4. The system directory
     //
-    GetSystemDirectory( tmpPath, ARRAYSIZE( tmpPath ) );
+    GetSystemDirectoryW( tmpPath, ARRAYSIZE( tmpPath ) );
 
     completePath = std::wstring( tmpPath ) + L"\\" + filename;
 
@@ -240,7 +240,7 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
     //
     // 5. The Windows directory
     //
-    GetWindowsDirectory( tmpPath, ARRAYSIZE( tmpPath ) );
+    GetWindowsDirectoryW( tmpPath, ARRAYSIZE( tmpPath ) );
 
     completePath = std::wstring( tmpPath ) + L"\\" + filename;
 
@@ -253,7 +253,7 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
     //
     // 6. The current directory
     //
-    GetCurrentDirectory( ARRAYSIZE( tmpPath ), tmpPath );
+    GetCurrentDirectoryW( ARRAYSIZE( tmpPath ), tmpPath );
 
     completePath = std::wstring( tmpPath ) + L"\\" + filename;
 
@@ -266,7 +266,7 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
     //
     // 7. Directories listed in PATH environment variable
     //
-    GetEnvironmentVariable( L"PATH", tmpPath, ARRAYSIZE( tmpPath ) );
+    GetEnvironmentVariableW( L"PATH", tmpPath, ARRAYSIZE( tmpPath ) );
     wchar_t *pContext;
 
     for (wchar_t *pDir = wcstok_s( tmpPath, L";", &pContext ); pDir; pDir = wcstok_s( pContext, L";", &pContext ))
@@ -348,13 +348,13 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
 std::wstring NameResolve::GetProcessDirectory( DWORD pid )
 {
     HANDLE snapshot = 0;
-    MODULEENTRY32 mod = { sizeof(MODULEENTRY32), 0 };
+    MODULEENTRY32W mod = { sizeof(MODULEENTRY32W), 0 };
     std::wstring path = L"";
 
     if ((snapshot = CreateToolhelp32Snapshot( TH32CS_SNAPMODULE, pid )) == INVALID_HANDLE_VALUE)
         return L"";
 
-    if (Module32First( snapshot, &mod ) == TRUE)
+    if (Module32FirstW( snapshot, &mod ) == TRUE)
     {
         path = mod.szExePath;
         path = path.substr( 0, path.rfind( L"\\" ) );

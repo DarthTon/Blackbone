@@ -626,7 +626,10 @@ ULONG NtLdr::HashString( const std::wstring& str )
 /// <returns>true on success</returns>
 bool NtLdr::FindLdrpHashTable( )
 {
-    PEB_LDR_DATA_T *Ldr = reinterpret_cast<PEB_LDR_DATA_T*>(NtCurrentTeb()->ProcessEnvironmentBlock->Ldr);
+    PEB_LDR_DATA_T *Ldr = 
+        reinterpret_cast<PEB_LDR_DATA_T*>(
+        reinterpret_cast<PEB_T*>(
+        reinterpret_cast<TEB_T*>(NtCurrentTeb())->ProcessEnvironmentBlock)->Ldr);
 
     LDR_DATA_TABLE_ENTRY_BASE_T *Ntdll = CONTAINING_RECORD( Ldr->InInitializationOrderModuleList.Flink,
                                                              LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
@@ -666,7 +669,7 @@ bool NtLdr::FindLdrpHashTable( )
 /// <returns>true on success</returns>
 bool NtLdr::FindLdrpModuleIndexBase( )
 {
-    PEB_T* pPeb = reinterpret_cast<PEB_T*>(NtCurrentTeb( )->ProcessEnvironmentBlock);
+    PEB_T* pPeb = reinterpret_cast<PEB_T*>(reinterpret_cast<TEB_T*>(NtCurrentTeb())->ProcessEnvironmentBlock);
 
     if(pPeb)
     {
@@ -737,7 +740,7 @@ bool NtLdr::ScanPatterns( )
     void* pStart  = nullptr;
     size_t scanSize = 0;
 
-    HMODULE hNtdll = GetModuleHandle( L"ntdll.dll" );
+    HMODULE hNtdll = GetModuleHandleW( L"ntdll.dll" );
     ntdll.Parse( hNtdll );
 
     // Find ntdll code section
@@ -759,7 +762,7 @@ bool NtLdr::ScanPatterns( )
     // Win 8.1 and later
     if (IsWindows8Point1OrGreater())
     {
-    #ifdef _M_AMD64
+    #ifdef USE64
         // RtlInsertInvertedFunctionTable
         // 48 83 EC 20 8B F2 4C 8D 4C 24
         PatternSearch ps1( "\x48\x83\xec\x20\x8b\xf2\x4c\x8d\x4c\x24" );
@@ -804,7 +807,7 @@ bool NtLdr::ScanPatterns( )
     // Win 8
     else if (IsWindows8OrGreater())
     {
-    #ifdef _M_AMD64
+    #ifdef USE64
         // LdrpHandleTlsData
         // 48 8B 79 30 45 8D 66 01
         PatternSearch ps( "\x48\x8b\x79\x30\x45\x8d\x66\x01" );
@@ -839,7 +842,7 @@ bool NtLdr::ScanPatterns( )
     // Win 7
     else if(IsWindows7OrGreater())
     {
-    #ifdef _M_AMD64
+    #ifdef USE64
         // LdrpHandleTlsData
         // 41 B8 09 00 00 00 48 8D 44 24 38
         PatternSearch ps1( "\x41\xb8\x09\x00\x00\x00\x48\x8d\x44\x24\x38", 11 );
@@ -968,7 +971,7 @@ bool NtLdr::Unlink( ptr_t baseAddress, eModType type )
 template<typename T>
 ptr_t NtLdr::UnlinkFromLdr( ptr_t baseAddress )
 {
-    _PEB_T2<T>::type peb = { 0 };
+    typename _PEB_T2<T>::type peb = { 0 };
     _PEB_LDR_DATA2<T> ldr = { 0 };
 
     auto native = _process.core().native();

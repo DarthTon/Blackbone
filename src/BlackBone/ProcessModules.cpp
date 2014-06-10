@@ -1,3 +1,4 @@
+#include "Config.h"
 #include "ProcessModules.h"
 #include "Process.h"
 #include "RemoteExec.h"
@@ -8,8 +9,11 @@
 #include <memory>
 #include <type_traits>
 
+#ifdef COMPILER_MSVC
 #include <mscoree.h>
 #include <metahost.h>
+#endif
+
 #include <VersionHelpers.h>
 
 namespace blackbone
@@ -63,7 +67,7 @@ const ModuleData* ProcessModules::GetModule( std::wstring& name,
     if (type == mt_default)
         type = _core.native()->GetWow64Barrier().targetWow64 ? mt_mod32 : mt_mod64;
 
-    std::lock_guard<std::mutex> lg( _modGuard );
+    CSLock lck( _modGuard );
 
     auto key = std::make_pair( name, type );
 
@@ -100,7 +104,7 @@ const ModuleData* ProcessModules::GetModule( module_t modBase,
     if (type == mt_default)
         type = _core.native()->GetWow64Barrier().targetWow64 ? mt_mod32 : mt_mod64;
 
-    std::lock_guard<std::mutex> lg( _modGuard );
+    CSLock lck( _modGuard );
 
     auto compFn = [modBase]( const mapModules::value_type& val )
     { 
@@ -154,18 +158,15 @@ const ProcessModules::mapModules& ProcessModules::GetAllModules( eModSeachType s
 
     _core.native()->EnumModules( modules, search, mt );
 
-    std::lock_guard<std::mutex> lg( _modGuard );
+    CSLock lck( _modGuard );
 
-    //
     // Remove non-manual modules
-    //
-    auto iter = _modules.begin();
-    while (iter != _modules.end( ))
+    for (auto iter = _modules.begin(); iter != _modules.end();)
     {
         if (!iter->second.manual) 
-            iter = _modules.erase( iter );
-
-        else ++iter;
+            _modules.erase( iter++ );
+        else 
+            ++iter;
     }
 
     // Update local cache
@@ -282,7 +283,7 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
             else
                 return data;
 
-            if ((reinterpret_cast<size_t>(name_ord) <= 0xFFFF && reinterpret_cast<WORD>(name_ord) == (OrdIndex + pExpData->Base)) ||
+            if ((reinterpret_cast<size_t>(name_ord) <= 0xFFFF && (WORD)((uintptr_t)name_ord) == (OrdIndex + pExpData->Base)) ||
                  (reinterpret_cast<size_t>(name_ord) > 0xFFFF && strcmp( pName, name_ord ) == 0))
             {
                 data.procAddress = pAddressOfFuncs[OrdIndex] + hMod->baseAddress;
@@ -381,7 +382,7 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
             return nullptr;
 
         // Patch LdrFindOrMapDll to enable kernel32.dll loading
-        #ifdef _M_AMD64
+        #ifdef USE64
         if (!_ldrPatched && IsWindows7OrGreater( ) && !IsWindows8OrGreater( ))
         {
             uint8_t patch[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
@@ -528,6 +529,8 @@ inline size_t DWAlign( size_t offset )
 
 using namespace AsmJit;
 
+#ifdef COMPILER_MSVC
+
 /// <summary>
 /// Inject pure IL image.
 /// </summary>
@@ -641,7 +644,7 @@ bool ProcessModules::InjectPureIL( const std::wstring& netVersion,
     ALLOC_STACK_VAR( sa, stack_StartupFlags, DWORD );
     ALLOC_STACK_VAR( sa, stack_returnCode,   HRESULT );
 
-#ifdef _M_AMD64
+#ifdef USE64
     GPReg callReg = r13;
 
 #else
@@ -731,7 +734,7 @@ bool ProcessModules::InjectPureIL( const std::wstring& netVersion,
     // stack restoration
     a.bind( L_Exit );
 
-#ifdef _M_AMD64
+#ifdef USE64
     a.add( nsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
 #else
     a.mov( nsp, nbp );
@@ -825,12 +828,15 @@ bool ProcessModules::InjectPureIL( const std::wstring& netVersion,
     return true;
 }
 
+#endif // COMPILER_MSVC
+
 /// <summary>
 /// Reset local data
 /// </summary>
 void ProcessModules::reset()
 {
-    std::lock_guard<std::mutex> lg( _modGuard ); 
+    CSLock lck( _modGuard );
+
     _modules.clear(); 
     _ldrPatched = false;
 }

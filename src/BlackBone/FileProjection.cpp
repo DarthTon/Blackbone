@@ -29,20 +29,20 @@ void* FileProjection::Project( const std::wstring& path )
     Release();
 
     // Prepare activation context
-    ACTCTX act = { 0 };
+    ACTCTXW act = { 0 };
     act.cbSize = sizeof(act);
     act.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
     act.lpSource = path.c_str();
     act.lpResourceName = MAKEINTRESOURCEW( 2 );
 
-    _hctx = CreateActCtx( &act );
+    _hctx = CreateActCtxW( &act );
 
     // Retry with another resource id
     if (_hctx == INVALID_HANDLE_VALUE)
     {
         act.lpResourceName = MAKEINTRESOURCEW( 1 );
 
-        if ((_hctx = CreateActCtx( &act )) != INVALID_HANDLE_VALUE)
+        if ((_hctx = CreateActCtxW( &act )) != INVALID_HANDLE_VALUE)
             _manifestIdx = 1;
     }
     else

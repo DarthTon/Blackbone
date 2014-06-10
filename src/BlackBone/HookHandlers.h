@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "LocalHookBase.h"
 
 namespace blackbone
@@ -16,7 +17,7 @@ struct HookHandler;
 
 #include "HookHandlerCdecl.h"
 
-#ifndef _M_AMD64
+#ifndef USE64
 #include "HookHandlerStdcall.h"
 #include "HookHandlerThiscall.h"
 #include "HookHandlerFastcall.h"

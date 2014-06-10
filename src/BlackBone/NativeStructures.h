@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "Winheaders.h"
 
 namespace blackbone
@@ -598,7 +599,7 @@ namespace blackbone
     typedef _CONTEXT_T<DWORD64>   _CONTEXT64;
     typedef _CONTEXT_T<DWORD_PTR>  CONTEXT_T;
 
-#ifdef _M_AMD64
+#ifdef USE64
     typedef _PEB64 PEB_T;
 #else
     typedef _PEB32 PEB_T;

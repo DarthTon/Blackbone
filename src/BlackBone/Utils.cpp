@@ -1,9 +1,7 @@
+#include "Config.h"
 #include "Utils.h"
 #include "DynImport.h"
 
-#include <codecvt>
-#include <locale>
-#include <filesystem>
 #include <algorithm>
 
 namespace blackbone
@@ -16,8 +14,7 @@ namespace blackbone
 /// <returns>wide char string</returns>
 std::wstring Utils::UTF8ToWstring( const std::string& str )
 {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> conv;
-    return conv.from_bytes( str );
+    return AnsiToWstring( str, CP_UTF8 );
 }
 
 /// <summary>
@@ -27,8 +24,7 @@ std::wstring Utils::UTF8ToWstring( const std::string& str )
 /// <returns>UTF-8 string</returns>
 std::string Utils::WstringToUTF8( const std::wstring& str )
 {
-    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> conv;
-    return conv.to_bytes( str );
+    return WstringToAnsi( str, CP_UTF8 );
 }
 
 /// <summary>
@@ -41,6 +37,19 @@ std::wstring Utils::AnsiToWstring( const std::string& input, DWORD locale /*= CP
 {
     wchar_t buf[8192] = { 0 };
     MultiByteToWideChar( locale, 0, input.c_str(), (int)input.length(), buf, ARRAYSIZE( buf ) );
+    return buf;
+}
+
+/// <summary>
+/// Convert wide char string to ANSI one
+/// </summary>
+/// <param name="input">wide char string.</param>
+/// <param name="locale">String locale</param>
+/// <returns>ANSI string</returns>
+std::string Utils::WstringToAnsi( const std::wstring& input, DWORD locale /*= CP_ACP*/ )
+{
+    char buf[8192] = { 0 };
+    WideCharToMultiByte( locale, 0, input.c_str(), (int)input.length(), buf, ARRAYSIZE( buf ), nullptr, nullptr );
     return buf;
 }
 
@@ -93,7 +102,11 @@ std::wstring Utils::GetExeDirectory()
     wchar_t imgName[MAX_PATH] = { 0 };
     DWORD len = ARRAYSIZE(imgName);
 
-    QueryFullProcessImageNameW( GetCurrentProcess(), 0, imgName, &len );
+    auto pFunc = DynImport::get<fnQueryFullProcessImageNameW>( "QueryFullProcessImageNameW" );
+    if (pFunc == nullptr)
+        pFunc = reinterpret_cast<fnQueryFullProcessImageNameW>(DynImport::load( "QueryFullProcessImageNameW", L"kernel32.dll" ));
+
+    pFunc( GetCurrentProcess(), 0, imgName, &len );
 
     return GetParent( imgName );
 }
@@ -163,7 +176,7 @@ NTSTATUS Utils::LoadDriver( const std::wstring& svcName, const std::wstring& pat
 
     swprintf_s( wszLocalPath, ARRAYSIZE( wszLocalPath ), L"\\??\\%s", path.c_str() );
 
-    status = RegOpenKey( HKEY_LOCAL_MACHINE, L"system\\CurrentControlSet\\Services", &key1 );
+    status = RegOpenKeyW( HKEY_LOCAL_MACHINE, L"system\\CurrentControlSet\\Services", &key1 );
 
     if (status)
         return status;
@@ -176,7 +189,7 @@ NTSTATUS Utils::LoadDriver( const std::wstring& svcName, const std::wstring& pat
         return status;
     }
 
-    status = RegSetValueEx( key2, L"ImagePath", 0, REG_SZ, reinterpret_cast<const BYTE*>(wszLocalPath), 
+    status = RegSetValueExW( key2, L"ImagePath", 0, REG_SZ, reinterpret_cast<const BYTE*>(wszLocalPath), 
                             static_cast<DWORD>(sizeof(WCHAR)* (wcslen( wszLocalPath ) + 1)) );
 
     if (status)
@@ -186,7 +199,7 @@ NTSTATUS Utils::LoadDriver( const std::wstring& svcName, const std::wstring& pat
         return status;
     }
 
-    status = RegSetValueEx( key2, L"Type", 0, REG_DWORD, &dwType, sizeof(DWORD) );
+    status = RegSetValueExW( key2, L"Type", 0, REG_DWORD, &dwType, sizeof(DWORD) );
 
     if (status)
     {

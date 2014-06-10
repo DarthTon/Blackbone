@@ -32,6 +32,14 @@ public:
     static std::wstring AnsiToWstring( const std::string& input, DWORD locale = CP_ACP );
 
     /// <summary>
+    /// Convert wide char string to ANSI one
+    /// </summary>
+    /// <param name="input">wide char string.</param>
+    /// <param name="locale">String locale</param>
+    /// <returns>ANSI string</returns>
+    static std::string WstringToAnsi( const std::wstring& input, DWORD locale = CP_ACP );
+
+    /// <summary>
     /// Get filename from full-qualified path
     /// </summary>
     /// <param name="path">File path</param>
@@ -79,6 +87,63 @@ public:
     /// <param name="path">Driver file path</param>
     /// <returns>Status</returns>
     static NTSTATUS LoadDriver( const std::wstring& svcName, const std::wstring& path );
+};
+
+
+/// <summary>
+/// std::mutex alternative
+/// </summary>
+class CriticalSection
+{
+public:
+    CriticalSection()
+    {
+        InitializeCriticalSection( &_native );
+    }
+
+    ~CriticalSection()
+    {
+        DeleteCriticalSection( &_native );
+    }
+
+    void lock()
+    {
+        EnterCriticalSection( &_native );
+    }
+
+    void unlock()
+    {
+        LeaveCriticalSection( &_native );
+    }
+
+private:
+    CRITICAL_SECTION _native;
+};
+
+
+/// <summary>
+/// std::lock_guard alternative
+/// </summary>
+class CSLock
+{
+public:
+    CSLock( CriticalSection& cs )
+        : _cs( cs ) 
+    {
+        cs.lock();
+    }
+
+    ~CSLock()
+    {
+        _cs.unlock();
+    }
+
+private:
+    CSLock( const CSLock& ) = delete;
+    CSLock& operator = ( const CSLock& ) = delete;
+
+private:
+    CriticalSection& _cs;
 };
 
 }

@@ -1,6 +1,9 @@
 #pragma once
+#include "Config.h"
+#ifdef COMPILER_MSVC
 
 #include "Winheaders.h"
+
 #include <cor.h>
 #include <CorError.h>
 
@@ -52,3 +55,5 @@ private:
 };
 
 }
+
+#endif

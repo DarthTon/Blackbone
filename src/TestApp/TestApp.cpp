@@ -36,16 +36,16 @@ void TestTEB( Process& proc )
                << teb64.ClientId.UniqueThread << std::endl << std::endl;
 }
 
-int wmain( int /*argc*/, wchar_t* /*argv*/[] )
+int main( int /*argc*/, char* /*argv*/[] )
 { 
-    Process proc, proc2;
+    Process proc;
     proc.Attach( GetCurrentProcessId() );
 
     TestPEB( proc );
     TestTEB( proc );
     TestLocalHook();
     TestRemoteCall();
-    //TestRemoteHook();
+    TestRemoteHook();
     TestMMap();
 
 	return 0;

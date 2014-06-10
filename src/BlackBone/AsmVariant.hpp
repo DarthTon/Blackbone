@@ -116,7 +116,7 @@ namespace blackbone
             //
             // Treat function pointer as void*
             //
-            const bool isFunction = std::is_function<std::remove_pointer<T>::type>::value;
+            const bool isFunction = std::is_function<typename std::remove_pointer<T>::type>::value;
             typedef typename std::conditional<isFunction, void*, T>::type Type;
 
             type = isFunction ? imm : dataPtr;
@@ -162,14 +162,42 @@ namespace blackbone
 
         AsmVariant( AsmVariant&& other )
         {
-            type            = other.type;
+            /*type            = other.type;
             size            = other.size;        
             imm_val         = other.imm_val;
             reg_val         = other.reg_val;
             mem_val         = other.mem_val;
             buf             = other.buf;
             imm_double_val  = other.imm_double_val;
-            new_imm_val     = other.new_imm_val;
+            new_imm_val     = other.new_imm_val;*/
+            *this = std::move( other );
+        }
+
+        AsmVariant( const AsmVariant& other )
+        {
+            /*type = other.type;
+            size = other.size;
+            imm_val = other.imm_val;
+            reg_val = other.reg_val;
+            mem_val = other.mem_val;
+            buf = other.buf;
+            imm_double_val = other.imm_double_val;
+            new_imm_val = other.new_imm_val;*/
+            *this = std::move( other );
+        }
+
+        AsmVariant& operator =(const AsmVariant& other)
+        {
+            type = other.type;
+            size = other.size;
+            imm_val = other.imm_val;
+            reg_val = other.reg_val;
+            mem_val = other.mem_val;
+            buf = other.buf;
+            imm_double_val = other.imm_double_val;
+            new_imm_val = other.new_imm_val;
+
+            return *this;
         }
 
         //

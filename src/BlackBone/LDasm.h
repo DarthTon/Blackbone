@@ -1,14 +1,15 @@
 #ifndef _LDASM_
 #define _LDASM_
 
+#include "Config.h"
 #include <stdint.h>
 #include <string.h>
 
-#ifdef _M_AMD64
+#ifdef USE64
     #define is_x64 1
 #else
     #define is_x64 0
-#endif//_M_AMD64
+#endif//USE64
 
 #ifdef __cplusplus
 extern "C"

@@ -16,6 +16,10 @@ namespace blackbone
                           THREAD_TERMINATE         | \
                           SYNCHRONIZE
 
+#define MAXULONG64_2 ((uint64_t)~((uint64_t)0))
+#define MAXULONG32_2 ((uint32_t)~((uint32_t)0))
+
+
 // Breakpoint type
 enum HWBPType
 {

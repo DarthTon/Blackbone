@@ -1,4 +1,7 @@
+#include "Config.h"
 #include "ImageNET.h"
+
+#ifdef COMPILER_MSVC
 
 #include <mscoree.h>
 #include <metahost.h>
@@ -202,3 +205,5 @@ std::wstring ImageNET::GetImageRuntimeVer( const wchar_t* ImagePath )
 }
 
 }
+
+#endif

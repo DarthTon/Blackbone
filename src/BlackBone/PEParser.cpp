@@ -137,7 +137,7 @@ mapImports& PEParser::ProcessImports( bool useDelayed /*= false*/ )
                 if (AddressOfData < (_is64 ? IMAGE_ORDINAL_FLAG64 : IMAGE_ORDINAL_FLAG32) && pAddressTable->Name[0])
                 {
                     data.importByOrd = false;
-                    data.importName = pAddressTable->Name;
+                    data.importName = reinterpret_cast<const char*>(pAddressTable->Name);
                     data.importOrdinal = 0;
                 }
                 // import by ordinal
@@ -188,7 +188,7 @@ mapImports& PEParser::ProcessImports( bool useDelayed /*= false*/ )
                 if (AddressOfData < (_is64 ? IMAGE_ORDINAL_FLAG64 : IMAGE_ORDINAL_FLAG32) && pAddressTable->Name[0])
                 {
                     data.importByOrd   = false;
-                    data.importName    = pAddressTable->Name;
+                    data.importName    = reinterpret_cast<const char*>(pAddressTable->Name);
                     data.importOrdinal = 0;
                 }
                 // import by ordinal

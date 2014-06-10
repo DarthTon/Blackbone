@@ -71,7 +71,7 @@ bool Process::valid()
 /// </summary>
 /// <param name="name">Privilege name</param>
 /// <returns>Status</returns>
-NTSTATUS Process::GrantPriviledge( const std::wstring& name )
+NTSTATUS Process::GrantPriviledge( const std::basic_string<TCHAR>& name )
 {
     TOKEN_PRIVILEGES Priv, PrivOld;
     DWORD cbPriv = sizeof(PrivOld);

@@ -98,7 +98,7 @@ namespace blackbone
             // if instruction has relative offset, calculate new offset 
             if (ld.flags & F_RELATIVE)
             {
-            #ifdef _M_AMD64
+            #ifdef USE64
                 // exit if jump is greater then 2GB
                 if (_abs64( (uintptr_t)(src + *((int*)(old + ld.opcd_size))) - (uintptr_t)old ) > INT_MAX)
                     break;

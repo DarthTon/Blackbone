@@ -40,27 +40,27 @@ public:
         //_order = CallOrder::HookFirst;
         //_retType = ReturnMethod::UseOriginal;
 
-        _type = HookType::VTable;
-        _callOriginal = _original = (*(void***)ppVtable)[index];
-        _callback = hkPtr;
-        _internalHandler = &HookHandler<Fn, C>::Handler;
-        _ppVtable = ppVtable;
-        _pVtable = *ppVtable;
-        _vtIndex = index;
-        _vtCopied = copyVtable;
+        this->_type = HookType::VTable;
+        this->_callOriginal = this->_original = (*(void***)ppVtable)[index];
+        this->_callback = hkPtr;
+        this->_internalHandler = &HookHandler<Fn, C>::Handler;
+        this->_ppVtable = ppVtable;
+        this->_pVtable = *ppVtable;
+        this->_vtIndex = index;
+        this->_vtCopied = copyVtable;
 
         // Construct jump to hook handler
-#ifdef _M_AMD64
+#ifdef USE64
         // mov gs:[0x28], this
         jmpToHook.mov( AsmJit::rax, (uint64_t)this );
         jmpToHook.mov( AsmJit::qword_ptr_abs( (void*)0x28, 0, AsmJit::SEGMENT_GS ), AsmJit::rax );
 #else
         // mov fs:[0x14], this
         jmpToHook.mov( AsmJit::dword_ptr_abs( (void*)0x14, 0, AsmJit::SEGMENT_FS ), (uint32_t)this );
-#endif // _M_AMD64
+#endif // USE64
 
-        jmpToHook.jmp( _internalHandler );
-        jmpToHook.relocCode( _buf );
+        jmpToHook.jmp( this->_internalHandler );
+        jmpToHook.relocCode( this->_buf );
 
         // Modify VTable copy
         if (copyVtable)
@@ -71,21 +71,21 @@ public:
             // Copy VTable
             if (vtableLen != 0)
             {
-                memcpy( _buf + 0x300, *ppVtable, vtableLen * sizeof(void*) );
+                memcpy( this->_buf + 0x300, *ppVtable, vtableLen * sizeof( void* ) );
             }
             else for (;; vtableLen++)
             {
                 if ((*(void***)ppVtable)[vtableLen] == nullptr ||
                     (*(void***)ppVtable)[vtableLen] == (void**)ccpad)
                 {
-                    memcpy( _buf + 0x300, *ppVtable, vtableLen * sizeof(void*) );
+                    memcpy( this->_buf + 0x300, *ppVtable, vtableLen * sizeof( void* ) );
                     break;
                 }
             }
 
             // Replace pointer to VTable
-            ((void**)_buf + 0x300 / sizeof(uintptr_t))[index] = _buf;
-            *ppVtable = _buf + 0x300;
+            ((void**)this->_buf + 0x300 / sizeof( uintptr_t ))[index] = this->_buf;
+            *ppVtable = this->_buf + 0x300;
         }
         // Modify pointer in-place
         else
@@ -93,11 +93,11 @@ public:
             DWORD flOld = 0;
 
             VirtualProtect( *(uintptr_t**)ppVtable + index, sizeof(void*), PAGE_EXECUTE_READWRITE, &flOld );
-            (*(void***)ppVtable)[index] = _buf;
+            (*(void***)ppVtable)[index] = this->_buf;
             VirtualProtect( *(uintptr_t**)ppVtable + index, sizeof(void*), flOld, &flOld );
         }
 
-        return (_hooked = true);
+        return (this->_hooked = true);
     }
 
     /// <summary>
@@ -113,7 +113,7 @@ public:
     /// <returns>true on success</returns>
     bool Hook( void** ppVtable, uintptr_t index, hktypeC hkPtr, C* pClass, bool copyVtable = false, int vtableLen = 0 )
     {
-        _callbackClass = pClass;
+        this->_callbackClass = pClass;
         return Hook( ppVtable, index, brutal_cast<hktype>(hkPtr), copyVtable, vtableLen );
     }
 
@@ -123,23 +123,23 @@ public:
     /// <returns>true on success, false if not hooked</returns>
     bool Restore()
     {
-        if (!_hooked)
+        if (!this->_hooked)
             return false;
 
-        if (_vtCopied)
+        if (this->_vtCopied)
         {
-            *_ppVtable = _pVtable;
+            *this->_ppVtable = this->_pVtable;
         }
         else
         {
             DWORD flOld = 0;
 
-            VirtualProtect( *(uintptr_t**)_ppVtable + _vtIndex, sizeof(void*), PAGE_EXECUTE_READWRITE, &flOld );
-            (*(void***)_ppVtable)[_vtIndex] = _original;
-            VirtualProtect( *(uintptr_t**)_ppVtable + _vtIndex, sizeof(void*), flOld, &flOld );
+            VirtualProtect( *(uintptr_t**)this->_ppVtable + this->_vtIndex, sizeof( void* ), PAGE_EXECUTE_READWRITE, &flOld );
+            (*(void***)this->_ppVtable)[this->_vtIndex] = this->_original;
+            VirtualProtect( *(uintptr_t**)this->_ppVtable + this->_vtIndex, sizeof( void* ), flOld, &flOld );
         }
 
-        _hooked = false;
+        this->_hooked = false;
         return true;
     }
 

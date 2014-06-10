@@ -106,7 +106,7 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
         ResetEvent( _hWaitEvent );
 
     // Patch KiUserApcDispatcher 
-#ifdef _M_AMD64
+#ifdef USE64
     if (!_apcPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
     {
         if (_proc.core().native()->GetWow64Barrier().type == wow_64_32)
@@ -176,7 +176,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         AsmJit::Assembler a;
         AsmJitHelper ah( a );
 
-#ifdef _M_AMD64
+#ifdef USE64
         const int count = 15;
         AsmJit::GPReg regs[] = { AsmJit::rax, AsmJit::rbx, AsmJit::rcx, AsmJit::rdx, AsmJit::rsi,
                                  AsmJit::rdi, AsmJit::r8,  AsmJit::r9,  AsmJit::r10, AsmJit::r11,
@@ -498,7 +498,7 @@ bool RemoteExec::PrepareCallAssembly( AsmJit::Assembler& a,
     {
         a.mov( AsmJit::nax, _userData.ptr<size_t>() + RET_OFFSET );
 
-#ifdef _M_AMD64
+#ifdef USE64
         if (retType == rt_double)
             a.movsd( AsmJit::Mem( AsmJit::nax, 0 ), AsmJit::xmm0 );
         else

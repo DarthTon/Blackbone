@@ -1,5 +1,6 @@
 #include "Thread.h"
 #include "ProcessCore.h"
+#include "DynImport.h"
 #include "Macro.h"
 
 namespace blackbone
@@ -64,7 +65,7 @@ bool Thread::Suspend()
         return true;
 
     if (_core->isWow64())
-        return (Wow64SuspendThread( _handle ) != -1);
+        return (GET_IMPORT(Wow64SuspendThread)( _handle ) != -1);
     else
         return (SuspendThread( _handle ) != -1);
 }
@@ -296,7 +297,7 @@ bool Thread::RemoveHWBP( ptr_t ptr )
 /// <returns>Thread exit code</returns>
 DWORD Thread::ExitCode() const
 {
-    DWORD code = MAXULONG32;
+    DWORD code = MAXULONG32_2;
     GetExitCodeThread( _handle, &code );
 
     return code;
@@ -313,7 +314,7 @@ uint64_t Thread::startTime()
     if (GetThreadTimes( _handle, &times[0], &times[1], &times[2], &times[3] ))
         return (static_cast<uint64_t>(times[0].dwHighDateTime) << 32) | times[0].dwLowDateTime;
 
-    return MAXULONG64;
+    return MAXULONG64_2;
 }
 
 /// <summary>
@@ -328,7 +329,7 @@ uint64_t Thread::execTime()
         return ((static_cast<uint64_t>(times[2].dwHighDateTime) << 32) | times[2].dwLowDateTime) 
              + ((static_cast<uint64_t>(times[3].dwHighDateTime) << 32) | times[3].dwLowDateTime);
 
-    return MAXULONG64;
+    return MAXULONG64_2;
 }
 
 

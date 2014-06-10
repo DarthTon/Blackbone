@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "HookHandlers.h"
 #include "Process.h"
 
@@ -17,7 +18,7 @@ public:
 public:  
     Detour()
     {
-        _internalHandler = &HookHandler<Fn, C>::Handler;
+        this->_internalHandler = &HookHandler<Fn, C>::Handler;
     }
 
     ~Detour()
@@ -38,16 +39,16 @@ public:
                CallOrder::e order = CallOrder::HookFirst,
                ReturnMethod::e retType = ReturnMethod::UseOriginal )
     { 
-        if (_hooked)
+        if (this->_hooked)
             return false;
 
-        _type  = type;
-        _order = order;
-        _retType = retType;
-        _callOriginal = _original = ptr;
-        _callback = hkPtr;
+        this->_type  = type;
+        this->_order = order;
+        this->_retType = retType;
+        this->_callOriginal = this->_original = ptr;
+        this->_callback = hkPtr;
 
-        switch (_type)
+        switch (this->_type)
         {
             case HookType::Inline:
                 return HookInline();
@@ -77,7 +78,7 @@ public:
                CallOrder::e order = CallOrder::HookFirst,
                ReturnMethod::e retType = ReturnMethod::UseOriginal )
     {
-        _callbackClass = pClass;
+        this->_callbackClass = pClass;
         return Hook( Ptr, brutal_cast<hktype>(hkPtr), type, order, retType );
     }
 
@@ -88,15 +89,15 @@ public:
     /// <returns>true on success, false if not hooked</returns>
     bool Restore()
     {
-        if (!_hooked)
+        if (!this->_hooked)
             return false;
         
-        switch (_type)
+        switch (this->_type)
         {
             case HookType::Inline:
             case HookType::InternalInline:
             case HookType::Int3:
-                WriteProcessMemory( GetCurrentProcess(), _original, _origCode, _origSize, NULL );
+                WriteProcessMemory( GetCurrentProcess(), this->_original, this->_origCode, this->_origSize, NULL );
                 break;
 
             case HookType::HWBP:
@@ -105,9 +106,9 @@ public:
                     thisProc.Attach( GetCurrentProcessId() );
 
                     for (auto& thd : thisProc.threads().getAll())
-                        thd.RemoveHWBP( reinterpret_cast<ptr_t>(_original) );
+                        thd.RemoveHWBP( reinterpret_cast<ptr_t>(this->_original) );
 
-                    _hwbpIdx.clear();
+                    this->_hwbpIdx.clear();
                 }
                 break;
 
@@ -115,7 +116,7 @@ public:
                 break;
         }
 
-        _hooked = false;
+        this->_hooked = false;
         return true;
     }
 
@@ -132,34 +133,35 @@ private:
         //
         // Construct jump to thunk
         //
-#ifdef _M_AMD64
-        jmpToThunk.mov( AsmJit::rax, (uint64_t)_buf );
+#ifdef USE64
+        jmpToThunk.mov( AsmJit::rax, (uint64_t)this->_buf );
         jmpToThunk.jmp( AsmJit::rax );
 
-        _origSize = jmpToThunk.getCodeSize( );
+        this->_origSize = jmpToThunk.getCodeSize( );
 #else
         jmpToThunk.jmp( _buf );
-        _origSize = jmpToThunk.getCodeSize( );
+        this->_origSize = jmpToThunk.getCodeSize();
 #endif
         
-        DetourBase::CopyOldCode( (uint8_t*)_original );
+        DetourBase::CopyOldCode( (uint8_t*)this->_original );
 
         // Construct jump to hook handler
-#ifdef _M_AMD64
+#ifdef USE64
         // mov gs:[0x28], this
         jmpToHook.mov( AsmJit::rax, (uint64_t)this );
         jmpToHook.mov( AsmJit::qword_ptr_abs( (void*)0x28, 0, AsmJit::SEGMENT_GS ), AsmJit::rax );
 #else
         // mov fs:[0x14], this
         jmpToHook.mov( AsmJit::dword_ptr_abs( (void*)0x14, 0, AsmJit::SEGMENT_FS ), (uint32_t)this );
-#endif // _M_AMD64
+#endif // USE64
 
         jmpToHook.jmp( &HookHandler<Fn, C>::Handler );
-        jmpToHook.relocCode( _buf );
+        jmpToHook.relocCode( this->_buf );
 
-        BOOL res = WriteProcessMemory( GetCurrentProcess(), _original, _newCode, jmpToThunk.relocCode( _newCode, (sysuint_t)_original ), NULL );
+        BOOL res = WriteProcessMemory( GetCurrentProcess(), this->_original, this->_newCode,
+                                       jmpToThunk.relocCode( this->_newCode, (sysuint_t)this->_original ), NULL );
         
-        return (_hooked = (res == TRUE));
+        return (this->_hooked = (res == TRUE));
     }
 
     /// <summary>
@@ -168,25 +170,25 @@ private:
     /// <returns>true on success</returns>
     bool HookInt3()
     {
-        _newCode[0] = 0xCC;
-        _origSize = sizeof(_newCode[0]);
+        this->_newCode[0] = 0xCC;
+        this->_origSize = sizeof( this->_newCode[0] );
 
         // Setup handler
-        if (_vecHandler == nullptr)
-            _vecHandler = AddVectoredExceptionHandler( 1, &DetourBase::VectoredHandler );
+        if (this->_vecHandler == nullptr)
+            this->_vecHandler = AddVectoredExceptionHandler( 1, &DetourBase::VectoredHandler );
 
-        if (!_vecHandler)
+        if (!this->_vecHandler)
             return false;
 
-        _breakpoints.insert( std::make_pair( _original, (DetourBase*)this ) );
+        this->_breakpoints.insert( std::make_pair( this->_original, (DetourBase*)this ) );
 
         // Save original code
-        memcpy( _origCode, _original, _origSize );
+        memcpy( this->_origCode, this->_original, this->_origSize );
 
         // Write break instruction
-        BOOL res = WriteProcessMemory( GetCurrentProcess(), _original, _newCode, _origSize, NULL );
+        BOOL res = WriteProcessMemory( GetCurrentProcess(), this->_original, this->_newCode, this->_origSize, NULL );
 
-        return (_hooked = (res == TRUE));
+        return (this->_hooked = (res == TRUE));
     }
 
     /// <summary>
@@ -199,19 +201,19 @@ private:
         thisProc.Attach( GetCurrentProcessId() );
 
         // Setup handler
-        if (_vecHandler == nullptr)
-            _vecHandler = AddVectoredExceptionHandler( 1, &DetourBase::VectoredHandler );
+        if (this->_vecHandler == nullptr)
+            this->_vecHandler = AddVectoredExceptionHandler( 1, &DetourBase::VectoredHandler );
 
-        if (!_vecHandler)
+        if (!this->_vecHandler)
             return false;
 
-        _breakpoints.insert( std::make_pair( _original, (DetourBase*)this ) );
+        this->_breakpoints.insert( std::make_pair( this->_original, (DetourBase*)this ) );
 
         // Add breakpoint to every thread
         for (auto& thd : thisProc.threads().getAll())
-            _hwbpIdx[thd.id()] = thd.AddHWBP( reinterpret_cast<ptr_t>(_original), hwbp_execute, hwbp_1 );
+            this->_hwbpIdx[thd.id()] = thd.AddHWBP( reinterpret_cast<ptr_t>(this->_original), hwbp_execute, hwbp_1 );
     
-        return _hooked = true;
+        return this->_hooked = true;
     }
 };
 

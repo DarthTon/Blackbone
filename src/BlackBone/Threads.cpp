@@ -73,7 +73,7 @@ std::vector<Thread>& ProcessThreads::getAll( bool dontUpdate /*= false*/ )
 /// <returns>Pointer to thread object, nullptr if failed</returns>
 Thread* ProcessThreads::getMain()
 {
-    uint64_t mintime = MAXULONG64;
+    uint64_t mintime = MAXULONG64_2;
     Thread* pMain = nullptr;
 
     for (auto& thread : getAll())
@@ -96,7 +96,7 @@ Thread* ProcessThreads::getMain()
 /// <returns>Pointer to thread object, nullptr if failed</returns>
 Thread* ProcessThreads::getLeastExecuted()
 {
-    uint64_t mintime = MAXULONG64;
+    uint64_t mintime = MAXULONG64_2;
     Thread* pThread = nullptr;
 
     for (auto& thread : getAll())

@@ -1,10 +1,15 @@
-#include "Tests.h"
+#include "../BlackBone/Config.h"
 
+#ifdef COMPILER_MSVC
+#include "Tests.h"
+#include "../BlackBone/RemoteFunction.hpp"
+#endif
 /*
     Get explorer.exe path
 */
 void TestRemoteCall()
 {
+#ifdef COMPILER_MSVC
     std::wcout << L"\r\nRemote function call test\n";
     std::wcout << L"Searching for explorer.exe... ";
 
@@ -60,4 +65,5 @@ void TestRemoteCall()
         std::wcout << L"Not found, aborting\n";
 
     std::wcout << std::endl;
+#endif // COMPILER_MSVC
 }

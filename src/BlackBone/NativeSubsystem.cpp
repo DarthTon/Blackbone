@@ -44,6 +44,7 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
     }
 
     HMODULE hNtdll = GetModuleHandleW( L"ntdll.dll" );
+    HMODULE hKernel32 = GetModuleHandleW( L"kernel32.dll" );
 
     DynImport::load( "NtQueryInformationProcess", hNtdll );
     DynImport::load( "NtQueryInformationThread",  hNtdll );
@@ -51,6 +52,9 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
     DynImport::load( "NtQueryVirtualMemory",      hNtdll );
     DynImport::load( "NtCreateThreadEx",          hNtdll );
     DynImport::load( "NtLockVirtualMemory",       hNtdll );
+    DynImport::load( "Wow64GetThreadContext",     hKernel32 );
+    DynImport::load( "Wow64SetThreadContext",     hKernel32 );
+    DynImport::load( "Wow64SuspendThread",        hKernel32 );    
 }
 
 /*
@@ -237,8 +241,8 @@ NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     }
     else
     {
-        LastNtStatus( STATUS_SUCCESS );
-        Wow64GetThreadContext( hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx) );
+        LastNtStatus( STATUS_SUCCESS );        
+        GET_IMPORT(Wow64GetThreadContext)( hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx) );
         return LastNtStatus();
     }
 }
@@ -272,7 +276,7 @@ NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     else
     {
         LastNtStatus( STATUS_SUCCESS );
-        Wow64SetThreadContext( hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx) );
+        GET_IMPORT( Wow64SetThreadContext )(hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx));
         return LastNtStatus();
     }
 }
@@ -368,7 +372,7 @@ ptr_t Native::getTEB( HANDLE hThread, _TEB64* pteb )
 template<typename T>
 size_t Native::EnumModulesT( Native::listModules& result )
 {
-    _PEB_T2<T>::type peb = { 0 };
+    typename _PEB_T2<T>::type peb = { 0 };
     _PEB_LDR_DATA2<T> ldr = { 0 };
 
     result.clear();
@@ -565,7 +569,7 @@ size_t Native::EnumPEHeaders( listModules& result )
         else
         {
             wchar_t buf[64];
-            wsprintf( buf, L"Unknown_0x%I64x", data.baseAddress );
+            wsprintfW( buf, L"Unknown_0x%I64x", data.baseAddress );
 
             data.fullPath = buf;
             data.name = data.fullPath;
@@ -593,10 +597,7 @@ size_t Native::EnumModules( listModules& result, eModSeachType search/*= LdrList
         if (mtype == mt_default)
             mtype = _wowBarrier.targetWow64 ? mt_mod32 : mt_mod64;
 
-        if (mtype == mt_mod32)
-            return EnumModulesT<DWORD>( result );
-        else
-            return EnumModulesT<DWORD64>( result );
+        return (mtype == mt_mod32) ? EnumModulesT<DWORD>( result ) : EnumModulesT<DWORD64>( result );
     }
     else if(search == Sections)
     {

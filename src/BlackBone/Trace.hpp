@@ -10,15 +10,6 @@ namespace blackbone
 #ifndef BLACBONE_NO_TRACE
 
 template<typename Ch>
-inline void DoTrace( const Ch* fmt, ... )
-{
-    va_list va_args;
-    va_start( va_args, fmt );
-    DoTraceV( fmt, va_args );
-    va_end( va_args );
-}
-
-template<typename Ch>
 void DoTraceV( const Ch* fmt, va_list va_args );
 
 template<>
@@ -39,7 +30,16 @@ void DoTraceV<wchar_t>( const wchar_t* fmt, va_list va_args )
     OutputDebugStringW( buf );
 }
 
-#define BLACBONE_TRACE(fmt, ...) DoTrace(fmt, __VA_ARGS__)
+template<typename Ch>
+inline void DoTrace( const Ch* fmt, ... )
+{
+    va_list va_args;
+    va_start( va_args, fmt );
+    DoTraceV( fmt, va_args );
+    va_end( va_args );
+}
+
+#define BLACBONE_TRACE(fmt, ...) DoTrace(fmt, ##__VA_ARGS__)
 
 #else
 #define BLACBONE_TRACE(...)

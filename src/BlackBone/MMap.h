@@ -1,9 +1,13 @@
 #pragma once
 
+#include "Config.h"
 #include "Winheaders.h"
 #include "FileProjection.h"
 #include "PEParser.h"
+
+#ifdef COMPILER_MSVC
 #include "ImageNET.h"
+#endif // COMPILER_MSVC
 #include "MemBlock.h"
 #include "MExcept.h"
 

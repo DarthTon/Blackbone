@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "RemoteContext.hpp"
 
 #include "Winheaders.h"
@@ -94,6 +95,8 @@ public:
         return AddReturnHookP( ptr, newFn, nullptr );
     }
 
+    // FIXME: Alternative for MinGW
+#ifdef COMPILER_MSVC
     /// <summary>
     /// Hook specified address
     /// </summary>
@@ -123,6 +126,7 @@ public:
     {
         return AddReturnHookP( ptr, brutal_cast<fnCallback>(newFn), &classRef );
     }
+#endif // COMPILER_MSVC
 
     /// <summary>
     /// Remove existing hook

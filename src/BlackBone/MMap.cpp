@@ -433,7 +433,7 @@ const ModuleData* MMap::FindOrMapDependency( ImageContext* pImage, std::wstring&
 {
     // For win32 one exception handler is enough
     // For amd64 each image must have it's own handler to resolve C++ exceptions properly
-#ifdef _M_AMD64
+#ifdef USE64
     eLoadFlags newFlags = static_cast<eLoadFlags>(pImage->flags | NoSxS | NoDelayLoad);
 #else
     eLoadFlags newFlags = static_cast<eLoadFlags>(pImage->flags | NoSxS | NoDelayLoad | PartialExcept);
@@ -552,7 +552,7 @@ bool MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
 bool MMap::EnableExceptions( ImageContext* pImage )
 {
     BLACBONE_TRACE( L"ManualMap: Enabling exception support for image '%ls'", pImage->FileName.c_str() );
-#ifdef _M_AMD64
+#ifdef USE64
     size_t size = pImage->PEImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_EXCEPTION );
     IMAGE_RUNTIME_FUNCTION_ENTRY *pExpTable = 
         reinterpret_cast<decltype(pExpTable)>(pImage->PEImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXCEPTION ));
@@ -605,7 +605,7 @@ bool MMap::EnableExceptions( ImageContext* pImage )
 bool MMap::DisableExceptions( ImageContext* pImage )
 {
     BLACBONE_TRACE( L"ManualMap: Disabling exception support for image '%ls'", pImage->FileName.c_str() );
-#ifdef _M_AMD64
+#ifdef USE64
     if(pImage->pExpTableAddr)
     {
         AsmJit::Assembler a;
@@ -688,7 +688,7 @@ bool MMap::InitializeCookie( ImageContext* pImage )
 
         cookie = _process.pid() ^ _process.remote().getWorker()->id() ^ reinterpret_cast<uintptr_t>(&cookie);
 
-    #ifdef _M_AMD64
+    #ifdef USE64
         cookie ^= *reinterpret_cast<uint64_t*>(&systime);
         cookie ^= (PerformanceCount.QuadPart << 32) ^ PerformanceCount.QuadPart;
         cookie &= 0xFFFFFFFFFFFF;
@@ -910,7 +910,7 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
 /// <returns>bool on success</returns>
 bool MMap::UnlinkVad( const MemBlock& imageMem )
 {
-    HANDLE hFile = CreateFile( _T( "\\\\.\\VadPurge" ), GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
+    HANDLE hFile = CreateFileW( L"\\\\.\\VadPurge" , GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
 
     // Load missing driver
     if (hFile == INVALID_HANDLE_VALUE)
@@ -929,7 +929,7 @@ bool MMap::UnlinkVad( const MemBlock& imageMem )
         if (status != ERROR_SUCCESS && status != STATUS_IMAGE_ALREADY_LOADED)
             return false;
 
-        hFile = CreateFile( _T( "\\\\.\\VadPurge" ), GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
+        hFile = CreateFileW( L"\\\\.\\VadPurge", GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
     }
 
     //
@@ -1031,7 +1031,7 @@ bool MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
 /// <returns>Driver object handle, INVALID_HANDLE_VALUE if failed</returns>
 HANDLE MMap::GetDriverHandle()
 {
-    HANDLE hFile = CreateFile( _T( "\\\\.\\VadPurge" ), GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
+    HANDLE hFile = CreateFileW( L"\\\\.\\VadPurge", GENERIC_ALL, 0, NULL, OPEN_EXISTING, 0, NULL );
 
     // Load missing driver
     if (hFile == INVALID_HANDLE_VALUE)

@@ -72,7 +72,7 @@ public:
 
 private:
 
-    NTSTATUS GrantPriviledge( const std::wstring& name );
+    NTSTATUS GrantPriviledge( const std::basic_string<TCHAR>& name );
 
     Process(const Process&) = delete;
     Process& operator =(const Process&) = delete;

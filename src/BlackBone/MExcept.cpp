@@ -46,7 +46,7 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
     if (!_pVEHCode.valid())
         return LastNtStatus();
 
-#ifdef _M_AMD64 
+#ifdef USE64 
     AsmJit::Assembler ea;
     AsmJit::Label lExit = ea.newLabel();
 
@@ -172,7 +172,7 @@ using namespace blackbone;
 //
 // VEH to inject into process
 //
-#ifdef _M_AMD64
+#ifdef USE64
 
 //
 // This thing is fragile as fuck.
@@ -319,4 +319,4 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
     }
 }
 
-#endif//_M_AMD64
+#endif//USE64

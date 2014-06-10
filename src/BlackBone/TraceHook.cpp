@@ -1,3 +1,4 @@
+#include "Config.h"
 #include "TraceHook.h"
 #include "Macro.h"
 
@@ -11,7 +12,7 @@
 #define SingleStep          0x100
 
 // Architecture-specific
-#ifdef _M_AMD64
+#ifdef USE64
 #define ADDR_MASK 0xFFFFFFFFFFFFF000
 #else
 #define ADDR_MASK 0xFFFFF000
@@ -253,9 +254,9 @@ LONG TraceHook::VecHandlerP( PEXCEPTION_POINTERS ExceptionInfo )
                 exptContex->NIP &= HIGHEST_BIT_UNSET;
 
                 // Restore stack for x64
-            #ifdef _M_AMD64
+            #ifdef USE64
                 *(uintptr_t*)exptContex->NSP &= HIGHEST_BIT_UNSET;
-            #endif // _M_AMD64
+            #endif // USE64
 
                 // Continue stepping
                 exptContex->EFlags |= SingleStep;
@@ -294,13 +295,16 @@ bool TraceHook::CheckBranching( const HookContext& ctx, uintptr_t ip, uintptr_t 
         DISASM info = { 0 };
         info.EIP = ctx.lastIP;
 
-    #ifdef _M_AMD64
+    #ifdef USE64
         info.Archi = 64;
     #endif  
 
+        // FIXME: Alternateve for MinGW
+#ifdef COMPILER_MSVC
         // Double-check call instruction using disasm
         if (Disasm( &info ) > 0 && info.Instruction.BranchType == CallType)
             return true;
+#endif //COMPILER_MSVC
     }
 
     return false;
@@ -363,7 +367,7 @@ bool TraceHook::RestorePtr( const HookContext& ctx, PEXCEPTION_POINTERS Exceptio
     }
 
     // Exception on read/write
-#ifdef _M_AMD64
+#ifdef USE64
     for (DWORD_PTR* pRegVal = &expCtx->Rax; pRegVal <= &expCtx->R15; pRegVal++)
 #else
     for (DWORD_PTR* pRegVal = &expCtx->NDI; pRegVal <= &expCtx->NAX; pRegVal++)  
@@ -431,15 +435,18 @@ size_t TraceHook::StackBacktrace( uintptr_t ip, uintptr_t sp, vecStackFrames& re
             DISASM info = { 0 };
             info.EIP = original - j;
 
-        #ifdef _M_AMD64
+        #ifdef USE64
             info.Archi = 64;
         #endif  
 
+            // FIXME: Alternative for MinGW
+#ifdef COMPILER_MSVC
             if (Disasm( &info ) > 0 && info.Instruction.BranchType == CallType)
             {
                 results.emplace_back( std::make_pair( stackPtr, stack_val ) );
                 break;
             }
+#endif // COMPILER_MSVC
         }
 
     }

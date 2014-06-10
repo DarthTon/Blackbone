@@ -380,6 +380,9 @@
     <ClInclude Include="VTableHook.hpp">
       <Filter>LocalHook</Filter>
     </ClInclude>
+    <ClInclude Include="Config.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\contrib\AsmJit\Regenerate.py">

@@ -1,7 +1,6 @@
 #include "Tests.h"
 #include "../BlackBone/VTableHook.hpp"
 
-
 class TestClass
 {
 public:
@@ -95,6 +94,7 @@ int __stdcall hkTest( void*& _this, int& a1, int&, int& )
 
 void TestLocalHook()
 {
+#ifdef COMPILER_MSVC
     MyMook mh;
     TestClassChild ts;
     Process proc;
@@ -128,4 +128,5 @@ void TestLocalHook()
     std::cout << "Returned value = " <<  val << "\r\n";
 
     proc.Attach( GetCurrentProcessId() );
+#endif
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Config.h"
 #include "NativeStructures.h"
 
 namespace blackbone
@@ -203,5 +204,46 @@ typedef decltype(&NtQueryInformationThread) fnNtQueryInformationThread;
 
 // NtQueryObject
 typedef decltype(&NtQueryObject) fnNtQueryObject;
+
+//
+// GCC compatibility
+//
+
+// Wow64GetThreadContext
+typedef BOOL( __stdcall* fnWow64GetThreadContext )
+    (
+        HANDLE hThread,
+        PWOW64_CONTEXT lpContext
+    );
+
+// Wow64SetThreadContext
+typedef BOOL( __stdcall* fnWow64SetThreadContext )
+    (
+        HANDLE hThread,
+        const WOW64_CONTEXT *lpContext
+    );
+
+// Wow64SuspendThread
+typedef DWORD( __stdcall* fnWow64SuspendThread )
+    (
+        HANDLE hThread
+    );
+
+// GetProcessDEPPolicy
+typedef BOOL( __stdcall* fnGetProcessDEPPolicy )
+    (
+        HANDLE  hProcess,
+        LPDWORD lpFlags,
+        PBOOL   lpPermanent
+    );
+
+// QueryFullProcessImageNameW
+typedef BOOL( __stdcall* fnQueryFullProcessImageNameW)
+    (
+        HANDLE hProcess,
+        DWORD  dwFlags,
+        PWSTR  lpExeName,
+        PDWORD lpdwSize
+    );
 
 }
