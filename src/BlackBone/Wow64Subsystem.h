@@ -78,6 +78,15 @@ public:
     virtual NTSTATUS VirtualQueryExT( ptr_t lpAddress, MEMORY_INFORMATION_CLASS infoClass, LPVOID lpBuffer, size_t bufSize );
 
     /// <summary>
+    /// Call NtQueryInformationProcess for underlying process
+    /// </summary>
+    /// <param name="infoClass">Information class</param>
+    /// <param name="lpBuffer">Output buffer</param>
+    /// <param name="bufSize">Buffer size</param>
+    /// <returns>Status code</returns>
+    virtual NTSTATUS QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize );
+
+    /// <summary>
     /// Creates new thread in the remote process
     /// </summary>
     /// <param name="hThread">Created thread handle</param>

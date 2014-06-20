@@ -3,6 +3,7 @@
 #include "DynImport.h"
 
 #include <algorithm>
+#include <random>
 
 namespace blackbone
 {
@@ -102,13 +103,34 @@ std::wstring Utils::GetExeDirectory()
     wchar_t imgName[MAX_PATH] = { 0 };
     DWORD len = ARRAYSIZE(imgName);
 
-    auto pFunc = DynImport::get<fnQueryFullProcessImageNameW>( "QueryFullProcessImageNameW" );
+    auto pFunc = reinterpret_cast<fnQueryFullProcessImageNameW>(DynImport::load( "QueryFullProcessImageNameW", L"kernel32.dll" ));
     if (pFunc == nullptr)
-        pFunc = reinterpret_cast<fnQueryFullProcessImageNameW>(DynImport::load( "QueryFullProcessImageNameW", L"kernel32.dll" ));
-
-    pFunc( GetCurrentProcess(), 0, imgName, &len );
+        pFunc( GetCurrentProcess(), 0, imgName, &len );
 
     return GetParent( imgName );
+}
+
+/// <summary>
+/// Generate random alpha-numeric string
+/// </summary>
+/// <param name="length">Desired length. 0 - random length from 5 to 15</param>
+/// <returns>Generated string</returns>
+std::wstring Utils::RandomANString( int length /*= 0*/ )
+{
+    static const wchar_t alphabet[] = L"ABCDEFGHIJKLMNOPQRSTUVWXYZbcdefghijklmnopqrstuvwxyz1234567890";
+    static std::random_device rd;
+    static std::uniform_int_distribution<> dist( 0, ARRAYSIZE(alphabet) - 2 );
+    static std::uniform_int_distribution<> dist_len( 5, 15 );
+    std::wstring result;
+
+    // Get random string length
+    if (length == 0)
+        length = dist_len( rd );
+
+    for (int i = 0; i < length; i++)
+        result.push_back( alphabet[dist( rd )] );
+
+    return result;
 }
 
 /// <summary>
@@ -177,12 +199,10 @@ NTSTATUS Utils::LoadDriver( const std::wstring& svcName, const std::wstring& pat
     swprintf_s( wszLocalPath, ARRAYSIZE( wszLocalPath ), L"\\??\\%s", path.c_str() );
 
     status = RegOpenKeyW( HKEY_LOCAL_MACHINE, L"system\\CurrentControlSet\\Services", &key1 );
-
     if (status)
         return status;
 
     status = RegCreateKeyW( key1, svcName.c_str(), &key2 );
-
     if (status)
     {
         RegCloseKey( key1 );
@@ -191,7 +211,6 @@ NTSTATUS Utils::LoadDriver( const std::wstring& svcName, const std::wstring& pat
 
     status = RegSetValueExW( key2, L"ImagePath", 0, REG_SZ, reinterpret_cast<const BYTE*>(wszLocalPath), 
                             static_cast<DWORD>(sizeof(WCHAR)* (wcslen( wszLocalPath ) + 1)) );
-
     if (status)
     {
         RegCloseKey( key2 );
@@ -200,7 +219,6 @@ NTSTATUS Utils::LoadDriver( const std::wstring& svcName, const std::wstring& pat
     }
 
     status = RegSetValueExW( key2, L"Type", 0, REG_DWORD, &dwType, sizeof(DWORD) );
-
     if (status)
     {
         RegCloseKey( key2 );
@@ -217,9 +235,8 @@ NTSTATUS Utils::LoadDriver( const std::wstring& svcName, const std::wstring& pat
     DynImport::load( "NtUnloadDriver", GetModuleHandleW( L"ntdll.dll" ) );
     DynImport::load( "NtLoadDriver", GetModuleHandleW( L"ntdll.dll" ) );
 
-    // Remove previously loaded instance
+    // Remove previously loaded instance, if any
     GET_IMPORT( NtUnloadDriver )(&Ustr);
-
     return GET_IMPORT( NtLoadDriver )(&Ustr);
 }
 

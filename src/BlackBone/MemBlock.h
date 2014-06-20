@@ -126,7 +126,7 @@ public:
     /// <param name="def_val">Defult return value if read has failed</param>
     /// <returns>Read data</returns>
     template<class T>
-    T Read( size_t offset, T def_val )
+    T Read( size_t offset, const T& def_val )
     {
         T res = def_val;
         Read( offset, sizeof(T), &res );
@@ -140,7 +140,7 @@ public:
     /// <param name="data">Data to write</param>
     /// <returns>Status</returns>
     template<class T>
-    NTSTATUS Write( size_t offset, T data )
+    NTSTATUS Write( size_t offset, const T& data )
     {
         return Write( offset, sizeof(T), &data );
     }

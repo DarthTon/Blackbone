@@ -4,6 +4,7 @@
 #include "MemBlock.h"
 
 #include <vector>
+#include <list>
 
 namespace blackbone
 {
@@ -92,17 +93,24 @@ public:
     /// <param name="data">Data to write</param>
     /// <returns>Status</returns>
     template<class T>
-    inline NTSTATUS Write( ptr_t dwAddress, T data )
+    inline NTSTATUS Write( ptr_t dwAddress, const T& data )
     {
         return Write( dwAddress, sizeof(T), &data );
     }
+
+    /// <summary>
+    /// Enumerate valid memory regions
+    /// </summary>
+    /// <param name="results">Found regions</param>
+    /// <param name="includeFree">If true - non-allocated regions will be included in list</param>
+    /// <returns>Number of regions found</returns>
+    size_t EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree = false );
 
     inline class ProcessCore& core() { return _core; }
 
 private:
     ProcessMemory( const ProcessMemory& ) = delete;
     ProcessMemory& operator =(const ProcessMemory&) = delete;
-
 private:
     class ProcessCore& _core;   // Core routines
 };

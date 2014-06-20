@@ -90,6 +90,15 @@ public:
     virtual NTSTATUS VirtualQueryExT( ptr_t lpAddress, MEMORY_INFORMATION_CLASS infoClass, LPVOID lpBuffer, size_t bufSize );
 
     /// <summary>
+    /// Call NtQueryInformationProcess for underlying process
+    /// </summary>
+    /// <param name="infoClass">Information class</param>
+    /// <param name="lpBuffer">Output buffer</param>
+    /// <param name="bufSize">Buffer size</param>
+    /// <returns>Status code</returns>
+    virtual NTSTATUS QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize );
+
+    /// <summary>
     /// Creates new thread in the remote process
     /// </summary>
     /// <param name="hThread">Created thread handle</param>
@@ -160,6 +169,14 @@ public:
     virtual ptr_t getTEB( HANDLE hThread, _TEB64* pteb );
 
     /// <summary>
+    /// Enumerate valid memory regions
+    /// </summary>
+    /// <param name="results">Found regions</param>
+    /// <param name="includeFree">If true - non-allocated regions will be included in list</param>
+    /// <returns>Number of regions found</returns>
+    size_t EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree = false );
+
+    /// <summary>
     /// Enumerate process modules
     /// </summary>
     /// <param name="result">Found modules</param>
@@ -177,8 +194,8 @@ public:
     /// Get highest possible valid address value
     /// </summary>
     /// <returns>Address value</returns>
-    inline ptr_t maxAddr() const { return /*_wowBarrier.targetWow64 ?*/ 0x7FFFFFFF0000; }
-
+    inline ptr_t maxAddr() const { return 0x7FFFFFFEFFFF; }
+                                                                        
     /// <summary>
     /// Get page size
     /// </summary>
@@ -207,7 +224,6 @@ private:
     /// <param name="result">Found modules</param>
     /// <returns>Sections count</returns>
     size_t EnumPEHeaders( listModules& result );
-
 protected:
     HANDLE _hProcess;           // Process handle
     Wow64Barrier _wowBarrier;   // WOW64 barrier info

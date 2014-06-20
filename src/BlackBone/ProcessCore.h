@@ -70,6 +70,12 @@ public:
     /// <returns>PEB pointer</returns>
     inline ptr_t peb() { return peb( (PEB_T*)nullptr ); }
 
+    /// <summary>
+    /// Check if process is a protected process
+    /// </summary>
+    /// <returns>true if protected</returns>
+    bool isProtected();
+
 private:
      ProcessCore();
      ProcessCore( const ProcessCore& ) = delete;

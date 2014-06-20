@@ -3,6 +3,8 @@
 #include "Config.h"
 #include "Winheaders.h"
 
+#include <type_traits>
+
 namespace blackbone
 {
 
@@ -273,13 +275,31 @@ namespace blackbone
     struct _PROCESS_BASIC_INFORMATION_T
     {
         NTSTATUS ExitStatus;
-        ULONG	 Reserved0;
+        ULONG    Reserved0;
         T	     PebBaseAddress;
         T	     AffinityMask;
         LONG	 BasePriority;
         ULONG	 Reserved1;
         T	     uUniqueProcessId;
         T	     uInheritedFromUniqueProcessId;
+    };
+
+    template<typename T>
+    struct _PROCESS_EXTENDED_BASIC_INFORMATION_T
+    {
+        T Size;  // Must be set to structure size on input
+        _PROCESS_BASIC_INFORMATION_T<T> BasicInfo;
+        struct
+        {
+            ULONG IsProtectedProcess : 1;
+            ULONG IsWow64Process : 1;
+            ULONG IsProcessDeleting : 1;
+            ULONG IsCrossSessionCreate : 1;
+            ULONG IsFrozen : 1;
+            ULONG IsBackground : 1;
+            ULONG IsStronglyNamed : 1;
+            ULONG SpareBits : 25;
+        }Flags;
     };
 
     template<typename T>

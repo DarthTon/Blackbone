@@ -95,4 +95,19 @@ void ProcessCore::Close()
     }
 }
 
+bool ProcessCore::isProtected()
+{
+    if (_hProcess)
+    {
+        _PROCESS_EXTENDED_BASIC_INFORMATION_T<DWORD64> info = { 0 };
+        info.Size = sizeof( info );
+        
+        _native->QueryProcessInfoT( ProcessBasicInformation, &info, sizeof( info ) );
+        return info.Flags.IsProtectedProcess;
+    }
+
+    return false;
+}
+
+
 }

@@ -179,6 +179,19 @@ NTSTATUS Native::WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer, siz
 }
 
 /// <summary>
+/// Call NtQueryInformationProcess for underlying process
+/// </summary>
+/// <param name="infoClass">Information class</param>
+/// <param name="lpBuffer">Output buffer</param>
+/// <param name="bufSize">Buffer size</param>
+/// <returns>Status code</returns>
+NTSTATUS Native::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize )
+{
+    ULONG length = 0;
+    return GET_IMPORT( NtQueryInformationProcess )(_hProcess, infoClass, lpBuffer, bufSize, &length);
+}
+
+/// <summary>
 /// Creates new thread in the remote process
 /// </summary>
 /// <param name="hThread">Created thread handle</param>
@@ -362,6 +375,35 @@ ptr_t Native::getTEB( HANDLE hThread, _TEB64* pteb )
             ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof(_TEB64), NULL );
 
     return tbi.TebBaseAddress;
+}
+
+/// <summary>
+/// Enumerate valid memory regions
+/// </summary>
+/// <param name="results">Found regions</param>
+/// <param name="includeFree">If true - non-allocated regions will be included in list</param>
+/// <returns>Number of regions found</returns>
+size_t Native::EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree /*= false*/ )
+{
+    MEMORY_BASIC_INFORMATION64 mbi = { 0 };
+
+    results.clear();
+
+    for (ptr_t memptr = minAddr(); memptr < maxAddr(); memptr = mbi.BaseAddress + mbi.RegionSize)
+    {
+        auto status = VirtualQueryExT( memptr, &mbi );
+
+        if (status == STATUS_INVALID_PARAMETER)
+            break;
+        else if (status != STATUS_SUCCESS)
+            continue;
+
+        // Filter, if required
+        if (includeFree || mbi.State & (MEM_COMMIT | MEM_RESERVE))
+            results.emplace_back( mbi );
+    }
+
+    return results.size();
 }
 
 /// <summary>
@@ -610,5 +652,6 @@ size_t Native::EnumModules( listModules& result, eModSeachType search/*= LdrList
 
     return 0;
 }
+
 
 }

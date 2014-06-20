@@ -136,6 +136,19 @@ NTSTATUS NativeWow64::WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer
 }
 
 /// <summary>
+/// Call NtQueryInformationProcess for underlying process
+/// </summary>
+/// <param name="infoClass">Information class</param>
+/// <param name="lpBuffer">Output buffer</param>
+/// <param name="bufSize">Buffer size</param>
+/// <returns>Status code</returns>
+NTSTATUS NativeWow64::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize )
+{
+    ULONG length = 0;
+    return GET_IMPORT( NtWow64QueryInformationProcess64 )(_hProcess, infoClass, lpBuffer, bufSize, &length);
+}
+
+/// <summary>
 /// Creates new thread in the remote process
 /// </summary>
 /// <param name="hThread">Created thread handle</param>

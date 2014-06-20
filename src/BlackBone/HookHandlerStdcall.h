@@ -8,16 +8,16 @@ struct HookHandler<R( __stdcall* )(Args...), C> : public DetourBase
 {
     typedef typename std::conditional<std::is_same<R, void>::value, int, R>::type ReturnType;
 
-    typedef typename R( __stdcall *type )(Args...);
-    typedef typename R( __stdcall *hktype )(Args&...);
-    typedef typename R( C::*hktypeC )(Args&...);
+    typedef R( __stdcall *type )(Args...);
+    typedef R( __stdcall *hktype )(Args&...);
+    typedef R( C::*hktypeC )(Args&...);
 
     //
     // Workaround for void return type
     //
-    typedef typename ReturnType( __stdcall *typeR )(Args...);
-    typedef typename ReturnType( __stdcall *hktypeR )(Args&...);
-    typedef typename ReturnType( C::*hktypeCR )(Args&...);
+    typedef ReturnType( __stdcall *typeR )(Args...);
+    typedef ReturnType( __stdcall *hktypeR )(Args&...);
+    typedef ReturnType( C::*hktypeCR )(Args&...);
 
     static __declspec(noinline) ReturnType __stdcall Handler( Args... args )
     {

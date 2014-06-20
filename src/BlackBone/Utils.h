@@ -67,6 +67,13 @@ public:
     static std::wstring ToLower( const std::wstring& str );
 
     /// <summary>
+    /// Generate random alpha-numeric string
+    /// </summary>
+    /// <param name="length">Desired length. 0 - random length from 5 to 15</param>
+    /// <returns>Generated string</returns>
+    static std::wstring RandomANString( int length = 0);
+
+    /// <summary>
     /// Get system error description
     /// </summary>
     /// <param name="code">The code.</param>

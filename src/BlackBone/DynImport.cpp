@@ -35,7 +35,7 @@ FARPROC blackbone::DynImport::load( const std::string& name, HMODULE hMod )
         return proc;
     }
 
-    return false;
+    return nullptr;
 }
 
 }
