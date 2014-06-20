@@ -33,8 +33,7 @@ RemoteExec::~RemoteExec()
 /// <returns>Status</returns>
 NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult )
 {
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    AsmJitHelper a;
     NTSTATUS dwResult = STATUS_SUCCESS;
 
     // Write code
@@ -47,7 +46,7 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
     if (pExitThread == 0)
         return LastNtStatus( STATUS_NOT_FOUND );
 
-    ah.GenPrologue( switchMode );
+    a.GenPrologue( switchMode );
 
     // Prepare thread to run in x64 mode
     if(switchMode)
@@ -57,20 +56,20 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
                                                "RtlAllocateActivationContextStack" ).procAddress;
         if (createActStack)
         {
-            ah.GenCall( static_cast<size_t>(createActStack), { _userData.ptr<size_t>() + 0x3100 } );
-            a.mov( AsmJit::nax, _userData.ptr<size_t>( ) + 0x3100 );
-            a.mov( AsmJit::nax, AsmJit::sysint_ptr( AsmJit::nax ) );
+            a.GenCall( static_cast<size_t>(createActStack), { _userData.ptr<size_t>() + 0x3100 } );
+            a->mov( asmjit::host::zax, _userData.ptr<size_t>( ) + 0x3100 );
+            a->mov( asmjit::host::zax, asmjit::host::intptr_ptr( asmjit::host::zax ) );
 
-            ah.SetTebPtr();
-            a.mov( AsmJit::sysint_ptr( AsmJit::ndx, 0x2c8 ), AsmJit::nax );
+            a.SetTebPtr();
+            a->mov( asmjit::host::intptr_ptr( asmjit::host::zdx, 0x2c8 ), asmjit::host::zax );
         }
     }
 
-    ah.GenCall( _userCode.ptr<size_t>(), { } );
-    ah.ExitThreadWithStatus( pExitThread, _userData.ptr<size_t>( ) + INTRET_OFFSET );
+    a.GenCall( _userCode.ptr<size_t>(), { } );
+    a.ExitThreadWithStatus( (size_t)pExitThread, _userData.ptr<size_t>() + INTRET_OFFSET );
     
     // Execute code in newly created thread
-    if (_userCode.Write( size, a.getCodeSize(), a.make() ) == STATUS_SUCCESS)
+    if (_userCode.Write( size, a->getCodeSize(), a->make() ) == STATUS_SUCCESS)
     {
         auto thread = _threads.CreateNew( _userCode.ptr<ptr_t>() + size, _userData.ptr<ptr_t>() );
 
@@ -173,51 +172,50 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
 
     if (thd.GetContext( ctx, CONTEXT_ALL, true ))
     {
-        AsmJit::Assembler a;
-        AsmJitHelper ah( a );
+        AsmJitHelper a;
 
 #ifdef USE64
         const int count = 15;
-        AsmJit::GPReg regs[] = { AsmJit::rax, AsmJit::rbx, AsmJit::rcx, AsmJit::rdx, AsmJit::rsi,
-                                 AsmJit::rdi, AsmJit::r8,  AsmJit::r9,  AsmJit::r10, AsmJit::r11,
-                                 AsmJit::r12, AsmJit::r13, AsmJit::r14, AsmJit::r15, AsmJit::rbp };
+        asmjit::host::GpReg regs[] = { asmjit::host::rax, asmjit::host::rbx, asmjit::host::rcx, asmjit::host::rdx, asmjit::host::rsi,
+                                       asmjit::host::rdi, asmjit::host::r8, asmjit::host::r9, asmjit::host::r10, asmjit::host::r11,
+                                       asmjit::host::r12, asmjit::host::r13, asmjit::host::r14, asmjit::host::r15, asmjit::host::rbp };
         //
         // Preserve thread context
         // I don't care about FPU, XMM and anything else
         //
-        a.sub(AsmJit::rsp, count * WordSize);  // Stack must be aligned on 16 bytes 
-        a.pushfq();                            //
+        a->sub( asmjit::host::rsp, count * WordSize );  // Stack must be aligned on 16 bytes 
+        a->pushf();                                     //
 
         // Save registers
         for (int i = 0; i < count; i++)
-            a.mov( AsmJit::Mem( AsmJit::rsp, i * WordSize ), regs[i] );
+            a->mov( asmjit::host::Mem( asmjit::host::rsp, i * WordSize ), regs[i] );
 
-        ah.GenCall( _userCode.ptr<size_t>(), { _userData.ptr<size_t>() } );
-        AddReturnWithEvent( ah, rt_int32, INTRET_OFFSET );
+        a.GenCall( _userCode.ptr<size_t>(), { _userData.ptr<size_t>() } );
+        AddReturnWithEvent( a, rt_int32, INTRET_OFFSET );
 
         // Restore registers
         for (int i = 0; i < count; i++)
-            a.mov( regs[i], AsmJit::Mem( AsmJit::rsp, i * WordSize ) );
+            a->mov( regs[i], asmjit::host::Mem( asmjit::host::rsp, i * WordSize ) );
 
-        a.popfq();
-        a.add( AsmJit::rsp, count * WordSize );
+        a->popf();
+        a->add( asmjit::host::rsp, count * WordSize );
 
-        a.jmp( ctx.Rip );
+        a->jmp( (void*)ctx.Rip );
     #else
-        a.pushad();
-        a.pushfd();
+        a->pusha();
+        a->pushf();
 
-        ah.GenCall( _userCode.ptr<size_t>(), { _userData.ptr<size_t>() } );
-        AddReturnWithEvent( ah, rt_int32, INTRET_OFFSET );
+        a.GenCall( _userCode.ptr<size_t>(), { _userData.ptr<size_t>() } );
+        AddReturnWithEvent( a, rt_int32, INTRET_OFFSET );
 
-        a.popfd();
-        a.popad();
+        a->popf();
+        a->popa();
 
-        a.push( ctx.NIP );
-        a.ret();
+        //a->push( ctx.NIP );
+        a->ret();
     #endif
 
-        if (_userCode.Write( size, a.getCodeSize(), a.make() ) == STATUS_SUCCESS)
+        if (_userCode.Write( size, a->getCodeSize(), a->make() ) == STATUS_SUCCESS)
         {
             ctx.NIP = _userCode.ptr<size_t>() + size;
 
@@ -306,9 +304,8 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool noThread /*= false*/ )
 /// <returns>Thread ID</returns>
 DWORD RemoteExec::CreateWorkerThread()
 {
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
-    AsmJit::Label l_loop = a.newLabel();
+    AsmJitHelper a;
+    asmjit::Label l_loop = a->newLabel();
 
     //
     // Create execution thread
@@ -320,22 +317,22 @@ DWORD RemoteExec::CreateWorkerThread()
         {
             mt = mt_mod64;
 
-            ah.SwitchTo64();
+            a.SwitchTo64();
 
             // Align stack on 16 byte boundary
-            a.and_( AsmJit::nsp, -16 );
+            a->and_( asmjit::host::zsp, -16 );
 
             // Allocate new x64 activation stack
             auto createActStack = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt ),
                                                    "RtlAllocateActivationContextStack" ).procAddress;
             if(createActStack)
             {
-                ah.GenCall( static_cast<size_t>(createActStack), { _userData.ptr<size_t>() + 0x3000 } );
-                a.mov( AsmJit::nax, _userData.ptr<size_t>() + 0x3000 );
-                a.mov( AsmJit::nax, AsmJit::sysint_ptr( AsmJit::nax ) );
+                a.GenCall( static_cast<size_t>(createActStack), { _userData.ptr<size_t>() + 0x3000 } );
+                a->mov( asmjit::host::zax, _userData.ptr<size_t>() + 0x3000 );
+                a->mov( asmjit::host::zax, asmjit::host::intptr_ptr( asmjit::host::zax ) );
 
-                ah.SetTebPtr();
-                a.mov( AsmJit::sysint_ptr( AsmJit::ndx, 0x2c8 ), AsmJit::nax );
+                a.SetTebPtr();
+                a->mov( asmjit::host::intptr_ptr( asmjit::host::zdx, 0x2c8 ), asmjit::host::zax );
             }
         }          
 
@@ -350,18 +347,18 @@ DWORD RemoteExec::CreateWorkerThread()
 
             ExitThread(SetEvent(m_hWaitEvent));
         */
-        a.bind( l_loop );
-        ah.GenCall( static_cast<size_t>(proc), { TRUE, _workerCode.ptr<size_t>() } );
-        a.jmp( l_loop );
+        a->bind( l_loop );
+        a.GenCall( static_cast<size_t>(proc), { TRUE, _workerCode.ptr<size_t>() } );
+        a->jmp( l_loop );
 
-        ah.ExitThreadWithStatus( pExitThread, _userData.ptr<size_t>() );
+        a.ExitThreadWithStatus( (size_t)pExitThread, _userData.ptr<size_t>() );
 
         // Write code into process
         LARGE_INTEGER liDelay = { 0 };
         liDelay.QuadPart = -10 * 1000 * 5;
 
         _workerCode.Write( 0, liDelay );
-        _workerCode.Write( sizeof(LARGE_INTEGER), a.getCodeSize(), a.make() );
+        _workerCode.Write( sizeof(LARGE_INTEGER), a->getCodeSize(), a->make() );
 
         _hWorkThd = _threads.CreateNew( _workerCode.ptr<size_t>() + sizeof(LARGE_INTEGER), _userData.ptr<size_t>() );
     }
@@ -378,8 +375,7 @@ bool RemoteExec::CreateAPCEvent( DWORD threadID )
 {         
     if(_hWaitEvent == NULL)
     {
-        AsmJit::Assembler a;
-        AsmJitHelper ah( a );
+        AsmJitHelper a;
 
         wchar_t pEventName[128] = { 0 };
         uint64_t dwResult = NULL;
@@ -407,15 +403,15 @@ bool RemoteExec::CreateAPCEvent( DWORD threadID )
         if (pCreateEvent == 0)
             return false;
 
-        ah.GenCall( static_cast<size_t>(pCreateEvent), { 
+        a.GenCall( static_cast<size_t>(pCreateEvent), { 
             _userData.ptr<size_t>( ) + EVENT_OFFSET, EVENT_ALL_ACCESS,
             _userData.ptr<size_t>() + ARGS_OFFSET, 0, FALSE } );
 
         // Save status
-        a.mov( AsmJit::ndx, _userData.ptr<size_t>() + ERR_OFFSET );
-        a.mov( AsmJit::dword_ptr( AsmJit::ndx ), AsmJit::eax );
+        a->mov( asmjit::host::zdx, _userData.ptr<size_t>() + ERR_OFFSET );
+        a->mov( asmjit::host::dword_ptr( asmjit::host::zdx ), asmjit::host::eax );
 
-        a.ret();
+        a->ret();
 
         NTSTATUS status = _userData.Write( ARGS_OFFSET, obAttr );
         status |= _userData.Write( ARGS_OFFSET + sizeof(obAttr), ustr );
@@ -424,7 +420,7 @@ bool RemoteExec::CreateAPCEvent( DWORD threadID )
         if (status != STATUS_SUCCESS)
             return false;
 
-        ExecInNewThread( a.make(), a.getCodeSize(), dwResult );
+        ExecInNewThread( a->make(), a->getCodeSize(), dwResult );
 
         status = _userData.Read<NTSTATUS>( ERR_OFFSET, -1 );
         if (status != STATUS_SUCCESS)
@@ -452,14 +448,13 @@ bool RemoteExec::CreateAPCEvent( DWORD threadID )
 /// <param name="cc">Calling convention</param>
 /// <param name="retType">Return type</param>
 /// <returns>true on success</returns>
-bool RemoteExec::PrepareCallAssembly( AsmJit::Assembler& a, 
+bool RemoteExec::PrepareCallAssembly( AsmHelperBase& a, 
                                       const void* pfn, 
                                       std::vector<AsmVariant>& args, 
                                       eCalligConvention cc, 
                                       eReturnType retType )
 {
     size_t data_offset = ARGS_OFFSET;
-    AsmJitHelper ah( a );
 
     // Invalid calling convention
     if (cc < cc_cdecl || cc > cc_fastcall)
@@ -490,26 +485,26 @@ bool RemoteExec::PrepareCallAssembly( AsmJit::Assembler& a,
         args.front().type = AsmVariant::structRet;
     }
         
-    ah.GenPrologue();
-    ah.GenCall( pfn, args, cc );
+    a.GenPrologue();
+    a.GenCall( pfn, args, cc );
 
     // Retrieve result from XMM0 or ST0
     if (retType == rt_float || retType == rt_double)
     {
-        a.mov( AsmJit::nax, _userData.ptr<size_t>() + RET_OFFSET );
+        a->mov( asmjit::host::zax, _userData.ptr<size_t>() + RET_OFFSET );
 
 #ifdef USE64
         if (retType == rt_double)
-            a.movsd( AsmJit::Mem( AsmJit::nax, 0 ), AsmJit::xmm0 );
+            a->movsd( asmjit::host::Mem( asmjit::host::zax, 0 ), asmjit::host::xmm0 );
         else
-            a.movss( AsmJit::Mem( AsmJit::nax, 0 ), AsmJit::xmm0 );
+            a->movss( asmjit::host::Mem( asmjit::host::zax, 0 ), asmjit::host::xmm0 );
 #else
-        a.fstp( AsmJit::Mem( AsmJit::nax, 0, retType * sizeof(float) ) );
+        a->fstp( asmjit::host::Mem( asmjit::host::zax, 0, retType * sizeof(float) ) );
 #endif
     }
 
-    AddReturnWithEvent( ah, retType );
-    ah.GenEpilogue();
+    AddReturnWithEvent( a, retType );
+    a.GenEpilogue();
 
     return true;
 }
@@ -539,14 +534,14 @@ NTSTATUS RemoteExec::CopyCode( PVOID pCode, size_t size )
 /// <summary>
 /// Generate return from function with event synchronization
 /// </summary>
-/// <param name="ah">Target assembly helper</param>
+/// <param name="a">Target assembly helper</param>
 /// <param name="retType">Function return type</param>
 /// <param name="retOffset">Return value offset</param>
-void RemoteExec::AddReturnWithEvent( AsmHelperBase& ah, eReturnType retType /*= rt_int32 */, uint32_t retOffset /*= RET_OFFSET*/ )
+void RemoteExec::AddReturnWithEvent( AsmHelperBase& a, eReturnType retType /*= rt_int32 */, uint32_t retOffset /*= RET_OFFSET*/ )
 {
     size_t ptr = _userData.ptr<size_t>();
     auto pSetEvent = _proc.modules().GetExport( _proc.modules().GetModule( L"ntdll.dll" ), "NtSetEvent" );
-    ah.SaveRetValAndSignalEvent( pSetEvent.procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
+    a.SaveRetValAndSignalEvent( (size_t)pSetEvent.procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
 }
 
 

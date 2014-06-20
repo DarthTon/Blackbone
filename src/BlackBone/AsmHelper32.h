@@ -11,7 +11,7 @@ namespace blackbone
 class AsmHelper32 : public AsmHelperBase
 {
 public:
-    AsmHelper32( AsmJit::Assembler& _a );
+    AsmHelper32( );
     ~AsmHelper32( void );
 
     /// <summary>
@@ -68,7 +68,7 @@ public:
     virtual void SetTebPtr()
     {
         // mov edx, fs:[0x18]   
-        a.mov( AsmJit::edx, AsmJit::dword_ptr_abs( reinterpret_cast<void*>(0x18), 0, AsmJit::SEGMENT_FS ) );
+        _assembler.mov( asmjit::host::edx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );
     }
 
 private:

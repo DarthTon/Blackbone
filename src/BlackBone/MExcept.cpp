@@ -35,9 +35,8 @@ MExcept::~MExcept()
 /// <param name="imageSize">Size of the image</param>
 /// <returns>Error code</returns>
 NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
-{
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+{    
+    AsmJitHelper ea;
     uint64_t result = 0;
     
     // VEH codecave
@@ -47,8 +46,7 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
         return LastNtStatus();
 
 #ifdef USE64 
-    AsmJit::Assembler ea;
-    AsmJit::Label lExit = ea.newLabel();
+    asmjit::Label lExit = ea->newLabel();
 
     //
     // Assembly code for VectoredHandler64
@@ -57,32 +55,32 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
     // 0x30 - EXCEPTION_RECORD.ExceptionInformation[2]
     // 0x38 - EXCEPTION_RECORD.ExceptionInformation[3]
     //
-    ea.mov( AsmJit::rax, qword_ptr( AsmJit::rcx ) );
-    ea.cmp( AsmJit::dword_ptr( AsmJit::rax ), EH_EXCEPTION_NUMBER );
-    ea.jne( lExit );
-    ea.mov( AsmJit::rdx, pTargetBase );
-    ea.mov( AsmJit::r8, AsmJit::qword_ptr( AsmJit::rax, 0x30 ) );
-    ea.cmp( AsmJit::r8, AsmJit::rdx );;
-    ea.jl( lExit );
-    ea.add( AsmJit::rdx, imageSize );
-    ea.cmp( AsmJit::r8, AsmJit::rdx );;
-    ea.jg( lExit );
-    ea.cmp( AsmJit::qword_ptr( AsmJit::rax, 0x20 ), EH_PURE_MAGIC_NUMBER1 );;
-    ea.jne( lExit );
-    ea.cmp( AsmJit::qword_ptr( AsmJit::rax, 0x38 ), 0 );
-    ea.jne( lExit );
-    ea.mov( AsmJit::qword_ptr( AsmJit::rax, 0x20 ), EH_MAGIC_NUMBER1 );
-    ea.mov( AsmJit::rcx, qword_ptr( AsmJit::rcx ) );
-    ea.mov( AsmJit::rdx, pTargetBase );
-    ea.mov( AsmJit::qword_ptr( AsmJit::rax, 0x38 ), AsmJit::rdx );
-    ea.bind( lExit );
-    ea.xor_( AsmJit::rax, AsmJit::rax );
-    ea.ret();
-    ea._emitByte( 0xCC );
-    ea._emitByte( 0xCC );
-    ea._emitByte( 0xCC );
+    ea->mov( asmjit::host::rax, qword_ptr( asmjit::host::rcx ) );
+    ea->cmp( asmjit::host::dword_ptr( asmjit::host::rax ), EH_EXCEPTION_NUMBER );
+    ea->jne( lExit );
+    ea->mov( asmjit::host::rdx, pTargetBase );
+    ea->mov( asmjit::host::r8, asmjit::host::qword_ptr( asmjit::host::rax, 0x30 ) );
+    ea->cmp( asmjit::host::r8, asmjit::host::rdx );;
+    ea->jl( lExit );
+    ea->add( asmjit::host::rdx, imageSize );
+    ea->cmp( asmjit::host::r8, asmjit::host::rdx );;
+    ea->jg( lExit );
+    ea->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_PURE_MAGIC_NUMBER1 );;
+    ea->jne( lExit );
+    ea->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), 0 );
+    ea->jne( lExit );
+    ea->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_MAGIC_NUMBER1 );
+    ea->mov( asmjit::host::rcx, qword_ptr( asmjit::host::rcx ) );
+    ea->mov( asmjit::host::rdx, pTargetBase );
+    ea->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), asmjit::host::rdx );
+    ea->bind( lExit );
+    ea->xor_( asmjit::host::rax, asmjit::host::rax );
+    ea->ret();
+    ea->emit( 0xCC );
+    ea->emit( 0xCC );
+    ea->emit( 0xCC );
 
-    if (_pVEHCode.Write( 0, ea.getCodeSize(), ea.make() ) != STATUS_SUCCESS)
+    if (_pVEHCode.Write( 0, ea->getCodeSize(), ea->make() ) != STATUS_SUCCESS)
     {
         _pVEHCode.Free();
         return LastNtStatus();
@@ -127,15 +125,15 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
 
 #endif
 
-    ah.GenPrologue();
+    ea.GenPrologue();
 
     // AddVectoredExceptionHandler(0, pHandler);
-    ah.GenCall( reinterpret_cast<void*>(&AddVectoredExceptionHandler), { 0, _pVEHCode.ptr<size_t>() } );
+    ea.GenCall( reinterpret_cast<void*>(&AddVectoredExceptionHandler), { 0, _pVEHCode.ptr<size_t>() } );
 
-    _proc.remote().AddReturnWithEvent( ah );
-    ah.GenEpilogue();
+    _proc.remote().AddReturnWithEvent( ea );
+    ea.GenEpilogue();
 
-    _proc.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+    _proc.remote().ExecInWorkerThread( ea->make(), ea->getCodeSize(), result );
     _hVEH = static_cast<size_t>(result);
 
     return (result == 0 ? STATUS_NOT_FOUND : STATUS_SUCCESS);
@@ -147,19 +145,19 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
 /// <returns></returns>
 NTSTATUS MExcept::RemoveVEH()
 {
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    
+    AsmJitHelper a;
     uint64_t result = 0;
 
-    ah.GenPrologue();
+    a.GenPrologue();
 
     // RemoveVectoredExceptionHandler(pHandler);
-    ah.GenCall( reinterpret_cast<void*>(&RemoveVectoredExceptionHandler), { _hVEH } );
+    a.GenCall( reinterpret_cast<void*>(&RemoveVectoredExceptionHandler), { _hVEH } );
 
-    _proc.remote().AddReturnWithEvent( ah );
-    ah.GenEpilogue();
+    _proc.remote().AddReturnWithEvent( a );
+    a.GenEpilogue();
 
-    _proc.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+    _proc.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     _pVEHCode.Free();
 
     return STATUS_SUCCESS;

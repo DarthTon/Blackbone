@@ -33,9 +33,9 @@ public:
     /// <param name="vtableLen">Optional. Valid only when copyVtable is true. Number of function in vtable. 
     /// Used to determine number of function to copy</param>
     /// <returns>true on success</returns>
-    bool Hook( void** ppVtable, uintptr_t index, hktype hkPtr, bool copyVtable = false, int vtableLen = 0 )
+    bool Hook( void** ppVtable, int index, hktype hkPtr, bool copyVtable = false, int vtableLen = 0 )
     {
-        AsmJit::Assembler jmpToHook;
+        AsmJitHelper jmpToHook;
 
         //_order = CallOrder::HookFirst;
         //_retType = ReturnMethod::UseOriginal;
@@ -52,15 +52,15 @@ public:
         // Construct jump to hook handler
 #ifdef USE64
         // mov gs:[0x28], this
-        jmpToHook.mov( AsmJit::rax, (uint64_t)this );
-        jmpToHook.mov( AsmJit::qword_ptr_abs( (void*)0x28, 0, AsmJit::SEGMENT_GS ), AsmJit::rax );
+        jmpToHook->mov( asmjit::host::rax, (uint64_t)this );
+        jmpToHook->mov( asmjit::host::qword_ptr_abs( 0x28 ).setSegment( asmjit::host::gs ), asmjit::host::rax );
 #else
         // mov fs:[0x14], this
-        jmpToHook.mov( AsmJit::dword_ptr_abs( (void*)0x14, 0, AsmJit::SEGMENT_FS ), (uint32_t)this );
+        jmpToHook->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ), (uint32_t)this );
 #endif // USE64
 
-        jmpToHook.jmp( this->_internalHandler );
-        jmpToHook.relocCode( this->_buf );
+        jmpToHook->jmp( this->_internalHandler );
+        jmpToHook->relocCode( this->_buf );
 
         // Modify VTable copy
         if (copyVtable)
@@ -111,7 +111,7 @@ public:
     /// <param name="vtableLen">Optional. Valid only when copyVtable is true. Number of function in vtable. 
     /// Used to determine number of function to copy</param>
     /// <returns>true on success</returns>
-    bool Hook( void** ppVtable, uintptr_t index, hktypeC hkPtr, C* pClass, bool copyVtable = false, int vtableLen = 0 )
+    bool Hook( void** ppVtable, int index, hktypeC hkPtr, C* pClass, bool copyVtable = false, int vtableLen = 0 )
     {
         this->_callbackClass = pClass;
         return Hook( ppVtable, index, brutal_cast<hktype>(hkPtr), copyVtable, vtableLen );

@@ -9,7 +9,7 @@ namespace blackbone
 class AsmHelper64 : public AsmHelperBase
 {
 public:
-    AsmHelper64( AsmJit::Assembler& _a );
+    AsmHelper64();
     ~AsmHelper64( void );
 
     /// <summary>
@@ -69,7 +69,7 @@ public:
     virtual void SetTebPtr()
     {
         // mov rdx, gs:[0x30]   
-        a.mov( AsmJit::rdx, AsmJit::dword_ptr_abs( reinterpret_cast<void*>(0x30), 0, AsmJit::SEGMENT_GS ) );
+        _assembler.mov( asmjit::host::rdx, asmjit::host::dword_ptr_abs( 0x30 ).setSegment( asmjit::host::gs ) );
     }
 
 private:

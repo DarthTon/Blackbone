@@ -128,19 +128,19 @@ private:
     /// <returns>true on success</returns>
     bool HookInline()
     {
-        AsmJit::Assembler jmpToHook, jmpToThunk; 
+        AsmJitHelper jmpToHook, jmpToThunk; 
 
         //
         // Construct jump to thunk
         //
 #ifdef USE64
-        jmpToThunk.mov( AsmJit::rax, (uint64_t)this->_buf );
-        jmpToThunk.jmp( AsmJit::rax );
+        jmpToThunk->mov( asmjit::host::rax, (uint64_t)this->_buf );
+        jmpToThunk->jmp( asmjit::host::rax );
 
-        this->_origSize = jmpToThunk.getCodeSize( );
+        this->_origSize = jmpToThunk->getCodeSize( );
 #else
-        jmpToThunk.jmp( _buf );
-        this->_origSize = jmpToThunk.getCodeSize();
+        jmpToThunk->jmp( _buf );
+        this->_origSize = jmpToThunk->getCodeSize();
 #endif
         
         DetourBase::CopyOldCode( (uint8_t*)this->_original );
@@ -148,18 +148,18 @@ private:
         // Construct jump to hook handler
 #ifdef USE64
         // mov gs:[0x28], this
-        jmpToHook.mov( AsmJit::rax, (uint64_t)this );
-        jmpToHook.mov( AsmJit::qword_ptr_abs( (void*)0x28, 0, AsmJit::SEGMENT_GS ), AsmJit::rax );
+        jmpToHook->mov( asmjit::host::rax, (uint64_t)this );
+        jmpToHook->mov( asmjit::host::qword_ptr_abs( 0x28 ).setSegment( asmjit::host::gs ), asmjit::host::rax );
 #else
         // mov fs:[0x14], this
-        jmpToHook.mov( AsmJit::dword_ptr_abs( (void*)0x14, 0, AsmJit::SEGMENT_FS ), (uint32_t)this );
+        jmpToHook->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ) , (uint32_t)this );
 #endif // USE64
 
-        jmpToHook.jmp( &HookHandler<Fn, C>::Handler );
-        jmpToHook.relocCode( this->_buf );
+        jmpToHook->jmp( &HookHandler<Fn, C>::Handler );
+        jmpToHook->relocCode( this->_buf );
 
         BOOL res = WriteProcessMemory( GetCurrentProcess(), this->_original, this->_newCode,
-                                       jmpToThunk.relocCode( this->_newCode, (sysuint_t)this->_original ), NULL );
+                                       jmpToThunk->relocCode( this->_newCode, (uintptr_t)this->_original ), NULL );
         
         return (this->_hooked = (res == TRUE));
     }

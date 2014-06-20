@@ -6,8 +6,7 @@
 namespace blackbone
 {
 
-AsmHelper32::AsmHelper32( AsmJit::Assembler& _a )
-    : AsmHelperBase( _a )
+AsmHelper32::AsmHelper32( )
 {
 }
 
@@ -27,8 +26,8 @@ void AsmHelper32::GenPrologue( bool switchMode /*= false*/ )
     }
     else
     {
-        a.push( AsmJit::ebp );
-        a.mov( AsmJit::ebp, AsmJit::esp );
+        _assembler.push( asmjit::host::ebp );
+        _assembler.mov( asmjit::host::ebp, asmjit::host::esp );
     }
 }
 
@@ -48,11 +47,11 @@ void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= Wor
     }
     else
     {
-        a.mov( AsmJit::esp, AsmJit::ebp );
-        a.pop( AsmJit::ebp );
+        _assembler.mov( asmjit::host::esp, asmjit::host::ebp );
+        _assembler.pop( asmjit::host::ebp );
     }
 
-    a.ret( retSize );
+    _assembler.ret( retSize );
 }
 
 /// <summary>
@@ -87,13 +86,13 @@ void AsmHelper32::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
     // Direct pointer
     if(pFN.type == AsmVariant::imm)
     {
-        a.mov( AsmJit::eax, pFN.imm_val );
-        a.call( AsmJit::eax );
+        _assembler.mov( asmjit::host::eax, pFN.imm_val );
+        _assembler.call( asmjit::host::eax );
     }
     // Already in register
     else if (pFN.type == AsmVariant::reg)
     {
-        a.call( pFN.reg_val );
+        _assembler.call( pFN.reg_val );
     }
     else
     {
@@ -113,7 +112,7 @@ void AsmHelper32::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
                 argsize += sizeof(void*);
         }
 
-        a.add( AsmJit::esp, argsize );
+        _assembler.add( asmjit::host::esp, argsize );
     }
       
 }
@@ -127,15 +126,15 @@ void AsmHelper32::ExitThreadWithStatus( size_t pExitThread, size_t resultPtr = 0
 {
     if (resultPtr != 0)
     {
-        a.mov( AsmJit::edx, resultPtr );
-        a.mov( AsmJit::dword_ptr( AsmJit::edx ), AsmJit::eax );
+        _assembler.mov( asmjit::host::edx, resultPtr );
+        _assembler.mov( asmjit::host::dword_ptr( asmjit::host::edx ), asmjit::host::eax );
     }
 
     // NtTerminateThread( NULL, eax );
-    a.push( AsmJit::eax );
-    a.push( 0 );
-    a.mov( AsmJit::eax, pExitThread );
-    a.call( AsmJit::eax );
+    _assembler.push( asmjit::host::eax );
+    _assembler.push( 0 );
+    _assembler.mov( asmjit::host::eax, pExitThread );
+    _assembler.call( asmjit::host::eax );
     
     GenEpilogue();
 }
@@ -154,34 +153,34 @@ void AsmHelper32::SaveRetValAndSignalEvent( size_t pSetEvent,
                                             size_t errPtr, 
                                             eReturnType rtype /*= rt_int32*/ )
 {
-    a.mov( AsmJit::ecx, ResultPtr );
+    _assembler.mov( asmjit::host::ecx, ResultPtr );
 
     // Return 64bit value
     if (rtype == rt_int64)
     {
-        a.mov( AsmJit::dword_ptr( AsmJit::ecx, 4 ), AsmJit::eax );
-        a.mov( AsmJit::dword_ptr( AsmJit::ecx ), AsmJit::edx );
+        _assembler.mov( asmjit::host::dword_ptr( asmjit::host::ecx, 4 ), asmjit::host::eax );
+        _assembler.mov( asmjit::host::dword_ptr( asmjit::host::ecx ), asmjit::host::edx );
     }
     else if (rtype == rt_int32)
-        a.mov( AsmJit::dword_ptr( AsmJit::ecx ), AsmJit::eax );
+        _assembler.mov( asmjit::host::dword_ptr( asmjit::host::ecx ), asmjit::host::eax );
 
     // Save last NT status
     SetTebPtr();
 
     // Save status
-    a.add( AsmJit::edx, LAST_STATUS_OFS );
-    a.mov( AsmJit::edx, AsmJit::dword_ptr( AsmJit::edx ) );
-    a.mov( AsmJit::eax, errPtr );
-    a.mov( AsmJit::dword_ptr( AsmJit::eax ), AsmJit::edx );
+    _assembler.add( asmjit::host::edx, LAST_STATUS_OFS );
+    _assembler.mov( asmjit::host::edx, asmjit::host::dword_ptr( asmjit::host::edx ) );
+    _assembler.mov( asmjit::host::eax, errPtr );
+    _assembler.mov( asmjit::host::dword_ptr( asmjit::host::eax ), asmjit::host::edx );
 
     // SetEvent(hEvent)
     // NtSetEvent(hEvent, NULL)
-    a.push( 0 );
-    a.mov( AsmJit::eax, EventPtr );
-    a.mov( AsmJit::eax, AsmJit::dword_ptr( AsmJit::eax ) );
-    a.push( AsmJit::eax );
-    a.mov( AsmJit::eax, pSetEvent );
-    a.call( AsmJit::eax );
+    _assembler.push( 0 );
+    _assembler.mov( asmjit::host::eax, EventPtr );
+    _assembler.mov( asmjit::host::eax, asmjit::host::dword_ptr( asmjit::host::eax ) );
+    _assembler.push( asmjit::host::eax );
+    _assembler.mov( asmjit::host::eax, pSetEvent );
+    _assembler.call( asmjit::host::eax );
 }
 
 /// <summary>
@@ -208,18 +207,18 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
         {
             // Ensure stack remain aligned on word size
             size_t realSize = (arg.size < WordSize) ? WordSize : arg.size;
-            a.sub( AsmJit::esp, realSize );
-            a.mov( AsmJit::esi, arg.new_imm_val );
-            a.mov( AsmJit::edi, AsmJit::esp);
+            _assembler.sub( asmjit::host::esp, realSize );
+            _assembler.mov( asmjit::host::esi, arg.new_imm_val );
+            _assembler.mov( asmjit::host::edi, asmjit::host::esp);
 
             // Preserve ecx value, may be __thiscall or __fastcall function
-            a.mov( AsmJit::eax, AsmJit::ecx );
+            _assembler.mov( asmjit::host::eax, asmjit::host::ecx );
 
-            a.mov( AsmJit::ecx, arg.size );
-            a.rep_movsb();
+            _assembler.mov( asmjit::host::ecx, arg.size );
+            _assembler.rep_movsb();
 
             // Restore registers
-            a.mov( AsmJit::ecx, AsmJit::eax );
+            _assembler.mov( asmjit::host::ecx, asmjit::host::eax );
         }
         break;
 
@@ -228,8 +227,8 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
             ULARGE_INTEGER li;
             li.QuadPart = arg.getImm_double();
 
-            PushArgp( li.HighPart, regidx );
-            PushArgp( li.LowPart, regidx );
+            PushArgp( static_cast<uint32_t>(li.HighPart), regidx );
+            PushArgp( static_cast<uint32_t>(li.LowPart), regidx );
         }
         break;
 
@@ -238,8 +237,8 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
         break;
 
     case AsmVariant::mem_ptr:        
-        a.lea( AsmJit::eax, arg.mem_val );
-        PushArgp( AsmJit::eax, regidx );
+        _assembler.lea( asmjit::host::eax, arg.mem_val );
+        PushArgp( asmjit::host::eax, regidx );
         break;
 
     case AsmVariant::mem:
@@ -264,13 +263,13 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
 template<typename _Type>
 void AsmHelper32::PushArgp( _Type arg, eArgType index )
 {
-    static const AsmJit::GPReg regs[] = { AsmJit::ecx, AsmJit::edx };
+    static const asmjit::host::GpReg regs[] = { asmjit::host::ecx, asmjit::host::edx };
 
     // for __fastcall and __thiscall
     if (index < at_stack)
-        a.mov( regs[index], arg );
+        _assembler.mov( regs[index], arg );
     else
-        a.push( arg );
+        _assembler.push( arg );
 }
 
 }

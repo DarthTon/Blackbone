@@ -96,16 +96,16 @@ T* NtLdr::SetNode( T* ptr, void* pModule )
 {
     if(ptr == nullptr)
     {
-        /*AsmJit::Assembler a;
-        AsmJitHelper ah(a);
+        /*
+        AsmJitHelper a
 
-        ah.GenPrologue();
-        ah.GenCall(&GetProcessHeap, {  });
-        ah.GenCall(&HeapAlloc, { AsmJit::nax, HEAP_ZERO_MEMORY, sizeof(T) });
-        ah.SaveRetValAndSignalEvent();
-        ah.GenEpilogue();
+        a.GenPrologue();
+        a.GenCall(&GetProcessHeap, {  });
+        a.GenCall(&HeapAlloc, { asmjit::host::zax, HEAP_ZERO_MEMORY, sizeof(T) });
+        a->SaveRetValAndSignalEvent();
+        a.GenEpilogue();
 
-        m_memory.ExecInWorkerThread(a.make(), a.getCodeSize(), (size_t&)ptr);*/
+        m_memory.ExecInWorkerThread(a->make(), a->getCodeSize(), (size_t&)ptr);*/
 
         auto rgn = _process.memory().Allocate( sizeof(T), PAGE_READWRITE );
         if (rgn.valid())
@@ -162,16 +162,15 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
     // Use native method
     if(_LdrpHandleTlsData)
     {
-        AsmJit::Assembler a;
-        AsmJitHelper ah( a );
+        AsmJitHelper a;
         uint64_t result = 0;
 
-        ah.GenPrologue();
-        ah.GenCall( _LdrpHandleTlsData, { reinterpret_cast<size_t>(pNode) }, IsWindows8Point1OrGreater() ? cc_thiscall : cc_stdcall );
-        _process.remote().AddReturnWithEvent( ah );
-        ah.GenEpilogue();
+        a.GenPrologue();
+        a.GenCall( _LdrpHandleTlsData, { reinterpret_cast<size_t>(pNode) }, IsWindows8Point1OrGreater() ? cc_thiscall : cc_stdcall );
+        _process.remote().AddReturnWithEvent( a );
+        a.GenEpilogue();
 
-        _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+        _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     }
     else
         return false;
@@ -191,8 +190,8 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
 { 
     RTL_INVERTED_FUNCTION_TABLE7 table = { 0 };
     PRTL_INVERTED_FUNCTION_TABLE_ENTRY Entries = nullptr;
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    
+    AsmJitHelper a;
     uint64_t result = 0;
 
     // Invalid addresses. Probably pattern scan has failed
@@ -213,19 +212,19 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
         if(Entries[i].ImageBase == ModuleBase)
             return true;
 
-    ah.GenPrologue();
+    a.GenPrologue();
 
     if (IsWindows8Point1OrGreater())
-        ah.GenCall( _RtlInsertInvertedFunctionTable, { reinterpret_cast<size_t>(ModuleBase), ImageSize }, cc_fastcall );
+        a.GenCall( _RtlInsertInvertedFunctionTable, { reinterpret_cast<size_t>(ModuleBase), ImageSize }, cc_fastcall );
     else if (IsWindows8OrGreater())
-        ah.GenCall( _RtlInsertInvertedFunctionTable, { reinterpret_cast<size_t>(ModuleBase), ImageSize } );
+        a.GenCall( _RtlInsertInvertedFunctionTable, { reinterpret_cast<size_t>(ModuleBase), ImageSize } );
     else
-        ah.GenCall( _RtlInsertInvertedFunctionTable, { _LdrpInvertedFunctionTable, reinterpret_cast<size_t>(ModuleBase), ImageSize } );
+        a.GenCall( _RtlInsertInvertedFunctionTable, { _LdrpInvertedFunctionTable, reinterpret_cast<size_t>(ModuleBase), ImageSize } );
 
-    _process.remote().AddReturnWithEvent( ah );
-    ah.GenEpilogue();
+    _process.remote().AddReturnWithEvent( a );
+    a.GenEpilogue();
 
-    _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     _process.memory().Read( _LdrpInvertedFunctionTable, sizeof(table), &table );
 
     for(DWORD i = 0; i < table.Count; i++)
@@ -276,8 +275,8 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase, size_t ImageSize,
     _LDR_DATA_TABLE_ENTRY_W8 *pEntry = nullptr; 
     _LDR_DDAG_NODE *pDdagNode = nullptr;
 
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    
+    AsmJitHelper a;
 
     // Allocate space for Unicode string
     auto StringBuf = _process.memory().Allocate( 0x1000, PAGE_READWRITE );
@@ -291,31 +290,31 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase, size_t ImageSize,
     //
     // HeapAlloc(LdrHeap, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
     //
-    ah.GenPrologue();
+    a.GenPrologue();
 
-    ah.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8) } );
+    a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8) } );
 
-    _process.remote().AddReturnWithEvent( ah );
-    ah.GenEpilogue();
+    _process.remote().AddReturnWithEvent( a );
+    a.GenEpilogue();
 
-    _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     pEntry = reinterpret_cast<decltype(pEntry)>(result);
 
     if(pEntry)
     {
-        a.clear();
+        a->clear();
 
         //
         // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DDAG_NODE));
         //
-        ah.GenPrologue();
+        a.GenPrologue();
 
-        ah.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DDAG_NODE) } );
+        a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DDAG_NODE) } );
 
-        _process.remote().AddReturnWithEvent( ah );
-        ah.GenEpilogue();
+        _process.remote().AddReturnWithEvent( a );
+        a.GenEpilogue();
 
-        _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+        _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
         pDdagNode = reinterpret_cast<decltype(pDdagNode)>(result);
 
         if(pDdagNode)
@@ -389,8 +388,7 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node( void* ModuleBase, size_t ImageSize,
 
     _LDR_DATA_TABLE_ENTRY_W7 *pEntry = nullptr; 
 
-    AsmJit::Assembler a;
-    AsmJitHelper ah(a);
+    AsmJitHelper a;
 
     // Allocate space for Unicode string
     auto StringBuf = _process.memory().Allocate( MAX_PATH, PAGE_READWRITE );
@@ -404,14 +402,14 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node( void* ModuleBase, size_t ImageSize,
     //
     // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
     //
-    ah.GenPrologue();
+    a.GenPrologue();
 
-    ah.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W7) } );
+    a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W7) } );
 
-    _process.remote().AddReturnWithEvent( ah );
-    ah.GenEpilogue();
+    _process.remote().AddReturnWithEvent( a );
+    a.GenEpilogue();
 
-    _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     pEntry = reinterpret_cast<decltype(pEntry)>(result);
 
     if(pEntry)
@@ -513,8 +511,8 @@ void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, size_t modBase )
     }
 
     // Insert using RtlRbInsertNodeEx
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    
+    AsmJitHelper a;
     uint64_t result = 0;
 
     eModType mt = _process.core().native()->GetWow64Barrier().sourceWow64 ? mt_mod32 : mt_mod64;
@@ -522,15 +520,15 @@ void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, size_t modBase )
     auto RtlRbInsertNodeEx = _process.modules().GetExport( 
         _process.modules().GetModule( L"ntdll.dll", LdrList, mt ), "RtlRbInsertNodeEx" ).procAddress;
 
-    ah.GenPrologue( );
-    ah.GenCall( static_cast<size_t>(RtlRbInsertNodeEx), { _LdrpModuleIndexBase,
+    a.GenPrologue( );
+    a.GenCall( static_cast<size_t>(RtlRbInsertNodeEx), { _LdrpModuleIndexBase,
                                                            GET_FIELD_PTR( pLdrNode, BaseAddressIndexNode ), 
                                                            static_cast<size_t>(bRight), GET_FIELD_PTR( pNode, BaseAddressIndexNode ) } );
 
-    _process.remote().AddReturnWithEvent( ah );
-    ah.GenEpilogue();
+    _process.remote().AddReturnWithEvent( a );
+    a.GenEpilogue();
 
-    _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
 }
 
 /// <summary>
@@ -1062,25 +1060,25 @@ ptr_t NtLdr::UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, size_t of
 /// <returns>Address of removed record</returns>
 ptr_t NtLdr::UnlinkTreeNode( ptr_t ldrEntry )
 {
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    
+    AsmJitHelper a;
     uint64_t result = 0;
 
     auto RtlRbRemoveNode = _process.modules().GetExport(
         _process.modules().GetModule( L"ntdll.dll" ), "RtlRbRemoveNode" ).procAddress;
 
-    ah.GenPrologue();
-    ah.GenCall( static_cast<size_t>(RtlRbRemoveNode), 
+    a.GenPrologue();
+    a.GenCall( static_cast<size_t>(RtlRbRemoveNode), 
     { 
         _LdrpModuleIndexBase, 
         static_cast<size_t>(ldrEntry) 
         + FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_W8, BaseAddressIndexNode ) 
     } );
 
-    _process.remote().AddReturnWithEvent( ah );
-    ah.GenEpilogue();
+    _process.remote().AddReturnWithEvent( a );
+    a.GenEpilogue();
 
-    _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
 
     return ldrEntry;
 }

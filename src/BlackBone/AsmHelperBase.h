@@ -48,7 +48,7 @@ namespace blackbone
     class AsmHelperBase
     {
     public:
-        AsmHelperBase( AsmJit::Assembler& _a ) : a( _a ) { }
+        AsmHelperBase() : _assembler( &_runtime ) { }
         virtual ~AsmHelperBase() { }
 
         virtual void GenPrologue( bool switchMode = false ) = 0;
@@ -64,12 +64,12 @@ namespace blackbone
         /// </summary>
         void SwitchTo86()
         {
-            AsmJit::Label l = a.newLabel();
+            asmjit::Label l = _assembler.newLabel();
 
-            a.call( l ); a.bind( l );
-            a.mov( AsmJit::dword_ptr( AsmJit::esp, 4 ), 0x23 );
-            a.add( AsmJit::dword_ptr( AsmJit::esp ), 0xD );
-            a._emitByte( 0xCB );    // retf
+            _assembler.call( l ); _assembler.bind( l );
+            _assembler.mov( asmjit::host::dword_ptr( asmjit::host::esp, 4 ), 0x23 );
+            _assembler.add( asmjit::host::dword_ptr( asmjit::host::esp ), 0xD );
+            _assembler.emit( 0xCB );    // retf
         }
 
         /// <summary>
@@ -77,19 +77,22 @@ namespace blackbone
         /// </summary>
         void SwitchTo64()
         {
-            AsmJit::Label l = a.newLabel();
+            asmjit::Label l = _assembler.newLabel();
 
-            a.push( 0x33 );
-            a.call( l );  a.bind( l );
-            a.add( AsmJit::dword_ptr( AsmJit::esp ), 5 );
-            a._emitByte( 0xCB );    // retf
+            _assembler.push( 0x33 );
+            _assembler.call( l );  _assembler.bind( l );
+            _assembler.add( asmjit::host::dword_ptr( asmjit::host::esp ), 5 );
+            _assembler.emit( 0xCB );    // retf
         }
+
+        inline asmjit::host::Assembler* operator ->() { return &_assembler; }
 
     private:
         AsmHelperBase( const AsmHelperBase& ) = delete;
         AsmHelperBase& operator =(const AsmHelperBase&) = delete;
 
     protected:
-        AsmJit::Assembler& a;
+        asmjit::JitRuntime _runtime;
+        asmjit::host::Assembler _assembler;
     };
 }

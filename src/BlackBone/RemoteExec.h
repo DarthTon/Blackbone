@@ -81,10 +81,10 @@ public:
     /// <summary>
     /// Generate return from function with event synchronization
     /// </summary>
-    /// <param name="ah">Target assembly helper</param>
+    /// <param name="a">Target assembly helper</param>
     /// <param name="retType">Function return type</param>
     /// <param name="retOffset">Return value offset</param>
-    void AddReturnWithEvent( AsmHelperBase& ah, eReturnType retType = rt_int32, uint32_t retOffset = RET_OFFSET );
+    void AddReturnWithEvent( AsmHelperBase& a, eReturnType retType = rt_int32, uint32_t retOffset = RET_OFFSET );
 
     /// <summary>
     /// Retrieve last NTSTATUS code
@@ -149,7 +149,7 @@ private:
     /// <param name="cc">Calling convention</param>
     /// <param name="retType">Return type</param>
     /// <returns>true on success</returns>
-    bool PrepareCallAssembly( AsmJit::Assembler& a, const void* pfn, 
+    bool PrepareCallAssembly( AsmHelperBase& a, const void* pfn,
                               std::vector<blackbone::AsmVariant>& args, 
                               eCalligConvention cc, eReturnType retType );
 

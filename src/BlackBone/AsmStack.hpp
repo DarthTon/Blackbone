@@ -1,6 +1,8 @@
 #pragma once
 
-#include "AsmJit/Assembler.h"
+#pragma warning(disable : 4100)
+#include "AsmJit/AsmJit.h"
+#pragma warning(default : 4100)
 #include "Macro.h"
 
 #include <stdint.h>
@@ -26,15 +28,15 @@ public:
     /// </summary>
     /// <param name="size">Variable size</param>
     /// <returns>Variable memory object</returns>
-    AsmJit::Mem AllocVar( intptr_t size )
+    asmjit::host::Mem AllocVar( intptr_t size )
     {
         // Align on word length
         size = Align( size, sizeof(size_t) );
 
 #ifdef USE64
-        auto val = AsmJit::Mem( AsmJit::nsp, disp_ofst, size );
+        auto val = asmjit::host::Mem( asmjit::host::zsp, static_cast<int32_t>(disp_ofst), static_cast<int32_t>(size) );
 #else
-        auto val = AsmJit::Mem( AsmJit::nbp, -disp_ofst - size, size );
+        auto val = asmjit::host::Mem( asmjit::host::zbp, -disp_ofst - size, size );
 #endif
         disp_ofst += size;
         return val;
@@ -47,14 +49,14 @@ public:
     /// <param name="count">Array elements count.</param>
     /// <param name="size">Element size.</param>
     /// <returns>true on success</returns>
-    bool AllocArray( AsmJit::Mem arr[], int count, intptr_t size )
+    bool AllocArray( asmjit::host::Mem arr[], int count, intptr_t size )
     {
         for (int i = 0; i < count; i++)
         {
 #ifdef USE64
-            arr[i] = AsmJit::Mem( AsmJit::nsp, disp_ofst, size );
+            arr[i] = asmjit::host::Mem( asmjit::host::zsp, static_cast<int32_t>(disp_ofst), static_cast<int32_t>(size) );
 #else
-            arr[i] = AsmJit::Mem( AsmJit::nbp, -disp_ofst - size, size );
+            arr[i] = asmjit::host::Mem( asmjit::host::zbp, -disp_ofst - size, size );
 #endif
             disp_ofst += size;
         }
@@ -75,11 +77,11 @@ private:
 //
 //  Helpers
 //
-#define ALLOC_STACK_VAR(worker, name, type) AsmJit::Mem name( worker.AllocVar( sizeof(type) ) );
-#define ALLOC_STACK_VAR_S(worker, name, size) AsmJit::Mem name( worker.AllocVar( size ) );
+#define ALLOC_STACK_VAR(worker, name, type) asmjit::host::Mem name( worker.AllocVar( sizeof(type) ) );
+#define ALLOC_STACK_VAR_S(worker, name, size) asmjit::host::Mem name( worker.AllocVar( size ) );
 
 #define ALLOC_STACK_ARRAY(worker, name, type, count) \
-    AsmJit::Mem name[count]; \
+    asmjit::host::Mem name[count]; \
     worker.AllocArray( name, count, sizeof(type) );
 
 }

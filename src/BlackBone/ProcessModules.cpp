@@ -342,8 +342,8 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
 {
     const ModuleData* mod = 0;
     ptr_t res = 0;
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    
+    AsmJitHelper a;
     FileProjection fp;
     pe::PEParser img;
 
@@ -400,10 +400,10 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
         }
         #endif
 
-        ah.GenCall( (size_t)pLdrLoadDll, { 0, 0, modName.ptr<size_t>( ), modName.ptr<size_t>( ) + 0x800 } );
-        a.ret();
+        a.GenCall( (size_t)pLdrLoadDll, { 0, 0, modName.ptr<size_t>( ), modName.ptr<size_t>( ) + 0x800 } );
+        a->ret();
 
-        _proc.remote().ExecInNewThread( a.make(), a.getCodeSize(), res );
+        _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
     }
 
     if (res == STATUS_SUCCESS)
@@ -435,13 +435,13 @@ bool ProcessModules::Unload( const ModuleData* hMod )
     if (_proc.core().isWow64() && hMod->type == mt_mod64)
     {
         uint64_t res = 0;
-        AsmJit::Assembler a;
-        AsmJitHelper ah( a );
+        
+        AsmJitHelper a;
 
-        ah.GenCall( static_cast<size_t>(pUnload.procAddress), { static_cast<size_t>(hMod->baseAddress) } );
-        a.ret();
+        a.GenCall( static_cast<size_t>(pUnload.procAddress), { static_cast<size_t>(hMod->baseAddress) } );
+        a->ret();
 
-        _proc.remote().ExecInNewThread( a.make(), a.getCodeSize(), res );
+        _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
     }
     else
         _proc.remote().ExecDirect( pUnload.procAddress, hMod->baseAddress );
@@ -527,7 +527,8 @@ inline size_t DWAlign( size_t offset )
 }
 
 
-using namespace AsmJit;
+using namespace asmjit;
+using namespace asmjit::host;
 
 #ifdef COMPILER_MSVC
 
@@ -619,22 +620,21 @@ bool ProcessModules::InjectPureIL( const std::wstring& netVersion,
     size_t CreateInstanceAddress = (size_t)GetExport( pMscoree, "CLRCreateInstance" ).procAddress;
 
     // Scary assembler code incoming!
-    Assembler a;
-    AsmJitHelper ah( a );
+    AsmJitHelper a;
     AsmStackAllocator sa( 0x30 );   // 0x30 - 6 arguments of ExecuteInDefaultAppDomain
 
     // Stack will be reserved manually
-    ah.EnableX64CallStack( false );
+    a.EnableX64CallStack( false );
 
-    Label L_Exit = a.newLabel();
-    Label L_Error1 = a.newLabel();
-    Label L_Error2 = a.newLabel();
-    Label L_Error3 = a.newLabel();
-    Label L_Error4 = a.newLabel();
-    Label L_Error5 = a.newLabel();
-    Label L_Error6 = a.newLabel();
-    Label L_SkipStart = a.newLabel();
-    Label L_ReleaseInterface = a.newLabel();
+    Label L_Exit = a->newLabel();
+    Label L_Error1 = a->newLabel();
+    Label L_Error2 = a->newLabel();
+    Label L_Error3 = a->newLabel();
+    Label L_Error4 = a->newLabel();
+    Label L_Error5 = a->newLabel();
+    Label L_Error6 = a->newLabel();
+    Label L_SkipStart = a->newLabel();
+    Label L_ReleaseInterface = a->newLabel();
 
     // stack variables for the injected code
     ALLOC_STACK_VAR( sa, stack_MetaHost,     ICLRMetaHost* );
@@ -645,174 +645,174 @@ bool ProcessModules::InjectPureIL( const std::wstring& netVersion,
     ALLOC_STACK_VAR( sa, stack_returnCode,   HRESULT );
 
 #ifdef USE64
-    GPReg callReg = r13;
+    GpReg callReg = r13;
 
 #else
-    GPReg callReg = edx;
+    GpReg callReg = edx;
 
-    a.push( nbp );
-    a.mov( nbp, nsp );
+    a->push( zbp );
+    a->mov( zbp, zsp );
 #endif
 
     // function prologue  
-    a.sub( nsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
-    a.xor_( nsi, nsi );
+    a->sub( zsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
+    a->xor_( zsi, zsi );
 
     // CLRCreateInstance()
-    ah.GenCall( (size_t)CreateInstanceAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
+    a.GenCall( (size_t)CreateInstanceAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
     // success?
-    a.test( nax, nax );
-    a.jnz( L_Error1 );
+    a->test( zax, zax );
+    a->jnz( L_Error1 );
 
     // pMetaHost->GetRuntime()
-    a.mov( nax, stack_MetaHost );
-    a.mov( ncx, sysint_ptr( nax ) );
-    a.mov( callReg, sysint_ptr( ncx, 3 * sizeof(void*) ) );
-    ah.GenCall( callReg, { ncx, address_VersionString, address_IID_ICLRRuntimeInfo, &stack_RuntimeInfo } );
+    a->mov( zax, stack_MetaHost );
+    a->mov( zcx, intptr_ptr( zax ) );
+    a->mov( callReg, intptr_ptr( zcx, 3 * sizeof( void* ) ) );
+    a.GenCall( callReg, { zcx, address_VersionString, address_IID_ICLRRuntimeInfo, &stack_RuntimeInfo } );
     // success?
-    a.test( nax, nax );
-    a.jnz( L_Error2 );
+    a->test( zax, zax );
+    a->jnz( L_Error2 );
     
     // pRuntimeInterface->IsStarted()
-    a.mov( ncx, stack_RuntimeInfo );
-    a.mov( nax, sysint_ptr( ncx ) );
-    a.mov( callReg, sysint_ptr( nax, 14 * sizeof(void*) ) );
-    ah.GenCall( callReg, { ncx, &stack_IsStarted, &stack_StartupFlags } );
+    a->mov( zcx, stack_RuntimeInfo );
+    a->mov( zax, intptr_ptr( zcx ) );
+    a->mov( callReg, intptr_ptr( zax, 14 * sizeof( void* ) ) );
+    a.GenCall( callReg, { zcx, &stack_IsStarted, &stack_StartupFlags } );
     // success?
-    a.test( nax, nax );
-    a.jnz( L_Error3 );
+    a->test( zax, zax );
+    a->jnz( L_Error3 );
 
     // pRuntimeTime->GetInterface()
-    a.mov( ncx, stack_RuntimeInfo );
-    a.mov( nax, sysint_ptr( ncx ) );
-    a.mov( callReg, sysint_ptr( nax, 9 * sizeof(void*) ) );
-    ah.GenCall( callReg, { ncx, address_CLSID_CLRRuntimeHost, address_IID_ICLRRuntimeHost, &stack_RuntimeHost } );
+    a->mov( zcx, stack_RuntimeInfo );
+    a->mov( zax, intptr_ptr( zcx ) );
+    a->mov( callReg, intptr_ptr( zax, 9 * sizeof( void* ) ) );
+    a.GenCall( callReg, { zcx, address_CLSID_CLRRuntimeHost, address_IID_ICLRRuntimeHost, &stack_RuntimeHost } );
     // success?
-    a.test( nax, nax );
-    a.jnz( L_Error3 );
+    a->test( zax, zax );
+    a->jnz( L_Error3 );
 
     // jump if already started
-    a.cmp( stack_IsStarted, nsi );
-    a.jne( L_SkipStart ); 
+    a->cmp( stack_IsStarted, zsi );
+    a->jne( L_SkipStart ); 
 
     // pRuntimeHost->Start()
-    a.mov( ncx, stack_RuntimeHost );
-    a.mov( nax, sysint_ptr( ncx ) );
-    a.mov( callReg, sysint_ptr( nax, 3 * sizeof(void*) ) );
-    ah.GenCall( callReg, { ncx } );
+    a->mov( zcx, stack_RuntimeHost );
+    a->mov( zax, intptr_ptr( zcx ) );
+    a->mov( callReg, intptr_ptr( zax, 3 * sizeof( void* ) ) );
+    a.GenCall( callReg, { zcx } );
     // success?
-    a.test( nax, nax );
-    a.jnz( L_Error5 );
+    a->test( zax, zax );
+    a->jnz( L_Error5 );
 
     // pRuntimeHost->ExecuteInDefaultAppDomain()
-    a.bind( L_SkipStart );
+    a->bind( L_SkipStart );
 
-    a.mov( ncx, stack_RuntimeHost );
-    a.mov( nax, sysint_ptr( ncx ) );
-    a.mov( callReg, sysint_ptr( nax, 11 * sizeof(void*) ) );
-    ah.GenCall( callReg, { ncx, address_netAssemblyDll, address_netAssemblyClass, address_netAssemblyMethod,
+    a->mov( zcx, stack_RuntimeHost );
+    a->mov( zax, intptr_ptr( zcx ) );
+    a->mov( callReg, intptr_ptr( zax, 11 * sizeof( void* ) ) );
+    a.GenCall( callReg, { zcx, address_netAssemblyDll, address_netAssemblyClass, address_netAssemblyMethod,
                                 address_netAssemblyArgs, &stack_returnCode } );
     // success?
-    a.test( nax, nax );
-    a.jnz( L_Error6 );
+    a->test( zax, zax );
+    a->jnz( L_Error6 );
 
     // Release unneeded interfaces
-    a.mov( ncx, stack_RuntimeHost );
-    a.call( L_ReleaseInterface );
-    a.mov( ncx, stack_RuntimeInfo );
-    a.call( L_ReleaseInterface );
-    a.mov( ncx, stack_MetaHost );
-    a.call( L_ReleaseInterface );
+    a->mov( zcx, stack_RuntimeHost );
+    a->call( L_ReleaseInterface );
+    a->mov( zcx, stack_RuntimeInfo );
+    a->call( L_ReleaseInterface );
+    a->mov( zcx, stack_MetaHost );
+    a->call( L_ReleaseInterface );
 
     // Write the managed code's return value to the first DWORD
     // in the allocated buffer
-    a.mov( eax, stack_returnCode );
-    a.mov( ndx, address.ptr<size_t>() );
-    a.mov( dword_ptr( ndx ), eax );
-    a.mov( nax, 0 );
+    a->mov( eax, stack_returnCode );
+    a->mov( zdx, address.ptr<size_t>() );
+    a->mov( dword_ptr( zdx ), eax );
+    a->mov( zax, 0 );
 
     // stack restoration
-    a.bind( L_Exit );
+    a->bind( L_Exit );
 
 #ifdef USE64
-    a.add( nsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
+    a->add( zsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
 #else
-    a.mov( nsp, nbp );
-    a.pop( nbp );
+    a->mov( zsp, zbp );
+    a->pop( zbp );
 #endif
 
-    a.ret();
+    a->ret();
 
     // CLRCreateInstance() failed
-    a.bind( L_Error1 );
-    a.mov( nax, 1 );
-    a.jmp( L_Exit );
+    a->bind( L_Error1 );
+    a->mov( zax, 1 );
+    a->jmp( L_Exit );
 
     // pMetaHost->GetRuntime() failed
-    a.bind( L_Error2 );
-    a.mov( ncx, stack_MetaHost );
-    a.call( L_ReleaseInterface );
-    a.mov( nax, 2 );
-    a.jmp( L_Exit );
+    a->bind( L_Error2 );
+    a->mov( zcx, stack_MetaHost );
+    a->call( L_ReleaseInterface );
+    a->mov( zax, 2 );
+    a->jmp( L_Exit );
 
     // pRuntimeInterface->IsStarted() failed
-    a.bind( L_Error3 );
-    a.mov( ncx, stack_RuntimeInfo );
-    a.call( L_ReleaseInterface );
-    a.mov( ncx, stack_MetaHost );
-    a.call( L_ReleaseInterface );
-    a.mov( nax, 3 );
-    a.jmp( L_Exit );
+    a->bind( L_Error3 );
+    a->mov( zcx, stack_RuntimeInfo );
+    a->call( L_ReleaseInterface );
+    a->mov( zcx, stack_MetaHost );
+    a->call( L_ReleaseInterface );
+    a->mov( zax, 3 );
+    a->jmp( L_Exit );
 
     // pRuntimeTime->GetInterface() failed
-    a.bind( L_Error4 );
-    a.mov( ncx, stack_RuntimeInfo );
-    a.call( L_ReleaseInterface );
-    a.mov( ncx, stack_MetaHost );
-    a.call( L_ReleaseInterface );
-    a.mov( nax, 4 );
-    a.jmp( L_Exit );
+    a->bind( L_Error4 );
+    a->mov( zcx, stack_RuntimeInfo );
+    a->call( L_ReleaseInterface );
+    a->mov( zcx, stack_MetaHost );
+    a->call( L_ReleaseInterface );
+    a->mov( zax, 4 );
+    a->jmp( L_Exit );
 
     // pRuntimeHost->Start() failed
-    a.bind( L_Error5 );
-    a.mov( ncx, stack_RuntimeHost );
-    a.call( L_ReleaseInterface );
-    a.mov( ncx, stack_RuntimeInfo );
-    a.call( L_ReleaseInterface );
-    a.mov( ncx, stack_MetaHost );
-    a.call( L_ReleaseInterface );
-    a.mov( nax, 5 );
-    a.jmp( L_Exit );
+    a->bind( L_Error5 );
+    a->mov( zcx, stack_RuntimeHost );
+    a->call( L_ReleaseInterface );
+    a->mov( zcx, stack_RuntimeInfo );
+    a->call( L_ReleaseInterface );
+    a->mov( zcx, stack_MetaHost );
+    a->call( L_ReleaseInterface );
+    a->mov( zax, 5 );
+    a->jmp( L_Exit );
 
     // pRuntimeHost->ExecuteInDefaultAppDomain() failed
-    a.bind( L_Error6 );
-    a.push( nax );
-    a.mov( ncx, stack_RuntimeHost );
-    a.call( L_ReleaseInterface );
-    a.mov( ncx, stack_RuntimeInfo );
-    a.call( L_ReleaseInterface );
-    a.mov( ncx, stack_MetaHost );
-    a.call( L_ReleaseInterface );
-    a.mov( nax, 6 );
-    a.pop( nax );
-    a.jmp( L_Exit );
+    a->bind( L_Error6 );
+    a->push( zax );
+    a->mov( zcx, stack_RuntimeHost );
+    a->call( L_ReleaseInterface );
+    a->mov( zcx, stack_RuntimeInfo );
+    a->call( L_ReleaseInterface );
+    a->mov( zcx, stack_MetaHost );
+    a->call( L_ReleaseInterface );
+    a->mov( zax, 6 );
+    a->pop( zax );
+    a->jmp( L_Exit );
 
     // void __fastcall ReleaseInterface(IUnknown* pInterface)
-    a.bind( L_ReleaseInterface );
-    a.mov( nax, ncx );
-    a.mov( ncx, sysint_ptr( nax ) );
-    a.mov( callReg, sysint_ptr( ncx, 2 * sizeof(void*) ) );
-    ah.GenCall( callReg, { nax } );
+    a->bind( L_ReleaseInterface );
+    a->mov( zax, zcx );
+    a->mov( zcx, intptr_ptr( zax ) );
+    a->mov( callReg, intptr_ptr( zcx, 2 * sizeof( void* ) ) );
+    a.GenCall( callReg, { zax } );
 
-    a.ret();
+    a->ret();
 
     // write JIT code to target
-    sysint_t codeSize = a.getCodeSize();
+    size_t codeSize = a->getCodeSize();
     size_t codeAddress = address.ptr<size_t>() + offset;
 
     std::vector<uint8_t> codeBuffer( codeSize );
 
-    a.relocCode( codeBuffer.data(), codeAddress );
+    a->relocCode( codeBuffer.data(), codeAddress );
     if (address.Write( offset, codeSize, codeBuffer.data() ) != STATUS_SUCCESS)
     {
         returnCode = 17;

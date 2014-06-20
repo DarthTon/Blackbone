@@ -44,7 +44,7 @@ protected:
     NTSTATUS Call( T& result, std::vector<AsmVariant>& args, Thread* contextThread = nullptr )
     {
         uint64_t result2 = 0;
-        AsmJit::Assembler a;
+        AsmJitHelper a;
 
         // Ensure RPC environment exists
         if (_process.remote().CreateRPCEnvironment() != STATUS_SUCCESS)
@@ -72,11 +72,11 @@ protected:
 
         // Choose execution thread
         if (contextThread == nullptr)
-            _process.remote().ExecInNewThread( a.make(), a.getCodeSize(), result2 );
+            _process.remote().ExecInNewThread( a->make(), a->getCodeSize(), result2 );
         else if (*contextThread == _process.remote()._hWorkThd)
-            _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result2 );
+            _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result2 );
         else
-            _process.remote().ExecInAnyThread( a.make(), a.getCodeSize(), result2, *contextThread );
+            _process.remote().ExecInAnyThread( a->make(), a->getCodeSize(), result2, *contextThread );
 
         // Get function return value
         _process.remote().GetCallResult<T>( result );

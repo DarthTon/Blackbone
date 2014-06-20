@@ -506,14 +506,12 @@ bool MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
                 if (!hFwdMod)
                 {
                     // TODO: Add error code
-                    BLACBONE_TRACE( L"ManualMap: Failed to load forwarded dependency '%ls'. Status = 0x%x", 
-                                    wstrDll.c_str(), LastNtStatus() );
+                    BLACBONE_TRACE( L"ManualMap: Failed to load forwarded dependency '%ls'. Status = 0x%x", wstrDll.c_str(), LastNtStatus() );
                     return false;
                 }
 
                 if (expData.forwardByOrd)
-                    expData = _process.modules().GetExport( hFwdMod, reinterpret_cast<const char*>(expData.forwardOrdinal), 
-                                                            wdllpath.c_str() );
+                    expData = _process.modules().GetExport( hFwdMod, reinterpret_cast<const char*>(expData.forwardOrdinal), wdllpath.c_str() );
                 else
                     expData = _process.modules().GetExport( hFwdMod, expData.forwardName.c_str(), wdllpath.c_str() );
             }
@@ -559,23 +557,22 @@ bool MMap::EnableExceptions( ImageContext* pImage )
 
     // Invoke RtlAddFunctionTable
     if(pExpTable)
-    {
-        AsmJit::Assembler a;
-        AsmJitHelper ah(a);
+    {     
+        AsmJitHelper a;
         uint64_t result = 0;
 
         pImage->pExpTableAddr = REBASE( pExpTable, pImage->FileImage.base(), pImage->imgMem.ptr<ptr_t>() );
         auto pAddTable = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->PEImage.mType() ),
                                                        "RtlAddFunctionTable" );
 
-        ah.GenPrologue();
-        ah.GenCall( static_cast<size_t>(pAddTable.procAddress), { pImage->pExpTableAddr, 
+        a.GenPrologue();
+        a.GenCall( static_cast<size_t>(pAddTable.procAddress), { pImage->pExpTableAddr, 
                                                                   size / sizeof(IMAGE_RUNTIME_FUNCTION_ENTRY),
                                                                   pImage->imgMem.ptr<size_t>() } );
-        _process.remote().AddReturnWithEvent( ah );
-        ah.GenEpilogue();
+        _process.remote().AddReturnWithEvent( a );
+        a.GenEpilogue();
 
-        if (_process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result ) != STATUS_SUCCESS)
+        if (_process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result ) != STATUS_SUCCESS)
             return false;
 
         if (pImage->flags & CreateLdrRef)
@@ -607,22 +604,21 @@ bool MMap::DisableExceptions( ImageContext* pImage )
     BLACBONE_TRACE( L"ManualMap: Disabling exception support for image '%ls'", pImage->FileName.c_str() );
 #ifdef USE64
     if(pImage->pExpTableAddr)
-    {
-        AsmJit::Assembler a;
-        AsmJitHelper ah( a );
+    {      
+        AsmJitHelper a;
         size_t result = 0;
 
-        ah.GenPrologue();
+        a.GenPrologue();
 
         auto pRmoveTable = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->PEImage.mType() ),
                                                          "RtlDeleteFunctionTable" );
 
         // RtlDeleteFunctionTable(pExpTable);
-        ah.GenCall( static_cast<size_t>(pRmoveTable.procAddress), { pImage->pExpTableAddr } );
-        _process.remote().AddReturnWithEvent( ah );
-        ah.GenEpilogue();
+        a.GenCall( static_cast<size_t>(pRmoveTable.procAddress), { pImage->pExpTableAddr } );
+        _process.remote().AddReturnWithEvent( a );
+        a.GenEpilogue();
 
-        if (_process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result ) != STATUS_SUCCESS)
+        if (_process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result ) != STATUS_SUCCESS)
             return false;
 
         if (pImage->flags & CreateLdrRef)
@@ -726,22 +722,22 @@ bool MMap::InitializeCookie( ImageContext* pImage )
 /// <returns>true on success</returns>
 bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
 {
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    
+    AsmJitHelper a;
     uint64_t result = 0;
 
     auto hNtdll = _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->PEImage.mType() );
     auto pActivateActx = _process.modules().GetExport( hNtdll, "RtlActivateActivationContext" );
     auto pDeactivateeActx = _process.modules().GetExport( hNtdll, "RtlDeactivateActivationContext" );
 
-    ah.GenPrologue();
+    a.GenPrologue();
 
     // ActivateActCtx
     if (_pAContext.valid())
     {
-        a.mov( AsmJit::nax, _pAContext.ptr<size_t>() );
-        a.mov( AsmJit::nax, AsmJit::dword_ptr( AsmJit::nax ) );
-        ah.GenCall( static_cast<size_t>(pActivateActx.procAddress), { 0, AsmJit::nax, _pAContext.ptr<size_t>() + sizeof(HANDLE) } );
+        a->mov( asmjit::host::zax, _pAContext.ptr<size_t>() );
+        a->mov( asmjit::host::zax, asmjit::host::dword_ptr( asmjit::host::zax ) );
+        a.GenCall( static_cast<size_t>(pActivateActx.procAddress), { 0, asmjit::host::zax, _pAContext.ptr<size_t>() + sizeof(HANDLE) } );
     }
 
     // Function order
@@ -755,14 +751,14 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
                 BLACBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d", 
                                 static_cast<size_t>(pCallback), pImage->FileName.c_str(), dwReason );
 
-                ah.GenCall( static_cast<size_t>(pCallback), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
+                a.GenCall( static_cast<size_t>(pCallback), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
             }
 
         // DllMain
         if (pImage->EntryPoint != 0)
         {
             BLACBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->FileName.c_str(), dwReason );
-            ah.GenCall( static_cast<size_t>(pImage->EntryPoint), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
+            a.GenCall( static_cast<size_t>(pImage->EntryPoint), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
         }
     }
     // Entry point first, TLS last
@@ -772,7 +768,7 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
         if (pImage->EntryPoint != 0)
         {
             BLACBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->FileName.c_str(), dwReason );
-            ah.GenCall( static_cast<size_t>(pImage->EntryPoint), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
+            a.GenCall( static_cast<size_t>(pImage->EntryPoint), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
         }
 
         // PTLS_CALLBACK_FUNCTION(pImage->ImageBase, dwReason, NULL);
@@ -782,22 +778,22 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
                 BLACBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d", 
                                 static_cast<size_t>(pCallback), pImage->FileName.c_str(), dwReason );
 
-                ah.GenCall( static_cast<size_t>(pCallback), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
+                a.GenCall( static_cast<size_t>(pCallback), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
             }
     }
 
     // DeactivateActCtx
     if (_pAContext.valid())
     {
-        a.mov( AsmJit::nax, _pAContext.ptr<size_t>() + sizeof(HANDLE) );
-        a.mov( AsmJit::nax, AsmJit::dword_ptr( AsmJit::nax ) );
-        ah.GenCall( static_cast<size_t>(pDeactivateeActx.procAddress), { 0, AsmJit::nax } );
+        a->mov( asmjit::host::zax, _pAContext.ptr<size_t>() + sizeof(HANDLE) );
+        a->mov( asmjit::host::zax, asmjit::host::dword_ptr( asmjit::host::zax ) );
+        a.GenCall( static_cast<size_t>(pDeactivateeActx.procAddress), { 0, asmjit::host::zax } );
     }
 
-    _process.remote().AddReturnWithEvent( ah );
-    ah.GenEpilogue();
+    _process.remote().AddReturnWithEvent( a );
+    a.GenEpilogue();
 
-    _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
 
     return true;
 }
@@ -815,8 +811,8 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
 /// <returns>true on success</returns>
 bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
 {
-    AsmJit::Assembler a;
-    AsmJitHelper ah( a );
+    
+    AsmJitHelper a;
 
     uint64_t result = 0;
     ACTCTXW act = { 0 };
@@ -844,49 +840,49 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
 
         act32.cbSize = sizeof(act32);
         act32.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
-        act32.lpSource = _pAContext.ptr<DWORD>() + sizeof(HANDLE) + sizeof(act32);
+        act32.lpSource = _pAContext.ptr<uint32_t>() + sizeof(HANDLE) + sizeof(act32);
         act32.lpResourceName = id ;
 
-        a.push( _pAContext.ptr<DWORD>() + static_cast<DWORD>(sizeof(HANDLE)) );
-        a.mov( AsmJit::eax, static_cast<DWORD>(pCreateActx.procAddress) );
-        a.call( AsmJit::nax );
-        a.mov( AsmJit::edx, _pAContext.ptr<DWORD>() );
-        a.mov( AsmJit::dword_ptr( AsmJit::edx ), AsmJit::eax );
+        a->push( _pAContext.ptr<uint32_t>() + static_cast<uint32_t>(sizeof( HANDLE )) );
+        a->mov( asmjit::host::eax, static_cast<uint32_t>(pCreateActx.procAddress) );
+        a->call( asmjit::host::zax );
+        a->mov( asmjit::host::edx, _pAContext.ptr<uint32_t>() );
+        a->mov( asmjit::host::dword_ptr( asmjit::host::edx ), asmjit::host::eax );
 
         auto pTermThd = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll" ), "NtTerminateThread" );
-        a.push( AsmJit::nax );
-        a.push( DWORD( 0 ) );
-        a.mov( AsmJit::eax, static_cast<DWORD>(pTermThd.procAddress) );
-        a.call( AsmJit::nax );
-        a.ret( 4 );
+        a->push( asmjit::host::zax );
+        a->push( uint32_t( 0 ) );
+        a->mov( asmjit::host::eax, static_cast<uint32_t>(pTermThd.procAddress) );
+        a->call( asmjit::host::zax );
+        a->ret( 4 );
         
         // Write path to file
         _pAContext.Write( sizeof(HANDLE), act32 );
         _pAContext.Write( sizeof(HANDLE) + sizeof(act32), (path.length() + 1) * sizeof(wchar_t), path.c_str() );
 
         auto pCode = _process.memory().Allocate( 0x1000 );
-        pCode.Write( 0, a.getCodeSize(), a.make() );
+        pCode.Write( 0, a->getCodeSize(), a->make() );
 
         result = _process.remote().ExecDirect( pCode.ptr<ptr_t>(), _pAContext.ptr<size_t>() + sizeof(HANDLE) );
     }
     // Native way
     else
     {
-        ah.GenPrologue();
+        a.GenPrologue();
 
-        ah.GenCall( static_cast<size_t>(pCreateActx.procAddress), { _pAContext.ptr<size_t>() + sizeof(HANDLE) } );
+        a.GenCall( static_cast<size_t>(pCreateActx.procAddress), { _pAContext.ptr<size_t>() + sizeof(HANDLE) } );
 
-        a.mov( AsmJit::ndx, _pAContext.ptr<size_t>() );
-        a.mov( AsmJit::sysint_ptr( AsmJit::ndx ), AsmJit::nax );
+        a->mov( asmjit::host::zdx, _pAContext.ptr<size_t>() );
+        a->mov( asmjit::host::intptr_ptr( asmjit::host::zdx ), asmjit::host::zax );
 
-        _process.remote().AddReturnWithEvent( ah );
-        ah.GenEpilogue();
+        _process.remote().AddReturnWithEvent( a );
+        a.GenEpilogue();
 
         // Write path to file
         _pAContext.Write( sizeof(HANDLE), act );
         _pAContext.Write( sizeof(HANDLE) + sizeof(act), (path.length() + 1) * sizeof(wchar_t), path.c_str() );
 
-        _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result );
+        _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     }
 
 

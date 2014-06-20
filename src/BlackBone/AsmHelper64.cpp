@@ -5,9 +5,8 @@
 namespace blackbone
 {
 
-AsmHelper64::AsmHelper64( AsmJit::Assembler& _a )
-    : AsmHelperBase( _a )
-    , _stackEnabled( true )
+AsmHelper64::AsmHelper64( )
+    : _stackEnabled( true )
 {
 }
 
@@ -28,14 +27,14 @@ void AsmHelper64::GenPrologue( bool switchMode /*= false*/ )
         SwitchTo64();
 
         // Align stack
-        a.and_( AsmJit::nsp, 0xFFFFFFFFFFFFFFF0 );
+        _assembler.and_( asmjit::host::zsp, 0xFFFFFFFFFFFFFFF0 );
     }
     else
     {
-        a.mov( AsmJit::qword_ptr( AsmJit::rsp, 1 * WordSize ), AsmJit::rcx );
-        a.mov( AsmJit::qword_ptr( AsmJit::rsp, 2 * WordSize ), AsmJit::rdx );
-        a.mov( AsmJit::qword_ptr( AsmJit::rsp, 3 * WordSize ), AsmJit::r8 );
-        a.mov( AsmJit::qword_ptr( AsmJit::rsp, 4 * WordSize ), AsmJit::r9 );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 1 * WordSize ), asmjit::host::rcx );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 2 * WordSize ), asmjit::host::rdx );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 3 * WordSize ), asmjit::host::r8 );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 4 * WordSize ), asmjit::host::r9 );
     }
 }
 
@@ -54,13 +53,13 @@ void AsmHelper64::GenEpilogue( bool switchMode /*= false*/, int retSize /*= 0*/ 
     }
     else
     {
-        a.mov( AsmJit::rcx, AsmJit::qword_ptr( AsmJit::rsp, 1 * WordSize ) );
-        a.mov( AsmJit::rdx, AsmJit::qword_ptr( AsmJit::rsp, 2 * WordSize ) );
-        a.mov( AsmJit::r8, AsmJit::qword_ptr( AsmJit::rsp, 3 * WordSize ) );
-        a.mov( AsmJit::r9, AsmJit::qword_ptr( AsmJit::rsp, 4 * WordSize ) );
+        _assembler.mov( asmjit::host::rcx, asmjit::host::qword_ptr( asmjit::host::rsp, 1 * WordSize ) );
+        _assembler.mov( asmjit::host::rdx, asmjit::host::qword_ptr( asmjit::host::rsp, 2 * WordSize ) );
+        _assembler.mov( asmjit::host::r8, asmjit::host::qword_ptr( asmjit::host::rsp, 3 * WordSize ) );
+        _assembler.mov( asmjit::host::r9, asmjit::host::qword_ptr( asmjit::host::rsp, 4 * WordSize ) );
     }
 
-    a.ret();
+    _assembler.ret();
 }
 
 /// <summary>
@@ -81,7 +80,7 @@ void AsmHelper64::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
     rsp_dif = Align( rsp_dif, 0x10 );
 
     if (_stackEnabled)
-        a.sub( AsmJit::rsp, rsp_dif + 8 );
+        _assembler.sub( asmjit::host::rsp, rsp_dif + 8 );
 
     // Set args
     for (size_t i = 0; i < args.size(); i++)
@@ -89,18 +88,18 @@ void AsmHelper64::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
 
     if (pFN.type == AsmVariant::imm)
     {
-        a.mov( AsmJit::r13, pFN.imm_val );
-        a.call( AsmJit::r13 );
+        _assembler.mov( asmjit::host::r13, pFN.imm_val );
+        _assembler.call( asmjit::host::r13 );
     }
     else if (pFN.type == AsmVariant::reg)
     {
-        a.call( pFN.reg_val );
+        _assembler.call( pFN.reg_val );
     }
     else
         assert("Invalid function pointer type" && false );
 
     if (_stackEnabled)
-        a.add( AsmJit::rsp, rsp_dif + 8 );
+        _assembler.add( asmjit::host::rsp, rsp_dif + 8 );
 }
 
 /// <summary>
@@ -112,14 +111,14 @@ void AsmHelper64::ExitThreadWithStatus( uint64_t pExitThread, size_t resultPtr )
 {
     if (resultPtr != 0)
     {
-        a.mov( AsmJit::rdx, resultPtr );
-        a.mov( AsmJit::dword_ptr( AsmJit::rdx ), AsmJit::rax );
+        _assembler.mov( asmjit::host::rdx, resultPtr );
+        _assembler.mov( asmjit::host::dword_ptr( asmjit::host::rdx ), asmjit::host::rax );
     }
 
-    a.mov( AsmJit::rdx, AsmJit::rax );
-    a.mov( AsmJit::rcx, 0 );
-    a.mov( AsmJit::r13, pExitThread );
-    a.call( AsmJit::r13 );
+    _assembler.mov( asmjit::host::rdx, asmjit::host::rax );
+    _assembler.mov( asmjit::host::rcx, 0 );
+    _assembler.mov( asmjit::host::r13, pExitThread );
+    _assembler.call( asmjit::host::r13 );
 }
 
 /// <summary>
@@ -136,25 +135,25 @@ void AsmHelper64::SaveRetValAndSignalEvent( size_t pSetEvent,
                                             size_t lastStatusPtr, 
                                             eReturnType rtype /*= rt_int32*/ )
 {
-    a.mov( AsmJit::rcx, ResultPtr );
+    _assembler.mov( asmjit::host::rcx, ResultPtr );
 
     // FPU value has been already saved
     if (rtype == rt_int64 || rtype == rt_int32)
-        a.mov( AsmJit::dword_ptr( AsmJit::rcx ), AsmJit::rax );
+        _assembler.mov( asmjit::host::dword_ptr( asmjit::host::rcx ), asmjit::host::rax );
 
     // Save last NT status
     SetTebPtr();
-    a.add( AsmJit::rdx, LAST_STATUS_OFS );
-    a.mov( AsmJit::rdx, AsmJit::dword_ptr( AsmJit::rdx ) );
-    a.mov( AsmJit::rax, lastStatusPtr );
-    a.mov( AsmJit::dword_ptr( AsmJit::rax ), AsmJit::rdx );
+    _assembler.add( asmjit::host::rdx, LAST_STATUS_OFS );
+    _assembler.mov( asmjit::host::rdx, asmjit::host::dword_ptr( asmjit::host::rdx ) );
+    _assembler.mov( asmjit::host::rax, lastStatusPtr );
+    _assembler.mov( asmjit::host::dword_ptr( asmjit::host::rax ), asmjit::host::rdx );
 
     // NtSetEvent(hEvent, NULL)
-    a.mov( AsmJit::rax, EventPtr );
-    a.mov( AsmJit::rcx, AsmJit::dword_ptr( AsmJit::rax ) );
-    a.mov( AsmJit::rdx, 0 );
-    a.mov( AsmJit::r13, pSetEvent );
-    a.call( AsmJit::r13 );
+    _assembler.mov( asmjit::host::rax, EventPtr );
+    _assembler.mov( asmjit::host::rcx, asmjit::host::dword_ptr( asmjit::host::rax ) );
+    _assembler.mov( asmjit::host::rdx, 0 );
+    _assembler.mov( asmjit::host::r13, pSetEvent );
+    _assembler.call( asmjit::host::r13 );
 }
 
 
@@ -199,8 +198,8 @@ void AsmHelper64::PushArg( const AsmVariant& arg, size_t index )
         break;
 
     case AsmVariant::mem_ptr:
-        a.lea( AsmJit::rax, arg.mem_val );
-        PushArgp( AsmJit::rax, index );
+        _assembler.lea( asmjit::host::rax, arg.mem_val );
+        PushArgp( asmjit::host::rax, index );
         break;
 
     case AsmVariant::mem:
@@ -226,8 +225,8 @@ void AsmHelper64::PushArg( const AsmVariant& arg, size_t index )
 template<typename _Type>
 void AsmHelper64::PushArgp( const _Type& arg, size_t index, bool fpu /*= false*/ )
 {
-    static const AsmJit::GPReg regs[] = { AsmJit::rcx, AsmJit::rdx, AsmJit::r8, AsmJit::r9 };
-    static const AsmJit::XMMReg xregs[] = { AsmJit::xmm0, AsmJit::xmm1, AsmJit::xmm2, AsmJit::xmm3 };
+    static const asmjit::host::GpReg regs[] = { asmjit::host::rcx, asmjit::host::rdx, asmjit::host::r8, asmjit::host::r9 };
+    static const asmjit::host::XmmReg xregs[] = { asmjit::host::xmm0, asmjit::host::xmm1, asmjit::host::xmm2, asmjit::host::xmm3 };
 
     // Pass via register
     if (index < 4)
@@ -235,17 +234,17 @@ void AsmHelper64::PushArgp( const _Type& arg, size_t index, bool fpu /*= false*/
         // Use XMM register
         if (fpu)
         {
-            a.mov( AsmJit::rax, arg );
-            a.movq( xregs[index], AsmJit::rax );
+            _assembler.mov( asmjit::host::rax, arg );
+            _assembler.movq( xregs[index], asmjit::host::rax );
         }
         else
-            a.mov( regs[index], arg );
+            _assembler.mov( regs[index], arg );
     }
     // Pass on stack
     else
     {
-        a.mov( AsmJit::r15, arg );
-        a.mov( AsmJit::qword_ptr( AsmJit::rsp, index * WordSize ), AsmJit::r15 );
+        _assembler.mov( asmjit::host::r15, arg );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, static_cast<int32_t>(index)* WordSize ), asmjit::host::r15 );
     }
 }
 

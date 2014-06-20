@@ -131,4 +131,15 @@ NTSTATUS ProcessMemory::Write( ptr_t pAddress, size_t dwSize, const void* pData 
     return _core.native()->WriteProcessMemoryT( pAddress, pData, dwSize );
 }
 
+/// <summary>
+/// Enumerate valid memory regions
+/// </summary>
+/// <param name="results">Found regions</param>
+/// <param name="includeFree">If true - non-allocated regions will be included in list</param>
+/// <returns>Number of regions found</returns>
+size_t ProcessMemory::EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree /*= false*/ )
+{
+    return _core.native()->EnumRegions( results, includeFree );
+}
+
 }

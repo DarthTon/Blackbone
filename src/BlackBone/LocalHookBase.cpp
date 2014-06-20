@@ -190,7 +190,7 @@ namespace blackbone
     LONG NTAPI DetourBase::StepHandler( PEXCEPTION_POINTERS excpt )
     {
         DWORD index = 0;
-        int found = _BitScanForward( &index, excpt->ContextRecord->Dr6 );
+        int found = _BitScanForward( &index, static_cast<DWORD>(excpt->ContextRecord->Dr6) );
 
         if (found != 0 && index < 4 && _breakpoints.count( excpt->ExceptionRecord->ExceptionAddress ))
         {

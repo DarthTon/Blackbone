@@ -1,7 +1,8 @@
 #pragma  once
 
-#include "AsmJit/Assembler.h"
-#include "AsmJit/MemoryManager.h"
+#pragma warning(disable : 4100)
+#include "AsmJit/AsmJit.h"
+#pragma warning(default : 4100)
 
 #include <memory>
 
@@ -81,7 +82,7 @@ namespace blackbone
             , imm_float_val( _imm_fpu )
             , new_imm_val( 0 ) { }
 
-        AsmVariant( AsmJit::GPReg _reg )
+        AsmVariant( asmjit::host::GpReg _reg )
             : type( reg )
             , size( sizeof(size_t) )
             , reg_val( _reg )
@@ -89,22 +90,22 @@ namespace blackbone
             , new_imm_val( 0 ) { }
 
         // Stack variable
-        AsmVariant( AsmJit::Mem _mem )
+        AsmVariant( asmjit::host::Mem _mem )
             : type( mem )
             , size( sizeof(size_t) )
             , mem_val( _mem )
             , imm_double_val( -1.0 ) { }
 
         // Pointer to stack address
-        AsmVariant( AsmJit::Mem* _mem )
+        AsmVariant( asmjit::host::Mem* _mem )
             : type( mem_ptr )
             , size( sizeof(size_t) )
             , mem_val( *_mem )
             , imm_double_val( -1.0 )
             , new_imm_val( 0 ) { }
 
-        AsmVariant( const AsmJit::Mem* _mem )
-            : AsmVariant( const_cast<AsmJit::Mem*>(_mem) ) { }
+        AsmVariant( const asmjit::host::Mem* _mem )
+            : AsmVariant( const_cast<asmjit::host::Mem*>(_mem) ) { }
 
         template <typename T>
         AsmVariant( T* ptr )
@@ -236,8 +237,8 @@ namespace blackbone
         eType         type;             // Variable type
         size_t        size;             // Variable size
 
-        AsmJit::GPReg reg_val;          // General purpose register
-        AsmJit::Mem   mem_val;          // Memory pointer
+        asmjit::host::GpReg reg_val;          // General purpose register
+        asmjit::host::Mem   mem_val;          // Memory pointer
 
         // Immediate values
         union
