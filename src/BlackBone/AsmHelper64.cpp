@@ -88,8 +88,8 @@ void AsmHelper64::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
 
     if (pFN.type == AsmVariant::imm)
     {
-        _assembler.mov( asmjit::host::r13, pFN.imm_val );
-        _assembler.call( asmjit::host::r13 );
+        _assembler.mov( asmjit::host::rax, pFN.imm_val );
+        _assembler.call( asmjit::host::rax );
     }
     else if (pFN.type == AsmVariant::reg)
     {
@@ -243,8 +243,8 @@ void AsmHelper64::PushArgp( const _Type& arg, size_t index, bool fpu /*= false*/
     // Pass on stack
     else
     {
-        _assembler.mov( asmjit::host::r15, arg );
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, static_cast<int32_t>(index)* WordSize ), asmjit::host::r15 );
+        _assembler.mov( asmjit::host::rax, arg );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, static_cast<int32_t>(index)* WordSize ), asmjit::host::rax );
     }
 }
 
