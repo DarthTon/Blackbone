@@ -1,0 +1,55 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Private.c" />
+    <ClCompile Include="Remap.c" />
+    <ClCompile Include="Dispatch.c" />
+    <ClCompile Include="VadHelpers.c" />
+    <ClCompile Include="VadRoutines.c" />
+    <ClCompile Include="BlackBoneDrv.c" />
+    <ClCompile Include="Routines.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Remap.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="NativeStructs.h">
+      <Filter>Include\Native</Filter>
+    </ClInclude>
+    <ClInclude Include="NativeStructs7.h">
+      <Filter>Include\Native</Filter>
+    </ClInclude>
+    <ClInclude Include="NativeStructs8.h">
+      <Filter>Include\Native</Filter>
+    </ClInclude>
+    <ClInclude Include="NativeStructs81.h">
+      <Filter>Include\Native</Filter>
+    </ClInclude>
+    <ClInclude Include="VadRoutines.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="VadHelpers.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="BlackBoneDrv.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="BlackBoneDef.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="NativeEnums.h">
+      <Filter>Include\Native</Filter>
+    </ClInclude>
+    <ClInclude Include="Private.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Include">
+      <UniqueIdentifier>{b7e17437-db3c-4555-9fd0-40e3b20f6b54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Include\Native">
+      <UniqueIdentifier>{1777770d-b977-4802-9b7d-a2c21fcfed88}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

@@ -1,9 +1,9 @@
 #pragma once
 
-#include "../BlackBone/Process.h"
-#include "../BlackBone/PEParser.h"
-#include "../BlackBone/Utils.h"
-#include "../BlackBone/DynImport.h"
+#include "../BlackBone/Process/Process.h"
+#include "../BlackBone/PE/PEParser.h"
+#include "../BlackBone/Misc/Utils.h"
+#include "../BlackBone/Misc/DynImport.h"
 
 #include <iostream>
 
@@ -13,3 +13,5 @@ void TestLocalHook();
 void TestRemoteHook();
 void TestMMap();
 void TestRemoteCall();
+void TestDriver();
+void TestRemoteMem();

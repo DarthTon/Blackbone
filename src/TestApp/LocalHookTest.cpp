@@ -1,5 +1,5 @@
 #include "Tests.h"
-#include "../BlackBone/VTableHook.hpp"
+#include "../BlackBone/localHook/VTableHook.hpp"
 
 class TestClass
 {

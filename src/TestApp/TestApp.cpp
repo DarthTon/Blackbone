@@ -46,6 +46,8 @@ int main( int /*argc*/, char* /*argv*/[] )
     TestLocalHook();
     TestRemoteCall();
     TestRemoteHook();
+    TestDriver();
+    TestRemoteMem();
     TestMMap();
 
 	return 0;

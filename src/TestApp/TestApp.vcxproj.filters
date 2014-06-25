@@ -6,6 +6,8 @@
     <ClCompile Include="RemoteHookTest.cpp" />
     <ClCompile Include="RemoteCallTest.cpp" />
     <ClCompile Include="MMapTest.cpp" />
+    <ClCompile Include="DriverTest.cpp" />
+    <ClCompile Include="RemoteMemTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Tests.h" />

@@ -2,7 +2,7 @@
 
 #ifdef COMPILER_MSVC
 #include "Tests.h"
-#include "../BlackBone/RemoteFunction.hpp"
+#include "../BlackBone/Process/RPC/RemoteFunction.hpp"
 #endif
 /*
     Get explorer.exe path

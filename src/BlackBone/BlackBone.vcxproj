@@ -71,25 +71,25 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)contrib;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)contrib;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)contrib;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(SolutionDir)contrib;$(IncludePath)</IncludePath>
+    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -97,7 +97,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;CONSOLE_TRACE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <BasicRuntimeChecks>UninitializedLocalUsageCheck</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -117,7 +117,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;CONSOLE_TRACE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
     </ClCompile>
@@ -137,7 +137,7 @@
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;BLACBONE_NO_TRACE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;BLACBONE_NO_TRACE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>
       </SDLCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -164,7 +164,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;_LIB;BLACBONE_NO_TRACE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;BLACBONE_NO_TRACE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
@@ -207,51 +207,42 @@
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86operand.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86regs.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86util.cpp" />
-    <ClCompile Include="AsmHelper32.cpp">
+    <ClCompile Include="Asm\AsmHelper32.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-      </ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="AsmHelper64.cpp">
+    <ClCompile Include="Asm\AsmHelper64.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
-    <ClCompile Include="AsmStack.hpp" />
-    <ClCompile Include="TraceHook.cpp" />
-    <ClCompile Include="LDasm.c" />
-    <ClCompile Include="LocalHookBase.cpp" />
-    <ClCompile Include="MExcept.cpp" />
-    <ClCompile Include="MMap.cpp" />
-    <ClCompile Include="FileProjection.cpp" />
-    <ClCompile Include="ImageNET.cpp" />
-    <ClCompile Include="MemBlock.cpp" />
-    <ClCompile Include="NameResolve.cpp" />
-    <ClCompile Include="NativeSubsystem.cpp" />
-    <ClCompile Include="DynImport.cpp" />
-    <ClCompile Include="Wow64Subsystem.cpp" />
-    <ClCompile Include="NtLoader.cpp" />
-    <ClCompile Include="NativeStructures.h" />
-    <ClCompile Include="PatternSearch.cpp" />
-    <ClCompile Include="PEParser.cpp" />
-    <ClCompile Include="Process.cpp" />
-    <ClCompile Include="ProcessCore.cpp" />
-    <ClCompile Include="ProcessMemory.cpp" />
-    <ClCompile Include="ProcessModules.cpp" />
-    <ClCompile Include="RemoteExec.cpp" />
-    <ClCompile Include="RemoteHook.cpp" />
-    <ClCompile Include="Thread.cpp" />
-    <ClCompile Include="Threads.cpp" />
-    <ClCompile Include="Utils.cpp" />
-    <ClCompile Include="Wow64Local.cpp">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-      </ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-      </ExcludedFromBuild>
-    </ClCompile>
-    <ClCompile Include="x86Subsystem.cpp" />
+    <ClCompile Include="Asm\LDasm.c" />
+    <ClCompile Include="DriverControl\DriverControl.cpp" />
+    <ClCompile Include="LocalHook\LocalHookBase.cpp" />
+    <ClCompile Include="LocalHook\TraceHook.cpp" />
+    <ClCompile Include="ManualMap\MExcept.cpp" />
+    <ClCompile Include="ManualMap\MMap.cpp" />
+    <ClCompile Include="ManualMap\Native\NtLoader.cpp" />
+    <ClCompile Include="Misc\DynImport.cpp" />
+    <ClCompile Include="Misc\NameResolve.cpp" />
+    <ClCompile Include="Misc\Utils.cpp" />
+    <ClCompile Include="Patterns\PatternSearch.cpp" />
+    <ClCompile Include="PE\FileProjection.cpp" />
+    <ClCompile Include="PE\ImageNET.cpp" />
+    <ClCompile Include="PE\PEParser.cpp" />
+    <ClCompile Include="Process\MemBlock.cpp" />
+    <ClCompile Include="Process\Process.cpp" />
+    <ClCompile Include="Process\ProcessCore.cpp" />
+    <ClCompile Include="Process\ProcessMemory.cpp" />
+    <ClCompile Include="Process\ProcessModules.cpp" />
+    <ClCompile Include="Process\RPC\RemoteExec.cpp" />
+    <ClCompile Include="Process\RPC\RemoteHook.cpp" />
+    <ClCompile Include="Process\RPC\RemoteMemory.cpp" />
+    <ClCompile Include="Process\Threads\Thread.cpp" />
+    <ClCompile Include="Process\Threads\Threads.cpp" />
+    <ClCompile Include="Subsystem\NativeSubsystem.cpp" />
+    <ClCompile Include="Subsystem\Wow64Local.cpp" />
+    <ClCompile Include="Subsystem\Wow64Subsystem.cpp" />
+    <ClCompile Include="Subsystem\x86Subsystem.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\contrib\AsmJit\apibegin.h" />
@@ -293,68 +284,64 @@
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86operand.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86regs.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86util.h" />
-    <ClInclude Include="AsmHelper32.h">
+    <ClInclude Include="Asm\AsmHelper.h" />
+    <ClInclude Include="Asm\AsmHelper32.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-      </ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="AsmHelper64.h">
+    <ClInclude Include="Asm\AsmHelper64.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="AsmHelperBase.h" />
-    <ClInclude Include="AsmVariant.hpp" />
-    <ClInclude Include="DynImport.h" />
-    <ClInclude Include="FunctionTypes.h" />
-    <ClInclude Include="HookHandlerCdecl.h" />
-    <ClInclude Include="HookHandlerFastcall.h" />
-    <ClInclude Include="HookHandlers.h" />
-    <ClInclude Include="HookHandlerStdcall.h" />
-    <ClInclude Include="HookHandlerThiscall.h" />
-    <ClInclude Include="TraceHook.h" />
-    <ClInclude Include="LocalHook.hpp" />
-    <ClInclude Include="LocalHookBase.h" />
-    <ClInclude Include="Trace.hpp" />
-    <ClInclude Include="VTableHook.hpp" />
-    <ClInclude Include="Wow64Subsystem.h" />
-    <ClInclude Include="Types.h" />
-    <ClInclude Include="LDasm.h" />
-    <ClInclude Include="MExcept.h" />
-    <ClInclude Include="MMap.h" />
-    <ClInclude Include="FileProjection.h" />
-    <ClInclude Include="ImageNET.h" />
-    <ClInclude Include="NativeSubsystem.h" />
-    <ClInclude Include="Win7Specific.h" />
-    <ClInclude Include="Win8Specific.h" />
-    <ClInclude Include="NtLoader.h" />
-    <ClInclude Include="RemoteFunction.hpp" />
-    <ClInclude Include="AsmHelper.h" />
-    <ClInclude Include="Macro.h" />
-    <ClInclude Include="MemBlock.h" />
-    <ClInclude Include="NameResolve.h" />
-    <ClInclude Include="PatternSearch.h" />
-    <ClInclude Include="PEParser.h" />
-    <ClInclude Include="Process.h" />
-    <ClInclude Include="ProcessCore.h" />
-    <ClInclude Include="ProcessMemory.h" />
-    <ClInclude Include="ProcessModules.h" />
-    <ClInclude Include="RemoteContext.hpp" />
-    <ClInclude Include="RemoteExec.h" />
-    <ClInclude Include="RemoteHook.h" />
-    <ClInclude Include="Thread.h" />
-    <ClInclude Include="Threads.h" />
-    <ClInclude Include="Utils.h" />
-    <ClInclude Include="Winheaders.h" />
-    <ClInclude Include="Wow64Local.h">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-      </ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-      </ExcludedFromBuild>
-    </ClInclude>
-    <ClInclude Include="x86Subsystem.h" />
+    <ClInclude Include="Asm\AsmHelperBase.h" />
+    <ClInclude Include="Asm\AsmStack.hpp" />
+    <ClInclude Include="Asm\AsmVariant.hpp" />
+    <ClInclude Include="Asm\LDasm.h" />
+    <ClInclude Include="Config.h" />
+    <ClInclude Include="DriverControl\DriverControl.h" />
+    <ClInclude Include="Include\FunctionTypes.h" />
+    <ClInclude Include="Include\Macro.h" />
+    <ClInclude Include="Include\NativeStructures.h" />
+    <ClInclude Include="Include\Types.h" />
+    <ClInclude Include="Include\Win7Specific.h" />
+    <ClInclude Include="Include\Win8Specific.h" />
+    <ClInclude Include="Include\Winheaders.h" />
+    <ClInclude Include="LocalHook\HookHandlerCdecl.h" />
+    <ClInclude Include="LocalHook\HookHandlerFastcall.h" />
+    <ClInclude Include="LocalHook\HookHandlers.h" />
+    <ClInclude Include="LocalHook\HookHandlerStdcall.h" />
+    <ClInclude Include="LocalHook\HookHandlerThiscall.h" />
+    <ClInclude Include="LocalHook\LocalHook.hpp" />
+    <ClInclude Include="LocalHook\LocalHookBase.h" />
+    <ClInclude Include="LocalHook\TraceHook.h" />
+    <ClInclude Include="LocalHook\VTableHook.hpp" />
+    <ClInclude Include="ManualMap\MExcept.h" />
+    <ClInclude Include="ManualMap\MMap.h" />
+    <ClInclude Include="ManualMap\Native\NtLoader.h" />
+    <ClInclude Include="Misc\DynImport.h" />
+    <ClInclude Include="Misc\NameResolve.h" />
+    <ClInclude Include="Misc\Trace.hpp" />
+    <ClInclude Include="Misc\Utils.h" />
+    <ClInclude Include="Patterns\PatternSearch.h" />
+    <ClInclude Include="PE\FileProjection.h" />
+    <ClInclude Include="PE\ImageNET.h" />
+    <ClInclude Include="PE\PEParser.h" />
+    <ClInclude Include="Process\MemBlock.h" />
+    <ClInclude Include="Process\Process.h" />
+    <ClInclude Include="Process\ProcessCore.h" />
+    <ClInclude Include="Process\ProcessMemory.h" />
+    <ClInclude Include="Process\ProcessModules.h" />
+    <ClInclude Include="Process\RPC\RemoteContext.hpp" />
+    <ClInclude Include="Process\RPC\RemoteExec.h" />
+    <ClInclude Include="Process\RPC\RemoteFunction.hpp" />
+    <ClInclude Include="Process\RPC\RemoteHook.h" />
+    <ClInclude Include="Process\RPC\RemoteMemory.h" />
+    <ClInclude Include="Process\Threads\Thread.h" />
+    <ClInclude Include="Process\Threads\Threads.h" />
+    <ClInclude Include="Subsystem\NativeSubsystem.h" />
+    <ClInclude Include="Subsystem\Wow64Local.h" />
+    <ClInclude Include="Subsystem\Wow64Subsystem.h" />
+    <ClInclude Include="Subsystem\x86Subsystem.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
