@@ -60,17 +60,13 @@ NTSTATUS RemoteMemory::Map( ptr_t base, uint32_t size )
     Driver().EnsureLoaded();
     NTSTATUS status = Driver().MapMemoryRegion( _process->pid(), base, size, result );
 
+    // Update regions
     if (NT_SUCCESS( status ))
     {
-        // Remove old region
-        if (result.removedPtr != 0)
-        {
-            auto iter = _mapDatabase.find( std::make_pair( result.removedPtr, result.removedSize ) );
-            if (iter != _mapDatabase.end())
-                _mapDatabase.erase( iter );
-        }
+        MapMemoryResult result;
 
-        _mapDatabase.emplace( std::make_pair( std::make_pair( result.originalPtr, result.size ), result.newPtr ) );
+        if (NT_SUCCESS( Driver().MapMemory( _process->pid(), _pipeName, false, result ) ))
+             std::swap( _mapDatabase, result.regions );
     }
 
     return status;
