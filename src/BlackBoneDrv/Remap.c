@@ -851,7 +851,7 @@ NTSTATUS BBMapMemory( IN PMAP_MEMORY pRemap, OUT PPROCESS_MAP_ENTRY* ppEntry )
         ObDereferenceObject( pProcess );
 
     // Remove entry if something went wrong
-    if (!NT_SUCCESS( status ))
+    if (!NT_SUCCESS( status ) && status != STATUS_ADDRESS_ALREADY_EXISTS)
         BBCleanupProcessEntry(pFoundEntry);
 
     KeReleaseGuardedMutex( &g_globalLock );
