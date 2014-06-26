@@ -48,7 +48,7 @@ namespace blackbone
     class AsmHelperBase
     {
     public:
-        AsmHelperBase() : _assembler( &_runtime ) { }
+        BLACKBONE_API AsmHelperBase() : _assembler( &_runtime ) { }
         virtual ~AsmHelperBase() { }
 
         virtual void GenPrologue( bool switchMode = false ) = 0;
@@ -62,7 +62,7 @@ namespace blackbone
         /// <summary>
         /// Switch processor into WOW64 emulation mode
         /// </summary>
-        void SwitchTo86()
+        BLACKBONE_API void SwitchTo86()
         {
             asmjit::Label l = _assembler.newLabel();
 
@@ -75,7 +75,7 @@ namespace blackbone
         /// <summary>
         /// Switch processor into x64 mode (long mode)
         /// </summary>
-        void SwitchTo64()
+        BLACKBONE_API void SwitchTo64()
         {
             asmjit::Label l = _assembler.newLabel();
 
@@ -85,7 +85,7 @@ namespace blackbone
             _assembler.emit( 0xCB );    // retf
         }
 
-        inline asmjit::host::Assembler* operator ->() { return &_assembler; }
+        BLACKBONE_API inline asmjit::host::Assembler* operator ->() { return &_assembler; }
 
     private:
         AsmHelperBase( const AsmHelperBase& ) = delete;

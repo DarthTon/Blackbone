@@ -11,8 +11,8 @@ namespace blackbone
 class ProcessThreads
 {
 public:
-    ProcessThreads( class ProcessCore& core );
-    ~ProcessThreads();
+    BLACKBONE_API ProcessThreads( class ProcessCore& core );
+    BLACKBONE_API ~ProcessThreads();
 
     /// <summary>
     /// Create the thread.
@@ -21,39 +21,39 @@ public:
     /// <param name="arg">Thread argument.</param>
     /// <param name="flags">Thread creation flags</param>
     /// <returns>New thread object</returns>
-    Thread CreateNew( ptr_t threadProc, ptr_t arg, DWORD flags = 0 );
+    BLACKBONE_API Thread CreateNew( ptr_t threadProc, ptr_t arg, DWORD flags = 0 );
 
     /// <summary>
     /// Gets all process threads
     /// </summary>
     /// <param name="dontUpdate">Return already existing thread list</param>
     /// <returns>Threads collection</returns>
-    std::vector<Thread>& getAll( bool dontUpdate = false );
+    BLACKBONE_API std::vector<Thread>& getAll( bool dontUpdate = false );
 
     /// <summary>
     /// Get main process thread
     /// </summary>
     /// <returns>Pointer to thread object, nullptr if failed</returns>
-    Thread* getMain();
+    BLACKBONE_API Thread* getMain();
 
     /// <summary>
     /// Get least executed thread
     /// </summary>
     /// <returns>Pointer to thread object, nullptr if failed</returns>
-    Thread* getLeastExecuted();
+    BLACKBONE_API Thread* getLeastExecuted();
 
     /// <summary>
     /// Get least executed thread
     /// </summary>
     /// <returns>Pointer to thread object, nullptr if failed</returns>
-    Thread* getRandom();
+    BLACKBONE_API Thread* getRandom();
 
     /// <summary>
     /// Get thread by ID
     /// </summary>
     /// <param name="id">Thread ID</param>
     /// <returns>Pointer to thread object, nullptr if failed</returns>
-    Thread* get( DWORD id );
+    BLACKBONE_API Thread* get( DWORD id );
 
 private:
     ProcessThreads( const ProcessThreads& ) = delete;

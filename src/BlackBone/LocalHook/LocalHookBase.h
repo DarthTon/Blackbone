@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Config.h"
 #include "../Include/Winheaders.h"
 #include "../Asm/AsmHelper.h"
 #include "../Asm/LDasm.h"
@@ -23,25 +24,25 @@ enum e
 
 namespace HookType
 {
-enum e
-{
-    Inline,         // Patch first few bytes
-    Int3,           // Place Int3 breakpoint
-    HWBP,           // Set hardware breakpoint
+    enum e
+    {
+        Inline,         // Patch first few bytes
+        Int3,           // Place Int3 breakpoint
+        HWBP,           // Set hardware breakpoint
 
-    // Reserved for internal use
-    VTable,
-    InternalInline  
-};
+        // Reserved for internal use
+        VTable,
+        InternalInline  
+    };
 }
 
 namespace ReturnMethod
 {
-enum e
-{
-    UseNew,
-    UseOriginal
-};
+    enum e
+    {
+        UseNew,
+        UseOriginal
+    };
 }
 
 class DetourBase
@@ -49,8 +50,8 @@ class DetourBase
     typedef std::unordered_map<DWORD, int> mapIdx;
 
 public:
-    DetourBase();
-    ~DetourBase();
+    BLACKBONE_API DetourBase();
+    BLACKBONE_API ~DetourBase();
 
 protected:
 
@@ -58,13 +59,13 @@ protected:
     /// Temporarily disable hook
     /// </summary>
     /// <returns>true on success</returns>
-    bool DisableHook();
+    BLACKBONE_API bool DisableHook();
 
     /// <summary>
     /// Enable disabled hook
     /// </summary>
     /// <returns>true on success</returns>
-    bool EnableHook();
+    BLACKBONE_API bool EnableHook();
 
     /// <summary>
     /// Toggle hardware breakpoint for current thread
@@ -72,23 +73,23 @@ protected:
     /// <param name="index">Breakpoint index ( 0-4 )</param>
     /// <param name="enable">true to enable, false to disable</param>
     /// <returns>true on success</returns>
-    bool ToggleHBP( int index, bool enable );
+    BLACKBONE_API bool ToggleHBP( int index, bool enable );
 
     /// <summary>
     /// Copy original function bytes
     /// </summary>
     /// <param name="Ptr">Origianl function address</param>
-    void CopyOldCode( uint8_t* Ptr );
+    BLACKBONE_API void CopyOldCode( uint8_t* Ptr );
 
     /// <summary>
     /// Exception handlers
     /// </summary>
     /// <param name="excpt">Exception information</param>
     /// <returns>Exception disposition</returns>
-    static LONG NTAPI VectoredHandler   ( PEXCEPTION_POINTERS excpt );
-    static LONG NTAPI Int3Handler       ( PEXCEPTION_POINTERS excpt );
-    static LONG NTAPI AVHandler         ( PEXCEPTION_POINTERS excpt );
-    static LONG NTAPI StepHandler       ( PEXCEPTION_POINTERS excpt );
+    BLACKBONE_API static LONG NTAPI VectoredHandler ( PEXCEPTION_POINTERS excpt );
+    BLACKBONE_API static LONG NTAPI Int3Handler     ( PEXCEPTION_POINTERS excpt );
+    BLACKBONE_API static LONG NTAPI AVHandler       ( PEXCEPTION_POINTERS excpt );
+    BLACKBONE_API static LONG NTAPI StepHandler     ( PEXCEPTION_POINTERS excpt );
 
 protected:
     bool _hooked = false;               // Hook is installed
@@ -110,10 +111,10 @@ protected:
     ReturnMethod::e _retType = ReturnMethod::UseOriginal;
 
     // Global hook instances relationship
-    static std::unordered_map<void*, DetourBase*> _breakpoints;
+    BLACKBONE_API static std::unordered_map<void*, DetourBase*> _breakpoints;
 
     // Exception handler
-    static void* _vecHandler;        
+    BLACKBONE_API static void* _vecHandler;
 };
 
 }

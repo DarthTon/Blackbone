@@ -22,28 +22,29 @@ public:
     typedef std::map<std::pair<std::wstring, std::wstring>, size_t> mapMethodRVA;
 
 public:
-    ImageNET(void);
-    ~ImageNET(void);
+    BLACKBONE_API ImageNET(void);
+    BLACKBONE_API ~ImageNET(void);
 
     /// <summary>
     /// Initialize COM classes
     /// </summary>
     /// <param name="path">Image file path</param>
     /// <returns>true on success</returns>
-    bool Init( const std::wstring& path );
+    BLACKBONE_API bool Init( const std::wstring& path );
 
     /// <summary>
     /// Extract methods from image
     /// </summary>
     /// <param name="methods">Found Methods</param>
     /// <returns>true on success</returns>
-    bool Parse( mapMethodRVA& methods );
+    BLACKBONE_API bool Parse( mapMethodRVA& methods );
 
     /// <summary>
     /// Get image .NET runtime version
     /// </summary>
     /// <returns>runtime version, "n/a" if nothing found</returns>
-    static std::wstring GetImageRuntimeVer( const wchar_t* ImagePath );
+    BLACKBONE_API static std::wstring GetImageRuntimeVer( const wchar_t* ImagePath );
+
 private:
     std::wstring _path;         // Image path
     mapMethodRVA _methods;      // Image methods

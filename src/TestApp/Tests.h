@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../BlackBone/Config.h"
 #include "../BlackBone/Process/Process.h"
 #include "../BlackBone/PE/PEParser.h"
 #include "../BlackBone/Misc/Utils.h"

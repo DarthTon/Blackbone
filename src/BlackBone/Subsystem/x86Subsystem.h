@@ -11,8 +11,8 @@ namespace blackbone
 class x86Native : public Native
 {
 public:
-    x86Native( HANDLE hProcess );
-    ~x86Native();
+    BLACKBONE_API x86Native( HANDLE hProcess );
+    BLACKBONE_API ~x86Native();
 
     /// <summary>
     /// Query virtual memory

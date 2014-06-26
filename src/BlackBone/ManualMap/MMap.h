@@ -65,8 +65,8 @@ class MMap : public MExcept
 {
         
 public:
-    MMap( class Process& proc );
-    ~MMap( void );
+    BLACKBONE_API MMap( class Process& proc );
+    BLACKBONE_API ~MMap( void );
 
     /// <summary>
     /// Manually map PE image into underlying target process
@@ -74,18 +74,18 @@ public:
     /// <param name="path">Image path</param>
     /// <param name="flags">Image mapping flags</param>
     /// <returns>Mapped image info</returns>
-    const ModuleData* MapImage( const std::wstring& path, int flags = NoFlags );
+    BLACKBONE_API const ModuleData* MapImage( const std::wstring& path, int flags = NoFlags );
 
     /// <summary>
     /// Unmap all manually mapped modules
     /// </summary>
     /// <returns>true on success</returns>
-    bool UnmapAllModules();
+    BLACKBONE_API bool UnmapAllModules();
 
     /// <summary>
     /// Reset local data
     /// </summary>
-    inline void reset() { _images.clear(); _pAContext.Reset(); _usedBlocks.clear(); }
+    BLACKBONE_API inline void reset() { _images.clear(); _pAContext.Reset(); _usedBlocks.clear(); }
 
 private:
 

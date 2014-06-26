@@ -6,12 +6,10 @@
 namespace blackbone
 {
 
-class NoClass
-{
-};
+    class BLACKBONE_API NoClass { };
 
-template<typename Fn, class C>
-struct HookHandler;
+    template<typename Fn, class C>
+    struct HookHandler;
 
 }
 

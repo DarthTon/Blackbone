@@ -13,12 +13,12 @@ class MExcept
 {
 public:
     // For debug purposes only
-    static void*  g_pImageBase;
-    static size_t g_imageSize;
+    BLACKBONE_API static void*  g_pImageBase;
+    BLACKBONE_API static size_t g_imageSize;
 
 protected:
-    MExcept( class Process& proc );
-    ~MExcept();
+    BLACKBONE_API MExcept( class Process& proc );
+    BLACKBONE_API ~MExcept();
 
     /// <summary>
     /// Inject VEH wrapper into process
@@ -27,13 +27,13 @@ protected:
     /// <param name="pTargetBase">Target image base address</param>
     /// <param name="imageSize">Size of the image</param>
     /// <returns>Error code</returns>
-    NTSTATUS CreateVEH( size_t pTargetBase, size_t imageSize );
+    BLACKBONE_API NTSTATUS CreateVEH( size_t pTargetBase, size_t imageSize );
 
     /// <summary>
     /// Removes VEH from target process
     /// </summary>
     /// <returns></returns>
-    NTSTATUS RemoveVEH();
+    BLACKBONE_API NTSTATUS RemoveVEH();
 
 private:
     MExcept( const MExcept& ) = delete;

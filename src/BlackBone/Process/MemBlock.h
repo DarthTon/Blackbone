@@ -40,7 +40,7 @@ class MemBlock
 {
 public:
 
-    MemBlock();
+    BLACKBONE_API MemBlock();
 
     /// <summary>
     /// MemBlock ctor
@@ -48,7 +48,7 @@ public:
     /// <param name="mem">Process memory routines</param>
     /// <param name="ptr">Memory address</param>
     /// <param name="own">true if caller will be responsible for block deallocation</param>
-    MemBlock( class ProcessMemory* mem, ptr_t ptr, bool own = true );
+    BLACKBONE_API MemBlock( class ProcessMemory* mem, ptr_t ptr, bool own = true );
 
     /// <summary>
     /// MemBlock ctor
@@ -58,9 +58,9 @@ public:
     /// <param name="size">Block size</param>
     /// <param name="prot">Memory protection</param>
     /// <param name="own">true if caller will be responsible for block deallocation</param>
-    MemBlock( class ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own = true );
+    BLACKBONE_API MemBlock( class ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own = true );
 
-    ~MemBlock();
+    BLACKBONE_API ~MemBlock();
 
     /// <summary>
     /// Allocate new memory block
@@ -70,7 +70,7 @@ public:
     /// <param name="desired">Desired base address of new block</param>
     /// <param name="protection">Win32 Memory protection flags</param>
     /// <returns>Memory block. If failed - returned block will be invalid</returns>
-    static MemBlock Allocate( class ProcessMemory& process, size_t size, ptr_t desired = 0, DWORD protection = PAGE_EXECUTE_READWRITE );
+    BLACKBONE_API static MemBlock Allocate( class ProcessMemory& process, size_t size, ptr_t desired = 0, DWORD protection = PAGE_EXECUTE_READWRITE );
 
     /// <summary>
     /// Reallocate existing block for new size
@@ -79,7 +79,7 @@ public:
     /// <param name="desired">Desired base address of new block</param>
     /// <param name="protection">Memory protection</param>
     /// <returns>New block address</returns>
-    ptr_t Realloc( size_t size, ptr_t desired = 0, DWORD protection = PAGE_EXECUTE_READWRITE );
+    BLACKBONE_API ptr_t Realloc( size_t size, ptr_t desired = 0, DWORD protection = PAGE_EXECUTE_READWRITE );
 
     /// <summary>
     /// Change memory protection
@@ -89,13 +89,13 @@ public:
     /// <param name="size">Block size</param>
     /// <param name="pOld">Old protection flags</param>
     /// <returns>Status</returns>
-    NTSTATUS Protect( DWORD protection, size_t offset = 0, size_t size = 0, DWORD* pOld = nullptr );
+    BLACKBONE_API NTSTATUS Protect( DWORD protection, size_t offset = 0, size_t size = 0, DWORD* pOld = nullptr );
 
     /// <summary>
     /// Free memory
     /// </summary>
     /// <param name="size">Size of memory chunk to free. If 0 - whole block is freed</param>
-    NTSTATUS Free( size_t size = 0 );
+    BLACKBONE_API NTSTATUS Free( size_t size = 0 );
 
     /// <summary>
     /// Read data
@@ -108,7 +108,7 @@ public:
     /// Otherwise function will fail if there is at least one non-committed page in region.
     /// </param>
     /// <returns>Status</returns>
-    NTSTATUS Read( size_t offset, size_t size, PVOID pResult, bool handleHoles = false );
+    BLACKBONE_API NTSTATUS Read( size_t offset, size_t size, PVOID pResult, bool handleHoles = false );
 
     /// <summary>
     /// Write data
@@ -117,7 +117,7 @@ public:
     /// <param name="size">Size of data to write</param>
     /// <param name="pData">Buffer to write</param>
     /// <returns>Status</returns>
-    NTSTATUS Write( size_t offset, size_t size, const void* pData );
+    BLACKBONE_API NTSTATUS Write( size_t offset, size_t size, const void* pData );
 
     /// <summary>
     /// Read data
@@ -148,12 +148,12 @@ public:
     /// <summary>
     /// Try to free memory and reset pointers
     /// </summary>
-    void Reset();
+    BLACKBONE_API void Reset();
 
     /// <summary>
     /// Memory will not be deallocated upon object destruction
     /// </summary>
-    inline void Release() const  { _own = false; }
+    BLACKBONE_API inline void Release() const  { _own = false; }
 
     /// <summary>
     /// Get memory pointer
@@ -166,26 +166,26 @@ public:
     /// Get block size
     /// </summary>
     /// <returns>Block size</returns>
-    inline size_t size() const { return _size; }
+    BLACKBONE_API inline size_t size() const { return _size; }
 
     /// <summary>
     /// Get block memory protection
     /// </summary>
     /// <returns>Memory protection flags</returns>
-    inline DWORD  protection() const { return _protection; }
+    BLACKBONE_API inline DWORD  protection() const { return _protection; }
 
     /// <summary>
     /// Validate memory block
     /// <returns>true if memory pointer isn't 0</returns>
-    inline bool valid() const { return (_memory != nullptr && _ptr != 0); }
+    BLACKBONE_API inline bool valid() const { return (_memory != nullptr && _ptr != 0); }
 
     /// <summary>
     /// Get memory pointer
     /// </summary>
     /// <returns>Memory pointer</returns>
-    operator ptr_t() const  { return _ptr; }
+    BLACKBONE_API inline operator ptr_t() const  { return _ptr; }
 
-    MemBlock& operator =(const MemBlock& other)
+    BLACKBONE_API MemBlock& operator =(const MemBlock& other)
     {
         _memory = other._memory;
         _ptr = other._ptr;

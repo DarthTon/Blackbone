@@ -21,7 +21,10 @@ void TestRemoteMem()
     
     status = proc.memory().Map( false );
     if (!NT_SUCCESS( status ))
-        std::cout << "TestRemoteMem: Process address space mapping failed with status 0x" << std::hex << status << "\r\n";
+    {
+        std::cout << "TestRemoteMem: Process address space mapping failed with status 0x" << std::hex << status << "\r\n\r\n";
+        return;
+    }
     
     // Translate main module base address
     auto addr = proc.modules().GetMainModule()->baseAddress;

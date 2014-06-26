@@ -19,10 +19,10 @@ public:
     typedef std::list<ModuleData> listModules;
 
 public:
-    Native( HANDLE hProcess, bool x86OS = false );
-    ~Native();
+    BLACKBONE_API Native( HANDLE hProcess, bool x86OS = false );
+    BLACKBONE_API ~Native();
 
-    inline const Wow64Barrier& GetWow64Barrier() const { return _wowBarrier; }
+    BLACKBONE_API inline const Wow64Barrier& GetWow64Barrier() const { return _wowBarrier; }
 
     /// <summary>
     /// Allocate virtual memory
@@ -174,7 +174,7 @@ public:
     /// <param name="results">Found regions</param>
     /// <param name="includeFree">If true - non-allocated regions will be included in list</param>
     /// <returns>Number of regions found</returns>
-    size_t EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree = false );
+    BLACKBONE_API size_t EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree = false );
 
     /// <summary>
     /// Enumerate process modules
@@ -182,25 +182,25 @@ public:
     /// <param name="result">Found modules</param>
     /// <param name="mtype">Module type: x86 or x64</param>
     /// <returns>Module count</returns>
-    size_t EnumModules( listModules& result, eModSeachType search = LdrList, eModType mtype = mt_default );
+    BLACKBONE_API size_t EnumModules( listModules& result, eModSeachType search = LdrList, eModType mtype = mt_default );
 
     /// <summary>
     /// Get lowest possible valid address value
     /// </summary>
     /// <returns>Address value</returns>
-    inline ptr_t minAddr() const { return 0x10000; }
+    BLACKBONE_API inline ptr_t minAddr() const { return 0x10000; }
 
     /// <summary>
     /// Get highest possible valid address value
     /// </summary>
     /// <returns>Address value</returns>
-    inline ptr_t maxAddr() const { return 0x7FFFFFFEFFFF; }
+    BLACKBONE_API inline ptr_t maxAddr() const { return 0x7FFFFFFEFFFF; }
                                                                         
     /// <summary>
     /// Get page size
     /// </summary>
     /// <returns>Address value</returns>
-    inline uint32_t pageSize() const { return _pageSize; }
+    BLACKBONE_API inline uint32_t pageSize() const { return _pageSize; }
 private:
 
     /// <summary>

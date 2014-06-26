@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Config.h"
 #include "../Include/Winheaders.h"
 #include <string>
 
@@ -12,51 +13,51 @@ namespace blackbone
 class FileProjection
 {
 public:
-    FileProjection(void);
-    FileProjection( const std::wstring& path );
-    ~FileProjection(void);
+    BLACKBONE_API FileProjection(void);
+    BLACKBONE_API FileProjection( const std::wstring& path );
+    BLACKBONE_API ~FileProjection(void);
 
     /// <summary>
     /// Memory-map specified file
     /// </summary>
     /// <param name="path">Image path</param>
     /// <returns>File address in memory, nullptr if failed</returns>
-    void* Project( const std::wstring& path );
+    BLACKBONE_API void* Project( const std::wstring& path );
 
     /// <summary>
     /// Release mapping, if any
     /// </summary>
-    void Release();
+    BLACKBONE_API void Release();
 
     /// <summary>
     /// Base of file in memory
     /// </summary>
     /// <returns></returns>
-    inline void* base() const { return _pData; }
+    BLACKBONE_API inline void* base() const { return _pData; }
 
     /// <summary>
     /// Get activation context handle
     /// </summary>
     /// <returns></returns>
-    inline HANDLE actx() const { return _hctx; }
+    BLACKBONE_API inline HANDLE actx() const { return _hctx; }
 
     /// <summary>
     /// true if image is mapped as plain data file
     /// </summary>
     /// <returns></returns>
-    inline bool  isPlainData() const { return _plainData; }
+    BLACKBONE_API inline bool  isPlainData() const { return _plainData; }
 
     /// <summary>
     /// Get manifest resource ID
     /// </summary>
     /// <returns></returns>
-    inline int manifestID() const { return _manifestIdx; }
+    BLACKBONE_API inline int manifestID() const { return _manifestIdx; }
 
     /// <summary>
     /// Base of file in memory
     /// </summary>
     /// <returns></returns>
-    inline operator void*() const { return _pData; }
+    BLACKBONE_API inline operator void*() const { return _pData; }
 
 private:
     HANDLE  _hFile = INVALID_HANDLE_VALUE;  // Target file HANDLE

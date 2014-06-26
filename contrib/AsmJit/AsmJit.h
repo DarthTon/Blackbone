@@ -366,7 +366,11 @@
 //!
 //! \brief Contributions.
 
+#ifdef BLACKBONE_STATIC
 #define ASMJIT_STATIC
+#elif BLACKBONE_EXPORTS
+#define ASMJIT_EXPORTS
+#endif
 
 // [Dependencies - Base]
 #include "base.h"

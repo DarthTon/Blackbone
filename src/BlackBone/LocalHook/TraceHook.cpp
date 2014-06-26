@@ -3,6 +3,7 @@
 #include "../Include/Macro.h"
 
 #define BEA_USE_STDCALL
+//#define BEA_ENGINE_STATIC
 #include "BeaEngine/headers/BeaEngine.h"
 
 #include <algorithm>

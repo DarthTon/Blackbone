@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../Config.h"
 #include "HookHandlers.h"
 #include "../Process/Process.h"
 
@@ -8,7 +7,7 @@ namespace blackbone
 {
 
 template<typename Fn, class C = NoClass>
-class Detour : public HookHandler<Fn, C>
+class Detour: public HookHandler<Fn, C>
 {
 public:
     typedef typename HookHandler<Fn, C>::type type;

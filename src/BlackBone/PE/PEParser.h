@@ -57,8 +57,8 @@ class PEParser
     typedef const IMAGE_NT_HEADERS64* PCHDR64;
     
 public:
-    PEParser( void );
-    ~PEParser( void );
+    BLACKBONE_API PEParser( void );
+    BLACKBONE_API ~PEParser( void );
 
     /// <summary>
     /// Parses PE image
@@ -66,20 +66,20 @@ public:
     /// <param name="pFileBase">File memory location</param>
     /// <param name="isPlainData">Treat file as plain datafile</param>
     /// <returns>true on success</returns>
-    bool Parse( const void* pFileBase, bool isPlainData = false );
+    BLACKBONE_API bool Parse( const void* pFileBase, bool isPlainData = false );
 
     /// <summary>
     /// Processes image imports
     /// </summary>
     /// <param name="useDelayed">Process delayed import instead</param>
     /// <returns>Import data</returns>
-    mapImports& ProcessImports( bool useDelayed = false );
+    BLACKBONE_API mapImports& ProcessImports( bool useDelayed = false );
 
     /// <summary>
     /// Retrieve all exported functions with names
     /// </summary>
     /// <param name="names">Found exports</param>
-    void GetExportNames( std::list<std::string>& names );
+    BLACKBONE_API void GetExportNames( std::list<std::string>& names );
 
     /// <summary>
     /// Retrieve image TLS callbacks
@@ -88,7 +88,7 @@ public:
     /// <param name="targetBase">Target image base</param>
     /// <param name="result">Found callbacks</param>
     /// <returns>Number of TLS callbacks in image</returns>
-    int GetTLSCallbacks( module_t targetBase, std::vector<ptr_t>& result ) const;
+    BLACKBONE_API int GetTLSCallbacks( module_t targetBase, std::vector<ptr_t>& result ) const;
 
     /// <summary>
     /// Retrieve data directory address
@@ -96,14 +96,14 @@ public:
     /// <param name="index">Directory index</param>
     /// <param name="keepRelative">Keep address relative to image base</param>
     /// <returns>Directory address</returns>
-    size_t DirectoryAddress( int index, bool keepRelative = false ) const;
+    BLACKBONE_API size_t DirectoryAddress( int index, bool keepRelative = false ) const;
 
     /// <summary>
     /// Get data directory size
     /// </summary>
     /// <param name="index">Data directory index</param>
     /// <returns>Data directory size</returns>
-    size_t DirectorySize( int index ) const;
+    BLACKBONE_API size_t DirectorySize( int index ) const;
 
     /// <summary>
     /// Resolve virtual memory address to physical file offset
@@ -111,64 +111,63 @@ public:
     /// <param name="Rva">Memory address</param>
     /// <param name="keepRelative">Keep address relative to file start</param>
     /// <returns>Resolved address</returns>
-    size_t ResolveRVAToVA( size_t Rva, bool keepRelative = false ) const;
+    BLACKBONE_API size_t ResolveRVAToVA( size_t Rva, bool keepRelative = false ) const;
 
     /// <summary>
     /// Get image base address
     /// </summary>
     /// <returns>Image base</returns>
-    inline module_t imageBase() const { return _imgBase; }
+    BLACKBONE_API inline module_t imageBase() const { return _imgBase; }
 
     /// <summary>
     /// Get image size in bytes
     /// </summary>
     /// <returns>Image size</returns>
-    inline size_t imageSize() const { return _imgSize; }
+    BLACKBONE_API inline size_t imageSize() const { return _imgSize; }
 
     /// <summary>
     /// Get size of image headers
     /// </summary>
     /// <returns>Size of image headers</returns>
-    inline size_t headersSize() const { return _hdrSize; }
+    BLACKBONE_API inline size_t headersSize() const { return _hdrSize; }
 
     /// <summary>
     /// Get image entry point rebased to another image base
     /// </summary>
     /// <param name="base">New image base</param>
     /// <returns>New entry point address</returns>
-    inline ptr_t entryPoint( module_t base ) const { return ((_epRVA != 0) ? (_epRVA + base) : 0); };
+    BLACKBONE_API inline ptr_t entryPoint( module_t base ) const { return ((_epRVA != 0) ? (_epRVA + base) : 0); };
 
     /// <summary>
     /// Get image sections
     /// </summary>
     /// <returns>Image sections</returns>
-    inline const vecSections& sections() const { return _sections; }
+    BLACKBONE_API inline const vecSections& sections() const { return _sections; }
 
     /// <summary>
     /// Check if image is an executable file and not a dll
     /// </summary>
     /// <returns>true if image is an *.exe</returns>
-    inline bool IsExe() const { return _isExe; }
-
+    BLACKBONE_API inline bool IsExe() const { return _isExe; }
 
     /// <summary>
     /// Check if image is pure IL image
     /// </summary>
     /// <returns>true on success</returns>
-    inline bool IsPureManaged() const  { return _isPureIL; }
+    BLACKBONE_API inline bool IsPureManaged() const  { return _isPureIL; }
 
     /// <summary>
     /// Get image type. 32/64 bit
     /// </summary>
     /// <returns>Image type</returns>
-    inline eModType mType() const { return _is64 ? mt_mod64 : mt_mod32; }
+    BLACKBONE_API inline eModType mType() const { return _is64 ? mt_mod64 : mt_mod32; }
 
 #ifdef COMPILER_MSVC
     /// <summary>
     /// .NET image parser
     /// </summary>
     /// <returns>.NET image parser</returns>
-    ImageNET& net() { return _netImage; }
+    BLACKBONE_API ImageNET& net() { return _netImage; }
 #endif
 
 private:

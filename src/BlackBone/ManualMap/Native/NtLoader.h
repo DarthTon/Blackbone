@@ -9,14 +9,14 @@ namespace blackbone
 class NtLdr
 {
 public:
-    NtLdr( class Process& proc );
-    ~NtLdr( void );
+    BLACKBONE_API NtLdr( class Process& proc );
+    BLACKBONE_API ~NtLdr( void );
 
     /// <summary>
     /// Initialize some loader stuff
     /// </summary>
     /// <returns></returns>
-    bool Init();
+    BLACKBONE_API bool Init();
 
     /// <summary>
     /// Add module to some loader structures 
@@ -26,7 +26,7 @@ public:
     /// <param name="ImageSize">Size of image</param>
     /// <param name="DllBasePath">Full-qualified image path.</param>
     /// <returns>true on success</returns>
-    bool CreateNTReference( HMODULE hMod, size_t ImageSize, const std::wstring& DllBasePath );
+    BLACKBONE_API bool CreateNTReference( HMODULE hMod, size_t ImageSize, const std::wstring& DllBasePath );
 
     /// <summary>
     /// Create thread static TLS array
@@ -34,7 +34,7 @@ public:
     /// <param name="pModule">Module base address</param>
     /// <param name="pTls">TLS directory of target image</param>
     /// <returns>true on success</returns>
-    bool AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls );
+    BLACKBONE_API bool AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls );
 
     /// <summary>
     /// Create module record in LdrpInvertedFunctionTable
@@ -44,7 +44,7 @@ public:
     /// <param name="ImageSize">Size of image</param>
     /// <param name="safeseh">Is set into true, if image has SAFESEH handlers</param>
     /// <returns>true on success</returns>
-    bool InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, bool& safeseh );
+    BLACKBONE_API bool InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, bool& safeseh );
 
     /// <summary>
     /// Unlink module from Ntdll loader
@@ -52,14 +52,14 @@ public:
     /// <param name="baseAddress">Module base address</param>
     /// <param name="type">32 or 64 bit.</param>
     /// <returns>true on success</returns>
-    bool Unlink( ptr_t baseAddress, eModType type );
+    BLACKBONE_API bool Unlink( ptr_t baseAddress, eModType type );
 
     // 
     // Get some not exported values
     //
-    inline size_t LdrpInvertedFunctionTable( ) const { return _LdrpInvertedFunctionTable; }
-    inline size_t LdrKernel32PatchAddress() const { return _LdrKernel32PatchAddress; }
-    inline size_t APC64PatchAddress() const { return _APC64PatchAddress; }
+    BLACKBONE_API inline size_t LdrpInvertedFunctionTable( ) const { return _LdrpInvertedFunctionTable; }
+    BLACKBONE_API inline size_t LdrKernel32PatchAddress() const { return _LdrKernel32PatchAddress; }
+    BLACKBONE_API inline size_t APC64PatchAddress() const { return _APC64PatchAddress; }
 
 private:
 

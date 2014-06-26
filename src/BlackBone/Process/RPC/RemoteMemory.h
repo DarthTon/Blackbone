@@ -54,15 +54,15 @@ public:
     };
 
 public:
-    RemoteMemory( class Process* process );
-    ~RemoteMemory();
+    BLACKBONE_API RemoteMemory( class Process* process );
+    BLACKBONE_API ~RemoteMemory();
 
     /// <summary>
     /// Map entire process address space
     /// </summary>
     /// <param name="mapSections">Set to true to map section objects. They are converted to private pages before locking</param>
     /// <returns>Status code</returns>
-    NTSTATUS Map( bool mapSections );
+    BLACKBONE_API NTSTATUS Map( bool mapSections );
 
     /// <summary>
     /// Map specific memory region
@@ -70,13 +70,13 @@ public:
     /// <param name="base">Region base</param>
     /// <param name="size">Region size</param>
     /// <returns>Status code</returns>
-    NTSTATUS Map( ptr_t base, uint32_t size );
+    BLACKBONE_API NTSTATUS Map( ptr_t base, uint32_t size );
 
     /// <summary>
     /// Unmap process address space from current process
     /// </summary>
     /// <returns>Status code</returns>
-    NTSTATUS Unmap();
+    BLACKBONE_API NTSTATUS Unmap();
 
     /// <summary>
     /// Unmap specific memory region from current process
@@ -84,7 +84,7 @@ public:
     /// <param name="base">Region base</param>
     /// <param name="size">Region size</param>
     /// <returns>Status code</returns>
-    NTSTATUS Unmap( ptr_t base, uint32_t size );
+    BLACKBONE_API NTSTATUS Unmap( ptr_t base, uint32_t size );
 
     /// <summary>
     /// Translate target address accordingly to current address space
@@ -92,7 +92,7 @@ public:
     /// <param name="address">Address to translate</param>
     /// <param name="resolveFault">If set to true, routine will try to map non-existing region upon translation failure</param>
     /// <returns>Translated address</returns>
-    ptr_t TranslateAddress( ptr_t address, bool resolveFault = true );
+    BLACKBONE_API ptr_t TranslateAddress( ptr_t address, bool resolveFault = true );
 
     /// <summary>
     /// Setup one of the 4 possible memory hooks:
@@ -105,19 +105,19 @@ public:
     /// MemUnmapSection - hook NtUnmapViewOfSection
     /// </param>
     /// <returns>true on success</returns>
-    NTSTATUS SetupHook( OperationType hkType );
+    BLACKBONE_API NTSTATUS SetupHook( OperationType hkType );
 
     /// <summary>
     /// Restore previously hooked function
     /// </summary>
     /// <param name="hkType">Hook type. For more info see SetupHook</param>
     /// <returns>true on success</returns>
-    bool RestoreHook( OperationType hkType );
+    BLACKBONE_API bool RestoreHook( OperationType hkType );
 
     /// <summary>
     /// Unmap any mapped memory, restore hooks and free resources
     /// </summary>
-    void reset();
+    BLACKBONE_API void reset();
 
 private:
     /// <summary>
@@ -145,6 +145,7 @@ private:
     /// <param name="pOriginal">Original function ptr</param>
     /// <param name="pOriginalLocal">Original function address in local address space</param>
     void BuildTrampoline( OperationType opType, uintptr_t pOriginal, uint8_t* pOriginalLocal );
+
 private:
     class Process* _process = nullptr;      // Target process
     mapMemoryMap _mapDatabase;              // Region map

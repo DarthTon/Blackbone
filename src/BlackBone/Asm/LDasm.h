@@ -39,9 +39,9 @@ typedef struct _ldasm_data
     uint8_t  imm_size;
 } ldasm_data;
 
-unsigned int  __fastcall ldasm( void *code, ldasm_data *ld, uint32_t is64 );
-unsigned long __fastcall SizeOfProc( void *Proc );
-void*         __fastcall ResolveJmp( void *Proc );
+BLACKBONE_API unsigned int  __fastcall ldasm( void *code, ldasm_data *ld, uint32_t is64 );
+BLACKBONE_API unsigned long __fastcall SizeOfProc( void *Proc );
+BLACKBONE_API void*         __fastcall ResolveJmp( void *Proc );
 
 #ifdef __cplusplus
 }

@@ -67,8 +67,8 @@ public:
     typedef std::map<ptr_t, bool> setAddresses;
 
 public:
-    RemoteHook( class ProcessMemory& memory );
-    ~RemoteHook();
+    BLACKBONE_API RemoteHook( class ProcessMemory& memory );
+    BLACKBONE_API ~RemoteHook();
 
     /// <summary>
     /// Hook specified address
@@ -78,7 +78,7 @@ public:
     /// <param name="newFn">Callback</param>
     /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
     /// <returns>true on success</returns>
-    inline bool Apply( eHookType type, uint64_t ptr, fnCallback newFn, Thread* pThread = nullptr )
+    BLACKBONE_API inline bool Apply( eHookType type, uint64_t ptr, fnCallback newFn, Thread* pThread = nullptr )
     {
         return ApplyP( type, ptr, newFn, nullptr, pThread );
     }
@@ -90,7 +90,7 @@ public:
     /// <param name="ptr">Hooked function address</param>
     /// <param name="newFn">Callback</param>
     /// <returns>true on success</returns>
-    inline bool AddReturnHook( uint64_t ptr, fnCallback newFn )
+    BLACKBONE_API inline bool AddReturnHook( uint64_t ptr, fnCallback newFn )
     {
         return AddReturnHookP( ptr, newFn, nullptr );
     }
@@ -132,12 +132,12 @@ public:
     /// Remove existing hook
     /// </summary>
     /// <param name="ptr">Hooked address</param>
-    void Remove( uint64_t ptr );
+    BLACKBONE_API void Remove( uint64_t ptr );
 
     /// <summary>
     /// Stop debug and remove all hooks
     /// </summary>
-    void reset();
+    BLACKBONE_API void reset();
 
 private:
 
@@ -150,7 +150,7 @@ private:
     /// <param name="pClass">Class reference.</param>
     /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
     /// <returns>true on success</returns>
-    bool ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass = nullptr, Thread* pThread = nullptr );
+    BLACKBONE_API bool ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass = nullptr, Thread* pThread = nullptr );
 
     /// <summary>
     /// Hook function return
@@ -160,14 +160,14 @@ private:
     /// <param name="newFn">Callback</param>
     /// <param name="pClass">Class reference.</param>
     /// <returns>true on success</returns>
-    bool AddReturnHookP( uint64_t ptr, fnCallback newFn, const void* pClass = nullptr );
+    BLACKBONE_API bool AddReturnHookP( uint64_t ptr, fnCallback newFn, const void* pClass = nullptr );
 
     /// <summary>
     /// Restore hooked function
     /// </summary>
     /// <param name="hook">Hook data</param>
     /// <param name="ptr">Hooked address</param>
-    void Restore( const HookData &hook, uint64_t ptr );
+    BLACKBONE_API void Restore( const HookData &hook, uint64_t ptr );
 
     /// <summary>
     /// Debug selected process

@@ -9,8 +9,8 @@ namespace blackbone
 class NativeWow64 : public Native
 {
 public:
-    NativeWow64( HANDLE hProcess );
-    ~NativeWow64();
+    BLACKBONE_API NativeWow64( HANDLE hProcess );
+    BLACKBONE_API ~NativeWow64();
 
     /// <summary>
     /// Allocate virtual memory

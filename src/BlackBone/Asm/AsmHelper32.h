@@ -11,8 +11,8 @@ namespace blackbone
 class AsmHelper32 : public AsmHelperBase
 {
 public:
-    AsmHelper32( );
-    ~AsmHelper32( void );
+    BLACKBONE_API AsmHelper32( );
+    BLACKBONE_API ~AsmHelper32( void );
 
     /// <summary>
     /// Generate function prologue code

@@ -1,5 +1,7 @@
 #pragma  once
 
+
+#include "../Config.h"
 #pragma warning(disable : 4100)
 #include <AsmJit/asmjit.h>
 #pragma warning(default : 4100)
@@ -36,53 +38,53 @@ namespace blackbone
         };
 
     public:
-        AsmVariant( void )
+        BLACKBONE_API AsmVariant( void )
             : AsmVariant( noarg, 0, 0 ) { }
 
-        AsmVariant( int _imm )
+        BLACKBONE_API AsmVariant( int _imm )
             : AsmVariant( imm, sizeof(_imm), static_cast<size_t>(_imm) ) { }
 
-        AsmVariant( unsigned long _imm )
+        BLACKBONE_API AsmVariant( unsigned long _imm )
             : AsmVariant( imm, sizeof(_imm), static_cast<size_t>(_imm) ) { }
 
-        AsmVariant( size_t _imm )
+        BLACKBONE_API AsmVariant( size_t _imm )
             : AsmVariant( imm, sizeof(_imm), _imm ) { }
         
-        AsmVariant( char* ptr )
+        BLACKBONE_API AsmVariant( char* ptr )
             : AsmVariant( dataPtr, strlen( ptr ) + 1, reinterpret_cast<size_t>(ptr) ) { }
 
-        AsmVariant( const char* ptr )
+        BLACKBONE_API AsmVariant( const char* ptr )
             : AsmVariant( const_cast<char*>(ptr) ) { }
 
-        AsmVariant( wchar_t* ptr )
+        BLACKBONE_API AsmVariant( wchar_t* ptr )
             : AsmVariant( dataPtr, (wcslen( ptr ) + 1) * sizeof(wchar_t), reinterpret_cast<size_t>(ptr) ) { }
 
-        AsmVariant( const wchar_t* ptr )
+        BLACKBONE_API AsmVariant( const wchar_t* ptr )
             : AsmVariant( const_cast<wchar_t*>(ptr) ) { }
 
-        AsmVariant( void* _imm )
+        BLACKBONE_API AsmVariant( void* _imm )
             : AsmVariant( imm, sizeof(void*), reinterpret_cast<size_t>(_imm) ) { }
 
-        AsmVariant( const void* _imm )
+        BLACKBONE_API AsmVariant( const void* _imm )
             : AsmVariant( imm, sizeof(void*), reinterpret_cast<size_t>(_imm) ) { }
 
         // In MSVS compiler 'long double' and 'double' are both 8 bytes long
-        AsmVariant( long double _imm_fpu )
+        BLACKBONE_API  AsmVariant( long double _imm_fpu )
             : AsmVariant( (double)_imm_fpu ) { }
 
-        AsmVariant( double _imm_fpu )
+        BLACKBONE_API AsmVariant( double _imm_fpu )
             : type( imm_double )
             , size( sizeof(double) )
             , imm_double_val( _imm_fpu )
             , new_imm_val( 0 ) { }
 
-        AsmVariant( float _imm_fpu )
+        BLACKBONE_API AsmVariant( float _imm_fpu )
             : type( imm_float )
             , size( sizeof(float) )
             , imm_float_val( _imm_fpu )
             , new_imm_val( 0 ) { }
 
-        AsmVariant( asmjit::host::GpReg _reg )
+        BLACKBONE_API AsmVariant( asmjit::host::GpReg _reg )
             : type( reg )
             , size( sizeof(size_t) )
             , reg_val( _reg )
@@ -90,21 +92,21 @@ namespace blackbone
             , new_imm_val( 0 ) { }
 
         // Stack variable
-        AsmVariant( asmjit::host::Mem _mem )
+        BLACKBONE_API AsmVariant( asmjit::host::Mem _mem )
             : type( mem )
             , size( sizeof(size_t) )
             , mem_val( _mem )
             , imm_double_val( -1.0 ) { }
 
         // Pointer to stack address
-        AsmVariant( asmjit::host::Mem* _mem )
+        BLACKBONE_API AsmVariant( asmjit::host::Mem* _mem )
             : type( mem_ptr )
             , size( sizeof(size_t) )
             , mem_val( *_mem )
             , imm_double_val( -1.0 )
             , new_imm_val( 0 ) { }
 
-        AsmVariant( const asmjit::host::Mem* _mem )
+        BLACKBONE_API AsmVariant( const asmjit::host::Mem* _mem )
             : AsmVariant( const_cast<asmjit::host::Mem*>(_mem) ) { }
 
         template <typename T>
@@ -161,25 +163,25 @@ namespace blackbone
         }
         #pragma warning(default : 4127)
 
-        AsmVariant( AsmVariant&& other )
+        BLACKBONE_API AsmVariant( AsmVariant&& other )
         {
             *this = std::move( other );
         }
 
-        AsmVariant( const AsmVariant& other ) = default;
-        AsmVariant& operator =(const AsmVariant& other) = default;
+        BLACKBONE_API AsmVariant( const AsmVariant& other ) = default;
+        BLACKBONE_API AsmVariant& operator =(const AsmVariant& other) = default;
 
         //
         // Get floating point value as raw data
         //
-        inline uint32_t getImm_float()  const { return *(reinterpret_cast<const uint32_t*>(&imm_float_val)); }
-        inline uint64_t getImm_double() const { return *(reinterpret_cast<const uint64_t*>(&imm_double_val)); }
+        BLACKBONE_API inline uint32_t getImm_float()  const { return *(reinterpret_cast<const uint32_t*>(&imm_float_val)); }
+        BLACKBONE_API inline uint64_t getImm_double() const { return *(reinterpret_cast<const uint64_t*>(&imm_double_val)); }
 
         /// <summary>
         /// Check if argument can be passed in x86 register
         /// </summary>
         /// <returns>true if can</returns>
-        inline bool reg86Compatible() const
+        BLACKBONE_API inline bool reg86Compatible() const
         {
             if (type == dataStruct || type == imm_float || type == imm_double || type == structRet)
                 return false;

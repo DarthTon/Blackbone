@@ -35,30 +35,30 @@ struct MapMemoryRegionResult
 class DriverControl
 {
 public:
-    DriverControl();
-    ~DriverControl();
+    BLACKBONE_API DriverControl();
+    BLACKBONE_API ~DriverControl();
 
-    static DriverControl& Instance();
+    BLACKBONE_API static DriverControl& Instance();
 
     /// <summary>
     /// Try to load driver if it isn't loaded
     /// </summary>
     /// <param name="path">Path to the driver file</param>
     /// <returns>Status code</returns>
-    NTSTATUS EnsureLoaded( const std::wstring& path = L"" );
+    BLACKBONE_API NTSTATUS EnsureLoaded( const std::wstring& path = L"" );
 
     /// <summary>
     /// Reload driver
     /// </summary>
     /// <param name="path">Path to the driver file</param>
     /// <returns>Status code</returns>
-    NTSTATUS Reload( std::wstring path = L"" );
+    BLACKBONE_API NTSTATUS Reload( std::wstring path = L"" );
 
     /// <summary>
     /// Unload driver
     /// </summary>
     /// <returns>Status code</returns>
-    NTSTATUS Unload();
+    BLACKBONE_API NTSTATUS Unload();
 
     /// <summary>
     /// Disable DEP for process
@@ -66,7 +66,7 @@ public:
     /// </summary>
     /// <param name="pid">Target PID</param>
     /// <returns>Status code</returns>
-    NTSTATUS DisableDEP( DWORD pid );
+    BLACKBONE_API NTSTATUS DisableDEP( DWORD pid );
 
     /// <summary>
     /// Change process protection flag
@@ -74,7 +74,7 @@ public:
     /// <param name="pid">Target PID</param>
     /// <param name="enable">true to enable protection, false to disable</param>
     /// <returns>Status code</returns>
-    NTSTATUS ProtectProcess( DWORD pid, bool enable );
+    BLACKBONE_API NTSTATUS ProtectProcess( DWORD pid, bool enable );
 
     /// <summary>
     /// Change handle access rights
@@ -83,7 +83,7 @@ public:
     /// <param name="handle">Handle</param>
     /// <param name="access">New access</param>
     /// <returns>Status code</returns>
-    NTSTATUS PromoteHandle( DWORD pid, HANDLE handle, DWORD access );
+    BLACKBONE_API NTSTATUS PromoteHandle( DWORD pid, HANDLE handle, DWORD access );
 
     /// <summary>
     /// Allocate virtual memory
@@ -94,7 +94,7 @@ public:
     /// <param name="type">Allocation type - MEM_RESERVE/MEM_COMMIT</param>
     /// <param name="protection">Memory protection</param>
     /// <returns>Status code</returns>
-    NTSTATUS AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD type, DWORD protection );
+    BLACKBONE_API NTSTATUS AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD type, DWORD protection );
 
     /// <summary>
     /// Free virtual memory
@@ -104,7 +104,7 @@ public:
     /// <param name="size">Region size</param>
     /// <param name="type">Free type - MEM_RELEASE/MEM_DECOMMIT</param>
     /// <returns>Status code</returns>
-    NTSTATUS FreeMem( DWORD pid, ptr_t base, ptr_t size, DWORD type );
+    BLACKBONE_API NTSTATUS FreeMem( DWORD pid, ptr_t base, ptr_t size, DWORD type );
 
     /// <summary>
     /// Read process memory
@@ -114,7 +114,7 @@ public:
     /// <param name="size">Data size</param>
     /// <param name="buffer">Buffer address</param>
     /// <returns>Status code</returns>
-    NTSTATUS ReadMem( DWORD pid, ptr_t base, ptr_t size, PVOID buffer );
+    BLACKBONE_API NTSTATUS ReadMem( DWORD pid, ptr_t base, ptr_t size, PVOID buffer );
 
     /// <summary>
     /// Write process memory
@@ -124,7 +124,7 @@ public:
     /// <param name="size">Data size</param>
     /// <param name="buffer">Buffer address</param>
     /// <returns>Status code</returns>
-    NTSTATUS WriteMem( DWORD pid, ptr_t base, ptr_t size, PVOID buffer );
+    BLACKBONE_API NTSTATUS WriteMem( DWORD pid, ptr_t base, ptr_t size, PVOID buffer );
 
     /// <summary>
     /// Change memory protection
@@ -134,7 +134,7 @@ public:
     /// <param name="size">Region size</param>
     /// <param name="protection">New protection</param>
     /// <returns>Status code</returns>
-    NTSTATUS ProtectMem( DWORD pid, ptr_t base, ptr_t size, DWORD protection );
+    BLACKBONE_API NTSTATUS ProtectMem( DWORD pid, ptr_t base, ptr_t size, DWORD protection );
 
     /// <summary>
     /// Maps target process memory into current process
@@ -144,7 +144,7 @@ public:
     /// <param name="mapSections">The map sections.</param>
     /// <param name="result">Results</param>
     /// <returns>Status code </returns>
-    NTSTATUS MapMemory( DWORD pid, const std::wstring& pipeName, bool mapSections, MapMemoryResult& result );
+    BLACKBONE_API NTSTATUS MapMemory( DWORD pid, const std::wstring& pipeName, bool mapSections, MapMemoryResult& result );
 
     /// <summary>
     /// Maps single memory region into current process
@@ -154,14 +154,14 @@ public:
     /// <param name="size">Region size</param>
     /// <param name="result">Mapped region info</param>
     /// <returns>Status code</returns>
-    NTSTATUS MapMemoryRegion( DWORD pid, ptr_t base, uint32_t size, MapMemoryRegionResult& result );
+    BLACKBONE_API NTSTATUS MapMemoryRegion( DWORD pid, ptr_t base, uint32_t size, MapMemoryRegionResult& result );
 
     /// <summary>
     /// Unmap memory of the target process from current
     /// </summary>
     /// <param name="pid">Target PID</param>
     /// <returns>Status code</returns>
-    NTSTATUS UnmapMemory( DWORD pid );
+    BLACKBONE_API NTSTATUS UnmapMemory( DWORD pid );
 
     /// <summary>
     /// Unmap single memory region
@@ -173,7 +173,7 @@ public:
     /// <param name="size">Region size</param>
     /// <param name="result">Unampped region info</param>
     /// <returns>Status code</returns>
-    NTSTATUS UnmapMemoryRegion( DWORD pid, ptr_t base, uint32_t size );
+    BLACKBONE_API NTSTATUS UnmapMemoryRegion( DWORD pid, ptr_t base, uint32_t size );
 
 private:
     DriverControl( const DriverControl& ) = delete;

@@ -111,7 +111,7 @@ void TestLocalHook()
     det.Hook( &CloseHandle, &MyMook::hkCloseHandle, &mh, HookType::HWBP );
     det2.Hook( &TestFastcall, &hkTestFastcall, HookType::Inline);
     det3.Hook( ptr, &::hkTest, HookType::Int3 );
-    det4.Hook( (void**)&ts, 0, &MyMook::hkVFunc, &mh/*, true, 1*/ );
+    det4.Hook( (void**)&ts, 0, &MyMook::hkVFunc, &mh );
 
     int a = 10;
 

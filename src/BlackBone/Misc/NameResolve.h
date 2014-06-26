@@ -25,15 +25,15 @@ public:
     };
 
 public:
-    ~NameResolve();
+    BLACKBONE_API ~NameResolve();
 
-    static NameResolve& Instance();
+    BLACKBONE_API static NameResolve& Instance();
 
     /// <summary>
     /// Initialize api set map
     /// </summary>
     /// <returns></returns>
-    bool Initialize();
+    BLACKBONE_API bool Initialize();
 
     /// <summary>
     /// Resolve image path.
@@ -45,12 +45,12 @@ public:
     /// <param name="procID">Process ID. Used to search process executable directory</param>
     /// <param name="actx">Activation context</param>
     /// <returns>Status</returns>
-    NTSTATUS ResolvePath( std::wstring& path, 
-                          const std::wstring& baseName, 
-                          const std::wstring& searchDir,
-                          eResolveFlag flags,
-                          DWORD procID, 
-                          HANDLE actx = INVALID_HANDLE_VALUE );
+    BLACKBONE_API NTSTATUS ResolvePath( std::wstring& path,
+                                        const std::wstring& baseName, 
+                                        const std::wstring& searchDir,
+                                        eResolveFlag flags,
+                                        DWORD procID, 
+                                        HANDLE actx = INVALID_HANDLE_VALUE );
 
     /// <summary>
     /// Try SxS redirection
@@ -58,7 +58,7 @@ public:
     /// <param name="path">Image path.</param>
     /// <param name="actx">Activation context</param>
     /// <returns></returns>
-    NTSTATUS ProbeSxSRedirect( std::wstring& path, HANDLE actx = INVALID_HANDLE_VALUE );
+    BLACKBONE_API NTSTATUS ProbeSxSRedirect( std::wstring& path, HANDLE actx = INVALID_HANDLE_VALUE );
 
 private:
     // Ensure singleton

@@ -86,18 +86,18 @@ public:
     /// <param name="tracePath">Function tracing path</param>
     /// <param name="checkIP">Optional. Address of instruction that checks target pointer</param>
     /// <returns>true on success, false if already hooked</returns>
-    bool ApplyHook( void* targetFunc, 
-                    void* hookFunc, 
-                    void* ptrAddress, 
-                    const HookContext::vecState& tracePath = HookContext::vecState(),
-                    void* checkIP = 0 );
+    BLACKBONE_API bool ApplyHook( void* targetFunc,
+                                  void* hookFunc,
+                                  void* ptrAddress,
+                                  const HookContext::vecState& tracePath = HookContext::vecState(),
+                                  void* checkIP = 0 );
 
     /// <summary>
     /// Remove existing hook
     /// </summary>
     /// <param name="targetFunc">Target function ptr</param>
     /// <returns>true on success, false if not found</returns>
-    bool RemoveHook( void* targetFunc );
+    BLACKBONE_API bool RemoveHook( void* targetFunc );
 
 private:
     // 

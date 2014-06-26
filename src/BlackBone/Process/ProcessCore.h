@@ -23,58 +23,58 @@ public:
     /// Check if target process is running in WOW64 mode
     /// </summary>
     /// <returns>true if process is WOW64</returns>
-    inline bool isWow64() const { return _native->GetWow64Barrier().targetWow64; }
+    BLACKBONE_API inline bool isWow64() const { return _native->GetWow64Barrier().targetWow64; }
 
     /// <summary>
     /// Get process handle
     /// </summary>
     /// <returns>Process handle</returns>
-    inline HANDLE handle() const { return _hProcess; }
+    BLACKBONE_API inline HANDLE handle() const { return _hProcess; }
 
     /// <summary>
     /// Get process ID
     /// </summary>
     /// <returns>Process ID</returns>
-    inline DWORD pid() const { return _pid; }
+    BLACKBONE_API inline DWORD pid() const { return _pid; }
 
     /// <summary>
     /// Get process data execution prevention state
     /// </summary>
     /// <returns>true if DEP is enabled for process</returns>
-    inline bool DEP() const { return _dep; };
+    BLACKBONE_API inline bool DEP() const { return _dep; };
   
     /// <summary>
     /// Get system routines
     /// </summary>
     /// <returns></returns>
-    inline Native* native() { return _native.get(); }
+    BLACKBONE_API inline Native* native() { return _native.get(); }
 
     /// <summary>
     /// Get WOW64 PEB
     /// </summary>
     /// <param name="ppeb">Retrieved PEB</param>
     /// <returns>PEB pointer</returns>
-    inline ptr_t peb( _PEB32* ppeb ) { return _native->getPEB( ppeb ); }
+    BLACKBONE_API inline ptr_t peb( _PEB32* ppeb ) { return _native->getPEB( ppeb ); }
 
     /// <summary>
     /// Get native PEB
     /// </summary>
     /// <param name="ppeb">Retrieved PEB</param>
     /// <returns>PEB pointer</returns>
-    inline ptr_t peb( _PEB64* ppeb ) { return _native->getPEB( ppeb ); }
+    BLACKBONE_API inline ptr_t peb( _PEB64* ppeb ) { return _native->getPEB( ppeb ); }
 
     /// <summary>
     /// Get PEB
     /// </summary>
     /// <param name="ppeb">Retrieved PEB</param>
     /// <returns>PEB pointer</returns>
-    inline ptr_t peb() { return peb( (PEB_T*)nullptr ); }
+    BLACKBONE_API inline ptr_t peb() { return peb( (PEB_T*)nullptr ); }
 
     /// <summary>
     /// Check if process is a protected process
     /// </summary>
     /// <returns>true if protected</returns>
-    bool isProtected();
+    BLACKBONE_API bool isProtected();
 
 private:
      ProcessCore();

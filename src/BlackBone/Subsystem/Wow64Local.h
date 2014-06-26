@@ -228,14 +228,14 @@ public:
     /// <param name="dst">Destination address</param>
     /// <param name="src">Source address</param>
     /// <param name="size">Region size</param>
-    void memcpy64( DWORD64 /*dst*/, DWORD64 /*src*/, DWORD /*size*/ );
+    BLACKBONE_API void memcpy64( DWORD64 /*dst*/, DWORD64 /*src*/, DWORD /*size*/ );
 
     /// <summary>
     /// Get native bit TEB
     /// </summary>
     /// <param name="out">TEB structure</param>
     /// <returns>TEB pointer</returns>
-    DWORD64 getTEB64( _TEB64& out );
+    BLACKBONE_API DWORD64 getTEB64( _TEB64& out );
 
     /// <summary>
     /// Gets 64 bit module base
@@ -243,20 +243,20 @@ public:
     /// <param name="lpModuleName">Module name</param>
     /// <param name="pSize">Found module size</param>
     /// <returns>Module base address, 0 if not found</returns>
-    DWORD64 GetModuleHandle64( const wchar_t* lpModuleName, DWORD* pSize = nullptr );
+    BLACKBONE_API DWORD64 GetModuleHandle64( const wchar_t* lpModuleName, DWORD* pSize = nullptr );
 
     /// <summary>
     /// Get 64 bit ntdll base
     /// </summary>
     /// <param name="pSize">Image size</param>
     /// <returns>ntdll address</returns>
-    DWORD64 getNTDLL64( DWORD* pSize = nullptr );
+    BLACKBONE_API DWORD64 getNTDLL64( DWORD* pSize = nullptr );
 
     /// <summary>
     /// Get 'LdrGetProcedureAddress' address
     /// </summary>
     /// <returns>'LdrGetProcedureAddress' address, 0 if not found</returns>
-    DWORD64 getLdrGetProcedureAddress();
+    BLACKBONE_API DWORD64 getLdrGetProcedureAddress();
 
     /// <summary>
     /// 64 bit implementation of GetProcAddress
@@ -264,14 +264,14 @@ public:
     /// <param name="hModule">Module base</param>
     /// <param name="funcName">Function name or ordinal</param>
     /// <returns>Procedure address, 0 if not found</returns>
-    DWORD64 GetProcAddress64( DWORD64 hModule, const char* funcName );
+    BLACKBONE_API DWORD64 GetProcAddress64( DWORD64 hModule, const char* funcName );
 
     /// <summary>
     /// Load 64 bit module into current process
     /// </summary>
     /// <param name="path">Module path</param>
     /// <returns>Module base address</returns>
-    DWORD64 LoadLibrary64( const wchar_t* path );
+    BLACKBONE_API DWORD64 LoadLibrary64( const wchar_t* path );
 
 private:
     DWORD64 _ntdll64 = 0;                   // 64bit ntdll address

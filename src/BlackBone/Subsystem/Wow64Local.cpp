@@ -27,11 +27,23 @@ void __declspec(naked, noinline) Wow64Local::memcpy64( DWORD64 /*dst*/, DWORD64 
     {
         X64_Start();
 
+        // Preserve non-volatile registers
+        X64_Push( _RSI )
+        X64_Pop( _RAX )
+        X64_Push( _RDI )
+        X64_Pop( _RDX )
+
         EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x7C ) EMIT( 0x24 ) EMIT( 0x04 )    // mov rdi, [rsp + 0x4]
         EMIT( 0x48 ) EMIT( 0x8B ) EMIT( 0x74 ) EMIT( 0x24 ) EMIT( 0x0C )    // mov rsi, [rsp + 0xC]
 
         mov ecx, [esp + 0x14]
         rep movsb
+
+        // Restore
+        X64_Push( _RAX )
+        X64_Pop( _RSI )
+        X64_Push( _RDX )
+        X64_Pop( _RDI )
 
         X64_End();
         retn 20

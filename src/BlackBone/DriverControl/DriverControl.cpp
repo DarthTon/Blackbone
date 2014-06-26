@@ -66,7 +66,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
 
     status = LoadDriver( DRIVER_SVC_NAME, path );
     if (!NT_SUCCESS( status ))
-        return status;
+        return LastNtStatus( status );
 
     _hDriver = CreateFile( BLACKBONE_DEVICE_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                            NULL, OPEN_EXISTING, 0, NULL );

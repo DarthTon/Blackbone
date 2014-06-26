@@ -4,7 +4,7 @@ namespace blackbone
 {
 
 template<typename R, typename... Args, class C>
-struct HookHandler<R( * )(Args...), C> : public DetourBase
+struct HookHandler<R( *)(Args...), C> : public DetourBase
 {
     typedef typename std::conditional<std::is_same<R, void>::value, int, R>::type ReturnType;
 

@@ -28,8 +28,8 @@ namespace blackbone
 class Process
 {
 public:
-    Process();
-    ~Process(void);
+    BLACKBONE_API Process();
+    BLACKBONE_API ~Process(void);
 
     /// <summary>
     /// Attach to existing process
@@ -37,41 +37,40 @@ public:
     /// <param name="pid">Process ID</param>
     /// <param name="access">Access mask</param>
     /// <returns>Status</returns>
-    NTSTATUS Attach( DWORD pid, DWORD access = DEFAULT_ACCESS_P );
+    BLACKBONE_API NTSTATUS Attach( DWORD pid, DWORD access = DEFAULT_ACCESS_P );
 
     /// <summary>
     /// Get process ID
     /// </summary>
     /// <returns>Process ID</returns>
-    inline DWORD pid() const { return _core.pid(); }
+    BLACKBONE_API inline DWORD pid() const { return _core.pid(); }
 
     /// <summary>
     /// Checks if process still exists
     /// </summary>
     /// <returns></returns>
-    bool valid();
+    BLACKBONE_API bool valid();
 
     /// <summary>
     /// Search for process by executable name
     /// </summary>
     /// <param name="name">Process name. If empty - function will retrieve all existing processes</param>
     /// <param name="found">Found processses</param>
-    static void EnumByName( const std::wstring& name, std::vector<DWORD>& found );
+    BLACKBONE_API static void EnumByName( const std::wstring& name, std::vector<DWORD>& found );
 
     //
     // Subroutines
     //
-    inline ProcessCore&    core()      { return _core; }       // Core routines and native 
-    inline ProcessMemory&  memory()    { return _memory; }     // Memory manipulations
-    inline ProcessModules& modules()   { return _modules; }    // Module management
-    inline ProcessThreads& threads()   { return _threads; }    // Threads
-    inline RemoteHook&     hooks()     { return _hooks; }      // Hooking code remotely
-    inline RemoteExec&     remote()    { return _remote; }     // Remote code execution
-    inline MMap&           mmap()      { return _mmap; }       // Manual module mapping
-    inline NtLdr&          nativeLdr() { return _nativeLdr; }  // Native loader routines
+    BLACKBONE_API inline ProcessCore&    core()      { return _core; }       // Core routines and native 
+    BLACKBONE_API inline ProcessMemory&  memory()    { return _memory; }     // Memory manipulations
+    BLACKBONE_API inline ProcessModules& modules()   { return _modules; }    // Module management
+    BLACKBONE_API inline ProcessThreads& threads()   { return _threads; }    // Threads
+    BLACKBONE_API inline RemoteHook&     hooks()     { return _hooks; }      // Hooking code remotely
+    BLACKBONE_API inline RemoteExec&     remote()    { return _remote; }     // Remote code execution
+    BLACKBONE_API inline MMap&           mmap()      { return _mmap; }       // Manual module mapping
+    BLACKBONE_API inline NtLdr&          nativeLdr() { return _nativeLdr; }  // Native loader routines
 
 private:
-
     NTSTATUS GrantPriviledge( const std::basic_string<TCHAR>& name );
 
     Process(const Process&) = delete;

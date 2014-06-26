@@ -25,8 +25,8 @@ class RemoteExec
     typedef std::vector<AsmVariant> vecArgs;
 
 public:
-    RemoteExec( class Process& proc );
-    ~RemoteExec();
+    BLACKBONE_API RemoteExec( class Process& proc );
+    BLACKBONE_API ~RemoteExec();
 
     /// <summary>
     /// Create environment for future remote procedure calls
@@ -40,7 +40,7 @@ public:
     /// </summary>
     /// <param name="noThread">Create only codecave and sync event, without thread</param>
     /// <returns>Status</returns>
-    NTSTATUS CreateRPCEnvironment( bool noThread = false );
+    BLACKBONE_API NTSTATUS CreateRPCEnvironment( bool noThread = false );
 
     /// <summary>
     /// Create new thread and execute code in it. Wait until execution ends
@@ -49,7 +49,7 @@ public:
     /// <param name="size">Code size</param>
     /// <param name="callResult">Code return value</param>
     /// <returns>Status</returns>
-    NTSTATUS ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult );
+    BLACKBONE_API NTSTATUS ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult );
 
     /// <summary>
     /// Execute code in context of our worker thread
@@ -58,7 +58,7 @@ public:
     /// <param name="size">Code size.</param>
     /// <param name="callResult">Execution result</param>
     /// <returns>Status</returns>
-    NTSTATUS ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& callResult );
+    BLACKBONE_API NTSTATUS ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& callResult );
 
     /// <summary>
     /// Execute code in context of any existing thread
@@ -68,7 +68,7 @@ public:
     /// <param name="callResult">Execution result</param>
     /// <param name="thd">Target thread</param>
     /// <returns>Status</returns>
-    NTSTATUS ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callResult, Thread& thread );
+    BLACKBONE_API NTSTATUS ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callResult, Thread& thread );
 
     /// <summary>
     /// Create new thread with specified entry point and argument
@@ -76,7 +76,7 @@ public:
     /// <param name="pCode">Entry point</param>
     /// <param name="arg">Thread function argument</param>
     /// <returns>Thread exit code</returns>
-    DWORD ExecDirect( ptr_t pCode, ptr_t arg );
+    BLACKBONE_API DWORD ExecDirect( ptr_t pCode, ptr_t arg );
 
     /// <summary>
     /// Generate return from function with event synchronization
@@ -84,13 +84,13 @@ public:
     /// <param name="a">Target assembly helper</param>
     /// <param name="retType">Function return type</param>
     /// <param name="retOffset">Return value offset</param>
-    void AddReturnWithEvent( AsmHelperBase& a, eReturnType retType = rt_int32, uint32_t retOffset = RET_OFFSET );
+    BLACKBONE_API void AddReturnWithEvent( AsmHelperBase& a, eReturnType retType = rt_int32, uint32_t retOffset = RET_OFFSET );
 
     /// <summary>
     /// Retrieve last NTSTATUS code
     /// </summary>
     /// <returns></returns>
-    inline NTSTATUS GetLastStatus()
+    BLACKBONE_API inline NTSTATUS GetLastStatus()
     {
         return _userData.Read<NTSTATUS>( ERR_OFFSET, STATUS_NOT_FOUND );
     }
@@ -98,24 +98,24 @@ public:
     /// <summary>
     /// Terminate existing worker thread
     /// </summary>
-    void TerminateWorker();
+    BLACKBONE_API void TerminateWorker();
 
     /// <summary>
     /// Get worker thread
     /// </summary>
     /// <returns></returns>
-    inline Thread* getWorker() { return &_hWorkThd; }
+    BLACKBONE_API inline Thread* getWorker() { return &_hWorkThd; }
 
     /// <summary>
     /// Ge memory routines
     /// </summary>
     /// <returns></returns>
-    inline class ProcessMemory& memory() { return _memory; }
+    BLACKBONE_API inline class ProcessMemory& memory() { return _memory; }
 
     /// <summary>
     /// Reset instance
     /// </summary>
-    void reset();
+    BLACKBONE_API void reset();
 
 private:
 
@@ -149,9 +149,9 @@ private:
     /// <param name="cc">Calling convention</param>
     /// <param name="retType">Return type</param>
     /// <returns>true on success</returns>
-    bool PrepareCallAssembly( AsmHelperBase& a, const void* pfn,
-                              std::vector<blackbone::AsmVariant>& args, 
-                              eCalligConvention cc, eReturnType retType );
+    BLACKBONE_API bool PrepareCallAssembly( AsmHelperBase& a, const void* pfn,
+                                            std::vector<blackbone::AsmVariant>& args,
+                                            eCalligConvention cc, eReturnType retType );
 
 #pragma warning(disable : 4127)
 

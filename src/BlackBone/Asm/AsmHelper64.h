@@ -9,8 +9,8 @@ namespace blackbone
 class AsmHelper64 : public AsmHelperBase
 {
 public:
-    AsmHelper64();
-    ~AsmHelper64( void );
+    BLACKBONE_API AsmHelper64();
+    BLACKBONE_API ~AsmHelper64( void );
 
     /// <summary>
     /// Generate function prologue code
