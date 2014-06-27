@@ -125,7 +125,7 @@ mapImports& PEParser::ProcessImports( bool useDelayed /*= false*/ )
             char *pDllName = reinterpret_cast<char*>(ResolveRVAToVA( pImportTbl->DllNameRVA ));
             auto dllStr = Utils::AnsiToWstring( pDllName );
 
-            pRVA = reinterpret_cast<uint8_t*>(pImportTbl->ImportNameTableRVA);
+            pRVA = reinterpret_cast<uint8_t*>(ResolveRVAToVA( pImportTbl->ImportNameTableRVA ));
 
             while (_is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData)
             {
