@@ -122,15 +122,15 @@ mapImports& PEParser::ProcessImports( bool useDelayed /*= false*/ )
         {
             uint8_t* pRVA = nullptr;
             DWORD IAT_Index = 0;
-            char *pDllName = MAKE_PTR( char*, pImportTbl->DllNameRVA, _pFileBase );
+            char *pDllName = reinterpret_cast<char*>(ResolveRVAToVA( pImportTbl->DllNameRVA ));
             auto dllStr = Utils::AnsiToWstring( pDllName );
 
-            pRVA = MAKE_PTR( uint8_t*, pImportTbl->ImportNameTableRVA, _pFileBase );
+            pRVA = reinterpret_cast<uint8_t*>(pImportTbl->ImportNameTableRVA);
 
             while (_is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData)
             {
                 uint64_t AddressOfData = _is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData;
-                IMAGE_IMPORT_BY_NAME* pAddressTable = MAKE_PTR( IMAGE_IMPORT_BY_NAME*, AddressOfData, _pFileBase );
+                IMAGE_IMPORT_BY_NAME* pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( AddressOfData ));
                 ImportData data;
 
                 // import by name
@@ -170,18 +170,19 @@ mapImports& PEParser::ProcessImports( bool useDelayed /*= false*/ )
         {
             uint8_t* pRVA = nullptr;
             DWORD IAT_Index = 0;
-            char *pDllName = MAKE_PTR( char*, pImportTbl->Name, _pFileBase );
+            char *pDllName = reinterpret_cast<char*>(ResolveRVAToVA( pImportTbl->Name ));
             auto dllStr = Utils::AnsiToWstring( pDllName );
 
-            if (pImportTbl->OriginalFirstThunk)
-                pRVA = MAKE_PTR( uint8_t*, pImportTbl->OriginalFirstThunk, _pFileBase );
-            else
-                pRVA = MAKE_PTR( uint8_t*, pImportTbl->FirstThunk, _pFileBase );
+            pRVA = reinterpret_cast<uint8_t*>(ResolveRVAToVA( 
+                pImportTbl->OriginalFirstThunk ? 
+                pImportTbl->OriginalFirstThunk : 
+                pImportTbl->FirstThunk ));
 
             while (_is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData)
             {
                 uint64_t AddressOfData = _is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData;
-                IMAGE_IMPORT_BY_NAME* pAddressTable = MAKE_PTR( IMAGE_IMPORT_BY_NAME*, AddressOfData, _pFileBase );
+                
+                IMAGE_IMPORT_BY_NAME* pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( AddressOfData ));
                 ImportData data;
 
                 // import by name

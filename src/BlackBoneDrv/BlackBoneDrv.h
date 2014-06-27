@@ -40,7 +40,7 @@ NTSTATUS BBSetProtection( IN PSET_PROC_PROTECTION pProtection );
 /// </summary>
 /// <param name="pAccess">Request params</param>
 /// <returns>Status code</returns>
-NTSTATUS BBGrantAccess( IN PGRANT_ACCESS pAccess );
+NTSTATUS BBGrantAccess( IN PHANDLE_GRANT_ACCESS pAccess );
 
 /// <summary>
 /// Allocate/Free process memory

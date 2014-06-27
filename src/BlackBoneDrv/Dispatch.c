@@ -48,7 +48,7 @@ NTSTATUS BBDispatch( IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp )
                 case IOCTL_BLACKBONE_SET_PROTECTION:
                     {
                         if (inputBufferLength >= sizeof( SET_PROC_PROTECTION ) && ioBuffer)
-                            Irp->IoStatus.Status = BBSetProtection( (const PSET_PROC_PROTECTION)ioBuffer );
+                            Irp->IoStatus.Status = BBSetProtection( (PSET_PROC_PROTECTION)ioBuffer );
                         else
                             Irp->IoStatus.Status = STATUS_INFO_LENGTH_MISMATCH;
                     }
@@ -56,8 +56,8 @@ NTSTATUS BBDispatch( IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp )
 
                 case IOCTL_BLACKBONE_GRANT_ACCESS:
                     {
-                        if (inputBufferLength >= sizeof( GRANT_ACCESS ) && ioBuffer)
-                            Irp->IoStatus.Status = BBGrantAccess( (const PGRANT_ACCESS)ioBuffer );
+                        if (inputBufferLength >= sizeof( HANDLE_GRANT_ACCESS ) && ioBuffer)
+                            Irp->IoStatus.Status = BBGrantAccess( (PHANDLE_GRANT_ACCESS)ioBuffer );
                         else
                             Irp->IoStatus.Status = STATUS_INFO_LENGTH_MISMATCH;
                     }

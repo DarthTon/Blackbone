@@ -304,7 +304,8 @@ bool MMap::CopyImage( ImageContext* pImage )
         {
             uint8_t* pSource = reinterpret_cast<uint8_t*>(pImage->PEImage.ResolveRVAToVA( section.VirtualAddress ));
 
-            if (pImage->imgMem.Write( section.VirtualAddress, section.Misc.VirtualSize, pSource ) != STATUS_SUCCESS)
+            if (section.SizeOfRawData != 0 && 
+                 pImage->imgMem.Write( section.VirtualAddress, section.SizeOfRawData, pSource ) != STATUS_SUCCESS)
             {
                 BLACBONE_TRACE( L"ManualMap: Failed to copy image section at offset 0x%x. Status = 0x%x", 
                                 section.VirtualAddress, LastNtStatus() );
@@ -395,9 +396,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
             if (fixtype == IMAGE_REL_BASED_HIGHLOW || fixtype == IMAGE_REL_BASED_DIR64)
             {
                 size_t fixRVA = static_cast<ULONG>(fixoffset) + fixrec->PageRVA;
-                size_t val = *reinterpret_cast<size_t*>(
-                    reinterpret_cast<size_t>(pImage->FileImage.base()) + fixoffset + fixrec->PageRVA) 
-                    + Delta;
+                size_t val = *reinterpret_cast<size_t*>(pImage->PEImage.ResolveRVAToVA( fixoffset + fixrec->PageRVA )) + Delta;
 
                 // Apply relocation
                 if (pImage->imgMem.Write( fixRVA, val ) != STATUS_SUCCESS)

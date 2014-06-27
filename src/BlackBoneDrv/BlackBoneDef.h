@@ -198,12 +198,12 @@ typedef struct _SET_PROC_PROTECTION
 /// <summary>
 /// Input for IOCTL_BLACKBONE_GRANT_ACCESS
 /// </summary>
-typedef struct _GRANT_ACCESS
+typedef struct _HANDLE_GRANT_ACCESS
 {
     ULONGLONG  handle;      // Handle to modify
     ULONG      pid;         // Process ID
     ULONG      access;      // Access flags to grant
-} GRANT_ACCESS, *PGRANT_ACCESS;
+} HANDLE_GRANT_ACCESS, *PHANDLE_GRANT_ACCESS;
 
 /// <summary>
 /// Input for IOCTL_BLACKBONE_COPY_MEMORY

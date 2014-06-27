@@ -276,7 +276,7 @@ NTSTATUS DriverControl::ProtectProcess( DWORD pid, bool enable )
 NTSTATUS DriverControl::PromoteHandle( DWORD pid, HANDLE handle, DWORD access )
 {
     DWORD bytes = 0;
-    GRANT_ACCESS grantAccess = { 0 };
+    HANDLE_GRANT_ACCESS grantAccess = { 0 };
 
     grantAccess.pid = pid;
     grantAccess.handle = (ULONGLONG)handle;
