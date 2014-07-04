@@ -199,7 +199,7 @@ NTSTATUS Native::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer,
 /// <param name="arg">Thread argument</param>
 /// <param name="flags">Creation flags</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, DWORD flags )
+NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags )
 {
     LastNtStatus( STATUS_SUCCESS );
     NTSTATUS status = 0; 
@@ -209,15 +209,19 @@ NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, D
     {
         OBJECT_ATTRIBUTES ob = { 0 };
         ob.Length = sizeof(ob);
-        BOOLEAN bSuspend = (flags & CREATE_SUSPENDED) ? TRUE : FALSE;
 
         status = pCreateThread( &hThread, THREAD_ALL_ACCESS, &ob,
                                 _hProcess, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
-                                reinterpret_cast<LPVOID>(arg), bSuspend,
+                                reinterpret_cast<LPVOID>(arg), static_cast<DWORD>(flags),
                                 0, 0x1000, 0x100000, NULL );
     }
     else
     {
+        DWORD win32Flags = 0;
+
+        if (flags & CreateSuspended)
+            win32Flags = CREATE_SUSPENDED;
+
         hThread = CreateRemoteThread( _hProcess, NULL, 0, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
                                       reinterpret_cast<LPVOID>(arg), flags, NULL );
         status = LastNtStatus();

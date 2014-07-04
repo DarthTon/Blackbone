@@ -12,7 +12,7 @@ void TestMMap()
     std::wcout << L"Manual image mapping test\n";
     std::wcout << L"Trying to map C:\\windows\\system32\\calc.exe into current process\n";
 
-    int flags = CreateLdrRef | ManualImports | RebaseProcess | NoDelayLoad;
+    eLoadFlags flags = CreateLdrRef | ManualImports | RebaseProcess | NoDelayLoad;
 
     if (thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", flags ) == 0)
     {

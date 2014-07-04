@@ -18,15 +18,23 @@
 // [AsmJit - Debugging]
 // ============================================================================
 
-// #define ASMJIT_DEBUG              // Define to enable debug-mode.
-// #define ASMJIT_RELEASE            // Define to enable release-mode.
+#ifdef _DEBUG
+ #define ASMJIT_DEBUG              // Define to enable debug-mode.
+#else
+ #define ASMJIT_RELEASE            // Define to enable release-mode.
+#endif
 
 // ============================================================================
 // [AsmJit - Library]
 // ============================================================================
 
 // #define ASMJIT_EMBED              // Asmjit is embedded (implies ASMJIT_STATIC).
-// #define ASMJIT_STATIC             // Define to enable static-library build.
+
+#ifdef BLACKBONE_STATIC
+ #define ASMJIT_STATIC
+#elif BLACKBONE_EXPORTS
+ #define ASMJIT_EXPORTS
+#endif
 
 // ============================================================================
 // [AsmJit - Features]
@@ -39,7 +47,7 @@
 // #define ASMJIT_BUILD_HOST         // Define to enable host instruction set.
 
 // #define ASMJIT_DISABLE_COMPILER   // Disable Compiler.
-// #define ASMJIT_DISABLE_LOGGER     // Disable Logger (completely).
+ #define ASMJIT_DISABLE_LOGGER     // Disable Logger (completely).
 // #define ASMJIT_DISABLE_INST_NAMES // Disable Instruction names (and API).
 
 // [Guard]

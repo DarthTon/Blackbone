@@ -29,7 +29,7 @@ MMap::~MMap(void)
 /// <param name="path">Image path</param>
 /// <param name="flags">Image mapping flags</param>
 /// <returns>Mapped image info</returns>
-const ModuleData* MMap::MapImage( const std::wstring& path, int flags /*= NoFlags*/ )
+const ModuleData* MMap::MapImage( const std::wstring& path, eLoadFlags flags /*= NoFlags*/ )
 {
     // Already loaded
     if (auto hMod = _process.modules().GetModule( path ))
@@ -90,13 +90,13 @@ const ModuleData* MMap::MapImage( const std::wstring& path, int flags /*= NoFlag
 /// <param name="path">Image path</param>
 /// <param name="flags">Mapping flags</param>
 /// <returns>Module info</returns>
-const ModuleData* MMap::FindOrMapModule( const std::wstring& path, int flags /*= NoFlags*/ )
+const ModuleData* MMap::FindOrMapModule( const std::wstring& path, eLoadFlags flags /*= NoFlags*/ )
 {
     std::unique_ptr<ImageContext> pImage( new ImageContext() );
 
     pImage->FilePath = path;
     pImage->FileName = Utils::StripPath( pImage->FilePath );
-    pImage->flags = static_cast<eLoadFlags>(flags);
+    pImage->flags = flags;
 
     // Load and parse image
     if (!pImage->FileImage.Project( path ) || !pImage->PEImage.Parse( pImage->FileImage, pImage->FileImage.isPlainData() ))

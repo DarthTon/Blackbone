@@ -124,7 +124,7 @@ typedef NTSTATUS( NTAPI* fnNtCreateThreadEx )
         IN HANDLE ProcessHandle,
         IN LPTHREAD_START_ROUTINE lpStartAddress,
         IN LPVOID lpParameter,
-        IN BOOL CreateSuspended,
+        IN DWORD Flags,
         IN SIZE_T StackZeroBits,
         IN SIZE_T SizeOfStackCommit,
         IN SIZE_T SizeOfStackReserve,

@@ -21,7 +21,7 @@ public:
     /// <param name="arg">Thread argument.</param>
     /// <param name="flags">Thread creation flags</param>
     /// <returns>New thread object</returns>
-    BLACKBONE_API Thread CreateNew( ptr_t threadProc, ptr_t arg, DWORD flags = 0 );
+    BLACKBONE_API Thread CreateNew( ptr_t threadProc, ptr_t arg, enum CreateThreadFlags flags = (CreateThreadFlags)0 );
 
     /// <summary>
     /// Gets all process threads

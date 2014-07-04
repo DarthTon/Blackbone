@@ -363,10 +363,7 @@
     <ClCompile Include="..\..\contrib\AsmJit\base\cpuinfo.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\cputicks.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\error.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\base\func.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\globals.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\base\intutil.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\base\logger.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\operand.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\podvector.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\runtime.cpp" />
@@ -439,11 +436,8 @@
     <ClInclude Include="..\..\contrib\AsmJit\base\cpuinfo.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\cputicks.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\error.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\base\func.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\globals.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\base\intutil.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\lock.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\base\logger.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\operand.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\podlist.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\podvector.h" />

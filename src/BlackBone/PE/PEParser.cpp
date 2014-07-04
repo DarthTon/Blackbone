@@ -130,7 +130,7 @@ mapImports& PEParser::ProcessImports( bool useDelayed /*= false*/ )
             while (_is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData)
             {
                 uint64_t AddressOfData = _is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData;
-                IMAGE_IMPORT_BY_NAME* pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( AddressOfData ));
+                auto pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( static_cast<size_t>(AddressOfData) ));
                 ImportData data;
 
                 // import by name
@@ -182,7 +182,7 @@ mapImports& PEParser::ProcessImports( bool useDelayed /*= false*/ )
             {
                 uint64_t AddressOfData = _is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData;
                 
-                IMAGE_IMPORT_BY_NAME* pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( AddressOfData ));
+                auto* pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( static_cast<size_t>(AddressOfData) ));
                 ImportData data;
 
                 // import by name

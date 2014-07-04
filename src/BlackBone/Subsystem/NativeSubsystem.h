@@ -2,6 +2,7 @@
 
 #include "../Include/Winheaders.h"
 #include "../Include/Types.h"
+#include "../Include/Macro.h"
 
 #include <string>
 #include <list>
@@ -12,6 +13,16 @@
 
 namespace blackbone
 {
+
+enum CreateThreadFlags
+{
+    NoThreadFlags   = 0x0000,
+    CreateSuspended = 0x0001,
+    NoDllCallbacks  = 0x0002,
+    HideFromDebug   = 0x0004,
+};
+
+ENUM_OPS(CreateThreadFlags)
 
 class Native
 {
@@ -106,7 +117,7 @@ public:
     /// <param name="arg">Thread argument</param>
     /// <param name="flags">Creation flags</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, DWORD flags );
+    virtual NTSTATUS CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags );
 
     /// <summary>
     /// Get native thread context

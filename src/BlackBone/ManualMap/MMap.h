@@ -2,6 +2,7 @@
 
 #include "../Config.h"
 #include "../Include/Winheaders.h"
+#include "../Include/Macro.h"
 #include "../PE/FileProjection.h"
 #include "../PE/PEParser.h"
 
@@ -35,6 +36,7 @@ enum eLoadFlags
     NoTLS           = 0x10000,   // Skip TLS initialization and don't execute TLS callbacks
 };
 
+ENUM_OPS(eLoadFlags)
 
 /// <summary>
 /// Image data
@@ -74,7 +76,7 @@ public:
     /// <param name="path">Image path</param>
     /// <param name="flags">Image mapping flags</param>
     /// <returns>Mapped image info</returns>
-    BLACKBONE_API const ModuleData* MapImage( const std::wstring& path, int flags = NoFlags );
+    BLACKBONE_API const ModuleData* MapImage( const std::wstring& path, eLoadFlags flags = NoFlags );
 
     /// <summary>
     /// Unmap all manually mapped modules
@@ -95,7 +97,7 @@ private:
     /// <param name="path">Image path</param>
     /// <param name="flags">Mapping flags</param>
     /// <returns>Module info</returns>
-    const ModuleData* FindOrMapModule( const std::wstring& path, int flags = NoFlags );
+    const ModuleData* FindOrMapModule( const std::wstring& path, eLoadFlags flags = NoFlags );
 
     /// <summary>
     /// Run module initializers(TLS and entry point).

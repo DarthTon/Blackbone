@@ -23,7 +23,7 @@ ProcessThreads::~ProcessThreads()
 /// <param name="arg">Thread argument.</param>
 /// <param name="flags">Thread creation flags</param>
 /// <returns>New thread object</returns>
-Thread ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg, DWORD flags /*= 0*/ )
+Thread ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg, CreateThreadFlags flags /*= 0*/ )
 {
     HANDLE hThd = NULL;
     _core.native()->CreateRemoteThreadT( hThd, threadProc, arg, flags );

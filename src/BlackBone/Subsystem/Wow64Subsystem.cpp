@@ -156,9 +156,8 @@ NTSTATUS NativeWow64::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBu
 /// <param name="arg">Thread argument</param>
 /// <param name="flags">Creation flags</param>
 /// <returns>Status code</returns>*/
-NTSTATUS NativeWow64::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, DWORD flags )
+NTSTATUS NativeWow64::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags )
 {
-
     // Try to use default routine if possible
     if(_wowBarrier.targetWow64 == true)
     {
@@ -175,11 +174,10 @@ NTSTATUS NativeWow64::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t a
 
         // hThread can't be used directly because x64Call will zero stack space near variable
         DWORD64 hThd2 = NULL;
-        BOOLEAN bSuspend = (flags & CREATE_SUSPENDED) ? TRUE : FALSE;
 
         NTSTATUS status = static_cast<NTSTATUS>(
             _local.X64Call( NtCreateThreadEx, &hThd2, THREAD_ALL_ACCESS, NULL,
-                            _hProcess, entry, arg, bSuspend, 0, 0x1000, 0x100000, NULL ));
+                            _hProcess, entry, arg, flags, 0, 0x1000, 0x100000, NULL ));
 
         hThread = reinterpret_cast<HANDLE>(hThd2);
         return status;

@@ -2,12 +2,12 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="TestApp.cpp" />
-    <ClCompile Include="LocalHookTest.cpp" />
     <ClCompile Include="RemoteHookTest.cpp" />
     <ClCompile Include="RemoteCallTest.cpp" />
     <ClCompile Include="MMapTest.cpp" />
     <ClCompile Include="DriverTest.cpp" />
     <ClCompile Include="RemoteMemTest.cpp" />
+    <ClCompile Include="LocalHookTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Tests.h" />

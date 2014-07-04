@@ -72,16 +72,7 @@
     <ClCompile Include="..\..\contrib\AsmJit\base\error.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\func.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\base\globals.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\intutil.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\logger.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\base\operand.cpp">
@@ -245,19 +236,10 @@
     <ClInclude Include="..\..\contrib\AsmJit\base\error.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\func.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base\globals.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\intutil.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base\lock.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\logger.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base\operand.h">

@@ -47,6 +47,28 @@
 #define SET_JUMP(_src,_dst) *(uint8_t*)(_src) = 0xE9; *(uintptr_t*)((_src) + 1) = (uintptr_t)(_dst) - (uintptr_t)(_src) - 5
 #endif
 
+#define ENUM_OPS(e) \
+    inline e operator |(e a1, e a2) { \
+        return static_cast<e>(static_cast<int>(a1) | static_cast<int>(a2)); \
+    } \
+    \
+    inline e operator |= (e& a1, e a2) { \
+        return a1 = a1 | a2; \
+    } \
+    \
+    inline e operator &(e a1, e a2) { \
+        return static_cast<e>(static_cast<int>(a1)& static_cast<int>(a2)); \
+    } \
+    \
+    inline e operator &= (e& a1, e a2) { \
+        return a1 = a1 & a2; \
+    } \
+    \
+    inline e operator ~(e a1) { \
+        return static_cast<e>(~static_cast<int>(a1)); \
+    }
+
+
 template<int s> 
 struct CompileTimeSizeOf;
 

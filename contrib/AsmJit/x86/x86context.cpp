@@ -5315,9 +5315,10 @@ _Done:
 template<int LoggingEnabled>
 static ASMJIT_INLINE Error X86X64Context_serialize(X86X64Context* self, X86X64Assembler* assembler, Node* start, Node* stop) {
   Node* node_ = start;
-  StringBuilder& sb = self->_stringBuilder;
 
 #if !defined(ASMJIT_DISABLE_LOGGER)
+  StringBuilder& sb = self->_stringBuilder;
+
   uint32_t vdCount;
   uint32_t annotationLength;
 
@@ -5400,9 +5401,10 @@ static ASMJIT_INLINE Error X86X64Context_serialize(X86X64Context* self, X86X64As
       }
 
       case kNodeTypeComment: {
-        CommentNode* node = static_cast<CommentNode*>(node_);
 
 #if !defined(ASMJIT_DISABLE_LOGGER)
+         CommentNode* node = static_cast<CommentNode*>(node_);
+
         if (LoggingEnabled)
           logger->logFormat(kLoggerStyleComment,
             "%s; %s\n", logger->getIndentation(), node->getComment());
