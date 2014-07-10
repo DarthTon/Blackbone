@@ -202,6 +202,7 @@
   <ItemGroup>
     <ClCompile Include="BlackBoneDrv.c" />
     <ClCompile Include="Dispatch.c" />
+    <ClCompile Include="NotifyRoutine.c" />
     <ClCompile Include="Private.c" />
     <ClCompile Include="Remap.c" />
     <ClCompile Include="Routines.c" />
@@ -218,6 +219,7 @@
     <ClInclude Include="NativeEnums.h" />
     <ClInclude Include="Remap.h" />
     <ClInclude Include="Private.h" />
+    <ClInclude Include="Routines.h" />
     <ClInclude Include="VadHelpers.h" />
     <ClInclude Include="VadRoutines.h" />
   </ItemGroup>

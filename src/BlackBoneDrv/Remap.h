@@ -97,17 +97,29 @@ NTSTATUS BBUnmapMemoryRegion( IN PUNMAP_MEMORY_REGION pRegion );
 NTSTATUS BBGetRequiredRemapOutputSize( IN PLIST_ENTRY pList, OUT PULONG_PTR pSize );
 
 /// <summary>
-/// Process termination handler
+/// Search process entry in list by PID
 /// </summary>
-/// <param name="ParentId">Parent PID</param>
-/// <param name="ProcessId">PID</param>
-/// <param name="Create">TRUE if process was created</param>
-VOID BBProcessNotify( IN HANDLE ParentId, IN HANDLE ProcessId, IN BOOLEAN Create );
+/// <param name="pid">PID.</param>
+/// <param name="asHost">If set to TRUE, pid is treated as host PID</param>
+/// <returns>Found entry, NULL in not found</returns>
+PPROCESS_MAP_ENTRY BBLookupProcessEntry( IN HANDLE pid, IN BOOLEAN asHost );
+
+/// <summary>
+/// Unmap all regions, delete MDLs, close handles, remove entry from table
+/// </summary>
+/// <param name="pProcessEntry">Process entry</param>
+VOID BBCleanupProcessEntry( IN PPROCESS_MAP_ENTRY pProcessEntry );
 
 /// <summary>
 /// Clear global process map table
 /// </summary>
 VOID BBCleanupProcessTable();
+
+/// <summary>
+/// Unmap any mapped pages from host process
+/// </summary>
+/// <param name="pProcessEntry">Process entry</param>
+VOID BBCleanupHostProcess( IN PPROCESS_MAP_ENTRY pProcessEntry );
 
 //
 // AVL table routines

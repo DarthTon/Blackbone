@@ -38,6 +38,10 @@ enum eLoadFlags
 
 ENUM_OPS(eLoadFlags)
 
+// Native loader flags callback
+typedef enum LdrRefFlags( *LdrCallback )(void* context, const ModuleData& modInfo);
+
+
 /// <summary>
 /// Image data
 /// </summary>
@@ -45,20 +49,19 @@ struct ImageContext
 {
     typedef std::vector<ptr_t> vecPtr;
 
-    FileProjection FileImage;           // Image file mapping
-    pe::PEParser   PEImage;             // PE data
-    MemBlock       imgMem;              // Target image memory region
-    std::wstring   FilePath;            // path to image being mapped
-    std::wstring   FileName;            // File name string
-    vecPtr         tlsCallbacks;        // TLS callback routines
-    ptr_t          pExpTableAddr = 0;   // Exception table address (amd64 only)
-    ptr_t          EntryPoint = 0;      // Target image entry point
-    eLoadFlags     flags = NoFlags;     // Image loader flags
-    bool           initialized = false; // Image entry point was called
+    FileProjection FileImage;               // Image file mapping
+    pe::PEParser   PEImage;                 // PE data
+    MemBlock       imgMem;                  // Target image memory region
+    std::wstring   FilePath;                // path to image being mapped
+    std::wstring   FileName;                // File name string
+    vecPtr         tlsCallbacks;            // TLS callback routines
+    ptr_t          pExpTableAddr = 0;       // Exception table address (amd64 only)
+    ptr_t          EntryPoint = 0;          // Target image entry point
+    eLoadFlags     flags = NoFlags;         // Image loader flags
+    bool           initialized = false;     // Image entry point was called
 };
 
 typedef std::vector<std::unique_ptr<ImageContext>> vecImageCtx;
-
 
 /// <summary>
 /// Manual image mapper
@@ -76,7 +79,10 @@ public:
     /// <param name="path">Image path</param>
     /// <param name="flags">Image mapping flags</param>
     /// <returns>Mapped image info</returns>
-    BLACKBONE_API const ModuleData* MapImage( const std::wstring& path, eLoadFlags flags = NoFlags );
+    BLACKBONE_API const ModuleData* MapImage( const std::wstring& path, 
+                                              eLoadFlags flags = NoFlags,
+                                              LdrCallback ldrCallback = nullptr,
+                                              void* ldrContext = nullptr);
 
     /// <summary>
     /// Unmap all manually mapped modules
@@ -97,7 +103,7 @@ private:
     /// <param name="path">Image path</param>
     /// <param name="flags">Mapping flags</param>
     /// <returns>Module info</returns>
-    const ModuleData* FindOrMapModule( const std::wstring& path, eLoadFlags flags = NoFlags );
+    const ModuleData* FindOrMapModule( const std::wstring& path, eLoadFlags flags = NoFlags);
 
     /// <summary>
     /// Run module initializers(TLS and entry point).
@@ -225,9 +231,11 @@ private:
     HANDLE GetDriverHandle();
 
 private:
-    vecImageCtx     _images;        // Mapped images
-    class Process&  _process;       // Target process manager
-    MemBlock        _pAContext;     // SxS activation context memory address
+    vecImageCtx     _images;                // Mapped images
+    class Process&  _process;               // Target process manager
+    MemBlock        _pAContext;             // SxS activation context memory address
+    LdrCallback     _ldrCallback = nullptr; // Loader callback for adding image into loader lists
+    void*           _ldrContext = nullptr;  // user context for _ldrCallback       
 
     std::vector<std::pair<ptr_t, size_t>> _usedBlocks;   // Used memory blocks 
 };

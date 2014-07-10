@@ -301,7 +301,7 @@ NTSTATUS DriverControl::PromoteHandle( DWORD pid, HANDLE handle, DWORD access )
 /// <param name="type">Allocation type - MEM_RESERVE/MEM_COMMIT</param>
 /// <param name="protection">Memory protection</param>
 /// <returns>Status code</returns>
-NTSTATUS DriverControl::AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD type, DWORD protection )
+NTSTATUS DriverControl::AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD type, DWORD protection, bool physical /*= false*/ )
 {
     DWORD bytes = 0;
     ALLOCATE_FREE_MEMORY allocMem = { 0 };
@@ -313,6 +313,7 @@ NTSTATUS DriverControl::AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD 
     allocMem.type = type;
     allocMem.protection = protection;
     allocMem.allocate = TRUE;
+    allocMem.physical = physical;
 
     // Not loaded
     if (_hDriver == INVALID_HANDLE_VALUE)
@@ -349,6 +350,7 @@ NTSTATUS DriverControl::FreeMem( DWORD pid, ptr_t base, ptr_t size, DWORD type )
     freeMem.size = size;
     freeMem.type = type;
     freeMem.allocate = FALSE;
+    freeMem.physical = FALSE;
 
     // Not loaded
     if (_hDriver == INVALID_HANDLE_VALUE)

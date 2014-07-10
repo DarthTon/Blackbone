@@ -29,7 +29,10 @@ MMap::~MMap(void)
 /// <param name="path">Image path</param>
 /// <param name="flags">Image mapping flags</param>
 /// <returns>Mapped image info</returns>
-const ModuleData* MMap::MapImage( const std::wstring& path, eLoadFlags flags /*= NoFlags*/ )
+const ModuleData* MMap::MapImage( const std::wstring& path, 
+                                  eLoadFlags flags /*= NoFlags*/, 
+                                  LdrCallback ldrCallback /*= nullptr*/,
+                                  void* ldrContext /*= nullptr*/ )
 {
     // Already loaded
     if (auto hMod = _process.modules().GetModule( path ))
@@ -46,6 +49,10 @@ const ModuleData* MMap::MapImage( const std::wstring& path, eLoadFlags flags /*=
     // Ignore MapInHighMem for native x64 process
     if (!_process.core().isWow64())
         flags &= ~MapInHighMem;
+
+    // Set native loader callback
+    _ldrCallback = ldrCallback;
+    _ldrContext  = ldrContext;
 
     BLACBONE_TRACE( L"ManualMap: Mapping image '%ls' with flags 0x%x", path.c_str(), flags );
 
@@ -179,10 +186,20 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path, eLoadFlags fl
         return nullptr;
     }
 
-    // Create reference for native loader functions
-    if (flags & CreateLdrRef)
-        _process.nativeLdr().CreateNTReference( pImage->imgMem.ptr<HMODULE>(), pImage->PEImage.imageSize(), pImage->FilePath );
+    // Get entry point
+    pImage->EntryPoint = pImage->PEImage.entryPoint( pImage->imgMem.ptr<ptr_t>() );
 
+    // Create reference for native loader functions
+    LdrRefFlags ldrFlags = flags & CreateLdrRef ? Ldr_All: Ldr_None;
+    if (_ldrCallback != nullptr)
+        ldrFlags = _ldrCallback( _ldrContext, *pMod );
+
+    if (ldrFlags != Ldr_None)
+        _process.nativeLdr().CreateNTReference( pImage->imgMem.ptr<HMODULE>(), 
+                                                pImage->PEImage.imageSize(), 
+                                                pImage->FilePath, 
+                                                static_cast<size_t>(pImage->EntryPoint),
+                                                ldrFlags );
 
     // Static TLS data
     if (!(flags & NoTLS) &&! InitStaticTLS( pImage.get( ) ))
@@ -194,13 +211,10 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path, eLoadFlags fl
     // Fill TLS callbacks
     pImage->PEImage.GetTLSCallbacks( pImage->imgMem.ptr<ptr_t>(), pImage->tlsCallbacks );
 
-    // Get entry point
-    pImage->EntryPoint = pImage->PEImage.entryPoint( pImage->imgMem.ptr<ptr_t>() );
-
     // Unload local copy
     pImage->FileImage.Release();
 
-    // Release image
+    // Release image memory block
     pImage->imgMem.Release();
 
     // Store image
@@ -720,7 +734,6 @@ bool MMap::InitializeCookie( ImageContext* pImage )
 /// <returns>true on success</returns>
 bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
 {
-    
     AsmJitHelper a;
     uint64_t result = 0;
 
@@ -808,8 +821,7 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
 /// <param name="id">Manifest resource id</param>
 /// <returns>true on success</returns>
 bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
-{
-    
+{   
     AsmJitHelper a;
 
     uint64_t result = 0;

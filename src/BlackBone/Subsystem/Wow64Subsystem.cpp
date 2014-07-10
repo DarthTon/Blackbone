@@ -148,6 +148,23 @@ NTSTATUS NativeWow64::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBu
     return GET_IMPORT( NtWow64QueryInformationProcess64 )(_hProcess, infoClass, lpBuffer, bufSize, &length);
 }
 
+
+/// <summary>
+/// Call NtSetInformationProcess for underlying process
+/// </summary>
+/// <param name="infoClass">Information class</param>
+/// <param name="lpBuffer">Input buffer</param>
+/// <param name="bufSize">Buffer size</param>
+/// <returns>Status code</returns>
+NTSTATUS NativeWow64::SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize )
+{
+    static ptr_t ntspi = _local.GetProcAddress64( _local.getNTDLL64(), "NtSetInformationProcess" );
+    if (ntspi == 0)
+        return STATUS_ORDINAL_NOT_FOUND;
+
+    return static_cast<NTSTATUS>(_local.X64Call( ntspi, _hProcess, infoClass, lpBuffer, bufSize ));
+}
+
 /// <summary>
 /// Creates new thread in the remote process
 /// </summary>

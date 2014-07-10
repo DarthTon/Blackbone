@@ -1,12 +1,40 @@
 #include "BlackBoneDrv.h"
+#include "Routines.h"
 #include <Ntstrsafe.h>
+
+LIST_ENTRY g_PhysProcesses;
+
+/// <summary>
+/// Allocate kernel memory and map into User space. Or free previously allocated memory
+/// </summary>
+/// <param name="pProcess">Target process object</param>
+/// <param name="pAllocFree">Request params.</param>
+/// <param name="pResult">Allocated region info.</param>
+/// <returns>Status code</returns>
+NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY pAllocFree, OUT PALLOCATE_FREE_MEMORY_RESULT pResult );
+
+/// <summary>
+/// Find allocated memory region entry
+/// </summary>
+/// <param name="pList">Region list</param>
+/// <param name="pBase">Region base</param>
+/// <returns>Found entry, NULL if not found</returns>
+PMEM_PHYS_ENTRY BBLookupPhysMemEntry( IN PLIST_ENTRY pList, IN PVOID pBase );
 
 #pragma alloc_text(PAGE, BBDisableDEP)
 #pragma alloc_text(PAGE, BBSetProtection)
 #pragma alloc_text(PAGE, BBGrantAccess)
 #pragma alloc_text(PAGE, BBCopyMemory)
 #pragma alloc_text(PAGE, BBAllocateFreeMemory)
+#pragma alloc_text(PAGE, BBAllocateFreePhysical)
 #pragma alloc_text(PAGE, BBProtectMemory)
+
+#pragma alloc_text(PAGE, BBLookupPhysProcessEntry)
+#pragma alloc_text(PAGE, BBLookupPhysMemEntry)
+
+#pragma alloc_text(PAGE, BBCleanupPhysMemEntry)
+#pragma alloc_text(PAGE, BBCleanupProcessPhysEntry)
+#pragma alloc_text(PAGE, BBCleanupProcessPhysList)
 
 /// <summary>
 /// Disable process DEP
@@ -211,6 +239,10 @@ NTSTATUS BBAllocateFreeMemory( IN PALLOCATE_FREE_MEMORY pAllocFree, OUT PALLOCAT
     NTSTATUS status = STATUS_SUCCESS;
     PEPROCESS pProcess = NULL;
 
+    ASSERT( pResult != NULL );
+    if (pResult == NULL)
+        return STATUS_INVALID_PARAMETER;
+
     status = PsLookupProcessByProcessId( (HANDLE)pAllocFree->pid, &pProcess );
     if (NT_SUCCESS( status ))
     {
@@ -221,17 +253,30 @@ NTSTATUS BBAllocateFreeMemory( IN PALLOCATE_FREE_MEMORY pAllocFree, OUT PALLOCAT
         KeStackAttachProcess( pProcess, &apc );
 
         if (pAllocFree->allocate)
-            status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &base, 0, &size, pAllocFree->type, pAllocFree->protection );
-        else
-            status = ZwFreeVirtualMemory( ZwCurrentProcess(), &base, &size, pAllocFree->type );
-
-        KeUnstackDetachProcess( &apc );
-
-        if (pResult != NULL)
         {
-            pResult->address = (ULONGLONG)base;
-            pResult->size = size;
+            if (pAllocFree->physical != FALSE)
+            {
+                status = BBAllocateFreePhysical( pProcess, pAllocFree, pResult );
+            }
+            else
+            {
+                status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &base, 0, &size, pAllocFree->type, pAllocFree->protection );
+                pResult->address = (ULONGLONG)base;
+                pResult->size = size;
+            }
         }
+        else
+        {
+            MI_VAD_TYPE vadType = VadNone;
+            BBGetVadType( pProcess, pAllocFree->base, &vadType );
+
+            if (vadType == VadDevicePhysicalMemory)
+                status = BBAllocateFreePhysical( pProcess, pAllocFree, pResult );
+            else
+                status = ZwFreeVirtualMemory( ZwCurrentProcess(), &base, &size, pAllocFree->type );
+        }
+
+        KeUnstackDetachProcess( &apc );        
     }
     else
         DPRINT( "BlackBone: %s: PsLookupProcessByProcessId failed with status 0x%X\n", __FUNCTION__, status );
@@ -241,6 +286,136 @@ NTSTATUS BBAllocateFreeMemory( IN PALLOCATE_FREE_MEMORY pAllocFree, OUT PALLOCAT
 
     return status;
 }
+
+
+/// <summary>
+/// Allocate kernel memory and map into User space. Or free previously allocated memory
+/// </summary>
+/// <param name="pProcess">Target process object</param>
+/// <param name="pAllocFree">Request params.</param>
+/// <param name="pResult">Allocated region info.</param>
+/// <returns>Status code</returns>
+NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY pAllocFree, OUT PALLOCATE_FREE_MEMORY_RESULT pResult )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    PVOID pRegionBase = NULL;
+    PMDL pMDL = NULL;
+
+    ASSERT( pProcess != NULL && pResult != NULL );
+    if (pProcess == NULL || pResult == NULL)
+        return STATUS_INVALID_PARAMETER;
+
+    // MDL doesn't support regions this large
+    if (pAllocFree->size > 0xFFFFFFFF)
+    {
+        DPRINT( "BlackBone: %s: Region size if too big: 0x%p\n", __FUNCTION__, pAllocFree->size );
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    // Align on page boundaries   
+    pAllocFree->base = (ULONGLONG)PAGE_ALIGN( pAllocFree->base );
+    pAllocFree->size = ADDRESS_AND_SIZE_TO_SPAN_PAGES( pAllocFree->base, pAllocFree->size ) << PAGE_SHIFT;
+
+    // Allocate
+    if (pAllocFree->allocate != FALSE)
+    {
+        PMMVAD_SHORT pVad = NULL;
+        if (pAllocFree->base != 0 && BBFindVAD( pProcess, pAllocFree->base, &pVad ) != STATUS_NOT_FOUND)
+            return STATUS_ALREADY_COMMITTED;
+
+        pRegionBase = ExAllocatePoolWithTag( NonPagedPool, pAllocFree->size, BB_POOL_TAG );
+        if (!pRegionBase)
+            return STATUS_MEMORY_NOT_ALLOCATED;
+
+        // Cleanup buffer before mapping it into UserMode to prevent exposure of kernel data
+        RtlZeroMemory( pRegionBase, pAllocFree->size );
+
+        pMDL = IoAllocateMdl( pRegionBase, (ULONG)pAllocFree->size, FALSE, FALSE, NULL );
+        if (pMDL == NULL)
+        {
+            ExFreePoolWithTag( pRegionBase, BB_POOL_TAG );
+            return STATUS_MEMORY_NOT_ALLOCATED;
+        }
+
+        MmBuildMdlForNonPagedPool( pMDL );
+
+        // Map at original base
+        __try {
+            pResult->address = (ULONGLONG)MmMapLockedPagesSpecifyCache( pMDL, UserMode, MmCached,
+                                                                        (PVOID)pAllocFree->base, FALSE, NormalPagePriority );
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER) { }
+
+        // Map at any suitable
+        if (pResult->address == 0 && pAllocFree->base != 0)
+        {
+            __try {
+                pResult->address = (ULONGLONG)MmMapLockedPagesSpecifyCache( pMDL, UserMode, MmCached,
+                                                                            NULL, FALSE, NormalPagePriority );
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER) { }
+        }
+
+        if (pResult->address)
+        {
+            PMEM_PHYS_PROCESS_ENTRY pEntry = NULL;
+            PMEM_PHYS_ENTRY pMemEntry = NULL;
+
+            pResult->size = pAllocFree->size;
+
+            // Set initial protection
+            BBProtectVAD( PsGetCurrentProcess(), pResult->address, BBConvertProtection( pAllocFree->protection, FALSE ) );
+
+            // Add to list
+            pEntry = BBLookupPhysProcessEntry( (HANDLE)pAllocFree->pid );
+            if (pEntry == NULL)
+            {
+                pEntry = ExAllocatePoolWithTag( PagedPool, sizeof( MEM_PHYS_PROCESS_ENTRY ), BB_POOL_TAG );
+                pEntry->pid = (HANDLE)pAllocFree->pid;
+
+                InitializeListHead( &pEntry->pVadList );
+                InsertTailList( &g_PhysProcesses, &pEntry->link );
+            }
+
+            pMemEntry = ExAllocatePoolWithTag( PagedPool, sizeof( MEM_PHYS_ENTRY ), BB_POOL_TAG );
+            
+            pMemEntry->pMapped = (PVOID)pResult->address;
+            pMemEntry->pMDL = pMDL;
+            pMemEntry->ptr = pRegionBase;
+            pMemEntry->size = pAllocFree->size;
+
+            InsertTailList( &pEntry->pVadList, &pMemEntry->link );
+        }
+        else
+        {
+            // Failed, cleanup
+            IoFreeMdl( pMDL );
+            ExFreePoolWithTag( pRegionBase, BB_POOL_TAG );
+
+            status = STATUS_NONE_MAPPED;
+        }
+    }
+    // Free
+    else
+    {
+        PMEM_PHYS_PROCESS_ENTRY pEntry = BBLookupPhysProcessEntry( (HANDLE)pAllocFree->pid );
+
+        if (pEntry != NULL)
+        {
+            PMEM_PHYS_ENTRY pMemEntry = BBLookupPhysMemEntry( &pEntry->pVadList, (PVOID)pAllocFree->base );
+
+            if (pMemEntry != NULL)
+                BBCleanupPhysMemEntry( pMemEntry, TRUE );
+            else
+                status = STATUS_NOT_FOUND;
+        }
+        else
+            status = STATUS_NOT_FOUND;
+    }
+
+    return status;
+}
+
 
 /// <summary>
 /// Change process memory protection
@@ -256,13 +431,42 @@ NTSTATUS BBProtectMemory( IN PPROTECT_MEMORY pProtect )
     if (NT_SUCCESS( status ))
     {
         KAPC_STATE apc;
+        MI_VAD_TYPE vadType = VadNone;
         PVOID base = (PVOID)pProtect->base;
         SIZE_T size = (SIZE_T)pProtect->size;
         ULONG oldProt = 0;
 
         KeStackAttachProcess( pProcess, &apc );
 
-        status = ZwProtectVirtualMemory( ZwCurrentProcess(), &base, &size, pProtect->newProtection, &oldProt );
+        // Handle physical allocations
+        status = BBGetVadType( pProcess, pProtect->base, &vadType );
+        if (NT_SUCCESS( status ))
+        {
+            if (vadType == VadDevicePhysicalMemory)
+            {
+                // Align on page boundaries   
+                pProtect->base = (ULONGLONG)PAGE_ALIGN( pProtect->base );
+                pProtect->size = ADDRESS_AND_SIZE_TO_SPAN_PAGES( pProtect->base, pProtect->size ) << PAGE_SHIFT;
+
+                status = BBProtectVAD( pProcess, pProtect->base, BBConvertProtection( pProtect->newProtection, FALSE ) );
+
+                // Update PTE
+                for (ULONG_PTR pAdress = pProtect->base; pAdress < pProtect->base + pProtect->size; pAdress += PAGE_SIZE)
+                {
+                    PMMPTE_HARDWARE64 pPTE = GetPTEForVA( (PVOID)pAdress );
+
+                    // Executable
+                    if (pProtect->newProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))
+                        pPTE->NoExecute = 0;
+
+                    // Read-only
+                    if (pProtect->newProtection & (PAGE_READONLY | PAGE_EXECUTE | PAGE_EXECUTE_READ))
+                        pPTE->Dirty1 = pPTE->Write = 0;
+                }
+            }
+            else
+                status = ZwProtectVirtualMemory( ZwCurrentProcess(), &base, &size, pProtect->newProtection, &oldProt );
+        }
 
         KeUnstackDetachProcess( &apc );
     }
@@ -273,4 +477,86 @@ NTSTATUS BBProtectMemory( IN PPROTECT_MEMORY pProtect )
         ObDereferenceObject( pProcess );
 
     return status;
+}
+
+
+
+
+/// <summary>
+/// Find memory allocation process entry
+/// </summary>
+/// <param name="pid">Target PID</param>
+/// <returns>Found entry, NULL if not found</returns>
+PMEM_PHYS_PROCESS_ENTRY BBLookupPhysProcessEntry( IN HANDLE pid )
+{
+    for (PLIST_ENTRY pListEntry = g_PhysProcesses.Flink; pListEntry != &g_PhysProcesses; pListEntry = pListEntry->Flink)
+    {
+        PMEM_PHYS_PROCESS_ENTRY pEntry = CONTAINING_RECORD( pListEntry, MEM_PHYS_PROCESS_ENTRY, link );
+        if (pEntry->pid == pid)
+            return pEntry;
+    }
+
+    return NULL;
+}
+
+
+/// <summary>
+/// Find allocated memory region entry
+/// </summary>
+/// <param name="pList">Region list</param>
+/// <param name="pBase">Region base</param>
+/// <returns>Found entry, NULL if not found</returns>
+PMEM_PHYS_ENTRY BBLookupPhysMemEntry( IN PLIST_ENTRY pList, IN PVOID pBase )
+{
+    ASSERT( pList != NULL );
+    if (pList == NULL)
+        return NULL;
+
+    for (PLIST_ENTRY pListEntry = pList->Flink; pListEntry != pList; pListEntry = pListEntry->Flink)
+    {
+        PMEM_PHYS_ENTRY pEntry = CONTAINING_RECORD( pListEntry, MEM_PHYS_ENTRY, link );
+        if (pBase >= pEntry->pMapped && pBase < (PVOID)((ULONG_PTR)pEntry->pMapped + pEntry->size))
+            return pEntry;
+    }
+
+    return NULL;
+}
+
+//
+// Cleanup routines
+//
+
+void BBCleanupPhysMemEntry( IN PMEM_PHYS_ENTRY pEntry, BOOLEAN attached )
+{
+    ASSERT( pEntry != NULL );
+    if (pEntry == NULL)
+        return;
+
+    if (attached)
+        MmUnmapLockedPages( pEntry->pMapped, pEntry->pMDL );
+
+    IoFreeMdl( pEntry->pMDL );
+    ExFreePoolWithTag( pEntry->ptr, BB_POOL_TAG );
+
+    RemoveEntryList( &pEntry->link );
+    ExFreePoolWithTag( pEntry, BB_POOL_TAG );
+}
+
+void BBCleanupProcessPhysEntry( IN PMEM_PHYS_PROCESS_ENTRY pEntry, BOOLEAN attached )
+{
+    ASSERT( pEntry != NULL );
+    if (pEntry == NULL)
+        return;
+
+    while (!IsListEmpty( &pEntry->pVadList ))
+        BBCleanupPhysMemEntry( (PMEM_PHYS_ENTRY)pEntry->pVadList.Flink, attached );
+
+    RemoveEntryList( &pEntry->link );
+    ExFreePoolWithTag( pEntry, BB_POOL_TAG );
+}
+
+void BBCleanupProcessPhysList()
+{
+    while (!IsListEmpty( &g_PhysProcesses ))
+        BBCleanupProcessPhysEntry( (PMEM_PHYS_PROCESS_ENTRY)g_PhysProcesses.Flink, FALSE );
 }

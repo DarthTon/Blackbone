@@ -35,7 +35,6 @@ bool NtLdr::Init()
     if (IsWindows8OrGreater())
         FindLdrpModuleIndexBase();
 
-    FindLdrpModuleBase();
     ScanPatterns();
     FindLdrHeap();
 
@@ -50,36 +49,58 @@ bool NtLdr::Init()
 /// </summary>
 /// <param name="hMod">Module base address</param>
 /// <param name="ImageSize">Size of image</param>
-/// <param name="DllBasePath">Full-qualified image path.</param>
+/// <param name="DllBasePath">Full-qualified image path</param>
+/// <param name="entryPoint">Entry point RVA</param>
+/// <param name="flags">Type of references to create</param>
 /// <returns>true on success</returns>
-bool NtLdr::CreateNTReference( HMODULE hMod, size_t ImageSize, const std::wstring& DllBasePath )
+bool NtLdr::CreateNTReference( HMODULE hMod, 
+                               size_t ImageSize, 
+                               const std::wstring& DllBasePath, 
+                               size_t entryPoint,
+                               LdrRefFlags flags /*= Ldr_All*/ )
 {
+    // Skip
+    if (flags == Ldr_None)
+        return true;
+
     // Win 8 and higher
     if (IsWindows8OrGreater())
     {
         ULONG hash = 0;
-        _LDR_DATA_TABLE_ENTRY_W8 *pEntry = InitW8Node( reinterpret_cast<void*>(hMod), ImageSize, DllBasePath, hash );
+        _LDR_DATA_TABLE_ENTRY_W8 *pEntry = InitW8Node( reinterpret_cast<void*>(hMod), ImageSize, DllBasePath, entryPoint, hash );
         _nodeMap.emplace( std::make_pair( hMod, pEntry ) );
 
         // Insert into LdrpHashTable
-        InsertHashNode( reinterpret_cast<PLIST_ENTRY>(GET_FIELD_PTR( pEntry, HashLinks )), hash );
+        if (flags & Ldr_HashTable)
+            InsertHashNode( GET_FIELD_PTR( pEntry, HashLinks ), hash );
 
         // Insert into module graph
-        InsertTreeNode( pEntry, reinterpret_cast<size_t>(hMod) );
+        if (flags & Ldr_ModList)
+            InsertTreeNode( pEntry, reinterpret_cast<size_t>(hMod) );
+
+        if (flags & Ldr_ThdCall)
+        {
+            _process.memory().Write( GET_FIELD_PTR( pEntry, Flags ), 0x80004 );
+            InsertMemModuleNode( 0, GET_FIELD_PTR( pEntry, InLoadOrderLinks ), 
+                                 GET_FIELD_PTR( pEntry, InInitializationOrderLinks ) );
+        }
     }
     // Windows 7 and earlier
     else
     {
         ULONG hash = 0;
-        _LDR_DATA_TABLE_ENTRY_W7 *pEntry = InitW7Node( reinterpret_cast<void*>(hMod), ImageSize, DllBasePath, hash );
+        _LDR_DATA_TABLE_ENTRY_W7 *pEntry = InitW7Node( reinterpret_cast<void*>(hMod), ImageSize, DllBasePath, entryPoint, hash );
         _nodeMap.emplace( std::make_pair( hMod, pEntry ) );
 
         // Insert into LdrpHashTable
-        InsertHashNode( reinterpret_cast<PLIST_ENTRY>(GET_FIELD_PTR( pEntry, HashLinks )), hash );
+        if (flags & Ldr_HashTable)
+            InsertHashNode( GET_FIELD_PTR( pEntry, HashLinks ), hash );
 
         // Insert into LDR list
-        InsertMemModuleNode( reinterpret_cast<PLIST_ENTRY>(GET_FIELD_PTR( pEntry, InMemoryOrderLinks )),
-                             reinterpret_cast<PLIST_ENTRY>(GET_FIELD_PTR( pEntry, InLoadOrderLinks )) );
+        if (flags & (Ldr_ModList | Ldr_ThdCall))
+            InsertMemModuleNode( GET_FIELD_PTR( pEntry, InMemoryOrderLinks ), 
+                                 GET_FIELD_PTR( pEntry, InLoadOrderLinks ), 
+                                 GET_FIELD_PTR( pEntry, InInitializationOrderLinks ) );
 	}
 
     return false;
@@ -264,9 +285,14 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
 /// <param name="ModuleBase">Module base address.</param>
 /// <param name="ImageSize">Size of image.</param>
 /// <param name="dllpath">Full-qualified image path</param>
+/// <param name="entryPoint">Entry point RVA</param>
 /// <param name="outHash">Iamge name hash</param>
 /// <returns>Pointer to created entry</returns>
-_LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase, size_t ImageSize, const std::wstring& dllpath, ULONG& outHash )
+_LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase, 
+                                             size_t ImageSize, 
+                                             const std::wstring& dllpath, 
+                                             size_t entryPoint,
+                                             ULONG& outHash )
 {
     std::wstring dllname = Utils::StripPath( dllpath );
     UNICODE_STRING strLocal = { 0 };
@@ -325,6 +351,9 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase, size_t ImageSize,
             // pEntry->SizeOfImage = ImageSize;
             _process.memory().Write( GET_FIELD_PTR( pEntry, SizeOfImage ), static_cast<ULONG>(ImageSize) );
 
+            // pEntry->EntryPoint = entryPoint;
+            _process.memory().Write( GET_FIELD_PTR( pEntry, EntryPoint ), entryPoint );
+
             // Dll name and name hash
             GET_IMPORT( RtlInitUnicodeString )( &strLocal, dllname.c_str() );
             outHash = HashString( dllname );
@@ -378,9 +407,14 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase, size_t ImageSize,
 /// <param name="ModuleBase">Module base address.</param>
 /// <param name="ImageSize">Size of image.</param>
 /// <param name="dllpath">Full-qualified image path</param>
+/// <param name="entryPoint">Entry point RVA</param>
 /// <param name="outHash">Iamge name hash</param>
 /// <returns>Pointer to created entry</returns>
-_LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node( void* ModuleBase, size_t ImageSize, const std::wstring& dllpath, ULONG& outHash )
+_LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node( void* ModuleBase, 
+                                             size_t ImageSize, 
+                                             const std::wstring& dllpath,
+                                             size_t entryPoint,
+                                             ULONG& outHash )
 {
     std::wstring dllname = Utils::StripPath( dllpath );
     UNICODE_STRING strLocal = { 0 };
@@ -419,6 +453,9 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node( void* ModuleBase, size_t ImageSize,
 
         // pEntry->SizeOfImage = ImageSize;
         _process.memory().Write( GET_FIELD_PTR( pEntry, SizeOfImage ), static_cast<ULONG>(ImageSize) );
+
+        // pEntry->EntryPoint = entryPoint;
+        _process.memory().Write( GET_FIELD_PTR( pEntry, EntryPoint ), entryPoint );
 
         // pEntry->LoadCount = -1;
         _process.memory().Write( GET_FIELD_PTR( pEntry, LoadCount ), -1 );
@@ -536,23 +573,27 @@ void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, size_t modBase )
 /// </summary>
 /// <param name="pNodeMemoryOrderLink">InMemoryOrderModuleList link of entry to be inserted</param>
 /// <param name="pNodeLoadOrderLink">InLoadOrderModuleList link of entry to be inserted</param>
-void NtLdr::InsertMemModuleNode( PLIST_ENTRY pNodeMemoryOrderLink, PLIST_ENTRY pNodeLoadOrderLink )
+void NtLdr::InsertMemModuleNode( size_t pNodeMemoryOrderLink, size_t pNodeLoadOrderLink, size_t pNodeInitOrderLink )
 {
     PEB_T* pPeb = reinterpret_cast<PEB_T*>(_process.core().peb());
+    PEB_LDR_DATA_T* pLdr = nullptr;
 
     if(pPeb)
-    {
-        PPEB_LDR_DATA pLdr = _process.memory().Read<PPEB_LDR_DATA>( GET_FIELD_PTR( pPeb, Ldr ) );
+        pLdr = _process.memory().Read<PEB_LDR_DATA_T*>( GET_FIELD_PTR( pPeb, Ldr ) );
                 
-        // Insert into pLdr->InMemoryOrderModuleList
-        if (pLdr)
-            InsertTailList( reinterpret_cast<PLIST_ENTRY>(GET_FIELD_PTR( pLdr, InMemoryOrderModuleList )), pNodeMemoryOrderLink );
+    if (pLdr)
+    {
+        // pLdr->InMemoryOrderModuleList
+        if (pNodeMemoryOrderLink)
+            InsertTailList( GET_FIELD_PTR( pLdr, InMemoryOrderModuleList ), pNodeMemoryOrderLink );
 
-        // Module list
-        PLIST_ENTRY pModuleList = _process.memory().Read<PLIST_ENTRY>( _LdrpModuleBase );
+        // pLdr->InLoadOrderModuleList
+        if (pNodeLoadOrderLink)
+            InsertTailList( GET_FIELD_PTR( pLdr, InLoadOrderModuleList ), pNodeLoadOrderLink );
 
-        if (pModuleList)
-            InsertTailList( pModuleList, pNodeLoadOrderLink );
+        // pLdr->InInitializationOrderModuleList
+        if (pNodeInitOrderLink)
+            InsertTailList( GET_FIELD_PTR( pLdr, InInitializationOrderModuleList ), pNodeInitOrderLink );
     }
 }
 
@@ -561,12 +602,12 @@ void NtLdr::InsertMemModuleNode( PLIST_ENTRY pNodeMemoryOrderLink, PLIST_ENTRY p
 /// </summary>
 /// <param name="pNodeLink">Link of entry to be inserted</param>
 /// <param name="hash">Module hash</param>
-void NtLdr::InsertHashNode( PLIST_ENTRY pNodeLink, ULONG hash )
+void NtLdr::InsertHashNode( size_t pNodeLink, ULONG hash )
 {
     if(pNodeLink)
     {
         // LrpHashTable record
-        PLIST_ENTRY pHashList = _process.memory().Read<PLIST_ENTRY>( _LdrpHashTable + sizeof(LIST_ENTRY)*(hash & 0x1F) );
+        auto pHashList = _process.memory().Read<size_t>( _LdrpHashTable + sizeof(LIST_ENTRY)*(hash & 0x1F) );
         InsertTailList( pHashList, pNodeLink );
     }
 }
@@ -576,22 +617,20 @@ void NtLdr::InsertHashNode( PLIST_ENTRY pNodeLink, ULONG hash )
 /// </summary>
 /// <param name="ListHead">List head pointer</param>
 /// <param name="Entry">Entry list link to be inserted</param>
-void NtLdr::InsertTailList( PLIST_ENTRY ListHead, PLIST_ENTRY Entry )
+void NtLdr::InsertTailList( size_t ListHead, size_t Entry )
 {
-    PLIST_ENTRY PrevEntry;
-
     // PrevEntry = ListHead->Blink;
-    PrevEntry = _process.memory().Read<PLIST_ENTRY>( GET_FIELD_PTR( ListHead, Blink ) );
+    auto PrevEntry = _process.memory().Read<size_t>( GET_FIELD_PTR( reinterpret_cast<PLIST_ENTRY>(ListHead), Blink) );
 
     // Entry->Flink = ListHead;
     // Entry->Blink = PrevEntry;
-    _process.memory().Write( GET_FIELD_PTR( Entry, Flink ), ListHead );
-    _process.memory().Write( GET_FIELD_PTR( Entry, Blink ), PrevEntry );
+    _process.memory().Write( GET_FIELD_PTR( reinterpret_cast<PLIST_ENTRY>(Entry), Flink ), ListHead );
+    _process.memory().Write( GET_FIELD_PTR( reinterpret_cast<PLIST_ENTRY>(Entry), Blink ), PrevEntry );
 
     // PrevEntry->Flink = Entry;
     // ListHead->Blink  = Entry;
-    _process.memory().Write( GET_FIELD_PTR( PrevEntry, Flink ), Entry );
-    _process.memory().Write( GET_FIELD_PTR( ListHead, Blink ), Entry );
+    _process.memory().Write( GET_FIELD_PTR( reinterpret_cast<PLIST_ENTRY>(PrevEntry), Flink ), Entry );
+    _process.memory().Write( GET_FIELD_PTR( reinterpret_cast<PLIST_ENTRY>(ListHead), Blink ), Entry );
 }
 
 /// <summary>
@@ -714,18 +753,6 @@ bool NtLdr::FindLdrpModuleIndexBase( )
     return false;
 }
 
-/// <summary>
-/// Get PEB->Ldr->InLoadOrderModuleList address
-/// </summary>
-/// <returns>true on success</returns>
-bool NtLdr::FindLdrpModuleBase()
-{
-    PEB_T peb = { 0 };
-    _process.core().peb( &peb );
-    _LdrpModuleBase = peb.Ldr + FIELD_OFFSET( PEB_LDR_DATA_T, InLoadOrderModuleList );
-
-    return true;
-}
 
 /// <summary>
 /// Search for RtlInsertInvertedFunctionTable, LdrpInvertedFunctionTable, LdrpHandleTlsData.
@@ -761,18 +788,6 @@ bool NtLdr::ScanPatterns( )
     if (IsWindows8Point1OrGreater())
     {
     #ifdef USE64
-        // RtlInsertInvertedFunctionTable
-        // 48 83 EC 20 8B F2 4C 8D 4C 24
-        PatternSearch ps1( "\x48\x83\xec\x20\x8b\xf2\x4c\x8d\x4c\x24" );
-        ps1.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xE);
-            _LdrpInvertedFunctionTable = (size_t)hNtdll + 0x129C50;//*reinterpret_cast<size_t*>(foundData.front() + 0x4A);
-            foundData.clear();
-        }
-
         // LdrpHandleTlsData
         // 44 8D 43 09 4C 8D 4C 24 38
         PatternSearch ps2( "\x44\x8d\x43\x09\x4c\x8d\x4c\x24\x38" );
@@ -941,15 +956,15 @@ bool NtLdr::FindLdrHeap()
 /// <param name="baseAddress">Module base address</param>
 /// <param name="type">32 or 64 bit.</param>
 /// <returns>true on success</returns>
-bool NtLdr::Unlink( ptr_t baseAddress, eModType type )
+bool NtLdr::Unlink( ptr_t baseAddress, const std::wstring& name, eModType type )
 {
     ptr_t ldrEntry = 0;
 
     // Unlink from linked lists
     if (type == mt_mod32)
-        ldrEntry = UnlinkFromLdr<DWORD>( baseAddress );
+        ldrEntry = UnlinkFromLdr<DWORD>( baseAddress, name );
     else
-        ldrEntry = UnlinkFromLdr<DWORD64>( baseAddress );
+        ldrEntry = UnlinkFromLdr<DWORD64>( baseAddress, name );
 
     auto barrier = _process.core().native()->GetWow64Barrier();
 
@@ -967,7 +982,7 @@ bool NtLdr::Unlink( ptr_t baseAddress, eModType type )
 /// <param name="baseAddress">Module base address.</param>
 /// <returns>Address of removed record</returns>
 template<typename T>
-ptr_t NtLdr::UnlinkFromLdr( ptr_t baseAddress )
+ptr_t NtLdr::UnlinkFromLdr( ptr_t baseAddress, const std::wstring& name )
 {
     typename _PEB_T2<T>::type peb = { 0 };
     _PEB_LDR_DATA2<T> ldr = { 0 };
@@ -979,35 +994,36 @@ ptr_t NtLdr::UnlinkFromLdr( ptr_t baseAddress )
         ptr_t ldrEntry = 0;
 
         // InLoadOrderModuleList
-        ldrEntry = UnlinkListEntry( ldr.InLoadOrderModuleList,
-                                    peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InLoadOrderModuleList ),
-                                    FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InLoadOrderLinks ),
-                                    baseAddress );
+        ldrEntry |= UnlinkListEntry( ldr.InLoadOrderModuleList,
+                                     peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InLoadOrderModuleList ),
+                                     FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InLoadOrderLinks ),
+                                     baseAddress );
 
         // InMemoryOrderModuleList
-        UnlinkListEntry( ldr.InMemoryOrderModuleList,
-                         peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InMemoryOrderModuleList ),
-                         FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InMemoryOrderLinks ),
-                         baseAddress );
+        ldrEntry |= UnlinkListEntry( ldr.InMemoryOrderModuleList,
+                                     peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InMemoryOrderModuleList ),
+                                     FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InMemoryOrderLinks ),
+                                     baseAddress );
 
         // InInitializationOrderModuleList
-        UnlinkListEntry( ldr.InInitializationOrderModuleList,
-                         peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InInitializationOrderModuleList ),
-                         FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InInitializationOrderLinks ),
-                         baseAddress );
+        ldrEntry |= UnlinkListEntry( ldr.InInitializationOrderModuleList,
+                                     peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InInitializationOrderModuleList ),
+                                     FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InInitializationOrderLinks ),
+                                     baseAddress );
 
-        if(ldrEntry)
-        {
-            _LDR_DATA_TABLE_ENTRY_BASE<T> modData = { 0 };
+        // Hash table
+        if (ldrEntry == 0)
+        { 
+            //
+            // Search module in hash list
+            //
+            auto pHashList = _LdrpHashTable + sizeof( _LIST_ENTRY_T<T> )*(HashString( name ) & 0x1F);
+            auto hashList = _process.memory().Read<_LIST_ENTRY_T<T>>( pHashList );
 
-            native->ReadProcessMemoryT( ldrEntry, &modData, sizeof(modData), 0 );
-
-            // HashLinks
-            UnlinkListEntry( modData.HashLinks,
-                             peb.Ldr + FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, HashLinks ),
-                             FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, HashLinks ),
-                             baseAddress );
+            UnlinkListEntry( hashList, pHashList,FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, HashLinks ), baseAddress );
         }
+        else
+            UnlinkListEntry<T>( ldrEntry + FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, HashLinks ) );
 
         return ldrEntry;
     }
@@ -1016,10 +1032,10 @@ ptr_t NtLdr::UnlinkFromLdr( ptr_t baseAddress )
 }
 
 /// <summary>
-/// Remove record from LIST_ENTRY structure
+/// Search and remove record from LIST_ENTRY structure
 /// </summary>
 /// <param name="pListEntry">List to remove from</param>
-/// <param name="head">List head address.</param>
+/// <param name="head">List head address</param>
 /// <param name="ofst">Offset of link in _LDR_DATA_TABLE_ENTRY_BASE struct</param>
 /// <param name="baseAddress">Record to remove.</param>
 /// <returns>Address of removed record</returns>
@@ -1051,6 +1067,27 @@ ptr_t NtLdr::UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, size_t of
     }
 
     return 0;
+}
+
+/// <summary>
+///  Remove record from LIST_ENTRY structure
+/// </summary>
+/// <param name="pListLink">Entry link</param>
+template<typename T>
+void NtLdr::UnlinkListEntry( ptr_t pListLink )
+{
+    T OldFlink = _process.memory().Read<T>( pListLink + FIELD_OFFSET( _LIST_ENTRY_T<T>, Flink ) );
+    T OldBlink = _process.memory().Read<T>( pListLink + FIELD_OFFSET( _LIST_ENTRY_T<T>, Blink ) );
+
+    // List is empty
+    if (OldBlink == 0 || OldFlink == 0 || OldBlink == OldFlink)
+        return;
+
+    // OldFlink->Blink = OldBlink;
+    _process.memory().Write( OldFlink + FIELD_OFFSET( _LIST_ENTRY_T<T>, Blink ), OldBlink );
+
+    // OldBlink->Flink = OldFlink;
+    _process.memory().Write( OldBlink + FIELD_OFFSET( _LIST_ENTRY_T<T>, Flink ), OldFlink );
 }
 
 /// <summary>

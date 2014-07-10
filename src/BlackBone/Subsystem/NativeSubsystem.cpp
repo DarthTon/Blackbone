@@ -47,6 +47,7 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
     HMODULE hKernel32 = GetModuleHandleW( L"kernel32.dll" );
 
     DynImport::load( "NtQueryInformationProcess", hNtdll );
+    DynImport::load( "NtSetInformationProcess",   hNtdll );
     DynImport::load( "NtQueryInformationThread",  hNtdll );
     DynImport::load( "NtQueryObject",             hNtdll );  
     DynImport::load( "NtQueryVirtualMemory",      hNtdll );
@@ -189,6 +190,18 @@ NTSTATUS Native::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer,
 {
     ULONG length = 0;
     return GET_IMPORT( NtQueryInformationProcess )(_hProcess, infoClass, lpBuffer, bufSize, &length);
+}
+
+/// <summary>
+/// Call NtSetInformationProcess for underlying process
+/// </summary>
+/// <param name="infoClass">Information class</param>
+/// <param name="lpBuffer">Input buffer</param>
+/// <param name="bufSize">Buffer size</param>
+/// <returns>Status code</returns>
+NTSTATUS Native::SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize )
+{
+    return GET_IMPORT( NtSetInformationProcess )(_hProcess, infoClass, lpBuffer, bufSize);
 }
 
 /// <summary>

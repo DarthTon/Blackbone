@@ -459,7 +459,7 @@ bool ProcessModules::Unload( const ModuleData* hMod )
 /// <returns>true on success</returns>
 bool ProcessModules::Unlink( const ModuleData* mod )
 {
-    return _proc.nativeLdr().Unlink( mod->baseAddress, mod->type );
+    return _proc.nativeLdr().Unlink( mod->baseAddress, mod->name, mod->type );
 }
 
 /// <summary>

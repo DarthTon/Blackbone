@@ -8,6 +8,7 @@
     <ClCompile Include="VadRoutines.c" />
     <ClCompile Include="BlackBoneDrv.c" />
     <ClCompile Include="Routines.c" />
+    <ClCompile Include="NotifyRoutine.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Remap.h">
@@ -41,6 +42,9 @@
       <Filter>Include\Native</Filter>
     </ClInclude>
     <ClInclude Include="Private.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Routines.h">
       <Filter>Include</Filter>
     </ClInclude>
   </ItemGroup>

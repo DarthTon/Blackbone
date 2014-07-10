@@ -56,12 +56,15 @@ typedef PULONG PWIN32_PROTECTION_MASK;
 
 typedef enum _WinVer
 {
-    WINVER_7 = 0x610,
+    WINVER_7     = 0x610,
     WINVER_7_SP1 = 0x611,
-    WINVER_8 = 0x620,
-    WINVER_81 = 0x630,
+    WINVER_8     = 0x620,
+    WINVER_81    = 0x630,
 } WinVer;
 
+/// <summary>
+/// OS-dependent stuff
+/// </summary>
 typedef struct _DYNAMIC_DATA
 {
     WinVer ver;             // OS version

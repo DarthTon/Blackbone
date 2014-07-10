@@ -90,14 +90,6 @@ NTSTATUS BBUnmapRegionEntry( IN PMAP_ENTRY pPageEntry, IN PPROCESS_MAP_ENTRY pFo
 //
 
 /// <summary>
-/// Search process entry in list by PID
-/// </summary>
-/// <param name="pid">PID.</param>
-/// <param name="asHost">If set to TRUE, pid is treated as host PID</param>
-/// <returns>Found entry, NULL in not found</returns>
-PPROCESS_MAP_ENTRY BBLookupProcessEntry( IN HANDLE pid, IN BOOLEAN asHost );
-
-/// <summary>
 /// Find memory region containing at least one byte from specific region
 /// </summary>
 /// <param name="pList">Region list to search in</param>
@@ -109,18 +101,6 @@ PMAP_ENTRY BBFindPageEntry( IN PLIST_ENTRY pList, IN ULONG_PTR baseAddress, IN U
 //
 // Cleanup routines
 //
-
-/// <summary>
-/// Unmap all regions, delete MDLs, close handles, remove entry from table
-/// </summary>
-/// <param name="pProcessEntry">Process entry</param>
-VOID BBCleanupProcessEntry( IN PPROCESS_MAP_ENTRY pProcessEntry );
-
-/// <summary>
-/// Unmap any mapped pages from host process
-/// </summary>
-/// <param name="pProcessEntry">Process entry</param>
-VOID BBCleanupHostProcess( IN PPROCESS_MAP_ENTRY pProcessEntry );
 
 /// <summary>
 /// Unmap pages, destroy MDLs, remove entry from list
@@ -161,7 +141,6 @@ NTSTATUS BBSafeHandleClose( IN PEPROCESS pProcess, IN HANDLE handle, IN KPROCESS
 #pragma alloc_text(PAGE, BBLookupProcessEntry)
 #pragma alloc_text(PAGE, BBFindPageEntry)
 
-#pragma alloc_text(PAGE, BBProcessNotify)
 #pragma alloc_text(PAGE, BBCleanupProcessTable)
 #pragma alloc_text(PAGE, BBCleanupProcessEntry)
 #pragma alloc_text(PAGE, BBCleanupHostProcess)
@@ -173,41 +152,6 @@ NTSTATUS BBSafeHandleClose( IN PEPROCESS pProcess, IN HANDLE handle, IN KPROCESS
 #pragma alloc_text(PAGE, AvlFree)
 
 
-/// <summary>
-/// Process termination handler
-/// </summary>
-/// <param name="ParentId">Parent PID</param>
-/// <param name="ProcessId">PID</param>
-/// <param name="Create">TRUE if process was created</param>
-VOID BBProcessNotify( IN HANDLE ParentId, IN HANDLE ProcessId, IN BOOLEAN Create )
-{
-    UNREFERENCED_PARAMETER( ParentId );
-    PPROCESS_MAP_ENTRY pProcessEntry = NULL;
-
-    if (Create == FALSE)
-    {
-        KeAcquireGuardedMutex( &g_globalLock );
-
-        pProcessEntry = BBLookupProcessEntry( ProcessId, FALSE );
-
-        // Target process shutdown
-        if (pProcessEntry != NULL)
-        {
-            DPRINT( "BlackBone: %s: Target process %u shutdown. Cleanup\n", __FUNCTION__, pProcessEntry->target.pid );
-            BBCleanupProcessEntry( pProcessEntry );
-        }
-        else
-        {
-            pProcessEntry = BBLookupProcessEntry( ProcessId, TRUE );
-
-            // Host process shutdown
-            if (pProcessEntry != NULL)
-                BBCleanupHostProcess( pProcessEntry );
-        }
-
-        KeReleaseGuardedMutex( &g_globalLock );
-    }
-}
 
 /*
 */

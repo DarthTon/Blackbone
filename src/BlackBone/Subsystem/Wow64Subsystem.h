@@ -87,6 +87,15 @@ public:
     virtual NTSTATUS QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize );
 
     /// <summary>
+    /// Call NtSetInformationProcess for underlying process
+    /// </summary>
+    /// <param name="infoClass">Information class</param>
+    /// <param name="lpBuffer">Input buffer</param>
+    /// <param name="bufSize">Buffer size</param>
+    /// <returns>Status code</returns>
+    virtual NTSTATUS SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize );
+
+    /// <summary>
     /// Creates new thread in the remote process
     /// </summary>
     /// <param name="hThread">Created thread handle</param>

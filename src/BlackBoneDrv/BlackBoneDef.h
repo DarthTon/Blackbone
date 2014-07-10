@@ -228,6 +228,7 @@ typedef struct _ALLOCATE_FREE_MEMORY
     ULONG     protection;       // Memory protection for allocation
     ULONG     type;             // MEM_RESERVE/MEM_COMMIT/MEM_DECOMMIT/MEM_RELEASE
     BOOLEAN   allocate;         // TRUE if allocation, FALSE is freeing
+    BOOLEAN   physical;         // If set to TRUE, physical pages will be directly mapped into UM space
 } ALLOCATE_FREE_MEMORY, *PALLOCATE_FREE_MEMORY;
 
 /// <summary>

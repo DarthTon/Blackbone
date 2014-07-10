@@ -150,10 +150,10 @@ typedef int ( NTAPI* fnRtlRbInsertNodeEx )
     );
 
 // NtSetInformationProcess
-typedef NTSTATUS ( NTAPI* fnNtSetInformationProcess)
+typedef NTSTATUS( NTAPI* fnNtSetInformationProcess )
     (
         IN HANDLE   ProcessHandle,
-        IN PROCESS_INFORMATION_CLASS ProcessInformationClass,
+        IN PROCESSINFOCLASS ProcessInformationClass,
         IN PVOID    ProcessInformation,
         IN ULONG    ProcessInformationLength 
     );

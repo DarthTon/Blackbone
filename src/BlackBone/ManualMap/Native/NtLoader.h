@@ -3,9 +3,23 @@
 #include "../../Include/Winheaders.h"
 #include "../../PE/PEParser.h"
 #include "../../Include/NativeStructures.h"
+#include "../../Include/Macro.h"
 
 namespace blackbone
 {
+
+enum LdrRefFlags
+{
+    Ldr_None      = 0x00,   // Do not create any reference
+    Ldr_ModList   = 0x01,   // Add to module list -  LdrpModuleIndex( win8 only ), InMemoryOrderModuleList( win7 only )
+    Ldr_HashTable = 0x02,   // Add to LdrpHashTable
+    Ldr_ThdCall   = 0x04,   // Add to thread callback list (dllmain will be called with THREAD_ATTACH/DETACH reasons)
+    Ldr_All       = 0xFF    // Add to everything
+};
+
+ENUM_OPS( LdrRefFlags )
+
+
 class NtLdr
 {
 public:
@@ -24,9 +38,15 @@ public:
     /// </summary>
     /// <param name="hMod">Module base address</param>
     /// <param name="ImageSize">Size of image</param>
-    /// <param name="DllBasePath">Full-qualified image path.</param>
+    /// <param name="DllBasePath">Full-qualified image path</param>
+    /// <param name="entryPoint">Entry point RVA</param>
+    /// <param name="flags">Type of references to create</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool CreateNTReference( HMODULE hMod, size_t ImageSize, const std::wstring& DllBasePath );
+    BLACKBONE_API bool CreateNTReference( HMODULE hMod, 
+                                          size_t ImageSize, 
+                                          const std::wstring& DllBasePath, 
+                                          size_t entryPoint,
+                                          LdrRefFlags flags = Ldr_All );
 
     /// <summary>
     /// Create thread static TLS array
@@ -52,7 +72,7 @@ public:
     /// <param name="baseAddress">Module base address</param>
     /// <param name="type">32 or 64 bit.</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool Unlink( ptr_t baseAddress, eModType type );
+    BLACKBONE_API bool Unlink( ptr_t baseAddress, const std::wstring& name, eModType type );
 
     // 
     // Get some not exported values
@@ -76,12 +96,6 @@ private:
     bool FindLdrpModuleIndexBase();
 
     /// <summary>
-    /// Get PEB->Ldr->InLoadOrderModuleList address
-    /// </summary>
-    /// <returns>true on success</returns>
-    bool FindLdrpModuleBase();
-
-    /// <summary>
     /// Search for RtlInsertInvertedFunctionTable, LdrpInvertedFunctionTable, LdrpHandleTlsDatas.
     /// </summary>
     /// <returns>true on success</returns>
@@ -99,9 +113,14 @@ private:
     /// <param name="ModuleBase">Module base address.</param>
     /// <param name="ImageSize">Size of image.</param>
     /// <param name="dllpath">Full-qualified image path</param>
+    /// <param name="entryPoint">Entry point RVA</param>
     /// <param name="outHash">Iamge name hash</param>
     /// <returns>Pointer to created entry</returns>
-    _LDR_DATA_TABLE_ENTRY_W8* InitW8Node( void* ModuleBase, size_t ImageSize, const std::wstring& dllpath, ULONG& outHash );
+    _LDR_DATA_TABLE_ENTRY_W8* InitW8Node( void* ModuleBase, 
+                                          size_t ImageSize, 
+                                          const std::wstring& dllpath, 
+                                          size_t entryPoint,
+                                          ULONG& outHash );
 
     /// <summary>
     ///  Initialize OS-specific module entry
@@ -109,9 +128,14 @@ private:
     /// <param name="ModuleBase">Module base address.</param>
     /// <param name="ImageSize">Size of image.</param>
     /// <param name="dllpath">Full-qualified image path</param>
+    /// <param name="entryPoint">Entry point RVA</param>
     /// <param name="outHash">Iamge name hash</param>
     /// <returns>Pointer to created entry</returns>
-    _LDR_DATA_TABLE_ENTRY_W7* InitW7Node( void* ModuleBase, size_t ImageSize, const std::wstring& dllpath, ULONG& outHash );
+    _LDR_DATA_TABLE_ENTRY_W7* InitW7Node( void* ModuleBase, 
+                                          size_t ImageSize, 
+                                          const std::wstring& dllpath, 
+                                          size_t entryPoint, 
+                                          ULONG& outHash );
 
     /// <summary>
     /// Insert entry into win8 module graph
@@ -124,21 +148,21 @@ private:
     /// </summary>
     /// <param name="pNodeLink">Link of entry to be inserted</param>
     /// <param name="hash">Module hash</param>
-    void InsertHashNode( PLIST_ENTRY pNodeLink, ULONG hash );
+    void InsertHashNode( size_t pNodeLink, ULONG hash );
 
     /// <summary>
     /// Insert entry into InLoadOrderModuleList and InMemoryOrderModuleList
     /// </summary>
     /// <param name="pNodeMemoryOrderLink">InMemoryOrderModuleList link of entry to be inserted</param>
     /// <param name="pNodeLoadOrderLink">InLoadOrderModuleList link of entry to be inserted</param>
-    void InsertMemModuleNode( PLIST_ENTRY pNodeMemoryOrderLink, PLIST_ENTRY pNodeLoadOrderLink );
+    void InsertMemModuleNode( size_t pNodeMemoryOrderLink, size_t pNodeLoadOrderLink, size_t pNodeInitOrderLink );
 
     /// <summary>
     /// Insert entry into standard double linked list
     /// </summary>
     /// <param name="ListHead">List head pointer</param>
     /// <param name="Entry">Entry list link to be inserted</param>
-    void InsertTailList( PLIST_ENTRY ListHead, PLIST_ENTRY Entry );
+    void InsertTailList( size_t ListHead, size_t Entry );
 
     /// <summary>
     /// Hash image name
@@ -162,7 +186,7 @@ private:
     /// <param name="baseAddress">Module base address.</param>
     /// <returns>Address of removed record</returns>
     template<typename T> 
-    ptr_t UnlinkFromLdr( ptr_t baseAddress );
+    ptr_t UnlinkFromLdr( ptr_t baseAddress, const std::wstring& name );
 
     /// <summary>
     /// Remove record from LIST_ENTRY structure
@@ -174,6 +198,9 @@ private:
     /// <returns>Address of removed record</returns>
     template<typename T> 
     ptr_t UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, size_t ofst, ptr_t baseAddress );
+
+    template<typename T>
+    void UnlinkListEntry( ptr_t pListLink );
 
     /// <summary>
     /// Unlink from module graph

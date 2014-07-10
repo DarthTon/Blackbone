@@ -49,6 +49,7 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registr
     //
     // Globals init
     //
+    InitializeListHead( &g_PhysProcesses );
     RtlInitializeGenericTableAvl( &g_ProcessPageTables, &AvlCompare, &AvlAllocate, &AvlFree, NULL );
     KeInitializeGuardedMutex( &g_globalLock );
 
@@ -96,6 +97,9 @@ VOID BBUnload( IN PDRIVER_OBJECT DriverObject )
 
     // Unregister notification
     PsSetCreateProcessNotifyRoutine( BBProcessNotify, TRUE );
+
+    // Cleanup physical regions
+    BBCleanupProcessPhysList();
 
     // Cleanup process mapping info
     BBCleanupProcessTable();

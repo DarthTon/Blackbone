@@ -136,14 +136,7 @@ typedef struct _MMVAD_SHORT // Size=64
 
 typedef struct _MMVAD // Size=120
 {
-    union ___unnamed710 u1; // Size=8 Offset=0
-    struct _MMVAD * LeftChild; // Size=8 Offset=8
-    struct _MMVAD * RightChild; // Size=8 Offset=16
-    unsigned __int64 StartingVpn; // Size=8 Offset=24
-    unsigned __int64 EndingVpn; // Size=8 Offset=32
-    union ___unnamed712 u; // Size=8 Offset=40
-    void * PushLock; // Size=8 Offset=48
-    union ___unnamed713 u5; // Size=8 Offset=56
+    MMVAD_SHORT vadShort;
     union ___unnamed715 u2; // Size=4 Offset=64
     union
     {
@@ -158,20 +151,7 @@ typedef struct _MMVAD // Size=120
 
 typedef struct _MMVAD_LONG // Size=144
 {
-    union ___unnamed710 u1; // Size=8 Offset=0
-    struct _MMVAD * LeftChild; // Size=8 Offset=8
-    struct _MMVAD * RightChild; // Size=8 Offset=16
-    unsigned __int64 StartingVpn; // Size=8 Offset=24
-    unsigned __int64 EndingVpn; // Size=8 Offset=32
-    union ___unnamed712 u; // Size=8 Offset=40
-    void * PushLock; // Size=8 Offset=48
-    union ___unnamed713 u5; // Size=8 Offset=56
-    union ___unnamed715 u2; // Size=4 Offset=64
-    struct _SUBSECTION * Subsection; // Size=8 Offset=72
-    struct _MMPTE * FirstPrototypePte; // Size=8 Offset=80
-    struct _MMPTE * LastContiguousPte; // Size=8 Offset=88
-    struct _LIST_ENTRY ViewLinks; // Size=16 Offset=96
-    struct _EPROCESS * VadsProcess; // Size=8 Offset=112
+    MMVAD vad;
     union ___unnamed1319 u3; // Size=16 Offset=120
     union ___unnamed1320 u4; // Size=8 Offset=136
 } MMVAD_LONG, *PMMVAD_LONG;

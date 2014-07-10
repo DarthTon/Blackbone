@@ -124,18 +124,23 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
     }
 
 #endif
+    // AddVectoredExceptionHandler(0, pHandler);
+    auto& mods = _proc.modules();
+    auto pAddHandler = mods.GetExport( mods.GetModule( L"ntdll.dll" ), "RtlAddVectoredExceptionHandler" ).procAddress;
+    if (pAddHandler == 0)
+        return STATUS_NOT_FOUND;
 
+    ea->reset();
     ea.GenPrologue();
 
-    // AddVectoredExceptionHandler(0, pHandler);
-    ea.GenCall( reinterpret_cast<void*>(&AddVectoredExceptionHandler), { 0, _pVEHCode.ptr<size_t>() } );
+    ea.GenCall( static_cast<size_t>(pAddHandler), { 0, _pVEHCode.ptr<size_t>() } );
 
     _proc.remote().AddReturnWithEvent( ea );
     ea.GenEpilogue();
 
     _proc.remote().ExecInWorkerThread( ea->make(), ea->getCodeSize(), result );
     _hVEH = static_cast<size_t>(result);
-
+        
     return (result == 0 ? STATUS_NOT_FOUND : STATUS_SUCCESS);
 }
 
@@ -144,21 +149,26 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
 /// </summary>
 /// <returns></returns>
 NTSTATUS MExcept::RemoveVEH()
-{
-    
+{  
     AsmJitHelper a;
     uint64_t result = 0;
+
+    auto& mods = _proc.modules();
+    auto pRemoveHandler = mods.GetExport( mods.GetModule( L"ntdll.dll" ), "RtlRemoveVectoredExceptionHandler" ).procAddress;
+    if (pRemoveHandler == 0)
+        return STATUS_NOT_FOUND;
 
     a.GenPrologue();
 
     // RemoveVectoredExceptionHandler(pHandler);
-    a.GenCall( reinterpret_cast<void*>(&RemoveVectoredExceptionHandler), { _hVEH } );
+    a.GenCall( static_cast<size_t>(pRemoveHandler), { _hVEH } );
 
     _proc.remote().AddReturnWithEvent( a );
     a.GenEpilogue();
 
     _proc.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     _pVEHCode.Free();
+    _hVEH = 0;
 
     return STATUS_SUCCESS;
 }

@@ -27,7 +27,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <RemoteDebuggerCommand>C:\RemoteDbg\$(TargetFileName)</RemoteDebuggerCommand>
     <RemoteDebuggerWorkingDirectory>C:\RemoteDbg\</RemoteDebuggerWorkingDirectory>
-    <RemoteDebuggerServerName>192.168.56.102</RemoteDebuggerServerName>
+    <RemoteDebuggerServerName>192.168.56.101</RemoteDebuggerServerName>
     <DeploymentDirectory>C:\RemoteDbg\</DeploymentDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|Win32'">

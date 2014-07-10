@@ -94,7 +94,7 @@ public:
     /// <param name="type">Allocation type - MEM_RESERVE/MEM_COMMIT</param>
     /// <param name="protection">Memory protection</param>
     /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD type, DWORD protection );
+    BLACKBONE_API NTSTATUS AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD type, DWORD protection, bool physical = false );
 
     /// <summary>
     /// Free virtual memory
