@@ -13,6 +13,7 @@ using namespace blackbone;
 void TestLocalHook();
 void TestRemoteHook();
 void TestMMap();
+void TestMMapFromMem();
 void TestRemoteCall();
 void TestDriver();
 void TestRemoteMem();

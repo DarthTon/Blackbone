@@ -28,9 +28,55 @@ MMap::~MMap(void)
 /// </summary>
 /// <param name="path">Image path</param>
 /// <param name="flags">Image mapping flags</param>
-/// <returns>Mapped image info</returns>
+/// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
+/// <param name="ldrContext">User-supplied Loader callback context</param>
+/// <returns>Mapped image info </returns>
 const ModuleData* MMap::MapImage( const std::wstring& path, 
                                   eLoadFlags flags /*= NoFlags*/, 
+                                  LdrCallback ldrCallback /*= nullptr*/,
+                                  void* ldrContext /*= nullptr*/ )
+{
+    return MapImage( path, nullptr, 0, false, flags, ldrCallback, ldrContext );
+}
+
+/// <summary>
+/// Manually map PE image into underlying target process
+/// </summary>
+/// <param name="buffer">Image data buffer</param>
+/// <param name="size">Buffer size.</param>
+/// <param name="asImage">If set to true - buffer has image memory layout</param>
+/// <param name="flags">Image mapping flags</param>
+/// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
+/// <param name="ldrContext">User-supplied Loader callback context</param>
+/// <returns>Mapped image info</returns>
+const ModuleData* MMap::MapImage( void* buffer, size_t size,
+                                  bool asImage /*= false*/,
+                                  eLoadFlags flags /*= NoFlags*/,
+                                  LdrCallback ldrCallback /*= nullptr*/,
+                                  void* ldrContext /*= nullptr */ )
+{
+    // Create fake path
+    wchar_t path[64];
+    wsprintfW( path, L"MemoryImage_0x%p", buffer );
+
+    return MapImage( path, buffer, size, asImage, flags, ldrCallback, ldrContext );
+}
+
+/// <summary>
+/// Manually map PE image into underlying target process
+/// </summary>
+/// <param name="path">Image path</param>
+/// <param name="buffer">Image data buffer</param>
+/// <param name="size">Buffer size.</param>
+/// <param name="asImage">If set to true - buffer has image memory layout</param>
+/// <param name="flags">Image mapping flags</param>
+/// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
+/// <param name="ldrContext">User-supplied Loader callback context</param>
+/// <returns>Mapped image info</returns>
+const ModuleData* MMap::MapImage( const std::wstring& path,
+                                  void* buffer,size_t size,
+                                  bool asImage /*= false*/,
+                                  eLoadFlags flags /*= NoFlags*/,
                                   LdrCallback ldrCallback /*= nullptr*/,
                                   void* ldrContext /*= nullptr*/ )
 {
@@ -40,7 +86,7 @@ const ModuleData* MMap::MapImage( const std::wstring& path,
 
     // Prepare target process
     if (_process.remote().CreateRPCEnvironment() != STATUS_SUCCESS)
-        return nullptr;    
+        return nullptr;
 
     // No need to support exceptions if DEP is disabled
     if (_process.core().DEP() == false)
@@ -52,12 +98,12 @@ const ModuleData* MMap::MapImage( const std::wstring& path,
 
     // Set native loader callback
     _ldrCallback = ldrCallback;
-    _ldrContext  = ldrContext;
+    _ldrContext = ldrContext;
 
     BLACBONE_TRACE( L"ManualMap: Mapping image '%ls' with flags 0x%x", path.c_str(), flags );
 
     // Map module and all dependencies
-    auto mod = FindOrMapModule( path, flags );
+    auto mod = FindOrMapModule( path, buffer, size, asImage, flags );
     if (mod == nullptr)
         return nullptr;
 
@@ -78,7 +124,7 @@ const ModuleData* MMap::MapImage( const std::wstring& path,
                 return nullptr;
 
             // Wipe header
-            if (img->flags & WipeHeader)           
+            if (img->flags & WipeHeader)
             {
                 if (img->imgMem.Free( img->PEImage.headersSize() ) != STATUS_SUCCESS)
                     img->imgMem.Protect( PAGE_NOACCESS, 0, img->PEImage.headersSize() );
@@ -95,9 +141,14 @@ const ModuleData* MMap::MapImage( const std::wstring& path,
 /// Get existing module or map it if absent
 /// </summary>
 /// <param name="path">Image path</param>
+/// <param name="buffer">Image data buffer</param>
+/// <param name="size">Buffer size.</param>
+/// <param name="asImage">If set to true - buffer has image memory layout</param>
 /// <param name="flags">Mapping flags</param>
 /// <returns>Module info</returns>
-const ModuleData* MMap::FindOrMapModule( const std::wstring& path, eLoadFlags flags /*= NoFlags*/ )
+const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
+                                         void* buffer, size_t size, bool asImage,
+                                         eLoadFlags flags /*= NoFlags*/ )
 {
     std::unique_ptr<ImageContext> pImage( new ImageContext() );
 
@@ -106,7 +157,12 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path, eLoadFlags fl
     pImage->flags = flags;
 
     // Load and parse image
-    if (!pImage->FileImage.Project( path ) || !pImage->PEImage.Parse( pImage->FileImage, pImage->FileImage.isPlainData() ))
+    if (buffer)
+        pImage->FileImage.Assign( buffer, size, !asImage );
+    else
+        pImage->FileImage.Project( path );
+
+    if (!pImage->PEImage.Parse( pImage->FileImage.base(), pImage->FileImage.isPlainData() ))
         return nullptr;
 
     // Check if already loaded
@@ -115,18 +171,44 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path, eLoadFlags fl
 
     BLACBONE_TRACE( L"ManualMap: Loading new image '%ls'", path.c_str() );
 
-    // Try to map image in high memory range
+    // Try to map image in high (>4GB) memory range
     if (flags & MapInHighMem)
     {
-        if (AllocateInHighMem( pImage->imgMem, pImage->PEImage.imageSize() ) == false)
-            pImage->imgMem = _process.memory().Allocate( pImage->PEImage.imageSize( ), 
-                                                         PAGE_EXECUTE_READWRITE, pImage->PEImage.imageBase() );
+        AllocateInHighMem( pImage->imgMem, pImage->PEImage.imageSize() );
     }
     // Try to map image at it's original ASRL-aware base
-    else
-    {
-        pImage->imgMem = _process.memory().Allocate( pImage->PEImage.imageSize(), PAGE_EXECUTE_READWRITE, pImage->PEImage.imageBase() );
+    else if (flags & UnlinkVAD)
+    {      
+        ptr_t base = pImage->PEImage.imageBase();
+        ptr_t size = pImage->PEImage.imageSize();
+
+        // Allocate as physical
+        Driver().EnsureLoaded();
+        auto status = Driver().AllocateMem( _process.pid(), base, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
+
+        // Allocate at any base
+        if (!NT_SUCCESS( status ))
+        {
+            size = pImage->PEImage.imageSize();
+            status = Driver().AllocateMem( _process.pid(), base, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
+        }
+
+        // Store allocated region
+        if (NT_SUCCESS( status ))
+        {
+            pImage->imgMem = MemBlock( &_process.memory(), base, static_cast<size_t>(size), PAGE_EXECUTE_READWRITE, true, true );
+        }
+        // Remove flag if failed
+        else
+        {
+            BLACBONE_TRACE( L"ManualMap: Failed to allocate physical memory for image, status 0x%d", status );
+            flags &= ~UnlinkVAD;
+        }
     }
+
+    // Allocate normally if something went wrong
+    if (pImage->imgMem == 0)
+        pImage->imgMem = _process.memory().Allocate( pImage->PEImage.imageSize(), PAGE_EXECUTE_READWRITE, pImage->PEImage.imageBase() );
 
     BLACBONE_TRACE( L"ManualMap: Image base allocated at 0x%p", pImage->imgMem.ptr<size_t>() );
 
@@ -468,7 +550,7 @@ const ModuleData* MMap::FindOrMapDependency( ImageContext* pImage, std::wstring&
 
     // Loading method
     if (pImage->flags & ManualImports)
-        return FindOrMapModule( path, newFlags );
+        return FindOrMapModule( path, nullptr, 0, false, newFlags );
     else
         return _process.modules().Inject( path );
 };
@@ -914,15 +996,12 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
 /// </summary>
 /// <param name="imageMem">Image to purge</param>
 /// <returns>bool on success</returns>
-NTSTATUS MMap::HideVad( const MemBlock& /*imageMem*/ )
+NTSTATUS MMap::HideVad( const MemBlock& imageMem)
 {
     NTSTATUS status = Driver().EnsureLoaded();
 
     if (NT_SUCCESS( status ))
-    {
-        // Not implemented yet
-        status = STATUS_NOT_IMPLEMENTED;
-    }
+        status = Driver().HideVAD( _process.pid(), imageMem.ptr(), static_cast<uint32_t>(imageMem.size()) );
 
     return status;
 }

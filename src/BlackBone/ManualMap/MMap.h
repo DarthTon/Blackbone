@@ -78,11 +78,29 @@ public:
     /// </summary>
     /// <param name="path">Image path</param>
     /// <param name="flags">Image mapping flags</param>
-    /// <returns>Mapped image info</returns>
-    BLACKBONE_API const ModuleData* MapImage( const std::wstring& path, 
+    /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
+    /// <param name="ldrContext">User-supplied Loader callback context</param>
+    /// <returns>Mapped image info </returns>
+    BLACKBONE_API const ModuleData* MapImage( const std::wstring& path,
                                               eLoadFlags flags = NoFlags,
                                               LdrCallback ldrCallback = nullptr,
                                               void* ldrContext = nullptr);
+
+    /// <summary>
+    ///Manually map PE image into underlying target process
+    /// </summary>
+    /// <param name="buffer">Image data buffer</param>
+    /// <param name="size">Buffer size.</param>
+    /// <param name="asImage">If set to true - buffer has image memory layout</param>
+    /// <param name="flags">Image mapping flags</param>
+    /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
+    /// <param name="ldrContext">User-supplied Loader callback context</param>
+    /// <returns>Mapped image info</returns>
+    BLACKBONE_API const ModuleData* MapImage( void* buffer, size_t size, 
+                                              bool asImage = false,
+                                              eLoadFlags flags = NoFlags,
+                                              LdrCallback ldrCallback = nullptr,
+                                              void* ldrContext = nullptr );
 
     /// <summary>
     /// Unmap all manually mapped modules
@@ -97,13 +115,22 @@ public:
 
 private:
 
+    const ModuleData* MapImage( const std::wstring& path,
+                                void* buffer, size_t size,
+                                bool asImage = false,
+                                eLoadFlags flags = NoFlags,
+                                LdrCallback ldrCallback = nullptr,
+                                void* ldrContext = nullptr );
+
     /// <summary>
     /// Get existing module or map it if absent
     /// </summary>
     /// <param name="path">Image path</param>
     /// <param name="flags">Mapping flags</param>
     /// <returns>Module info</returns>
-    const ModuleData* FindOrMapModule( const std::wstring& path, eLoadFlags flags = NoFlags);
+    const ModuleData* FindOrMapModule( const std::wstring& path, 
+                                       void* buffer, size_t size, bool asImage, 
+                                       eLoadFlags flags = NoFlags );
 
     /// <summary>
     /// Run module initializers(TLS and entry point).

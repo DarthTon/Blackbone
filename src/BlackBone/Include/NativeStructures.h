@@ -7,7 +7,6 @@
 
 namespace blackbone
 {
-
     enum MEMORY_INFORMATION_CLASS
     {
         MemoryBasicInformation = 0,
@@ -15,6 +14,12 @@ namespace blackbone
         MemorySectionName,
         MemoryBasicVlmInformation,
         MemoryWorkingSetExList
+    };
+
+    enum SECTION_INFORMATION_CLASS
+    {
+        SectionBasicInformation,
+        SectionImageInformation
     };
 
 // nonstandard extension used : nameless struct/union
@@ -282,6 +287,14 @@ namespace blackbone
         ULONG	 Reserved1;
         T	     uUniqueProcessId;
         T	     uInheritedFromUniqueProcessId;
+    };
+
+    template<typename T>
+    struct _SECTION_BASIC_INFORMATION_T 
+    {
+        T             Base;
+        ULONG         Attributes;
+        LARGE_INTEGER Size;
     };
 
     template<typename T>
@@ -618,6 +631,10 @@ namespace blackbone
     typedef _CONTEXT_T<DWORD>     _CONTEXT32;
     typedef _CONTEXT_T<DWORD64>   _CONTEXT64;
     typedef _CONTEXT_T<DWORD_PTR>  CONTEXT_T;
+
+    typedef _SECTION_BASIC_INFORMATION_T<DWORD>     _SECTION_BASIC_INFORMATION32;
+    typedef _SECTION_BASIC_INFORMATION_T<DWORD64>   _SECTION_BASIC_INFORMATION64;
+    typedef _SECTION_BASIC_INFORMATION_T<DWORD_PTR>  SECTION_BASIC_INFORMATION_T;
 
 #ifdef USE64
     typedef _PEB64 PEB_T;

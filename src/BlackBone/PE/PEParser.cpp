@@ -33,10 +33,7 @@ bool PEParser::Parse( const void* pFileBase, bool isPlainData /*= false*/ )
     const IMAGE_SECTION_HEADER *pSection = nullptr;
 
     if (!pFileBase)
-    {
-        //SetLastError(err::pe::NoFile);
         return false;
-    }
 
     _isPlainData = isPlainData;
 
@@ -46,10 +43,7 @@ bool PEParser::Parse( const void* pFileBase, bool isPlainData /*= false*/ )
 
     // File not a valid PE file
     if (pDosHdr->e_magic != IMAGE_DOS_SIGNATURE)
-    {
-        //SetLastError(err::pe::NoSignature);
         return false;
-    }
 
     // Get image header
     _pImageHdr32 = reinterpret_cast<PCHDR32>(reinterpret_cast<const uint8_t*>(pDosHdr) + pDosHdr->e_lfanew);
@@ -57,10 +51,7 @@ bool PEParser::Parse( const void* pFileBase, bool isPlainData /*= false*/ )
 
     // File not a valid PE file
     if (_pImageHdr32->Signature != IMAGE_NT_SIGNATURE)
-    {
-        //SetLastError(err::pe::NoSignature);
         return false;
-    }
 
     // Detect x64 image
     if (_pImageHdr32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
@@ -92,13 +83,10 @@ bool PEParser::Parse( const void* pFileBase, bool isPlainData /*= false*/ )
     // Pure IL image
     auto pCorHdr = reinterpret_cast<PIMAGE_COR20_HEADER>(DirectoryAddress( IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR ));
 
-    if (pCorHdr != nullptr && (pCorHdr->Flags & COMIMAGE_FLAGS_ILONLY))
-        _isPureIL = true;
-    else
-        _isPureIL = false;
+    _isPureIL = (pCorHdr && (pCorHdr->Flags & COMIMAGE_FLAGS_ILONLY)) ? true : false;
 
     // Sections
-    for (int i = 0; i < _pImageHdr32->FileHeader.NumberOfSections; ++i, pSection++)
+    for (int i = 0; i < _pImageHdr32->FileHeader.NumberOfSections; ++i, ++pSection)
         _sections.push_back( *pSection );
 
     return true;

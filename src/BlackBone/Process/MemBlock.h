@@ -58,7 +58,9 @@ public:
     /// <param name="size">Block size</param>
     /// <param name="prot">Memory protection</param>
     /// <param name="own">true if caller will be responsible for block deallocation</param>
-    BLACKBONE_API MemBlock( class ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own = true );
+    BLACKBONE_API MemBlock( class ProcessMemory* mem, ptr_t ptr, 
+                            size_t size, DWORD prot, bool own = true, 
+                            bool physical = false );
 
     BLACKBONE_API ~MemBlock();
 
@@ -153,7 +155,7 @@ public:
     /// <summary>
     /// Memory will not be deallocated upon object destruction
     /// </summary>
-    BLACKBONE_API inline void Release() const  { _own = false; }
+    BLACKBONE_API inline void Release() { _own = false; }
 
     /// <summary>
     /// Get memory pointer
@@ -194,16 +196,17 @@ public:
         _own = true;
 
         // Transfer memory ownership
-        other.Release();
+        const_cast<MemBlock&>(other).Release();
 
         return *this;
     }
 
 private:
-    ptr_t        _ptr = 0;          // Raw memory pointer
-    size_t       _size = 0;         // Region size
-    DWORD        _protection = 0;   // Region protection
-    mutable bool _own = true;       // Memory will be freed in destructor
+    ptr_t  _ptr = 0;                // Raw memory pointer
+    size_t _size = 0;               // Region size
+    DWORD  _protection = 0;         // Region protection
+    bool   _own = true;             // Memory will be freed in destructor
+    bool   _physical = false;       // Memory allocated as direct physical
     class ProcessMemory* _memory;   // Target process routines
 };
 

@@ -189,6 +189,26 @@ typedef NTSTATUS( NTAPI* fnNtUnloadDriver )
         IN PUNICODE_STRING path
     );
 
+// NtQuerySection
+typedef DWORD( NTAPI* fnNtQuerySection )
+    (
+        HANDLE hSection,
+        SECTION_INFORMATION_CLASS InfoClass, 
+        PVOID Buffer, 
+        ULONG BufferSize, 
+        PULONG ReturnLength
+    );
+
+// RtlCreateActivationContext
+typedef NTSTATUS( NTAPI *fnRtlCreateActivationContext )
+    (
+        IN ULONG    Flags,
+        IN PACTCTXW ActivationContextData,
+        IN ULONG    ExtraBytes,
+        IN PVOID    NotificationRoutine,
+        IN PVOID    NotificationContext,
+        OUT PVOID*  ActCtx
+    );
 
 // RtlInitUnicodeString
 typedef decltype(&RtlInitUnicodeString) fnRtlInitUnicodeString;

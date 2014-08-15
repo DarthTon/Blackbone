@@ -19,12 +19,15 @@ MemBlock::MemBlock()
 /// <param name="size">Block size</param>
 /// <param name="prot">Memory protection</param>
 /// <param name="own">true if caller will be responsible for block deallocation</param>
-MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own /*= true*/ )
+MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, 
+                    size_t size, DWORD prot, bool own /*= true*/,
+                    bool physical /*= false*/)
     : _ptr( ptr )
     , _memory( mem )
     , _size( size )
     , _protection( prot )
     , _own( own )
+    , _physical( physical )
 {
 }
 
@@ -121,22 +124,29 @@ ptr_t MemBlock::Realloc( size_t size, ptr_t desired /*= 0*/, DWORD protection /*
 /// <returns>Status</returns>
 NTSTATUS MemBlock::Protect( DWORD protection, size_t offset /*= 0*/, size_t size /*= 0*/, DWORD* pOld /*= nullptr */ )
 {
+    auto prot = CastProtection( protection, _memory->core().DEP() );
+
     if (size == 0)
         size = _size;
 
-    return _memory->Protect( _ptr + offset, size, CastProtection( protection, _memory->core().DEP() ), pOld );
+    return _physical ? Driver().ProtectMem( _memory->core().pid(), _ptr + offset, size, prot ) : 
+                       _memory->Protect( _ptr + offset, size, prot, pOld );
 }
 
 /// <summary>
 /// Free memory
 /// </summary>
 /// <param name="size">Size of memory chunk to free. If 0 - whole block is freed</param>
-NTSTATUS MemBlock::Free( size_t size /*=0 */ )
+NTSTATUS MemBlock::Free( size_t size /*= 0*/ )
 {
     if (_ptr != 0)
     {
         size = Align( size, 0x1000 );
-        if (_memory->Free( _ptr, size ) != STATUS_SUCCESS)
+
+        NTSTATUS status = _physical ? Driver().FreeMem( _memory->core().pid(), _ptr, size, MEM_RELEASE ) : 
+                                      _memory->Free( _ptr, size );
+
+        if (!NT_SUCCESS( status ))
             return LastNtStatus();
 
         if(size == 0)

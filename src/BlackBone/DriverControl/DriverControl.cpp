@@ -448,6 +448,27 @@ NTSTATUS DriverControl::ProtectMem( DWORD pid, ptr_t base, ptr_t size, DWORD pro
     return STATUS_SUCCESS;
 }
 
+
+NTSTATUS DriverControl::HideVAD( DWORD pid, ptr_t base, uint32_t size )
+{
+    DWORD bytes = 0;
+    HIDE_VAD hideVAD = { 0 };
+
+    hideVAD.base = base;
+    hideVAD.size = size;
+    hideVAD.pid = pid;
+
+    // Not loaded
+    if (_hDriver == INVALID_HANDLE_VALUE)
+        return STATUS_DEVICE_DOES_NOT_EXIST;
+
+    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_HIDE_VAD, &hideVAD, sizeof( hideVAD ), nullptr, 0, &bytes, NULL ))
+        return LastNtStatus();
+
+    return STATUS_SUCCESS;
+}
+
+
 /// <summary>
 /// Load arbitrary driver
 /// </summary>

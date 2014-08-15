@@ -175,6 +175,8 @@ public:
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS UnmapMemoryRegion( DWORD pid, ptr_t base, uint32_t size );
 
+    BLACKBONE_API NTSTATUS HideVAD( DWORD pid, ptr_t base, uint32_t size );
+
 private:
     DriverControl( const DriverControl& ) = delete;
     DriverControl& operator = (const DriverControl&) = delete;
