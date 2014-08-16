@@ -177,6 +177,24 @@
 */
 #define IOCTL_BLACKBONE_UNMAP_REGION  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x809, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
+/*
+    Unlink target VAD from process VAD tree
+
+    Input:
+       HIDE_VAD
+
+    Input size: 
+        sizeof(HIDE_VAD)
+
+    Output:
+        NULL
+
+    Output size:
+        0
+*/
+#define IOCTL_BLACKBONE_HIDE_VAD  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80A, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+
 
 /// <summary>
 /// Input for IOCTL_BLACKBONE_DISABLE_DEP
@@ -325,3 +343,14 @@ typedef struct _UNMAP_MEMORY_REGION
     ULONG     pid;              // Target process ID
     ULONG     size;             // Region size
 } UNMAP_MEMORY_REGION, *PUNMAP_MEMORY_REGION;
+
+
+/// <summary>
+/// Input for IOCTL_BLACKBONE_HIDE_VAD
+/// </summary>
+typedef struct _HIDE_VAD
+{
+    ULONGLONG base;             // Region base address
+    ULONGLONG size;             // Region size
+    ULONG pid;                  // Target process ID
+} HIDE_VAD, *PHIDE_VAD;
