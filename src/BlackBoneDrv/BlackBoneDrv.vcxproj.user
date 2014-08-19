@@ -25,10 +25,14 @@
     <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
     <TestCertificate>
     </TestCertificate>
+    <SignMode>TestSign</SignMode>
+    <ProductionCertificate>
+    </ProductionCertificate>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'">
     <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
-    <SignMode>TestSign</SignMode>
+    <SignMode>ProductionSign</SignMode>
+    <ProductionCertificate>C:\DarkSoft.pfx</ProductionCertificate>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
     <SignMode>TestSign</SignMode>

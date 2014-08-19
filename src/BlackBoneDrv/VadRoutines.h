@@ -17,7 +17,7 @@ NTSTATUS BBProtectVAD( IN PEPROCESS pProcess, IN ULONG_PTR address, IN ULONG pro
 /// <param name="pProcess">Target process object</param>
 /// <param name="address">Target address</param>
 /// <returns>Status code</returns>
-NTSTATUS BBHideVAD( IN PEPROCESS pProcess, IN ULONG_PTR address );
+NTSTATUS BBUnlinkVAD( IN PEPROCESS pProcess, IN ULONG_PTR address );
 
 /// <summary>
 /// Get region VAD type

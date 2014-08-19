@@ -161,8 +161,6 @@ typedef struct _POOL_HEADER // Size=16
 } POOL_HEADER, *PPOOL_HEADER;
 #pragma pack(pop)
 
-PVOID NTAPI RtlAvlRemoveNode( PRTL_AVL_TREE pTree, PMMADDRESS_NODE pNode );
-
 #pragma warning(default : 4214 4201)
 
 #define GET_VAD_ROOT(Table) Table->BalancedRoot

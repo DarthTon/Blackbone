@@ -199,6 +199,60 @@ typedef struct _SYSTEM_CALL_COUNT_INFORMATION
     ULONG limits[2];
  } SYSTEM_CALL_COUNT_INFORMATION, *PSYSTEM_CALL_COUNT_INFORMATION;
 
+typedef struct _SYSTEM_THREAD_INFORMATION
+{
+    LARGE_INTEGER KernelTime;
+    LARGE_INTEGER UserTime;
+    LARGE_INTEGER CreateTime;
+    ULONG WaitTime;
+    PVOID StartAddress;
+    CLIENT_ID ClientId;
+    KPRIORITY Priority;
+    LONG BasePriority;
+    ULONG ContextSwitches;
+    ULONG ThreadState;
+    KWAIT_REASON WaitReason;
+}SYSTEM_THREAD_INFORMATION, *PSYSTEM_THREAD_INFORMATION;
+
+typedef struct _SYSTEM_PROCESS_INFO
+{
+    ULONG NextEntryOffset;
+    ULONG NumberOfThreads;
+    LARGE_INTEGER WorkingSetPrivateSize;
+    ULONG HardFaultCount;
+    ULONG NumberOfThreadsHighWatermark;
+    ULONGLONG CycleTime;
+    LARGE_INTEGER CreateTime;
+    LARGE_INTEGER UserTime;
+    LARGE_INTEGER KernelTime;
+    UNICODE_STRING ImageName;
+    KPRIORITY BasePriority;
+    HANDLE UniqueProcessId;
+    HANDLE InheritedFromUniqueProcessId;
+    ULONG HandleCount;
+    ULONG SessionId;
+    ULONG_PTR UniqueProcessKey;
+    SIZE_T PeakVirtualSize;
+    SIZE_T VirtualSize;
+    ULONG PageFaultCount;
+    SIZE_T PeakWorkingSetSize;
+    SIZE_T WorkingSetSize;
+    SIZE_T QuotaPeakPagedPoolUsage;
+    SIZE_T QuotaPagedPoolUsage;
+    SIZE_T QuotaPeakNonPagedPoolUsage;
+    SIZE_T QuotaNonPagedPoolUsage;
+    SIZE_T PagefileUsage;
+    SIZE_T PeakPagefileUsage;
+    SIZE_T PrivatePageCount;
+    LARGE_INTEGER ReadOperationCount;
+    LARGE_INTEGER WriteOperationCount;
+    LARGE_INTEGER OtherOperationCount;
+    LARGE_INTEGER ReadTransferCount;
+    LARGE_INTEGER WriteTransferCount;
+    LARGE_INTEGER OtherTransferCount;
+    SYSTEM_THREAD_INFORMATION Threads[1];
+}SYSTEM_PROCESS_INFO, *PSYSTEM_PROCESS_INFO;
+
 #pragma warning(disable : 4214)
 typedef struct _MMPTE_HARDWARE64
 {
@@ -220,6 +274,50 @@ typedef struct _MMPTE_HARDWARE64
     ULONGLONG NoExecute : 1;
 } MMPTE_HARDWARE64, *PMMPTE_HARDWARE64;
 #pragma warning(default : 4214)
+
+typedef struct _NT_PROC_THREAD_ATTRIBUTE_ENTRY
+{
+    ULONG Attribute;    // PROC_THREAD_ATTRIBUTE_XXX
+    SIZE_T Size;
+    ULONG_PTR Value;
+    ULONG Unknown;
+} NT_PROC_THREAD_ATTRIBUTE_ENTRY, *NT_PPROC_THREAD_ATTRIBUTE_ENTRY;
+
+typedef struct _NT_PROC_THREAD_ATTRIBUTE_LIST
+{
+    ULONG Length;
+    NT_PROC_THREAD_ATTRIBUTE_ENTRY Entry[1];
+} NT_PROC_THREAD_ATTRIBUTE_LIST, *PNT_PROC_THREAD_ATTRIBUTE_LIST;
+
+
+//
+// PE related
+//
+
+#define IMAGE_DOS_SIGNATURE                 0x5A4D      // MZ
+#define IMAGE_NT_SIGNATURE                  0x00004550  // PE00
+
+#define IMAGE_NT_OPTIONAL_HDR32_MAGIC       0x10b
+#define IMAGE_NT_OPTIONAL_HDR64_MAGIC       0x20b
+
+#define IMAGE_NUMBEROF_DIRECTORY_ENTRIES    16
+
+#define IMAGE_DIRECTORY_ENTRY_EXPORT          0   // Export Directory
+#define IMAGE_DIRECTORY_ENTRY_IMPORT          1   // Import Directory
+#define IMAGE_DIRECTORY_ENTRY_RESOURCE        2   // Resource Directory
+#define IMAGE_DIRECTORY_ENTRY_EXCEPTION       3   // Exception Directory
+#define IMAGE_DIRECTORY_ENTRY_SECURITY        4   // Security Directory
+#define IMAGE_DIRECTORY_ENTRY_BASERELOC       5   // Base Relocation Table
+#define IMAGE_DIRECTORY_ENTRY_DEBUG           6   // Debug Directory
+//      IMAGE_DIRECTORY_ENTRY_COPYRIGHT       7   // (X86 usage)
+#define IMAGE_DIRECTORY_ENTRY_ARCHITECTURE    7   // Architecture Specific Data
+#define IMAGE_DIRECTORY_ENTRY_GLOBALPTR       8   // RVA of GP
+#define IMAGE_DIRECTORY_ENTRY_TLS             9   // TLS Directory
+#define IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG    10   // Load Configuration Directory
+#define IMAGE_DIRECTORY_ENTRY_BOUND_IMPORT   11   // Bound Import Directory in headers
+#define IMAGE_DIRECTORY_ENTRY_IAT            12   // Import Address Table
+#define IMAGE_DIRECTORY_ENTRY_DELAY_IMPORT   13   // Delay Load Import Descriptors
+#define IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR 14   // COM Runtime descriptor
 
 typedef struct _IMAGE_DOS_HEADER
 {
@@ -310,15 +408,81 @@ typedef struct _IMAGE_OPTIONAL_HEADER64
     ULONGLONG SizeOfHeapCommit;
     ULONG LoaderFlags;
     ULONG NumberOfRvaAndSizes;
-    struct _IMAGE_DATA_DIRECTORY DataDirectory[16];
+    struct _IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
 } IMAGE_OPTIONAL_HEADER64, *PIMAGE_OPTIONAL_HEADER64;
+
+typedef struct _IMAGE_OPTIONAL_HEADER32 
+{
+    //
+    // Standard fields.
+    //
+
+    USHORT  Magic;
+    UCHAR   MajorLinkerVersion;
+    UCHAR   MinorLinkerVersion;
+    ULONG   SizeOfCode;
+    ULONG   SizeOfInitializedData;
+    ULONG   SizeOfUninitializedData;
+    ULONG   AddressOfEntryPoint;
+    ULONG   BaseOfCode;
+    ULONG   BaseOfData;
+
+    //
+    // NT additional fields.
+    //
+
+    ULONG   ImageBase;
+    ULONG   SectionAlignment;
+    ULONG   FileAlignment;
+    USHORT  MajorOperatingSystemVersion;
+    USHORT  MinorOperatingSystemVersion;
+    USHORT  MajorImageVersion;
+    USHORT  MinorImageVersion;
+    USHORT  MajorSubsystemVersion;
+    USHORT  MinorSubsystemVersion;
+    ULONG   Win32VersionValue;
+    ULONG   SizeOfImage;
+    ULONG   SizeOfHeaders;
+    ULONG   CheckSum;
+    USHORT  Subsystem;
+    USHORT  DllCharacteristics;
+    ULONG   SizeOfStackReserve;
+    ULONG   SizeOfStackCommit;
+    ULONG   SizeOfHeapReserve;
+    ULONG   SizeOfHeapCommit;
+    ULONG   LoaderFlags;
+    ULONG   NumberOfRvaAndSizes;
+    IMAGE_DATA_DIRECTORY DataDirectory[IMAGE_NUMBEROF_DIRECTORY_ENTRIES];
+} IMAGE_OPTIONAL_HEADER32, *PIMAGE_OPTIONAL_HEADER32;
 
 typedef struct _IMAGE_NT_HEADERS64
 {
     ULONG Signature;
     struct _IMAGE_FILE_HEADER FileHeader;
     struct _IMAGE_OPTIONAL_HEADER64 OptionalHeader;
+} IMAGE_NT_HEADERS64, *PIMAGE_NT_HEADERS64;
+
+typedef struct _IMAGE_NT_HEADERS 
+{
+    ULONG Signature;
+    IMAGE_FILE_HEADER FileHeader;
+    IMAGE_OPTIONAL_HEADER32 OptionalHeader;
 };
+
+typedef struct _IMAGE_EXPORT_DIRECTORY {
+    ULONG   Characteristics;
+    ULONG   TimeDateStamp;
+    USHORT  MajorVersion;
+    USHORT  MinorVersion;
+    ULONG   Name;
+    ULONG   Base;
+    ULONG   NumberOfFunctions;
+    ULONG   NumberOfNames;
+    ULONG   AddressOfFunctions;     // RVA from base of image
+    ULONG   AddressOfNames;         // RVA from base of image
+    ULONG   AddressOfNameOrdinals;  // RVA from base of image
+} IMAGE_EXPORT_DIRECTORY, *PIMAGE_EXPORT_DIRECTORY;
+
 
 typedef struct _RTL_PROCESS_MODULE_INFORMATION
 {
@@ -370,3 +534,92 @@ typedef struct _MEMORY_WORKING_SET_EX_INFORMATION
 
 #pragma warning(default : 4214)
 
+
+
+typedef struct _PEB_LDR_DATA 
+{
+    ULONG Length;
+    UCHAR Initialized;
+    PVOID SsHandle;
+    LIST_ENTRY InLoadOrderModuleList;
+    LIST_ENTRY InMemoryOrderModuleList;
+    LIST_ENTRY InInitializationOrderModuleList;
+} PEB_LDR_DATA, *PPEB_LDR_DATA;
+
+typedef struct _LDR_DATA_TABLE_ENTRY 
+{
+    LIST_ENTRY InLoadOrderLinks;
+    LIST_ENTRY InMemoryOrderLinks;
+    LIST_ENTRY InInitializationOrderLinks;
+    PVOID DllBase;
+    PVOID EntryPoint;
+    ULONG SizeOfImage;
+    UNICODE_STRING FullDllName;
+    UNICODE_STRING BaseDllName;
+    ULONG Flags;
+    USHORT LoadCount;
+    USHORT TlsIndex;
+    LIST_ENTRY HashLinks;
+    ULONG TimeDateStamp;
+} LDR_DATA_TABLE_ENTRY, *PLDR_DATA_TABLE_ENTRY;
+
+
+typedef struct _PEB 
+{
+    UCHAR Reserved1[2];
+    UCHAR BeingDebugged;
+    UCHAR Reserved2[1];
+    PVOID Reserved3[2];
+    PPEB_LDR_DATA Ldr;
+    PVOID ProcessParameters;
+} PEB, *PPEB;
+
+typedef struct _PEB_LDR_DATA32
+{
+    ULONG Length;
+    UCHAR Initialized;
+    ULONG SsHandle;
+    LIST_ENTRY32 InLoadOrderModuleList;
+    LIST_ENTRY32 InMemoryOrderModuleList;
+    LIST_ENTRY32 InInitializationOrderModuleList;
+} PEB_LDR_DATA32, *PPEB_LDR_DATA32;
+
+typedef struct _LDR_DATA_TABLE_ENTRY32
+{
+    LIST_ENTRY32 InLoadOrderLinks;
+    LIST_ENTRY32 InMemoryOrderLinks;
+    LIST_ENTRY32 InInitializationOrderLinks;
+    ULONG DllBase;
+    ULONG EntryPoint;
+    ULONG SizeOfImage;
+    UNICODE_STRING32 FullDllName;
+    UNICODE_STRING32 BaseDllName;
+    ULONG Flags;
+    USHORT LoadCount;
+    USHORT TlsIndex;
+    LIST_ENTRY32 HashLinks;
+    ULONG TimeDateStamp;
+} LDR_DATA_TABLE_ENTRY32, *PLDR_DATA_TABLE_ENTRY32;
+
+typedef struct _PEB32
+{
+    UCHAR Reserved1[2];
+    UCHAR BeingDebugged;
+    UCHAR Reserved2[1];
+    ULONG Mutant;
+    ULONG ImageBaseAddress;
+    ULONG Ldr;
+    ULONG ProcessParameters;
+} PEB32, *PPEB32;
+
+typedef union _WOW64_APC_CONTEXT 
+{
+    struct 
+    {
+        ULONG Apc32BitContext;
+        ULONG Apc32BitRoutine;
+    };
+
+    PVOID Apc64BitContext;
+
+} WOW64_APC_CONTEXT, *PWOW64_APC_CONTEXT;

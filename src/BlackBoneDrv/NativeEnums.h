@@ -190,6 +190,14 @@ typedef enum _SYSTEM_INFORMATION_CLASS
     MaxSystemInfoClass = 0x9c,
 } SYSTEM_INFORMATION_CLASS;
 
+typedef enum _KAPC_ENVIRONMENT
+{
+    OriginalApcEnvironment,
+    AttachedApcEnvironment,
+    CurrentApcEnvironment,
+    InsertApcEnvironment
+} KAPC_ENVIRONMENT, *PKAPC_ENVIRONMENT;
+
 typedef enum _MI_VAD_TYPE 
 {
     VadNone,

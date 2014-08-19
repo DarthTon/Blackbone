@@ -74,6 +74,21 @@ NTSTATUS BBCopyMemory( IN PCOPY_MEMORY pCopy );
 NTSTATUS BBProtectMemory( IN PPROTECT_MEMORY pProtect );
 
 /// <summary>
+/// Hide VAD containing target address
+/// </summary>
+/// <param name="pData">Address info</param>
+/// <returns>Status code</returns>
+NTSTATUS BBHideVAD( IN PHIDE_VAD pData );
+
+/// <summary>
+/// Inject dll into process
+/// </summary>
+/// <param name="pid">Target PID</param>
+/// <param name="pPath">TFull-qualified dll path</param>
+/// <returns>Status code</returns>
+NTSTATUS BBInjectDll( IN PINJECT_DLL pData );
+
+/// <summary>
 /// Process termination handler
 /// </summary>
 /// <param name="ParentId">Parent PID</param>

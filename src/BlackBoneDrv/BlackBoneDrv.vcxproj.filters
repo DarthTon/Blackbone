@@ -9,6 +9,7 @@
     <ClCompile Include="BlackBoneDrv.c" />
     <ClCompile Include="Routines.c" />
     <ClCompile Include="NotifyRoutine.c" />
+    <ClCompile Include="Inject.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Remap.h">
@@ -46,6 +47,9 @@
     </ClInclude>
     <ClInclude Include="Routines.h">
       <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Imports.h">
+      <Filter>Include\Native</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

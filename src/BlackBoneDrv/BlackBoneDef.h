@@ -194,6 +194,22 @@
 */
 #define IOCTL_BLACKBONE_HIDE_VAD  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80A, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
+/*
+    Inject dll into arbitrary process
+
+    Input:
+       INJECT_DLL
+
+    Input size: 
+        sizeof(INJECT_DLL)
+
+    Output:
+        NULL
+
+    Output size:
+        0
+*/
+#define IOCTL_BLACKBONE_INJECT_DLL  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80B, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
 
 /// <summary>
@@ -354,3 +370,20 @@ typedef struct _HIDE_VAD
     ULONGLONG size;             // Region size
     ULONG pid;                  // Target process ID
 } HIDE_VAD, *PHIDE_VAD;
+
+typedef enum _InjectType
+{
+    IT_Thread,      // CreateThread into LdrLoadDll
+    IT_Apc,         // Force user APC into LdrLoadDll
+} InjectType;
+
+/// <summary>
+/// Input for IOCTL_BLACKBONE_INJECT_DLL
+/// </summary>
+typedef struct _INJECT_DLL
+{
+    wchar_t    FullDllPath[512];    // Fully-qualified path to the target dll
+    ULONG      pid;                 // Target process ID
+    BOOLEAN    wait;                // Wait on injection thread
+    InjectType type;                // Type of injection
+} INJECT_DLL, *PINJECT_DLL;

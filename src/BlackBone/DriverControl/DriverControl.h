@@ -177,6 +177,8 @@ public:
 
     BLACKBONE_API NTSTATUS HideVAD( DWORD pid, ptr_t base, uint32_t size );
 
+    BLACKBONE_API NTSTATUS InjectDll( DWORD pid, const std::wstring& path, InjectType itype, bool wait = true );
+
 private:
     DriverControl( const DriverControl& ) = delete;
     DriverControl& operator = (const DriverControl&) = delete;

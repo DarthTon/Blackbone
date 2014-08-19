@@ -240,7 +240,7 @@ NTSTATUS BBBuildProcessRegionListForRange( IN PLIST_ENTRY pList, IN ULONG_PTR st
             {
                 DPRINT( "BlackBone: %s: Failed to allocate memory for Remap descriptor\n", __FUNCTION__ );
                 BBCleanupPageList( FALSE, pList );
-                return STATUS_MEMORY_NOT_ALLOCATED;
+                return STATUS_NO_MEMORY;
             }
 
             pEntry->originalPtr = (ULONG_PTR)mbi.BaseAddress;
@@ -311,6 +311,8 @@ NTSTATUS BBConsolidateRegionList( IN PLIST_ENTRY pList )
 NTSTATUS BBUnmapRegionEntry( IN PMAP_ENTRY pPageEntry, IN PPROCESS_MAP_ENTRY pFoundEntry )
 {
     NTSTATUS status = STATUS_SUCCESS;
+
+    UNREFERENCED_PARAMETER( pFoundEntry );
 
     // MDL is valid
     if (pPageEntry->pMdl)
@@ -451,7 +453,7 @@ NTSTATUS BBPrepareMDLListEntry( IN OUT PMAP_ENTRY pEntry )
     if (pEntry->pMdl == NULL)
     {
         DPRINT( "BlackBone: %s: Failed to allocate MDL for address 0x%p\n", __FUNCTION__, pEntry->originalPtr );
-        return STATUS_MEMORY_NOT_ALLOCATED;
+        return STATUS_NO_MEMORY;
     }
 
     __try

@@ -468,6 +468,27 @@ NTSTATUS DriverControl::HideVAD( DWORD pid, ptr_t base, uint32_t size )
     return STATUS_SUCCESS;
 }
 
+BLACKBONE_API NTSTATUS DriverControl::InjectDll( DWORD pid, const std::wstring& path, InjectType itype, bool wait /*= true */ )
+{
+    DWORD bytes = 0;
+    INJECT_DLL data = { 0 };
+
+    // Not loaded
+    if (_hDriver == INVALID_HANDLE_VALUE)
+        return STATUS_DEVICE_DOES_NOT_EXIST;
+
+    wcscpy_s( data.FullDllPath, path.c_str() );
+    data.pid = pid;
+    data.wait = wait;
+    data.type = itype;
+
+    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_INJECT_DLL, &data, sizeof( data ), nullptr, 0, &bytes, NULL ))
+        return LastNtStatus();
+
+    return STATUS_SUCCESS;
+}
+
+
 
 /// <summary>
 /// Load arbitrary driver
@@ -554,6 +575,7 @@ LSTATUS DriverControl::PrepareDriverRegEntry( const std::wstring& svcName, const
 
     return status;
 }
+
 
 
 }

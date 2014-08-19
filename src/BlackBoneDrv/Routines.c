@@ -325,7 +325,7 @@ NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY
 
         pRegionBase = ExAllocatePoolWithTag( NonPagedPool, pAllocFree->size, BB_POOL_TAG );
         if (!pRegionBase)
-            return STATUS_MEMORY_NOT_ALLOCATED;
+            return STATUS_NO_MEMORY;
 
         // Cleanup buffer before mapping it into UserMode to prevent exposure of kernel data
         RtlZeroMemory( pRegionBase, pAllocFree->size );
@@ -334,7 +334,7 @@ NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY
         if (pMDL == NULL)
         {
             ExFreePoolWithTag( pRegionBase, BB_POOL_TAG );
-            return STATUS_MEMORY_NOT_ALLOCATED;
+            return STATUS_NO_MEMORY;
         }
 
         MmBuildMdlForNonPagedPool( pMDL );
@@ -479,8 +479,27 @@ NTSTATUS BBProtectMemory( IN PPROTECT_MEMORY pProtect )
     return status;
 }
 
+/// <summary>
+/// Hide VAD containing target address
+/// </summary>
+/// <param name="pData">Address info</param>
+/// <returns>Status code</returns>
+NTSTATUS BBHideVAD( IN PHIDE_VAD pData )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    PEPROCESS pProcess = NULL;
 
+    status = PsLookupProcessByProcessId( (HANDLE)pData->pid, &pProcess );
+    if (NT_SUCCESS( status ))
+        status = BBUnlinkVAD( pProcess, pData->base );
+    else
+        DPRINT( "BlackBone: %s: PsLookupProcessByProcessId failed with status 0x%X\n", __FUNCTION__, status );
 
+    if (pProcess)
+        ObDereferenceObject( pProcess );
+
+    return status;
+}
 
 /// <summary>
 /// Find memory allocation process entry

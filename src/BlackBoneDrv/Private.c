@@ -3,6 +3,9 @@
 
 #pragma alloc_text(PAGE, ExpLookupHandleTableEntry)
 #pragma alloc_text(PAGE, GetKernelBase)
+#pragma alloc_text(PAGE, GetModuleBase)
+#pragma alloc_text(PAGE, GetModuleExport)
+#pragma alloc_text(PAGE, IsWow64Process)
 #pragma alloc_text(PAGE, GetSSDTBase)
 #pragma alloc_text(PAGE, GetSSDTEntry)
 #pragma alloc_text(PAGE, GetPTEForVA)
@@ -100,13 +103,183 @@ PVOID GetKernelBase()
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
         DPRINT( "BlackBone: %s: Exception\n", __FUNCTION__ );
-        status = STATUS_UNHANDLED_EXCEPTION;
     }
 
     if (pMods)
         ExFreePoolWithTag( pMods, BB_POOL_TAG );
 
     return g_KernelBase;
+}
+
+/// <summary>
+/// Get module base address by name
+/// </summary>
+/// <param name="pProcess">Target process</param>
+/// <param name="ModuleName">Nodule name to search for</param>
+/// <param name="isWow64">If TRUE - search in 32-bit PEB</param>
+/// <returns>Found address, NULL if not found</returns>
+PVOID GetModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 )
+{
+    ASSERT( pProcess != NULL );
+    if (pProcess == NULL)
+        return NULL;
+
+    __try
+    {
+
+        // Wow64 process
+        if (isWow64)
+        {
+            PPEB32 pPeb32 = NULL;
+            ZwQueryInformationProcess( ZwCurrentProcess(), ProcessWow64Information, &pPeb32, sizeof( pPeb32 ), NULL );
+            if (pPeb32 == NULL)
+                return NULL;
+
+            // Search in InLoadOrderModuleList
+            for (PLIST_ENTRY32 pListEntry = (PLIST_ENTRY32)((PPEB_LDR_DATA32)pPeb32->Ldr)->InLoadOrderModuleList.Flink;
+                  pListEntry != &((PPEB_LDR_DATA32)pPeb32->Ldr)->InLoadOrderModuleList;
+                  pListEntry = (PLIST_ENTRY32)pListEntry->Flink)
+            {
+                UNICODE_STRING ustr;
+                PLDR_DATA_TABLE_ENTRY32 pEntry = CONTAINING_RECORD( pListEntry, LDR_DATA_TABLE_ENTRY32, InLoadOrderLinks );
+
+                RtlUnicodeStringInit( &ustr, (PWCH)pEntry->BaseDllName.Buffer );
+
+                if (RtlCompareUnicodeString( &ustr, ModuleName, TRUE ) == 0)
+                    return (PVOID)pEntry->DllBase;
+            }
+        }
+        // Native process
+        else
+        {
+            PPEB pPeb = PsGetProcessPeb( pProcess );
+            if (!pPeb)
+                return NULL;
+
+            // Search in InLoadOrderModuleList
+            for (PLIST_ENTRY pListEntry = pPeb->Ldr->InLoadOrderModuleList.Flink;
+                  pListEntry != &pPeb->Ldr->InLoadOrderModuleList;
+                  pListEntry = pListEntry->Flink)
+            {
+                PLDR_DATA_TABLE_ENTRY pEntry = CONTAINING_RECORD( pListEntry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks );
+                if (RtlCompareUnicodeString( &pEntry->BaseDllName, ModuleName, TRUE ) == 0)
+                    return pEntry->DllBase;
+            }
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        DPRINT( "BlackBone: %s: Exception\n", __FUNCTION__ );
+    }
+
+    return NULL;
+}
+
+/// <summary>
+/// Get exported function address
+/// </summary>
+/// <param name="pBase">Module base</param>
+/// <param name="name_ord">Function name or ordinal</param>
+/// <returns>Found address, NULL if not found</returns>
+PVOID GetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
+{
+    PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)pBase;
+    PIMAGE_NT_HEADERS32 pNtHdr32 = NULL;
+    PIMAGE_NT_HEADERS64 pNtHdr64 = NULL;
+    PIMAGE_EXPORT_DIRECTORY pExport = NULL;
+    ULONG expSize = 0;
+    ULONG_PTR pAddress = 0;
+
+    ASSERT( pBase != NULL );
+    if (pBase == NULL)
+        return NULL;
+
+    __try
+    {
+        // Not a PE file
+        if (pDosHdr->e_magic != IMAGE_DOS_SIGNATURE)
+            return NULL;
+
+        pNtHdr32 = (PIMAGE_NT_HEADERS32)((PUCHAR)pBase + pDosHdr->e_lfanew);
+        pNtHdr64 = (PIMAGE_NT_HEADERS64)((PUCHAR)pBase + pDosHdr->e_lfanew);
+
+        // Not a PE file
+        if (pNtHdr32->Signature != IMAGE_NT_SIGNATURE)
+            return NULL;
+
+        // 64 bit image
+        if (pNtHdr32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+        {
+            pExport = (PIMAGE_EXPORT_DIRECTORY)(pNtHdr64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress + (ULONG_PTR)pBase);
+            expSize = pNtHdr64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+        }
+        // 32 bit image
+        else
+        {
+            pExport = (PIMAGE_EXPORT_DIRECTORY)(pNtHdr32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress + (ULONG_PTR)pBase);
+            expSize = pNtHdr32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+        }
+
+        PUSHORT pAddressOfOrds  = (PUSHORT)(pExport->AddressOfNameOrdinals + (ULONG_PTR)pBase);
+        PULONG  pAddressOfNames = (PULONG)(pExport->AddressOfNames + (ULONG_PTR)pBase);
+        PULONG  pAddressOfFuncs = (PULONG)(pExport->AddressOfFunctions + (ULONG_PTR)pBase);
+
+        for (ULONG i = 0; i < pExport->NumberOfFunctions; ++i)
+        {
+            USHORT OrdIndex = 0xFFFF;
+            PCHAR  pName = NULL;
+
+            // Find by index
+            if ((ULONG_PTR)name_ord <= 0xFFFF)
+            {
+                OrdIndex = (USHORT)i;
+            }
+            // Find by name
+            else if ((ULONG_PTR)name_ord > 0xFFFF && i < pExport->NumberOfNames)
+            {
+                pName = (PCHAR)(pAddressOfNames[i] + (ULONG_PTR)pBase);
+                OrdIndex = pAddressOfOrds[i];
+            }
+            // Weird params
+            else
+                return NULL;
+
+            if (((ULONG_PTR)name_ord <= 0xFFFF && (USHORT)((ULONG_PTR)name_ord) == OrdIndex + pExport->Base) ||
+                 ((ULONG_PTR)name_ord > 0xFFFF && strcmp( pName, name_ord ) == 0))
+            {
+                pAddress = pAddressOfFuncs[OrdIndex] + (ULONG_PTR)pBase;
+
+                // Check forwarded export
+                if (pAddress >= (ULONG_PTR)pExport && pAddress <= (ULONG_PTR)pExport + expSize)
+                {
+                }
+
+                break;
+            }
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        DPRINT( "BlackBone: %s: Exception\n", __FUNCTION__ );
+    }
+
+    return (PVOID)pAddress;
+}
+
+/// <summary>
+/// Check if process is a WOW64 process
+/// </summary>
+/// <param name="hProcess">Target process handle</param>
+/// <param name="isWow64">Result</param>
+/// <returns>Status code</returns>
+NTSTATUS IsWow64Process( IN HANDLE hProcess, OUT PBOOLEAN isWow64 )
+{
+    PPEB32 pPeb32 = NULL;
+    NTSTATUS status = ZwQueryInformationProcess( hProcess, ProcessWow64Information, &pPeb32, sizeof( pPeb32 ), NULL );
+    if (isWow64)
+        *isWow64 = (pPeb32 != NULL) ? TRUE : FALSE;
+
+    return status;
 }
 
 /// <summary>
@@ -211,7 +384,7 @@ ZwProtectVirtualMemory(
     {
         //
         // If previous mode is UserMode, addresses passed into NtProtectVirtualMemory must be in user-mode space
-        // Switching to KernelMode will allow usage of kernel-mode addresses
+        // Switching to KernelMode allows usage of kernel-mode addresses
         //
         PUCHAR pPrevMode = (PUCHAR)PsGetCurrentThread() + dynData.PrevMode;
         UCHAR prevMode = *pPrevMode;
@@ -226,5 +399,48 @@ ZwProtectVirtualMemory(
 
     return status;
 }
+
+
+NTSTATUS 
+NTAPI 
+ZwCreateThreadEx(
+    OUT PHANDLE hThread,
+    IN ACCESS_MASK DesiredAccess,
+    IN PVOID ObjectAttributes,
+    IN HANDLE ProcessHandle,
+    IN PVOID lpStartAddress,
+    IN PVOID lpParameter,
+    IN ULONG Flags,
+    IN SIZE_T StackZeroBits,
+    IN SIZE_T SizeOfStackCommit,
+    IN SIZE_T SizeOfStackReserve,
+    IN PNT_PROC_THREAD_ATTRIBUTE_LIST AttributeList
+    )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+
+    fnNtCreateThreadEx NtCreateThreadEx = (fnNtCreateThreadEx)GetSSDTEntry( dynData.NtThdIndex );
+    if (NtCreateThreadEx)
+    {
+        //
+        // If previous mode is UserMode, addresses passed into ZwCreateThreadEx must be in user-mode space
+        // Switching to KernelMode allows usage of kernel-mode addresses
+        //
+        PUCHAR pPrevMode = (PUCHAR)PsGetCurrentThread() + dynData.PrevMode;
+        UCHAR prevMode = *pPrevMode;
+        *pPrevMode = KernelMode;
+
+        status = NtCreateThreadEx( hThread, DesiredAccess, ObjectAttributes,
+                                   ProcessHandle, lpStartAddress, lpParameter,
+                                   Flags, StackZeroBits, SizeOfStackCommit,
+                                   SizeOfStackReserve, AttributeList );
+        *pPrevMode = prevMode;
+    }
+    else
+        status = STATUS_NOT_FOUND;
+
+    return status;
+}
+
 #pragma  warning(default: 4055)
 #endif

@@ -191,6 +191,24 @@ NTSTATUS BBDispatch( IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp )
                     }
                     break;
 
+                case IOCTL_BLACKBONE_HIDE_VAD:
+                    {
+                        if (inputBufferLength >= sizeof( HIDE_VAD ) && ioBuffer)
+                            Irp->IoStatus.Status = BBHideVAD( (PHIDE_VAD)ioBuffer );
+                        else
+                            Irp->IoStatus.Status = STATUS_INFO_LENGTH_MISMATCH;
+                    }
+                    break;
+
+                case IOCTL_BLACKBONE_INJECT_DLL:
+                    {
+                        if (inputBufferLength >= sizeof( INJECT_DLL ) && ioBuffer)
+                            Irp->IoStatus.Status = BBInjectDll( (PINJECT_DLL)ioBuffer );
+                        else
+                            Irp->IoStatus.Status = STATUS_INFO_LENGTH_MISMATCH;
+                    }
+                    break;
+
                 default:
                     DPRINT( "BlackBone: %s: Unknown IRP_MJ_DEVICE_CONTROL 0x%X\n", __FUNCTION__, ioControlCode );
                     Irp->IoStatus.Status = STATUS_INVALID_PARAMETER;

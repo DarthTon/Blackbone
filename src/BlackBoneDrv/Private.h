@@ -1,7 +1,6 @@
 #pragma once
 
-#include "NativeEnums.h"
-#include "NativeStructs.h"
+#include "Imports.h"
 #include "VadHelpers.h"
 
 #ifdef DBG
@@ -74,48 +73,42 @@ typedef struct _DYNAMIC_DATA
     ULONG ObjTable;         // Process handle table offset in EPROCESS
     ULONG VadRoot;          // VadRoot offset in EPROCESS
     ULONG NtProtectIndex;   // NtProtectVirtualMemory SSDT index
+    ULONG NtThdIndex;       // NtCreateThreadEx SSDT index
     ULONG PrevMode;         // PreviousMode offset in KTHREAD
+    ULONG ApcState;         // KTHREAD ApcState field
 } DYNAMIC_DATA, *PDYNAMIC_DATA;
 
 
-// ExpLookupHandleTableEntry
-typedef PHANDLE_TABLE_ENTRY( NTAPI* fnExpLookupHandleTableEntry )
+typedef NTSTATUS( NTAPI* fnNtCreateThreadEx )
     (
-        IN PHANDLE_TABLE HandleTable,
-        IN EXHANDLE tHandle
+        OUT PHANDLE hThread,
+        IN ACCESS_MASK DesiredAccess,
+        IN PVOID ObjectAttributes,
+        IN HANDLE ProcessHandle,
+        IN PVOID lpStartAddress,
+        IN PVOID lpParameter,
+        IN ULONG Flags,
+        IN SIZE_T StackZeroBits,
+        IN SIZE_T SizeOfStackCommit,
+        IN SIZE_T SizeOfStackReserve,
+        OUT PVOID lpBytesBuffer
     );
 
-// MiProtectVirtualMemory
-typedef NTSTATUS (NTAPI* fnMiProtectVirtualMemory)
-    (
-        IN PEPROCESS CurrentProcess,
-        IN PEPROCESS TargetProcess,
-        IN PVOID *BaseAddress,
-        IN PSIZE_T RegionSize,
-        IN WIN32_PROTECTION_MASK NewProtectWin32,
-        IN PWIN32_PROTECTION_MASK LastProtect
-    );
 
-NTSYSAPI
-NTSTATUS
-NTAPI
-ZwQuerySystemInformation(
-    IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
-    OUT PVOID SystemInformation,
-    IN ULONG SystemInformationLength,
-    OUT PULONG ReturnLength OPTIONAL 
-    );
-
-NTSYSAPI
-NTSTATUS
-NTAPI
-ZwQueryVirtualMemory(
-    IN HANDLE  ProcessHandle,
-    IN PVOID   BaseAddress,
-    IN MEMORY_INFORMATION_CLASS MemoryInformationClass,
-    OUT PVOID  Buffer,
-    IN ULONG   Length,
-    OUT PULONG ResultLength 
+NTSTATUS 
+NTAPI 
+ZwCreateThreadEx(
+    OUT PHANDLE hThread,
+    IN ACCESS_MASK DesiredAccess,
+    IN PVOID ObjectAttributes,
+    IN HANDLE ProcessHandle,
+    IN PVOID lpStartAddress,
+    IN PVOID lpParameter,
+    IN ULONG Flags,
+    IN SIZE_T StackZeroBits,
+    IN SIZE_T SizeOfStackCommit,
+    IN SIZE_T SizeOfStackReserve,
+    IN PNT_PROC_THREAD_ATTRIBUTE_LIST AttributeList
     );
 
 #if defined(_WIN8_) || defined (_WIN7_)
@@ -139,6 +132,7 @@ ZwProtectVirtualMemory(
     OUT PULONG OldAccessProtection 
     );
 
+
 #else
 NTSYSAPI
 NTSTATUS
@@ -153,49 +147,17 @@ ZwProtectVirtualMemory(
 
 #endif
 
-NTKERNELAPI
-NTSTATUS
-MmCopyVirtualMemory(
-    IN PEPROCESS FromProcess,
-    IN PVOID FromAddress,
-    IN PEPROCESS ToProcess,
-    OUT PVOID ToAddress,
-    IN SIZE_T BufferSize,
-    IN KPROCESSOR_MODE PreviousMode,
-    OUT PSIZE_T NumberOfBytesCopied 
+#ifdef _WIN81_
+
+NTSYSAPI 
+PVOID 
+NTAPI 
+RtlAvlRemoveNode( 
+    IN PRTL_AVL_TREE pTree, 
+    IN PMMADDRESS_NODE pNode 
     );
 
-NTKERNELAPI
-NTSTATUS
-NTAPI
-ObDuplicateObject(
-    IN PEPROCESS SourceProcess,
-    IN HANDLE SourceHandle,
-    IN PEPROCESS TargetProcess OPTIONAL,
-    IN PHANDLE TargetHandle OPTIONAL,
-    IN ACCESS_MASK  DesiredAccess,
-    IN ULONG HandleAttributes,
-    IN ULONG Options,
-    IN KPROCESSOR_MODE PreviousMode 
-    );
-
-NTSTATUS NTAPI NtCreateNamedPipeFile(
-    OUT PHANDLE FileHandle,
-    IN ULONG DesiredAccess,
-    IN POBJECT_ATTRIBUTES ObjectAttributes,
-    OUT PIO_STATUS_BLOCK IoStatusBlock,
-    IN ULONG ShareAccess,
-    IN ULONG CreateDisposition,
-    IN ULONG CreateOptions,
-    IN ULONG NamedPipeType,
-    IN ULONG ReadMode,
-    IN ULONG CompletionMode,
-    IN ULONG MaximumInstances,
-    IN ULONG InboundQuota,
-    IN ULONG OutboundQuota,
-    IN PLARGE_INTEGER DefaultTimeout OPTIONAL 
-    );
-
+#endif
 
 /// <summary>
 /// Lookup handle in the process handle table
@@ -210,6 +172,31 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry( IN PHANDLE_TABLE HandleTable, IN 
 /// </summary>
 /// <returns>Found address, NULL if not found</returns>
 PVOID GetKernelBase();
+
+/// <summary>
+/// Get module base address by name
+/// </summary>
+/// <param name="pProcess">Target process</param>
+/// <param name="ModuleName">Nodule name to search for</param>
+/// <param name="isWow64">If TRUE - search in 32-bit PEB</param>
+/// <returns>Found address, NULL if not found</returns>
+PVOID GetModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 );
+
+/// <summary>
+/// Get exported function address
+/// </summary>
+/// <param name="pBase">Module base</param>
+/// <param name="name_ord">Function name or ordinal</param>
+/// <returns>Found address, NULL if not found</returns>
+PVOID GetModuleExport( IN PVOID pBase, IN PCCHAR name_ord );
+
+/// <summary>
+/// Check if process is a WOW64 process
+/// </summary>
+/// <param name="hProcess">Target process handle</param>
+/// <param name="isWow64">Result</param>
+/// <returns>Status code</returns>
+NTSTATUS IsWow64Process( IN HANDLE hProcess, OUT PBOOLEAN isWow64 );
 
 /// <summary>
 /// Gets SSDT base - KiSystemServiceTable

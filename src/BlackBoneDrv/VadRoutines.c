@@ -1,7 +1,7 @@
 #include "VadRoutines.h"
 
 #pragma alloc_text(PAGE, BBProtectVAD)
-#pragma alloc_text(PAGE, BBHideVAD)
+#pragma alloc_text(PAGE, BBUnlinkVAD)
 #pragma alloc_text(PAGE, BBGetVadType)
 #pragma alloc_text(PAGE, BBFindVAD)
 
@@ -64,21 +64,28 @@ NTSTATUS BBProtectVAD( IN PEPROCESS pProcess, IN ULONG_PTR address, IN ULONG pro
     return status;
 }
 
+#pragma warning(disable : 4055)
+
 /// <summary>
 /// Hide memory from NtQueryVirtualMemory
 /// </summary>
 /// <param name="pProcess">Target process object</param>
 /// <param name="address">Target address</param>
 /// <returns>Status code</returns>
-NTSTATUS BBHideVAD( IN PEPROCESS pProcess, IN ULONG_PTR address )
+NTSTATUS BBUnlinkVAD( IN PEPROCESS pProcess, IN ULONG_PTR address )
 {
-    //NTSTATUS status = STATUS_SUCCESS;
-    UNREFERENCED_PARAMETER( pProcess );
-    UNREFERENCED_PARAMETER( address );
+    return BBProtectVAD( pProcess, address, MM_ZERO_ACCESS );  
 
-    // Not ready yet
-    return STATUS_NOT_IMPLEMENTED;
+    /*
+#ifdef _WIN81_
+    RtlAvlRemoveNode( (PMM_AVL_TABLE)((PUCHAR)pProcess + dynData.VadRoot), (PMMADDRESS_NODE)pVad );
+#else
+    MiRemoveNode( (PMMADDRESS_NODE)pVad, (PMM_AVL_TABLE)((PUCHAR)pProcess + dynData.VadRoot) );
+#endif
+    */
 }
+
+#pragma warning(default : 4055)
 
 /// <summary>
 /// Get region VAD type

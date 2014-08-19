@@ -143,8 +143,7 @@
       <PreprocessorDefinitions>_WIN8_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>copy /y "$(TargetPath)" \\192.168.56.101\c$\$(TargetFileName)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Vista Release|x64'">
@@ -161,8 +160,7 @@
       <PreprocessorDefinitions>_WIN7_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>copy /y "$(TargetPath)" \\192.168.56.101\c$\$(TargetFileName)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'">
@@ -202,6 +200,7 @@
   <ItemGroup>
     <ClCompile Include="BlackBoneDrv.c" />
     <ClCompile Include="Dispatch.c" />
+    <ClCompile Include="Inject.c" />
     <ClCompile Include="NotifyRoutine.c" />
     <ClCompile Include="Private.c" />
     <ClCompile Include="Remap.c" />
@@ -212,6 +211,7 @@
   <ItemGroup>
     <ClInclude Include="BlackBoneDrv.h" />
     <ClInclude Include="BlackBoneDef.h" />
+    <ClInclude Include="Imports.h" />
     <ClInclude Include="NativeStructs.h" />
     <ClInclude Include="NativeStructs7.h" />
     <ClInclude Include="NativeStructs8.h" />
