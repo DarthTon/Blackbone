@@ -158,7 +158,8 @@ std::wstring Utils::GetErrorDescription( NTSTATUS code )
     if (FormatMessageW(
         FORMAT_MESSAGE_ALLOCATE_BUFFER |
         FORMAT_MESSAGE_FROM_SYSTEM |
-        FORMAT_MESSAGE_FROM_HMODULE,
+        FORMAT_MESSAGE_FROM_HMODULE |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
         GetModuleHandleW( L"ntdll.dll" ),
         code, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
         (LPWSTR)&lpMsgBuf, 0, NULL ) != 0)

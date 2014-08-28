@@ -6,7 +6,7 @@
     <RemoteDebuggerCommand>C:\RemoteDbg\$(TargetFileName)</RemoteDebuggerCommand>
     <RemoteDebuggerWorkingDirectory>C:\RemoteDbg\</RemoteDebuggerWorkingDirectory>
     <DeploymentDirectory>C:\RemoteDbg\</DeploymentDirectory>
-    <RemoteDebuggerServerName>192.168.56.102</RemoteDebuggerServerName>
+    <RemoteDebuggerServerName>192.168.56.101</RemoteDebuggerServerName>
     <LocalDebuggerWorkingDirectory>$(TargetDir)</LocalDebuggerWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|x64'">

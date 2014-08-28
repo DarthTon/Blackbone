@@ -61,6 +61,7 @@ void* FileProjection::Project( const std::wstring& path )
 
         if (_hMapping && _hMapping != INVALID_HANDLE_VALUE)
         {
+            _plainData = false;
             _pData = MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 );
 
             SECTION_BASIC_INFORMATION_T SectionInfo = { 0 };

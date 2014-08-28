@@ -48,8 +48,15 @@ public:
     /// <summary>
     /// Checks if process still exists
     /// </summary>
-    /// <returns></returns>
+    /// <returns>true if process is valid and exists</returns>
     BLACKBONE_API bool valid();
+
+    /// <summary>
+    /// Terminate process
+    /// </summary>
+    /// <param name="code">Exit code</param>
+    /// <returns>Stratus code</returns>
+    BLACKBONE_API NTSTATUS Terminate( uint32_t code = 0 );
 
     /// <summary>
     /// Search for process by executable name
@@ -75,7 +82,6 @@ private:
 
     Process(const Process&) = delete;
     Process& operator =(const Process&) = delete;
-
 private:
     ProcessCore    _core;       // Core routines and native subsystem
     ProcessModules _modules;    // Module management

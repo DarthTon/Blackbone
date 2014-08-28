@@ -30,10 +30,10 @@ enum WoW64Type
 
 struct Wow64Barrier
 {
-    WoW64Type type;
-    bool sourceWow64;
-    bool targetWow64;
-    bool x86OS;
+    WoW64Type type = wow_32_32;
+    bool sourceWow64 = false;
+    bool targetWow64 = false;
+    bool x86OS = false;
 };
 
 // Module type

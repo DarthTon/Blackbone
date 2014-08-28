@@ -68,6 +68,17 @@ bool Process::valid()
 }
 
 /// <summary>
+/// Terminate process
+/// </summary>
+/// <param name="code">Exit code</param>
+/// <returns>Stratus code</returns>
+NTSTATUS Process::Terminate( uint32_t code /*= 0*/ )
+{
+    TerminateProcess( _core.handle(), code );
+    return LastNtStatus();
+}
+
+/// <summary>
 /// Grant current process arbitrary privilege
 /// </summary>
 /// <param name="name">Privilege name</param>

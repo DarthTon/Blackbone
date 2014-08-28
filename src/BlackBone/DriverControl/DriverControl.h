@@ -175,9 +175,17 @@ public:
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS UnmapMemoryRegion( DWORD pid, ptr_t base, uint32_t size );
 
-    BLACKBONE_API NTSTATUS HideVAD( DWORD pid, ptr_t base, uint32_t size );
-
+    /// <summary>
+    /// Inject DLL into arbitrary process
+    /// </summary>
+    /// <param name="pid">Target PID.</param>
+    /// <param name="path">Full qualified dll path.</param>
+    /// <param name="itype">Injection type</param>
+    /// <param name="wait">Wait for injection</param>
+    /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS InjectDll( DWORD pid, const std::wstring& path, InjectType itype, bool wait = true );
+
+    BLACKBONE_API NTSTATUS HideVAD( DWORD pid, ptr_t base, uint32_t size );
 
 private:
     DriverControl( const DriverControl& ) = delete;

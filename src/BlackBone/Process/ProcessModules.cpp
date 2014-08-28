@@ -340,8 +340,9 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
 /// <returns>Module info. nullptr if failed</returns>
 const ModuleData* ProcessModules::Inject( const std::wstring& path )
 {
-    const ModuleData* mod = 0;
+    const ModuleData* mod = nullptr;
     ptr_t res = 0;
+    auto& barrier = _core.native()->GetWow64Barrier();
     
     AsmJitHelper a;
     FileProjection fp;
@@ -366,16 +367,19 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
     modName.Write( 0, ustr );
     modName.Write( sizeof(ustr), path.size() * sizeof(wchar_t), path.c_str() );
 
+    // Image and process have same processor architecture
+    bool sameArch = (img.mType() == mt_mod64 && _core.isWow64() == false) || (img.mType() == mt_mod32 && _core.isWow64() == true);
+
     auto pLoadLibrary = GetExport( GetModule( L"kernel32.dll", LdrList, img.mType() ), "LoadLibraryW" ).procAddress;
 
     // Try to use LoadLibrary if possible
-    if (pLoadLibrary != 0 &&
-         ((img.mType() == mt_mod64 && _core.isWow64() == false) ||
-         (img.mType() == mt_mod32 && _core.isWow64() == true)))
+    if (pLoadLibrary != 0 && sameArch)
     {
         _proc.remote().ExecDirect( pLoadLibrary, modName.ptr<ptr_t>() + sizeof(ustr) );
     }
-    else
+    // Can't generate code through WOW64 barrier
+    else if ((barrier.type != wow_32_64 && img.mType() == mt_mod64) ||
+              (barrier.type == wow_32_32 || barrier.type == wow_64_64) )
     {
         auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" ).procAddress;
         if (pLdrLoadDll == 0)
@@ -400,7 +404,7 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
         }
         #endif
 
-        a.GenCall( (size_t)pLdrLoadDll, { 0, 0, modName.ptr<size_t>( ), modName.ptr<size_t>( ) + 0x800 } );
+        a.GenCall( (size_t)pLdrLoadDll, { 0, 0, modName.ptr<size_t>(), modName.ptr<size_t>() + 0x800 } );
         a->ret();
 
         _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
@@ -711,7 +715,7 @@ bool ProcessModules::InjectPureIL( const std::wstring& netVersion,
     a->mov( zax, intptr_ptr( zcx ) );
     a->mov( callReg, intptr_ptr( zax, 11 * sizeof( void* ) ) );
     a.GenCall( callReg, { zcx, address_netAssemblyDll, address_netAssemblyClass, address_netAssemblyMethod,
-                                address_netAssemblyArgs, &stack_returnCode } );
+                          address_netAssemblyArgs, &stack_returnCode } );
     // success?
     a->test( zax, zax );
     a->jnz( L_Error6 );

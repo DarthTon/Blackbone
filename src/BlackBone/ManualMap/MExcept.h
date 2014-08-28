@@ -27,7 +27,7 @@ protected:
     /// <param name="pTargetBase">Target image base address</param>
     /// <param name="imageSize">Size of the image</param>
     /// <returns>Error code</returns>
-    BLACKBONE_API NTSTATUS CreateVEH( size_t pTargetBase, size_t imageSize );
+    BLACKBONE_API NTSTATUS CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt = mt_default );
 
     /// <summary>
     /// Removes VEH from target process

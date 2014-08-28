@@ -663,7 +663,8 @@ bool MMap::EnableExceptions( ImageContext* pImage )
         a.GenCall( static_cast<size_t>(pAddTable.procAddress), { pImage->pExpTableAddr, 
                                                                   size / sizeof(IMAGE_RUNTIME_FUNCTION_ENTRY),
                                                                   pImage->imgMem.ptr<size_t>() } );
-        _process.remote().AddReturnWithEvent( a );
+
+        _process.remote().AddReturnWithEvent( a, pImage->PEImage.mType() );
         a.GenEpilogue();
 
         if (_process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result ) != STATUS_SUCCESS)
@@ -672,7 +673,7 @@ bool MMap::EnableExceptions( ImageContext* pImage )
         if (pImage->flags & CreateLdrRef)
             return true;
         else
-            return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->PEImage.imageSize() ) == STATUS_SUCCESS);
+            return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->PEImage.imageSize(), pImage->PEImage.mType() ) == STATUS_SUCCESS);
     }
     else
         return false;
@@ -683,7 +684,7 @@ bool MMap::EnableExceptions( ImageContext* pImage )
     if ((pImage->flags & PartialExcept) || safeseh)
         return true;
     else
-        return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->PEImage.imageSize() ) == STATUS_SUCCESS);
+        return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->PEImage.imageSize(), pImage->PEImage.mType() ) == STATUS_SUCCESS);
 #endif
 
 }
@@ -883,7 +884,7 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
         a.GenCall( static_cast<size_t>(pDeactivateeActx.procAddress), { 0, asmjit::host::zax } );
     }
 
-    _process.remote().AddReturnWithEvent( a );
+    _process.remote().AddReturnWithEvent( a, pImage->PEImage.mType() );
     a.GenEpilogue();
 
     _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
@@ -939,7 +940,8 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
         a->mov( asmjit::host::eax, static_cast<uint32_t>(pCreateActx.procAddress) );
         a->call( asmjit::host::zax );
         a->mov( asmjit::host::edx, _pAContext.ptr<uint32_t>() );
-        a->mov( asmjit::host::dword_ptr( asmjit::host::edx ), asmjit::host::eax );
+        //a->mov( asmjit::host::dword_ptr( asmjit::host::edx ), asmjit::host::eax );
+        a->dw( '\x01\x02' );
 
         auto pTermThd = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll" ), "NtTerminateThread" );
         a->push( asmjit::host::zax );

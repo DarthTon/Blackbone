@@ -53,11 +53,13 @@ bool NtLdr::Init()
 /// <param name="entryPoint">Entry point RVA</param>
 /// <param name="flags">Type of references to create</param>
 /// <returns>true on success</returns>
-bool NtLdr::CreateNTReference( HMODULE hMod, 
-                               size_t ImageSize, 
-                               const std::wstring& DllBasePath, 
-                               size_t entryPoint,
-                               LdrRefFlags flags /*= Ldr_All*/ )
+bool NtLdr::CreateNTReference(
+    HMODULE hMod,
+    size_t ImageSize,
+    const std::wstring& DllBasePath,
+    size_t entryPoint,
+    LdrRefFlags flags /*= Ldr_All*/
+    )
 {
     // Skip
     if (flags == Ldr_None)
@@ -98,12 +100,13 @@ bool NtLdr::CreateNTReference( HMODULE hMod,
 
         // Insert into LDR list
         if (flags & (Ldr_ModList | Ldr_ThdCall))
-            InsertMemModuleNode( GET_FIELD_PTR( pEntry, InMemoryOrderLinks ), 
-                                 GET_FIELD_PTR( pEntry, InLoadOrderLinks ), 
-                                 GET_FIELD_PTR( pEntry, InInitializationOrderLinks ) );
+        {
+            _process.memory().Write( GET_FIELD_PTR( pEntry, Flags ), 0x80004 );
+            InsertMemModuleNode( 0, GET_FIELD_PTR( pEntry, InLoadOrderLinks ), 0 );
+        }
 	}
 
-    return false;
+    return true;
 }
 
 /// <summary>
@@ -288,11 +291,13 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
 /// <param name="entryPoint">Entry point RVA</param>
 /// <param name="outHash">Iamge name hash</param>
 /// <returns>Pointer to created entry</returns>
-_LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase, 
-                                             size_t ImageSize, 
-                                             const std::wstring& dllpath, 
-                                             size_t entryPoint,
-                                             ULONG& outHash )
+_LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
+    void* ModuleBase,
+    size_t ImageSize,
+    const std::wstring& dllpath,
+    size_t entryPoint,
+    ULONG& outHash
+    )
 {
     std::wstring dllname = Utils::StripPath( dllpath );
     UNICODE_STRING strLocal = { 0 };
@@ -320,7 +325,7 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase,
 
     a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8) } );
 
-    _process.remote().AddReturnWithEvent( a );
+    _process.remote().AddReturnWithEvent( a, mt );
     a.GenEpilogue();
 
     _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
@@ -337,7 +342,7 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase,
 
         a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DDAG_NODE) } );
 
-        _process.remote().AddReturnWithEvent( a );
+        _process.remote().AddReturnWithEvent( a, mt );
         a.GenEpilogue();
 
         _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
@@ -410,11 +415,13 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( void* ModuleBase,
 /// <param name="entryPoint">Entry point RVA</param>
 /// <param name="outHash">Iamge name hash</param>
 /// <returns>Pointer to created entry</returns>
-_LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node( void* ModuleBase, 
-                                             size_t ImageSize, 
-                                             const std::wstring& dllpath,
-                                             size_t entryPoint,
-                                             ULONG& outHash )
+_LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node(
+    void* ModuleBase,
+    size_t ImageSize,
+    const std::wstring& dllpath,
+    size_t entryPoint,
+    ULONG& outHash 
+    )
 {
     std::wstring dllname = Utils::StripPath( dllpath );
     UNICODE_STRING strLocal = { 0 };
@@ -440,7 +447,7 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node( void* ModuleBase,
 
     a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W7) } );
 
-    _process.remote().AddReturnWithEvent( a );
+    _process.remote().AddReturnWithEvent( a, mt );
     a.GenEpilogue();
 
     _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
@@ -561,8 +568,7 @@ void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, size_t modBase )
     a.GenCall( static_cast<size_t>(RtlRbInsertNodeEx), { _LdrpModuleIndexBase,
                                                            GET_FIELD_PTR( pLdrNode, BaseAddressIndexNode ), 
                                                            static_cast<size_t>(bRight), GET_FIELD_PTR( pNode, BaseAddressIndexNode ) } );
-
-    _process.remote().AddReturnWithEvent( a );
+    _process.remote().AddReturnWithEvent( a, mt );
     a.GenEpilogue();
 
     _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );

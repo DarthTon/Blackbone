@@ -42,11 +42,13 @@ public:
     /// <param name="entryPoint">Entry point RVA</param>
     /// <param name="flags">Type of references to create</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool CreateNTReference( HMODULE hMod, 
-                                          size_t ImageSize, 
-                                          const std::wstring& DllBasePath, 
-                                          size_t entryPoint,
-                                          LdrRefFlags flags = Ldr_All );
+    BLACKBONE_API bool CreateNTReference(
+        HMODULE hMod,
+        size_t ImageSize,
+        const std::wstring& DllBasePath,
+        size_t entryPoint,
+        LdrRefFlags flags = Ldr_All
+        );
 
     /// <summary>
     /// Create thread static TLS array
@@ -116,11 +118,13 @@ private:
     /// <param name="entryPoint">Entry point RVA</param>
     /// <param name="outHash">Iamge name hash</param>
     /// <returns>Pointer to created entry</returns>
-    _LDR_DATA_TABLE_ENTRY_W8* InitW8Node( void* ModuleBase, 
-                                          size_t ImageSize, 
-                                          const std::wstring& dllpath, 
-                                          size_t entryPoint,
-                                          ULONG& outHash );
+    _LDR_DATA_TABLE_ENTRY_W8* InitW8Node(
+        void* ModuleBase,
+        size_t ImageSize,
+        const std::wstring& dllpath,
+        size_t entryPoint,
+        ULONG& outHash
+        );
 
     /// <summary>
     ///  Initialize OS-specific module entry
@@ -131,11 +135,13 @@ private:
     /// <param name="entryPoint">Entry point RVA</param>
     /// <param name="outHash">Iamge name hash</param>
     /// <returns>Pointer to created entry</returns>
-    _LDR_DATA_TABLE_ENTRY_W7* InitW7Node( void* ModuleBase, 
-                                          size_t ImageSize, 
-                                          const std::wstring& dllpath, 
-                                          size_t entryPoint, 
-                                          ULONG& outHash );
+    _LDR_DATA_TABLE_ENTRY_W7* InitW7Node(
+        void* ModuleBase,
+        size_t ImageSize,
+        const std::wstring& dllpath,
+        size_t entryPoint,
+        ULONG& outHash
+        );
 
     /// <summary>
     /// Insert entry into win8 module graph

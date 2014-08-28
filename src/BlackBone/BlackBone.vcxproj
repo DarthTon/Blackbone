@@ -424,9 +424,9 @@
     <ClCompile Include="Subsystem\x86Subsystem.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\contrib\AsmJit\apibegin.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\apiend.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\asmjit.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\ApiBegin.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\ApiEnd.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\AsmJit.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\assembler.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\codegen.h" />
@@ -446,8 +446,8 @@
     <ClInclude Include="..\..\contrib\AsmJit\base\vectypes.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\vmem.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\zone.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\build.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\config.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Build.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\Config.h" />
     <ClInclude Include="..\..\contrib\AsmJit\contrib.h" />
     <ClInclude Include="..\..\contrib\AsmJit\host.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86.h" />

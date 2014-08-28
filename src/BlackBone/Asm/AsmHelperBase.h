@@ -69,7 +69,7 @@ namespace blackbone
             _assembler.call( l ); _assembler.bind( l );
             _assembler.mov( asmjit::host::dword_ptr( asmjit::host::esp, 4 ), 0x23 );
             _assembler.add( asmjit::host::dword_ptr( asmjit::host::esp ), 0xD );
-            _assembler.emit( 0xCB );    // retf
+            _assembler.db( 0xCB );    // retf
         }
 
         /// <summary>
@@ -81,8 +81,9 @@ namespace blackbone
 
             _assembler.push( 0x33 );
             _assembler.call( l );  _assembler.bind( l );
-            _assembler.add( asmjit::host::dword_ptr( asmjit::host::esp ), 5 );
-            _assembler.emit( 0xCB );    // retf
+            //_assembler.add( asmjit::host::dword_ptr( asmjit::host::esp ), 5 );
+            _assembler.dd( '\x83\x04\x24\x05' );
+            _assembler.db( 0xCB );    // retf
         }
 
         BLACKBONE_API inline asmjit::host::Assembler* operator ->() { return &_assembler; }

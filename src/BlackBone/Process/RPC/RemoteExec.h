@@ -82,9 +82,15 @@ public:
     /// Generate return from function with event synchronization
     /// </summary>
     /// <param name="a">Target assembly helper</param>
+    /// <param name="mt">32/64bit loader</param>
     /// <param name="retType">Function return type</param>
     /// <param name="retOffset">Return value offset</param>
-    BLACKBONE_API void AddReturnWithEvent( AsmHelperBase& a, eReturnType retType = rt_int32, uint32_t retOffset = RET_OFFSET );
+    BLACKBONE_API void AddReturnWithEvent(
+        AsmHelperBase& a,
+        eModType mt = mt_default, 
+        eReturnType retType = rt_int32,
+        uint32_t retOffset = RET_OFFSET 
+        );
 
     /// <summary>
     /// Retrieve last NTSTATUS code

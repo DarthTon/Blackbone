@@ -319,14 +319,13 @@ namespace blackbone
     struct _THREAD_BASIC_INFORMATION_T
     {
         NTSTATUS  ExitStatus;
-        //LONG      Padding;
         T         TebBaseAddress;
 
         struct
         {
-            T  p1;
-            T  p2;
-        }ClientId;
+            T  UniqueProcess;
+            T  UniqueThread;
+        } ClientId;
 
         T      AffinityMask;
         LONG   Priority;

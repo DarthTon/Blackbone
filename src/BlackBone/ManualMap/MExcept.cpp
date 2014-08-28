@@ -34,7 +34,7 @@ MExcept::~MExcept()
 /// <param name="pTargetBase">Target image base address</param>
 /// <param name="imageSize">Size of the image</param>
 /// <returns>Error code</returns>
-NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
+NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt /*= mt_default*/ )
 {    
     AsmJitHelper ea;
     uint64_t result = 0;
@@ -126,7 +126,7 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
 #endif
     // AddVectoredExceptionHandler(0, pHandler);
     auto& mods = _proc.modules();
-    auto pAddHandler = mods.GetExport( mods.GetModule( L"ntdll.dll" ), "RtlAddVectoredExceptionHandler" ).procAddress;
+    auto pAddHandler = mods.GetExport( mods.GetModule( L"ntdll.dll", LdrList, mt ), "RtlAddVectoredExceptionHandler" ).procAddress;
     if (pAddHandler == 0)
         return STATUS_NOT_FOUND;
 
@@ -135,7 +135,7 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize )
 
     ea.GenCall( static_cast<size_t>(pAddHandler), { 0, _pVEHCode.ptr<size_t>() } );
 
-    _proc.remote().AddReturnWithEvent( ea );
+    _proc.remote().AddReturnWithEvent( ea, mt );
     ea.GenEpilogue();
 
     _proc.remote().ExecInWorkerThread( ea->make(), ea->getCodeSize(), result );

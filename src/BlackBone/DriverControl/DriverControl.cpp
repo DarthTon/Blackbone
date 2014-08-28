@@ -3,6 +3,8 @@
 #include "../Misc/DynImport.h"
 #include "../Include/Macro.h"
 
+#include "VersionHelpers.h"
+
 namespace blackbone
 {
 
@@ -62,7 +64,19 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
 
     // Use default path
     if (path.empty())
-        path = Utils::GetExeDirectory() + L"\\" + L"BlackBoneDrv.sys";
+    {
+        const wchar_t* filename = nullptr;
+        if (IsWindows8Point1OrGreater())
+            filename = L"BlackBoneDrv81.sys";
+        else if (IsWindows8OrGreater())
+            filename = L"BlackBoneDrv8.sys";
+        else if (IsWindows7OrGreater())
+            filename = L"BlackBoneDrv7.sys";
+        else
+            filename = L"BlackBoneDrv.sys";
+
+        path = Utils::GetExeDirectory() + L"\\" + filename;
+    }
 
     status = LoadDriver( DRIVER_SVC_NAME, path );
     if (!NT_SUCCESS( status ))
@@ -448,27 +462,15 @@ NTSTATUS DriverControl::ProtectMem( DWORD pid, ptr_t base, ptr_t size, DWORD pro
     return STATUS_SUCCESS;
 }
 
-
-NTSTATUS DriverControl::HideVAD( DWORD pid, ptr_t base, uint32_t size )
-{
-    DWORD bytes = 0;
-    HIDE_VAD hideVAD = { 0 };
-
-    hideVAD.base = base;
-    hideVAD.size = size;
-    hideVAD.pid = pid;
-
-    // Not loaded
-    if (_hDriver == INVALID_HANDLE_VALUE)
-        return STATUS_DEVICE_DOES_NOT_EXIST;
-
-    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_HIDE_VAD, &hideVAD, sizeof( hideVAD ), nullptr, 0, &bytes, NULL ))
-        return LastNtStatus();
-
-    return STATUS_SUCCESS;
-}
-
-BLACKBONE_API NTSTATUS DriverControl::InjectDll( DWORD pid, const std::wstring& path, InjectType itype, bool wait /*= true */ )
+/// <summary>
+/// Inject DLL into arbitrary process
+/// </summary>
+/// <param name="pid">Target PID.</param>
+/// <param name="path">Full qualified dll path.</param>
+/// <param name="itype">Injection type</param>
+/// <param name="wait">Wait for injection</param>
+/// <returns>Status code</returns>
+NTSTATUS DriverControl::InjectDll( DWORD pid, const std::wstring& path, InjectType itype, bool wait /*= true */ )
 {
     DWORD bytes = 0;
     INJECT_DLL data = { 0 };
@@ -488,7 +490,24 @@ BLACKBONE_API NTSTATUS DriverControl::InjectDll( DWORD pid, const std::wstring& 
     return STATUS_SUCCESS;
 }
 
+NTSTATUS DriverControl::HideVAD( DWORD pid, ptr_t base, uint32_t size )
+{
+    DWORD bytes = 0;
+    HIDE_VAD hideVAD = { 0 };
 
+    hideVAD.base = base;
+    hideVAD.size = size;
+    hideVAD.pid = pid;
+
+    // Not loaded
+    if (_hDriver == INVALID_HANDLE_VALUE)
+        return STATUS_DEVICE_DOES_NOT_EXIST;
+
+    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_HIDE_VAD, &hideVAD, sizeof( hideVAD ), nullptr, 0, &bytes, NULL ))
+        return LastNtStatus();
+
+    return STATUS_SUCCESS;
+}
 
 /// <summary>
 /// Load arbitrary driver

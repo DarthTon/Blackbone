@@ -42,7 +42,7 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
         return dwResult;
 
     bool switchMode = (_proc.core().native()->GetWow64Barrier().type == wow_64_32);
-    auto pExitThread = _mods.GetExport( _mods.GetModule( L"ntdll.dll" ), "NtTerminateThread" ).procAddress;
+    auto pExitThread = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, switchMode ? mt_mod64 : mt_default ), "NtTerminateThread" ).procAddress;
     if (pExitThread == 0)
         return LastNtStatus( STATUS_NOT_FOUND );
 
@@ -191,7 +191,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
             a->mov( asmjit::host::Mem( asmjit::host::rsp, i * WordSize ), regs[i] );
 
         a.GenCall( _userCode.ptr<size_t>(), { _userData.ptr<size_t>() } );
-        AddReturnWithEvent( a, rt_int32, INTRET_OFFSET );
+        AddReturnWithEvent( a, mt_default, rt_int32, INTRET_OFFSET );
 
         // Restore registers
         for (int i = 0; i < count; i++)
@@ -200,18 +200,19 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         a->popf();
         a->add( asmjit::host::rsp, count * WordSize );
 
-        a->jmp( (void*)ctx.Rip );
+        a->push( (uint64_t)ctx.Rip );
+        a->ret();
     #else
         a->pusha();
         a->pushf();
 
         a.GenCall( _userCode.ptr<size_t>(), { _userData.ptr<size_t>() } );
-        AddReturnWithEvent( a, rt_int32, INTRET_OFFSET );
+        AddReturnWithEvent( a, mt_default, rt_int32, INTRET_OFFSET );
 
         a->popf();
         a->popa();
 
-        //a->push( ctx.NIP );
+        a->push( (size_t)ctx.NIP );
         a->ret();
     #endif
 
@@ -286,13 +287,16 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool noThread /*= false*/ )
 
     // Create RPC thread and sync event
     if (noThread == false)
-    {
         thdID = CreateWorkerThread();
-        if (thdID)
-            status = CreateAPCEvent( thdID );
-    }
+    else
+    // Randomize thread id for event name
+        thdID = GetTickCount();
              
-    if (thdID == 0 || status == false)
+    auto& barrier = _proc.core().native()->GetWow64Barrier();
+    if (barrier.type != wow_32_64)
+        status = CreateAPCEvent( thdID );
+
+    if ((noThread == false && thdID == 0) || status == false)
         dwResult = LastNtStatus();
 
     return dwResult;
@@ -316,7 +320,6 @@ DWORD RemoteExec::CreateWorkerThread()
         if (_memory.core().native()->GetWow64Barrier().type == wow_64_32)
         {
             mt = mt_mod64;
-
             a.SwitchTo64();
 
             // Align stack on 16 byte boundary
@@ -336,8 +339,9 @@ DWORD RemoteExec::CreateWorkerThread()
             }
         }          
 
-        auto proc = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt ), "NtDelayExecution" ).procAddress;
-        auto pExitThread = _mods.GetExport( _mods.GetModule( L"ntdll.dll" ), "NtTerminateThread" ).procAddress;
+        auto ntdll = _mods.GetModule( L"ntdll.dll", Sections, mt );
+        auto proc = _mods.GetExport( ntdll, "NtDelayExecution" ).procAddress;
+        auto pExitThread = _mods.GetExport( ntdll, "NtTerminateThread" ).procAddress;
         if (proc == 0 || pExitThread == 0)
             return 0;
 
@@ -399,7 +403,7 @@ bool RemoteExec::CreateAPCEvent( DWORD threadID )
         obAttr.ObjectName = reinterpret_cast<PUNICODE_STRING>(_userData.ptr<size_t>() + ARGS_OFFSET + sizeof(obAttr));
         obAttr.Length = sizeof(obAttr);
 
-        auto pCreateEvent = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt ), "NtCreateEvent" ).procAddress;
+        auto pCreateEvent = _mods.GetExport( _mods.GetModule( L"ntdll.dll", Sections, mt ), "NtCreateEvent" ).procAddress;
         if (pCreateEvent == 0)
             return false;
 
@@ -503,7 +507,7 @@ bool RemoteExec::PrepareCallAssembly( AsmHelperBase& a,
 #endif
     }
 
-    AddReturnWithEvent( a, retType );
+    AddReturnWithEvent( a, mt_default, retType );
     a.GenEpilogue();
 
     return true;
@@ -535,12 +539,18 @@ NTSTATUS RemoteExec::CopyCode( PVOID pCode, size_t size )
 /// Generate return from function with event synchronization
 /// </summary>
 /// <param name="a">Target assembly helper</param>
+/// <param name="mt">32/64bit loader</param>
 /// <param name="retType">Function return type</param>
 /// <param name="retOffset">Return value offset</param>
-void RemoteExec::AddReturnWithEvent( AsmHelperBase& a, eReturnType retType /*= rt_int32 */, uint32_t retOffset /*= RET_OFFSET*/ )
+void RemoteExec::AddReturnWithEvent(
+    AsmHelperBase& a,
+    eModType mt /*= mt_default*/,
+    eReturnType retType /*= rt_int32 */,
+    uint32_t retOffset /*= RET_OFFSET*/ 
+    )
 {
     size_t ptr = _userData.ptr<size_t>();
-    auto pSetEvent = _proc.modules().GetExport( _proc.modules().GetModule( L"ntdll.dll" ), "NtSetEvent" );
+    auto pSetEvent = _proc.modules().GetExport( _proc.modules().GetModule( L"ntdll.dll", LdrList, mt ), "NtSetEvent" );
     a.SaveRetValAndSignalEvent( (size_t)pSetEvent.procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
 }
 
