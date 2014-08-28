@@ -200,8 +200,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         a->popf();
         a->add( asmjit::host::rsp, count * WordSize );
 
-        a->push( (uint64_t)ctx.Rip );
-        a->ret();
+        a->jmp( asmjit::Imm( ctx.Rip ) );
     #else
         a->pusha();
         a->pushf();
