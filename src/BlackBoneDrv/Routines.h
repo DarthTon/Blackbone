@@ -89,6 +89,33 @@ NTSTATUS BBHideVAD( IN PHIDE_VAD pData );
 NTSTATUS BBInjectDll( IN PINJECT_DLL pData );
 
 /// <summary>
+/// Create new thread in the target process
+/// </summary>
+/// <param name="pBaseAddress">Thread start address</param>
+/// <param name="pParam">Thread argument</param>
+/// <param name="flags">Thread creation flags</param>
+/// <param name="wait">If set to TRUE - wait for thread completion</param>
+/// <param name="pExitStatus">Thread exit status</param>
+/// <returns>Status code</returns>
+NTSTATUS BBExecuteInNewThread(
+    IN PVOID pBaseAddress, 
+    IN PVOID pParam, 
+    IN ULONG flags, 
+    IN BOOLEAN wait, 
+    OUT PNTSTATUS pExitStatus 
+    );
+
+/// <summary>
+/// Send user-mode APC to the target thread
+/// </summary>
+/// <param name="pThread">Target thread</param>
+/// <param name="pUserFunc">APC function</param>
+/// <param name="Arg1">Argument 1</param>
+/// <param name="Arg2">Argument 2</param>
+/// <returns>Status code</returns>
+NTSTATUS BBQueueUserApc( IN PETHREAD pThread, IN PVOID pUserFunc, IN PVOID Arg1, IN PVOID Arg2 );
+
+/// <summary>
 /// Process termination handler
 /// </summary>
 /// <param name="ParentId">Parent PID</param>

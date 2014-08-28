@@ -5,7 +5,6 @@
 #pragma alloc_text(PAGE, GetKernelBase)
 #pragma alloc_text(PAGE, GetModuleBase)
 #pragma alloc_text(PAGE, GetModuleExport)
-#pragma alloc_text(PAGE, IsWow64Process)
 #pragma alloc_text(PAGE, GetSSDTBase)
 #pragma alloc_text(PAGE, GetSSDTEntry)
 #pragma alloc_text(PAGE, GetPTEForVA)
@@ -69,6 +68,7 @@ PVOID GetKernelBase()
     if (checkPtr == NULL)
         return NULL;
 
+    // Protect from UserMode AV
     __try
     {
         status = ZwQuerySystemInformation( SystemModuleInformation, 0, bytes, &bytes );
@@ -124,6 +124,7 @@ PVOID GetModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BO
     if (pProcess == NULL)
         return NULL;
 
+    // Protect from UserMode AV
     __try
     {
 
@@ -194,6 +195,7 @@ PVOID GetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
     if (pBase == NULL)
         return NULL;
 
+    // Protect from UserMode AV
     __try
     {
         // Not a PE file
@@ -267,23 +269,7 @@ PVOID GetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
 }
 
 /// <summary>
-/// Check if process is a WOW64 process
-/// </summary>
-/// <param name="hProcess">Target process handle</param>
-/// <param name="isWow64">Result</param>
-/// <returns>Status code</returns>
-NTSTATUS IsWow64Process( IN HANDLE hProcess, OUT PBOOLEAN isWow64 )
-{
-    PPEB32 pPeb32 = NULL;
-    NTSTATUS status = ZwQueryInformationProcess( hProcess, ProcessWow64Information, &pPeb32, sizeof( pPeb32 ), NULL );
-    if (isWow64)
-        *isWow64 = (pPeb32 != NULL) ? TRUE : FALSE;
-
-    return status;
-}
-
-/// <summary>
-/// Gets SSDT base - KiSystemServiceTable
+/// Gets SSDT base - KiServiceTable
 /// </summary>
 /// <returns>SSDT base, NULL if not found</returns>
 PVOID GetSSDTBase()
@@ -308,8 +294,8 @@ PVOID GetSSDTBase()
 
         for (PIMAGE_SECTION_HEADER pSec = pFirstSec; pSec < pFirstSec + pHdr->FileHeader.NumberOfSections; pSec++)
         {
-            // Non-paged, executable sections
-            if (pSec->Characteristics & 0x08000000 && pSec->Characteristics & 0x20000000)
+            // Non-paged, non-discardable, executable sections
+            if (pSec->Characteristics & 0x08000000 && pSec->Characteristics & 0x20000000 && !(pSec->Characteristics & 0x02000000))
             {
                 // Scan section
                 for (ULONG_PTR* pPtr = (ULONG_PTR*)(ntosBase + pSec->VirtualAddress);
@@ -320,14 +306,13 @@ PVOID GetSSDTBase()
                     if (*pPtr == (ULONG_PTR)pFn)
                         // Search for SSDT start
                         for (ULONG_PTR* pPtr2 = pPtr; pPtr2 > ( ULONG_PTR* )(ntosBase + pSec->VirtualAddress); pPtr2--)
-                            if (*pPtr2 == 0x9090909090909090)
+                            if (*pPtr2 == 0x9090909090909090 || *pPtr2 == 0xCCCCCCCCCCCCCCCC)
                                 return g_SSDT = pPtr2 + 1;
                 }
             }
         }
     }
    
-
     return NULL;
 }
 
@@ -363,10 +348,11 @@ PMMPTE_HARDWARE64 GetPTEForVA( IN PVOID pAddress )
     return MiGetHardwarePteAddress( pAddress );
 }
 
-#if defined(_WIN8_) || defined (_WIN7_)
-
 // 'type cast' : from data pointer 'PVOID' to function pointer 'fnNtProtectVirtualMemory'
 #pragma warning(disable : 4055)
+
+#if defined(_WIN8_) || defined (_WIN7_)
+
 NTSTATUS
 NTAPI
 ZwProtectVirtualMemory(
@@ -399,10 +385,10 @@ ZwProtectVirtualMemory(
 
     return status;
 }
+#endif
 
-
-NTSTATUS 
-NTAPI 
+NTSTATUS
+NTAPI
 ZwCreateThreadEx(
     OUT PHANDLE hThread,
     IN ACCESS_MASK DesiredAccess,
@@ -443,4 +429,3 @@ ZwCreateThreadEx(
 }
 
 #pragma  warning(default: 4055)
-#endif

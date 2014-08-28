@@ -29,6 +29,10 @@
 #define VIRTUAL_ADDRESS_BITS 48
 #define VIRTUAL_ADDRESS_MASK ((((ULONG_PTR)1) << VIRTUAL_ADDRESS_BITS) - 1)
 
+#define THREAD_CREATE_FLAGS_CREATE_SUSPENDED        0x00000001
+#define THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH      0x00000002
+#define THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER      0x00000004
+
 #define PTE_SHIFT 3
 #define ObpDecodeGrantedAccess( Access ) \
     ((Access)& ~ObpAccessProtectCloseBit)
@@ -76,6 +80,7 @@ typedef struct _DYNAMIC_DATA
     ULONG NtThdIndex;       // NtCreateThreadEx SSDT index
     ULONG PrevMode;         // PreviousMode offset in KTHREAD
     ULONG ApcState;         // KTHREAD ApcState field
+    ULONG ExitStatus;       // ETHREAD ExitStatus field
 } DYNAMIC_DATA, *PDYNAMIC_DATA;
 
 
@@ -189,14 +194,6 @@ PVOID GetModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BO
 /// <param name="name_ord">Function name or ordinal</param>
 /// <returns>Found address, NULL if not found</returns>
 PVOID GetModuleExport( IN PVOID pBase, IN PCCHAR name_ord );
-
-/// <summary>
-/// Check if process is a WOW64 process
-/// </summary>
-/// <param name="hProcess">Target process handle</param>
-/// <param name="isWow64">Result</param>
-/// <returns>Status code</returns>
-NTSTATUS IsWow64Process( IN HANDLE hProcess, OUT PBOOLEAN isWow64 );
 
 /// <summary>
 /// Gets SSDT base - KiSystemServiceTable

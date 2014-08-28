@@ -92,28 +92,36 @@ NTSTATUS BBSetProtection( IN PSET_PROC_PROTECTION pProtection )
     {
         if (dynData.Protection != 0)
         {
-#ifdef _WIN7_
-            if (pProtection->enableState)
-                *(PULONG)((PUCHAR)pProcess + dynData.Protection) |= 1 << 0xB;
-            else
-                *(PULONG)((PUCHAR)pProcess + dynData.Protection) &= ~(1 << 0xB);
-#elif _WIN8_
-            *((PUCHAR)pProcess + dynData.Protection) = pProtection->enableState;
-#else
-            PS_PROTECTION protBuf = { 0 };
-
-            if (pProtection->enableState == FALSE)
+            // Win7
+            if (dynData.ver <= WINVER_7_SP1)
             {
-                protBuf.Level = 0;
+                if (pProtection->enableState)
+                    *(PULONG)((PUCHAR)pProcess + dynData.Protection) |= 1 << 0xB;
+                else
+                    *(PULONG)((PUCHAR)pProcess + dynData.Protection) &= ~(1 << 0xB);
             }
-            else
+            // Win8
+            else if (dynData.ver == WINVER_8)
             {
-                protBuf.Flags.Signer = PsProtectedSignerWinTcb;
-                protBuf.Flags.Type = PsProtectedTypeProtected;
+                *((PUCHAR)pProcess + dynData.Protection) = pProtection->enableState;
             }
+            // Win8.1
+            else if (dynData.ver == WINVER_81)
+            {
+                PS_PROTECTION protBuf = { 0 };
 
-            *((PUCHAR)pProcess + dynData.Protection) = protBuf.Level;
-#endif
+                if (pProtection->enableState == FALSE)
+                {
+                    protBuf.Level = 0;
+                }
+                else
+                {
+                    protBuf.Flags.Signer = PsProtectedSignerWinTcb;
+                    protBuf.Flags.Type = PsProtectedTypeProtected;
+                }
+
+                *((PUCHAR)pProcess + dynData.Protection) = protBuf.Level;
+            }
         }
         else
         {

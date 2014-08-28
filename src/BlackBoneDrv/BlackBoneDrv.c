@@ -157,6 +157,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtThdIndex     = 0x0A5;
                 pData->PrevMode       = 0x1F6;
                 pData->ApcState       = 0x050;
+                pData->ExitStatus     = 0x380;
                 break;
 
                 // Windows 8
@@ -168,7 +169,8 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtProtectIndex = 0x04E;
                 pData->NtThdIndex     = 0x0AF; 
                 pData->PrevMode       = 0x232;
-                pData->ApcState       = 0x098;  // fixme
+                pData->ApcState       = 0x098;
+                pData->ExitStatus     = 0x450;
                 break;
 
                 // Windows 8.1
@@ -180,6 +182,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtThdIndex     = 0x0B0;
                 pData->PrevMode       = 0x232;
                 pData->ApcState       = 0x098;
+                pData->ExitStatus     = 0x6D8;
                 break;
 
             default:

@@ -60,6 +60,22 @@ PVOID
 NTAPI
 PsGetProcessWow64Process( IN PEPROCESS Process );
 
+NTSYSAPI
+PVOID
+NTAPI
+PsGetCurrentProcessWow64Process( );
+
+NTKERNELAPI
+BOOLEAN
+NTAPI
+KeTestAlertThread( IN KPROCESSOR_MODE AlertMode );
+
+NTSYSAPI
+BOOLEAN
+NTAPI
+PsIsProtectedProcess( IN PEPROCESS Process );
+
+
 typedef VOID( NTAPI *PKNORMAL_ROUTINE )
     (
         PVOID NormalContext,
