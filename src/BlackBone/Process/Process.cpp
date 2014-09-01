@@ -32,7 +32,7 @@ Process::~Process(void)
 /// </summary>
 /// <param name="pid">Process ID</param>
 /// <param name="access">Access mask</param>
-/// <returns>Status</returns>
+/// <returns>Status code</returns>
 NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 {
     // Reset data
@@ -42,16 +42,104 @@ NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
     _mmap.reset();
     _hooks.reset();
 
-    auto res = _core.Open( pid, access );
-
-    if (res == STATUS_SUCCESS)
+    auto status = _core.Open( pid, access );
+    if (NT_SUCCESS( status ))
     {
         _nativeLdr.Init();
         _remote.CreateRPCEnvironment( true );
     }
 
-    return res;
+    return status;
 }
+
+/// <summary>
+/// Attach to existing process
+/// </summary>
+/// <param name="pid">Process handle</param>
+/// <returns>Status code</returns>
+NTSTATUS Process::Attach( HANDLE hProc )
+{
+    // Reset data
+    _memory.reset();
+    _modules.reset();
+    _remote.reset();
+    _mmap.reset();
+    _hooks.reset();
+
+    auto status = _core.Open( hProc );
+    if (NT_SUCCESS( status ))
+    {
+        _nativeLdr.Init();
+        _remote.CreateRPCEnvironment( true );
+    }
+
+    return status;
+}
+
+/// <summary>
+/// Create new process and attach to it
+/// </summary>
+/// <param name="path">Executable path</param>
+/// <param name="suspended">Leave process in suspended state. To resume process one should resume its main thread</param>
+/// <param name="forceInit">If 'suspended' is true, this flag will enforce process initialization via second thread</param>
+/// <param name="cmdLine">Process command line</param>
+/// <param name="currentDir">Startup directory</param>
+/// <param name="pStartup">Additional startup params</param>
+/// <returns>Status code</returns>
+NTSTATUS Process::CreateAndAttach( 
+    const std::wstring& path, 
+    bool suspended /*= false*/,
+    bool forceInit /*= true*/,
+    const std::wstring& cmdLine /*= L""*/,
+    const wchar_t* currentDir /*= nullptr*/,
+    STARTUPINFOW* pStartup /*= nullptr*/
+    )
+{
+    STARTUPINFOW si = { 0 };
+    PROCESS_INFORMATION pi = { 0 };
+    if (!pStartup)
+        pStartup = &si;
+
+    if (!CreateProcessW( path.c_str(), const_cast<LPWSTR>(cmdLine.c_str()), NULL, NULL, 
+                         FALSE, CREATE_SUSPENDED, NULL, currentDir, pStartup, &pi ))
+    {
+        return LastNtStatus();
+    }
+
+    // Reset data
+    _memory.reset();
+    _modules.reset();
+    _remote.reset();
+    _mmap.reset();
+    _hooks.reset();
+
+    // Get handle ownership
+    auto status = _core.Open( pi.hProcess );
+    if (NT_SUCCESS( status ))
+    {
+        _nativeLdr.Init();
+
+        // Check if process must be left in suspended mode
+        if (suspended)
+        {
+            // Create new thread to make sure LdrInitializeProcess gets called
+            if (forceInit)
+            {
+                auto pProc = _modules.GetExport( _modules.GetModule( L"ntdll.dll", Sections ), "NtYieldExecution" ).procAddress;
+                if (pProc)
+                    _remote.ExecDirect( pProc, 0 );
+            }
+        }
+        else
+            ResumeThread( pi.hThread );
+    }
+
+    // Close unneeded handles
+    CloseHandle( pi.hThread );
+
+    return status;
+}
+
 
 /// <summary>
 /// Checks if process still exists

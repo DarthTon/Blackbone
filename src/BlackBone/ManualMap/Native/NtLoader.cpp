@@ -318,35 +318,53 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
     auto RtlAllocateHeap = _process.modules().GetExport(
         _process.modules().GetModule( L"ntdll.dll", LdrList, mt ), "RtlAllocateHeap" ).procAddress;
 
-    //
-    // HeapAlloc(LdrHeap, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
-    //
-    a.GenPrologue();
-
-    a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8) } );
-
-    _process.remote().AddReturnWithEvent( a, mt );
-    a.GenEpilogue();
-
-    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-    pEntry = reinterpret_cast<decltype(pEntry)>(result);
-
-    if(pEntry)
+    if (_LdrHeapBase)
     {
-        a->clear();
-
         //
-        // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DDAG_NODE));
+        // HeapAlloc(LdrHeap, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
         //
         a.GenPrologue();
 
-        a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DDAG_NODE) } );
-
+        a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W8 ) } );
         _process.remote().AddReturnWithEvent( a, mt );
         a.GenEpilogue();
 
         _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-        pDdagNode = reinterpret_cast<decltype(pDdagNode)>(result);
+
+        pEntry = reinterpret_cast<decltype(pEntry)>(result);
+    }
+    else
+    {
+        auto block = _process.memory().Allocate( sizeof( _LDR_DATA_TABLE_ENTRY_W8 ), PAGE_READWRITE );
+        pEntry = block.ptr<_LDR_DATA_TABLE_ENTRY_W8*>();
+        block.Release();
+    }
+
+    if(pEntry)
+    {
+        if (_LdrHeapBase)
+        {
+            a->clear();
+
+            //
+            // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DDAG_NODE));
+            //
+            a.GenPrologue();
+
+            a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DDAG_NODE ) } );
+
+            _process.remote().AddReturnWithEvent( a, mt );
+            a.GenEpilogue();
+
+            _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
+            pDdagNode = reinterpret_cast<decltype(pDdagNode)>(result);
+        }
+        else
+        {
+            auto block = _process.memory().Allocate( sizeof( _LDR_DATA_TABLE_ENTRY_W8 ), PAGE_READWRITE );
+            pDdagNode = block.ptr<_LDR_DDAG_NODE*>();
+            block.Release();
+        }  
 
         if(pDdagNode)
         {

@@ -90,6 +90,19 @@ private:
     NTSTATUS Open( DWORD pid, DWORD access );
 
     /// <summary>
+    /// Attach to existing process by handle
+    /// </summary>
+    /// <param name="pid">Process handle</param>
+    /// <returns>Status</returns>
+    NTSTATUS Open( HANDLE handle );
+
+    /// <summary>
+    /// Initialize some internal data
+    /// </summary>
+    /// <returns>Status code</returns>
+    NTSTATUS Init();
+
+    /// <summary>
     /// Close current process handle
     /// </summary>
     void Close();

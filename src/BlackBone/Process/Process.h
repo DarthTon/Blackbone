@@ -36,8 +36,34 @@ public:
     /// </summary>
     /// <param name="pid">Process ID</param>
     /// <param name="access">Access mask</param>
-    /// <returns>Status</returns>
+    /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS Attach( DWORD pid, DWORD access = DEFAULT_ACCESS_P );
+
+    /// <summary>
+    /// Attach to existing process
+    /// </summary>
+    /// <param name="pid">Process handle</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Attach( HANDLE hProc );
+
+    /// <summary>
+    /// Create new process and attach to it
+    /// </summary>
+    /// <param name="path">Executable path</param>
+    /// <param name="suspended">Leave process in suspended state. To resume process one should resume its main thread</param>
+    /// <param name="forceInit">If 'suspended' is true, this flag will enforce process initialization via second thread</param>
+    /// <param name="cmdLine">Process command line</param>
+    /// <param name="currentDir">Startup directory</param>
+    /// <param name="pStartup">Additional startup params</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS CreateAndAttach(
+        const std::wstring& path,
+        bool suspended = false,
+        bool forceInit = true,
+        const std::wstring& cmdLine = L"",
+        const wchar_t* currentDir = nullptr,
+        STARTUPINFOW* pStartup = nullptr
+        );
 
     /// <summary>
     /// Get process ID
@@ -78,6 +104,11 @@ public:
     BLACKBONE_API inline NtLdr&          nativeLdr() { return _nativeLdr; }  // Native loader routines
 
 private:
+    /// <summary>
+    /// Grant current process arbitrary privilege
+    /// </summary>
+    /// <param name="name">Privilege name</param>
+    /// <returns>Status</returns>
     NTSTATUS GrantPriviledge( const std::basic_string<TCHAR>& name );
 
     Process(const Process&) = delete;

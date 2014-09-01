@@ -133,7 +133,9 @@ void PEImage::Release()
     _imagePath.clear();
 
     // Ensure temporary file is deleted
-    DeleteFileW( _manifestPath.c_str() );
+    if (_noFile)
+        DeleteFileW( _manifestPath.c_str() );
+
     _manifestPath.clear();
 }
 
