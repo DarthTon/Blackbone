@@ -90,12 +90,6 @@
     <ClCompile Include="PE\ImageNET.cpp">
       <Filter>PE</Filter>
     </ClCompile>
-    <ClCompile Include="PE\PEParser.cpp">
-      <Filter>PE</Filter>
-    </ClCompile>
-    <ClCompile Include="PE\FileProjection.cpp">
-      <Filter>PE</Filter>
-    </ClCompile>
     <ClCompile Include="Patterns\PatternSearch.cpp">
       <Filter>Patterns</Filter>
     </ClCompile>
@@ -210,6 +204,9 @@
     <ClCompile Include="..\..\contrib\AsmJit\base\zone.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
+    <ClCompile Include="PE\PEImage.cpp">
+      <Filter>PE</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
@@ -259,12 +256,6 @@
       <Filter>Process\RPC</Filter>
     </ClInclude>
     <ClInclude Include="PE\ImageNET.h">
-      <Filter>PE</Filter>
-    </ClInclude>
-    <ClInclude Include="PE\PEParser.h">
-      <Filter>PE</Filter>
-    </ClInclude>
-    <ClInclude Include="PE\FileProjection.h">
       <Filter>PE</Filter>
     </ClInclude>
     <ClInclude Include="Patterns\PatternSearch.h">
@@ -473,6 +464,9 @@
     </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base\zone.h">
       <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="PE\PEImage.h">
+      <Filter>PE</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

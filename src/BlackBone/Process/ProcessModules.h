@@ -2,7 +2,7 @@
 
 #include "../Config.h"
 #include "../Include/Winheaders.h"
-#include "../PE/PEParser.h"
+#include "../PE/PEImage.h"
 #include "../Misc/Utils.h"
 
 #include <string>

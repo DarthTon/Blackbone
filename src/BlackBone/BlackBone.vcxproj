@@ -405,9 +405,8 @@
     <ClCompile Include="Misc\NameResolve.cpp" />
     <ClCompile Include="Misc\Utils.cpp" />
     <ClCompile Include="Patterns\PatternSearch.cpp" />
-    <ClCompile Include="PE\FileProjection.cpp" />
     <ClCompile Include="PE\ImageNET.cpp" />
-    <ClCompile Include="PE\PEParser.cpp" />
+    <ClCompile Include="PE\PEImage.cpp" />
     <ClCompile Include="Process\MemBlock.cpp" />
     <ClCompile Include="Process\Process.cpp" />
     <ClCompile Include="Process\ProcessCore.cpp" />
@@ -503,9 +502,8 @@
     <ClInclude Include="Misc\Trace.hpp" />
     <ClInclude Include="Misc\Utils.h" />
     <ClInclude Include="Patterns\PatternSearch.h" />
-    <ClInclude Include="PE\FileProjection.h" />
     <ClInclude Include="PE\ImageNET.h" />
-    <ClInclude Include="PE\PEParser.h" />
+    <ClInclude Include="PE\PEImage.h" />
     <ClInclude Include="Process\MemBlock.h" />
     <ClInclude Include="Process\Process.h" />
     <ClInclude Include="Process\ProcessCore.h" />

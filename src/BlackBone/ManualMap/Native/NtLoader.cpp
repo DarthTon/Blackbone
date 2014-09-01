@@ -732,7 +732,7 @@ bool NtLdr::FindLdrpModuleIndexBase( )
         }
 
         // Get pointer to root
-        pe::PEParser ntdll;
+        pe::PEImage ntdll;
         size_t* pStart = nullptr;
         size_t* pEnd = nullptr;
 
@@ -767,7 +767,7 @@ bool NtLdr::FindLdrpModuleIndexBase( )
 bool NtLdr::ScanPatterns( )
 {
     std::vector<ptr_t> foundData;
-    pe::PEParser ntdll;
+    pe::PEImage ntdll;
     void* pStart  = nullptr;
     size_t scanSize = 0;
 

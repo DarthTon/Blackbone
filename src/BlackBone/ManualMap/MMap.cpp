@@ -120,7 +120,7 @@ const ModuleData* MMap::MapImage(
     }
 
     // Change process base module address if needed
-    if (flags & RebaseProcess && !_images.empty() && _images.rbegin()->get()->PEImage.IsExe())
+    if (flags & RebaseProcess && !_images.empty() && _images.rbegin()->get()->peImage.IsExe())
     {
         BLACBONE_TRACE( L"ManualMap: Rebasing process to address 0x%p", static_cast<size_t>(mod->baseAddress) );
         _process.memory().Write( _process.core().peb() + 2 * WordSize, WordSize, &mod->baseAddress );
@@ -138,8 +138,8 @@ const ModuleData* MMap::MapImage(
             // Wipe header
             if (img->flags & WipeHeader)
             {
-                if (img->imgMem.Free( img->PEImage.headersSize() ) != STATUS_SUCCESS)
-                    img->imgMem.Protect( PAGE_NOACCESS, 0, img->PEImage.headersSize() );
+                if (img->imgMem.Free( img->peImage.headersSize() ) != STATUS_SUCCESS)
+                    img->imgMem.Protect( PAGE_NOACCESS, 0, img->peImage.headersSize() );
             }
 
             img->initialized = true;
@@ -160,10 +160,12 @@ const ModuleData* MMap::MapImage(
 /// <param name="asImage">If set to true - buffer has image memory layout</param>
 /// <param name="flags">Mapping flags</param>
 /// <returns>Module info</returns>
-const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
-                                         void* buffer, size_t size, bool asImage,
-                                         eLoadFlags flags /*= NoFlags*/ )
+const ModuleData* MMap::FindOrMapModule(
+    const std::wstring& path,
+    void* buffer, size_t size, bool asImage,
+    eLoadFlags flags /*= NoFlags*/ )
 {
+    NTSTATUS status = STATUS_SUCCESS;
     std::unique_ptr<ImageContext> pImage( new ImageContext() );
 
     pImage->FilePath = path;
@@ -171,16 +173,15 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
     pImage->flags = flags;
 
     // Load and parse image
-    if (buffer)
-        pImage->FileImage.Assign( buffer, size, !asImage );
-    else
-        pImage->FileImage.Project( path );
-
-    if (!pImage->PEImage.Parse( pImage->FileImage.base(), pImage->FileImage.isPlainData() ))
+    status = buffer ? pImage->peImage.Load( buffer, size, !asImage ) : pImage->peImage.Load( path, flags & NoSxS ? true : false );
+    if (!NT_SUCCESS( status ))
+    {
+        BLACBONE_TRACE( L"ManualMap: Failed to load image '%ls'/0x%p", path.c_str(), buffer  );
         return nullptr;
+    }
 
     // Check if already loaded
-    if (auto hMod = _process.modules().GetModule( path, LdrList, pImage->PEImage.mType() ))
+    if (auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType() ))
         return hMod;
 
     BLACBONE_TRACE( L"ManualMap: Loading new image '%ls'", path.c_str() );
@@ -188,13 +189,13 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
     // Try to map image in high (>4GB) memory range
     if (flags & MapInHighMem)
     {
-        AllocateInHighMem( pImage->imgMem, pImage->PEImage.imageSize() );
+        AllocateInHighMem( pImage->imgMem, pImage->peImage.imageSize() );
     }
     // Try to map image at it's original ASRL-aware base
     else if (flags & UnlinkVAD)
     {      
-        ptr_t base = pImage->PEImage.imageBase();
-        ptr_t size = pImage->PEImage.imageSize();
+        ptr_t base = pImage->peImage.imageBase();
+        ptr_t size = pImage->peImage.imageSize();
 
         // Allocate as physical
         Driver().EnsureLoaded();
@@ -203,7 +204,7 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
         // Allocate at any base
         if (!NT_SUCCESS( status ))
         {
-            size = pImage->PEImage.imageSize();
+            size = pImage->peImage.imageSize();
             status = Driver().AllocateMem( _process.pid(), base, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
         }
 
@@ -222,7 +223,7 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
 
     // Allocate normally if something went wrong
     if (pImage->imgMem == 0)
-        pImage->imgMem = _process.memory().Allocate( pImage->PEImage.imageSize(), PAGE_EXECUTE_READWRITE, pImage->PEImage.imageBase() );
+        pImage->imgMem = _process.memory().Allocate( pImage->peImage.imageSize(), PAGE_EXECUTE_READWRITE, pImage->peImage.imageBase() );
 
     BLACBONE_TRACE( L"ManualMap: Image base allocated at 0x%p", pImage->imgMem.ptr<size_t>() );
 
@@ -230,19 +231,17 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
         return nullptr;
 
     // Create Activation context for SxS
-    // .exe files usually contain manifest under id of 1
-    // .dll files have manifest under id of 2
-    if (pImage->FileImage.manifestID() == 0)
+    if (pImage->peImage.manifestID() == 0)
         flags |= NoSxS;
 
     if (!(flags & NoSxS))
-        CreateActx( path, pImage->FileImage.manifestID() );
+        CreateActx( pImage->peImage.manifestFile(), pImage->peImage.manifestID(), !pImage->peImage.noPhysFile() );
 
     // Core image mapping operations
     if (!CopyImage( pImage.get() ) || !RelocateImage( pImage.get() ))
         return nullptr;
 
-    auto mt = pImage->PEImage.mType();
+    auto mt = pImage->peImage.mType();
     auto pMod = _process.modules().AddManualModule( pImage->FilePath, pImage->imgMem.ptr<module_t>(), pImage->imgMem.size(), mt );
 
     // Import tables
@@ -274,7 +273,7 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
     }
 
     // Get entry point
-    pImage->EntryPoint = pImage->PEImage.entryPoint( pImage->imgMem.ptr<ptr_t>() );
+    pImage->EntryPoint = pImage->peImage.entryPoint( pImage->imgMem.ptr<ptr_t>() );
 
     // Create reference for native loader functions
     LdrRefFlags ldrFlags = flags & CreateLdrRef ? Ldr_All: Ldr_None;
@@ -283,7 +282,7 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
 
     if (ldrFlags != Ldr_None)
         _process.nativeLdr().CreateNTReference( pImage->imgMem.ptr<HMODULE>(), 
-                                                pImage->PEImage.imageSize(), 
+                                                pImage->peImage.imageSize(), 
                                                 pImage->FilePath, 
                                                 static_cast<size_t>(pImage->EntryPoint),
                                                 ldrFlags );
@@ -296,10 +295,10 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
     }
     
     // Fill TLS callbacks
-    pImage->PEImage.GetTLSCallbacks( pImage->imgMem.ptr<ptr_t>(), pImage->tlsCallbacks );
+    pImage->peImage.GetTLSCallbacks( pImage->imgMem.ptr<ptr_t>(), pImage->tlsCallbacks );
 
     // Unload local copy
-    pImage->FileImage.Release();
+    pImage->peImage.Release();
 
     // Release image memory block
     pImage->imgMem.Release();
@@ -316,14 +315,6 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
 /// <returns>Image base</returns>
 module_t MMap::MapPureManaged( )
 {
-    /*if(!netImg.Init(_pTopImage->FilePath))
-    {
-        SetLastError(0x1337);
-        return 0;
-    }*/
-
-    //netImg.Parse();
-
     LastNtStatus( STATUS_NOT_IMPLEMENTED );
     return 0;
 }
@@ -354,7 +345,7 @@ bool MMap::UnmapAllModules()
         pImage->imgMem.Free();
 
         // Remove reference from local modules list
-        _process.modules().RemoveManualModule( pImage->FilePath, pImage->PEImage.mType() );
+        _process.modules().RemoveManualModule( pImage->FilePath, pImage->peImage.mType() );
     } 
 
     Cleanup();
@@ -373,10 +364,10 @@ bool MMap::CopyImage( ImageContext* pImage )
     BLACBONE_TRACE( L"ManualMap: Performing image copy" );
 
     // offset to first section equals to header size
-    size_t dwHeaderSize = pImage->PEImage.headersSize();
+    size_t dwHeaderSize = pImage->peImage.headersSize();
 
     // Copy header
-    if (pImage->imgMem.Write( 0, dwHeaderSize, pImage->FileImage.base() ) != STATUS_SUCCESS)
+    if (pImage->imgMem.Write( 0, dwHeaderSize, pImage->peImage.base() ) != STATUS_SUCCESS)
     {
         BLACBONE_TRACE( L"ManualMap: Failed to copy image headers. Status = 0x%x", LastNtStatus() );
         return false;
@@ -389,7 +380,7 @@ bool MMap::CopyImage( ImageContext* pImage )
         return false;
     }
 
-    auto& sections = pImage->PEImage.sections();
+    auto& sections = pImage->peImage.sections();
 
     // Copy sections
     for( auto& section : sections)
@@ -398,7 +389,7 @@ bool MMap::CopyImage( ImageContext* pImage )
         if (section.Characteristics & (IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE) &&
              !(section.Characteristics & IMAGE_SCN_MEM_DISCARDABLE))
         {
-            uint8_t* pSource = reinterpret_cast<uint8_t*>(pImage->PEImage.ResolveRVAToVA( section.VirtualAddress ));
+            uint8_t* pSource = reinterpret_cast<uint8_t*>(pImage->peImage.ResolveRVAToVA( section.VirtualAddress ));
 
             if (section.SizeOfRawData != 0 && 
                  pImage->imgMem.Write( section.VirtualAddress, section.SizeOfRawData, pSource ) != STATUS_SUCCESS)
@@ -421,7 +412,7 @@ bool MMap::CopyImage( ImageContext* pImage )
 bool MMap::ProtectImageMemory( ImageContext* pImage )
 {
     // Set section memory protection
-    for (auto& section : pImage->PEImage.sections())
+    for (auto& section : pImage->peImage.sections())
     {
         auto prot = GetSectionProt( section.Characteristics );
         if (prot != PAGE_NOACCESS)
@@ -453,7 +444,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
     BLACBONE_TRACE( L"ManualMap: Relocating image '%ls'", pImage->FilePath.c_str() );
 
     // Reloc delta
-    size_t Delta = pImage->imgMem.ptr<size_t>() - static_cast<size_t>(pImage->PEImage.imageBase());
+    size_t Delta = pImage->imgMem.ptr<size_t>() - static_cast<size_t>(pImage->peImage.imageBase());
 
     // No need to relocate
     if (Delta == 0)
@@ -463,8 +454,8 @@ bool MMap::RelocateImage( ImageContext* pImage )
         return true;
     }
 
-    auto start = pImage->PEImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_BASERELOC );
-    auto end = start + pImage->PEImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_BASERELOC );
+    auto start = pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_BASERELOC );
+    auto end = start + pImage->peImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_BASERELOC );
 
     pe::RelocData* fixrec = reinterpret_cast<pe::RelocData*>(start);
     if (fixrec == nullptr)
@@ -492,7 +483,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
             if (fixtype == IMAGE_REL_BASED_HIGHLOW || fixtype == IMAGE_REL_BASED_DIR64)
             {
                 size_t fixRVA = static_cast<ULONG>(fixoffset) + fixrec->PageRVA;
-                size_t val = *reinterpret_cast<size_t*>(pImage->PEImage.ResolveRVAToVA( fixoffset + fixrec->PageRVA )) + Delta;
+                size_t val = *reinterpret_cast<size_t*>(pImage->peImage.ResolveRVAToVA( fixoffset + fixrec->PageRVA )) + Delta;
 
                 // Apply relocation
                 if (pImage->imgMem.Write( fixRVA, val ) != STATUS_SUCCESS)
@@ -534,17 +525,19 @@ const ModuleData* MMap::FindOrMapDependency( ImageContext* pImage, std::wstring&
 #endif
 
     // Already loaded
-    auto hMod = _process.modules().GetModule( path, LdrList, pImage->PEImage.mType(), pImage->FileName.c_str() );
+    auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType(), pImage->FileName.c_str() );
     if (hMod)
         return hMod;
 
     BLACBONE_TRACE( L"ManualMap: Loading new dependency '%ls'", path.c_str() );
 
-    NameResolve::Instance().ResolvePath( path, pImage->FileName,
-                                         Utils::GetParent( pImage->FilePath ),
-                                         NameResolve::EnsureFullPath,
-                                         _process.pid(),
-                                         pImage->FileImage.actx() );
+    auto basedir = pImage->peImage.noPhysFile() ? Utils::GetExeDirectory() : Utils::GetParent( pImage->FilePath );
+    auto status = NameResolve::Instance().ResolvePath( path, pImage->FileName, basedir, NameResolve::EnsureFullPath, _process.pid(), pImage->peImage.actx() );
+    if (!NT_SUCCESS( status ))
+    {
+        BLACBONE_TRACE( L"ManualMap: Failed to resolve dependency path '%ls'", path.c_str() );
+        return nullptr;
+    }
 
     BLACBONE_TRACE( L"ManualMap: Dependency path resolved to '%ls'", path.c_str() );
 
@@ -563,7 +556,7 @@ const ModuleData* MMap::FindOrMapDependency( ImageContext* pImage, std::wstring&
 /// <returns>true on success</returns>
 bool MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
 {
-    auto imports = pImage->PEImage.ProcessImports( useDelayed );
+    auto imports = pImage->peImage.GetImports( useDelayed );
     if (imports.empty())
         return true;
 
@@ -645,9 +638,9 @@ bool MMap::EnableExceptions( ImageContext* pImage )
 {
     BLACBONE_TRACE( L"ManualMap: Enabling exception support for image '%ls'", pImage->FileName.c_str() );
 #ifdef USE64
-    size_t size = pImage->PEImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_EXCEPTION );
+    size_t size = pImage->peImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_EXCEPTION );
     IMAGE_RUNTIME_FUNCTION_ENTRY *pExpTable = 
-        reinterpret_cast<decltype(pExpTable)>(pImage->PEImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXCEPTION ));
+        reinterpret_cast<decltype(pExpTable)>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXCEPTION ));
 
     // Invoke RtlAddFunctionTable
     if(pExpTable)
@@ -655,8 +648,8 @@ bool MMap::EnableExceptions( ImageContext* pImage )
         AsmJitHelper a;
         uint64_t result = 0;
 
-        pImage->pExpTableAddr = REBASE( pExpTable, pImage->FileImage.base(), pImage->imgMem.ptr<ptr_t>() );
-        auto pAddTable = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->PEImage.mType() ),
+        pImage->pExpTableAddr = REBASE( pExpTable, pImage->peImage.base(), pImage->imgMem.ptr<ptr_t>() );
+        auto pAddTable = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
                                                        "RtlAddFunctionTable" );
 
         a.GenPrologue();
@@ -664,7 +657,7 @@ bool MMap::EnableExceptions( ImageContext* pImage )
                                                                   size / sizeof(IMAGE_RUNTIME_FUNCTION_ENTRY),
                                                                   pImage->imgMem.ptr<size_t>() } );
 
-        _process.remote().AddReturnWithEvent( a, pImage->PEImage.mType() );
+        _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
         a.GenEpilogue();
 
         if (_process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result ) != STATUS_SUCCESS)
@@ -673,18 +666,18 @@ bool MMap::EnableExceptions( ImageContext* pImage )
         if (pImage->flags & CreateLdrRef)
             return true;
         else
-            return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->PEImage.imageSize(), pImage->PEImage.mType() ) == STATUS_SUCCESS);
+            return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType() ) == STATUS_SUCCESS);
     }
     else
         return false;
 #else
     bool safeseh = false;
-    _process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->PEImage.imageSize(), safeseh );
+    _process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->peImage.imageSize(), safeseh );
 
     if ((pImage->flags & PartialExcept) || safeseh)
         return true;
     else
-        return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->PEImage.imageSize(), pImage->PEImage.mType() ) == STATUS_SUCCESS);
+        return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType() ) == STATUS_SUCCESS);
 #endif
 
 }
@@ -705,7 +698,7 @@ bool MMap::DisableExceptions( ImageContext* pImage )
 
         a.GenPrologue();
 
-        auto pRmoveTable = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->PEImage.mType() ),
+        auto pRmoveTable = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
                                                          "RtlDeleteFunctionTable" );
 
         // RtlDeleteFunctionTable(pExpTable);
@@ -739,8 +732,8 @@ bool MMap::DisableExceptions( ImageContext* pImage )
 /// <returns>true on success</returns>
 bool MMap::InitStaticTLS( ImageContext* pImage )
 {
-    IMAGE_TLS_DIRECTORY *pTls = reinterpret_cast<decltype(pTls)>(pImage->PEImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_TLS ));
-    auto pRebasedTls = reinterpret_cast<IMAGE_TLS_DIRECTORY*>(REBASE( pTls, pImage->FileImage.base(), pImage->imgMem.ptr<ptr_t>() ));
+    IMAGE_TLS_DIRECTORY *pTls = reinterpret_cast<decltype(pTls)>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_TLS ));
+    auto pRebasedTls = reinterpret_cast<IMAGE_TLS_DIRECTORY*>(REBASE( pTls, pImage->peImage.base(), pImage->imgMem.ptr<ptr_t>() ));
 
     // Use native TLS initialization
     if (pTls && pTls->AddressOfIndex)
@@ -761,7 +754,7 @@ bool MMap::InitStaticTLS( ImageContext* pImage )
 /// <returns>true on success</returns>
 bool MMap::InitializeCookie( ImageContext* pImage )
 {
-    IMAGE_LOAD_CONFIG_DIRECTORY *pLC = reinterpret_cast<decltype(pLC)>(pImage->PEImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG ));
+    IMAGE_LOAD_CONFIG_DIRECTORY *pLC = reinterpret_cast<decltype(pLC)>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG ));
 
     //
     // Cookie generation based on MSVC++ compiler
@@ -798,7 +791,7 @@ bool MMap::InitializeCookie( ImageContext* pImage )
             cookie |= (cookie | 0x4711) << 16;
     #endif
 
-        _process.memory().Write( REBASE( pLC->SecurityCookie, pImage->PEImage.imageBase(), pImage->imgMem.ptr<ptr_t>() ), cookie );
+        _process.memory().Write( REBASE( pLC->SecurityCookie, pImage->peImage.imageBase(), pImage->imgMem.ptr<ptr_t>() ), cookie );
     }
 
     return true;
@@ -820,7 +813,7 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
     AsmJitHelper a;
     uint64_t result = 0;
 
-    auto hNtdll = _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->PEImage.mType() );
+    auto hNtdll = _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() );
     auto pActivateActx = _process.modules().GetExport( hNtdll, "RtlActivateActivationContext" );
     auto pDeactivateeActx = _process.modules().GetExport( hNtdll, "RtlDeactivateActivationContext" );
 
@@ -884,7 +877,7 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
         a.GenCall( static_cast<size_t>(pDeactivateeActx.procAddress), { 0, asmjit::host::zax } );
     }
 
-    _process.remote().AddReturnWithEvent( a, pImage->PEImage.mType() );
+    _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
     a.GenEpilogue();
 
     _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
@@ -900,10 +893,11 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
 /// | hCtx | ACTCTX | file_path |
 /// -----------------------------
 /// </summary>
-/// <param name="path">Image file path.</param>
+/// <param name="path">Manifest container path</param>
 /// <param name="id">Manifest resource id</param>
+/// <param name="asImage">if true - 'path' points to a valid PE file, otherwise - 'path' points to separate manifest file</param>
 /// <returns>true on success</returns>
-bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
+bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /*= true*/  )
 {   
     AsmJitHelper a;
 
@@ -913,9 +907,14 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */ )
     _pAContext = _process.memory().Allocate( 512, PAGE_READWRITE );
     
     act.cbSize = sizeof(act);
-    act.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
-    act.lpSource = reinterpret_cast<LPCWSTR>(_pAContext.ptr<size_t>() + sizeof(HANDLE) + sizeof(act));
-    act.lpResourceName = MAKEINTRESOURCEW( id );
+    act.lpSource = reinterpret_cast<LPCWSTR>(_pAContext.ptr<size_t>() + sizeof( HANDLE ) + sizeof( act ));
+
+    // Ignore some fields for pure manifest file
+    if (asImage)
+    {
+        act.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
+        act.lpResourceName = MAKEINTRESOURCEW( id );
+    }
 
     bool switchMode = (_process.core().native()->GetWow64Barrier().type == wow_64_32);
     auto pCreateActx = _process.modules().GetExport( _process.modules().GetModule( L"kernel32.dll" ), "CreateActCtxW" );

@@ -345,12 +345,10 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
     auto& barrier = _core.native()->GetWow64Barrier();
     
     AsmJitHelper a;
-    FileProjection fp;
-    pe::PEParser img;
+    pe::PEImage img;
 
-    fp.Project( path );
-    img.Parse( fp, fp.isPlainData() );
-    fp.Release();
+    img.Load( path, true );
+    img.Release();
 
     // Already loaded
     if ((mod = GetModule( path, LdrList, img.mType() )) != nullptr)

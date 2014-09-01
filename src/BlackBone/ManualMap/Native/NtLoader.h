@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Include/Winheaders.h"
-#include "../../PE/PEParser.h"
+#include "../../PE/PEImage.h"
 #include "../../Include/NativeStructures.h"
 #include "../../Include/Macro.h"
 

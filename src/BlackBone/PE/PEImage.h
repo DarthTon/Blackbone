@@ -51,29 +51,49 @@ typedef std::vector<IMAGE_SECTION_HEADER> vecSections;
 /// <summary>
 /// Primitive PE parsing class
 /// </summary>
-class PEParser
+class PEImage
 {
     typedef const IMAGE_NT_HEADERS32* PCHDR32;
     typedef const IMAGE_NT_HEADERS64* PCHDR64;
     
 public:
-    BLACKBONE_API PEParser( void );
-    BLACKBONE_API ~PEParser( void );
+    BLACKBONE_API PEImage( void );
+    BLACKBONE_API ~PEImage( void );
+
+    /// <summary>
+    /// Load image from file
+    /// </summary>
+    /// <param name="path">File path</param>
+    /// <param name="skipActx">If true - do not initialize activation context</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Load( const std::wstring& path, bool skipActx = false );
+
+    /// <summary>
+    /// Load image from memory location
+    /// </summary>
+    /// <param name="pData">Image data</param>
+    /// <param name="size">Data size.</param>
+    /// <param name="plainData">If false - data has image layout</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Load( void* pData, size_t size, bool plainData = true );
+
+    /// <summary>
+    /// Release mapping, if any
+    /// </summary>
+    BLACKBONE_API void Release();
 
     /// <summary>
     /// Parses PE image
     /// </summary>
-    /// <param name="pFileBase">File memory location</param>
-    /// <param name="isPlainData">Treat file as plain datafile</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool Parse( const void* pFileBase, bool isPlainData = false );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Parse( void* pImageBase = nullptr );
 
     /// <summary>
     /// Processes image imports
     /// </summary>
     /// <param name="useDelayed">Process delayed import instead</param>
     /// <returns>Import data</returns>
-    BLACKBONE_API mapImports& ProcessImports( bool useDelayed = false );
+    BLACKBONE_API mapImports& GetImports( bool useDelayed = false );
 
     /// <summary>
     /// Retrieve all exported functions with names
@@ -112,6 +132,12 @@ public:
     /// <param name="keepRelative">Keep address relative to file start</param>
     /// <returns>Resolved address</returns>
     BLACKBONE_API size_t ResolveRVAToVA( size_t Rva, bool keepRelative = false ) const;
+
+    /// <summary>
+    /// Get image load address
+    /// </summary>
+    /// <returns>Image base</returns>
+    BLACKBONE_API inline void* base() const { return _pFileBase; }
 
     /// <summary>
     /// Get image base address
@@ -162,6 +188,36 @@ public:
     /// <returns>Image type</returns>
     BLACKBONE_API inline eModType mType() const { return _is64 ? mt_mod64 : mt_mod32; }
 
+    /// <summary>
+    /// Get activation context handle
+    /// </summary>
+    /// <returns>Actx handle</returns>
+    BLACKBONE_API inline HANDLE actx() const { return _hctx; }
+
+    /// <summary>
+    /// true if image is mapped as plain data file
+    /// </summary>
+    /// <returns>true if mapped as plain data file, false if mapped as image</returns>
+    BLACKBONE_API inline bool isPlainData() const { return _isPlainData; }
+
+    /// <summary>
+    /// Get manifest resource ID
+    /// </summary>
+    /// <returns>Manifest resource ID</returns>
+    BLACKBONE_API inline int manifestID() const { return _manifestIdx; }
+
+    /// <summary>
+    /// Get manifest resource file
+    /// </summary>
+    /// <returns>Manifest resource file</returns>
+    BLACKBONE_API inline const std::wstring& manifestFile() const { return _manifestPath; }
+
+    /// <summary>
+    /// If true - no actual PE file available on disk
+    /// </summary>
+    /// <returns></returns>
+    BLACKBONE_API inline bool noPhysFile() const { return _noFile; }
+
 #ifdef COMPILER_MSVC
     /// <summary>
     /// .NET image parser
@@ -171,21 +227,45 @@ public:
 #endif
 
 private:
-    bool        _isPlainData = false;       // File mapped as plain data file
-    bool        _is64 = false;              // Image is 64 bit
-    bool        _isExe = false;             // Image is an .exe file
-    bool        _isPureIL = false;          // Pure IL image
-    const void *_pFileBase = nullptr;       // File mapping base address
-    PCHDR32     _pImageHdr32 = nullptr;     // PE header info
-    PCHDR64     _pImageHdr64 = nullptr;     // PE header info
-    ptr_t       _imgBase = 0;               // Image base
-    size_t      _imgSize = 0;               // Image size
-    size_t      _epRVA = 0;                 // Entry point RVA
-    size_t      _hdrSize = 0;               // Size of headers
+    /// <summary>
+    /// Prepare activation context
+    /// </summary>
+    /// <param name="filepath">Path to PE file. If nullptr - manifest is extracted from memory to disk</param>
+    /// <returns>Status code</returns>
+    NTSTATUS PrepareACTX( const wchar_t* filepath = nullptr );
 
-    vecSections _sections;                  // Section info
-    mapImports  _imports;                   // Import functions
-    mapImports  _delayImports;              // Import functions
+    /// <summary>
+    /// Get manifest from image data
+    /// </summary>
+    /// <param name="size">Manifest size</param>
+    /// <param name="manifestID">Mmanifest ID</param>
+    /// <returns>Manifest data</returns>
+    void* GetManifest( uint32_t& size, int& manifestID );
+
+private:
+    HANDLE      _hFile = INVALID_HANDLE_VALUE;  // Target file HANDLE
+    HANDLE      _hMapping = NULL;               // Memory mapping object
+    void*       _pFileBase = nullptr;           // Mapping base
+    bool        _isPlainData = false;           // File mapped as plain data file
+    bool        _is64 = false;                  // Image is 64 bit
+    bool        _isExe = false;                 // Image is an .exe file
+    bool        _isPureIL = false;              // Pure IL image
+    bool        _noFile = false;                // Parsed from memory, no underlying PE file available        
+    PCHDR32     _pImageHdr32 = nullptr;         // PE header info
+    PCHDR64     _pImageHdr64 = nullptr;         // PE header info
+    ptr_t       _imgBase = 0;                   // Image base
+    uint32_t    _imgSize = 0;                   // Image size
+    uint32_t    _epRVA = 0;                     // Entry point RVA
+    uint32_t    _hdrSize = 0;                   // Size of headers
+    HANDLE      _hctx = INVALID_HANDLE_VALUE;   // Activation context
+    int         _manifestIdx = 0;               // Manifest resource ID
+
+    vecSections _sections;                      // Section info
+    mapImports  _imports;                       // Import functions
+    mapImports  _delayImports;                  // Import functions
+
+    std::wstring _imagePath;                    // Image path
+    std::wstring _manifestPath;                 // Image manifest container
 
 #ifdef COMPILER_MSVC
     ImageNET    _netImage;                  // .net image info

@@ -3,12 +3,8 @@
 #include "../Config.h"
 #include "../Include/Winheaders.h"
 #include "../Include/Macro.h"
-#include "../PE/FileProjection.h"
-#include "../PE/PEParser.h"
+#include "../PE/PEImage.h"
 
-#ifdef COMPILER_MSVC
-#include "../PE/ImageNET.h"
-#endif // COMPILER_MSVC
 #include "../Process/MemBlock.h"
 #include "MExcept.h"
 
@@ -49,8 +45,7 @@ struct ImageContext
 {
     typedef std::vector<ptr_t> vecPtr;
 
-    FileProjection FileImage;               // Image file mapping
-    pe::PEParser   PEImage;                 // PE data
+    pe::PEImage    peImage;                 // PE image data
     MemBlock       imgMem;                  // Target image memory region
     std::wstring   FilePath;                // path to image being mapped
     std::wstring   FileName;                // File name string
@@ -81,10 +76,12 @@ public:
     /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
     /// <param name="ldrContext">User-supplied Loader callback context</param>
     /// <returns>Mapped image info </returns>
-    BLACKBONE_API const ModuleData* MapImage( const std::wstring& path,
-                                              eLoadFlags flags = NoFlags,
-                                              LdrCallback ldrCallback = nullptr,
-                                              void* ldrContext = nullptr);
+    BLACKBONE_API const ModuleData* MapImage(
+        const std::wstring& path,
+        eLoadFlags flags = NoFlags,
+        LdrCallback ldrCallback = nullptr,
+        void* ldrContext = nullptr
+        );
 
     /// <summary>
     ///Manually map PE image into underlying target process
@@ -96,11 +93,13 @@ public:
     /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
     /// <param name="ldrContext">User-supplied Loader callback context</param>
     /// <returns>Mapped image info</returns>
-    BLACKBONE_API const ModuleData* MapImage( void* buffer, size_t size, 
-                                              bool asImage = false,
-                                              eLoadFlags flags = NoFlags,
-                                              LdrCallback ldrCallback = nullptr,
-                                              void* ldrContext = nullptr );
+    BLACKBONE_API const ModuleData* MapImage(
+        void* buffer, size_t size,
+        bool asImage = false,
+        eLoadFlags flags = NoFlags,
+        LdrCallback ldrCallback = nullptr,
+        void* ldrContext = nullptr
+        );
 
     /// <summary>
     /// Unmap all manually mapped modules
@@ -120,13 +119,25 @@ public:
     BLACKBONE_API inline void reset() { _images.clear(); _pAContext.Reset(); _usedBlocks.clear(); }
 
 private:
-
-    const ModuleData* MapImage( const std::wstring& path,
-                                void* buffer, size_t size,
-                                bool asImage = false,
-                                eLoadFlags flags = NoFlags,
-                                LdrCallback ldrCallback = nullptr,
-                                void* ldrContext = nullptr );
+    /// <summary>
+    /// Manually map PE image into underlying target process
+    /// </summary>
+    /// <param name="path">Image path</param>
+    /// <param name="buffer">Image data buffer</param>
+    /// <param name="size">Buffer size.</param>
+    /// <param name="asImage">If set to true - buffer has image memory layout</param>
+    /// <param name="flags">Image mapping flags</param>
+    /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
+    /// <param name="ldrContext">User-supplied Loader callback context</param>
+    /// <returns>Mapped image info</returns>
+    const ModuleData* MapImage(
+        const std::wstring& path,
+        void* buffer, size_t size,
+        bool asImage = false,
+        eLoadFlags flags = NoFlags,
+        LdrCallback ldrCallback = nullptr,
+        void* ldrContext = nullptr
+        );
 
     /// <summary>
     /// Get existing module or map it if absent
@@ -134,9 +145,11 @@ private:
     /// <param name="path">Image path</param>
     /// <param name="flags">Mapping flags</param>
     /// <returns>Module info</returns>
-    const ModuleData* FindOrMapModule( const std::wstring& path, 
-                                       void* buffer, size_t size, bool asImage, 
-                                       eLoadFlags flags = NoFlags );
+    const ModuleData* FindOrMapModule(
+        const std::wstring& path,
+        void* buffer, size_t size, bool asImage,
+        eLoadFlags flags = NoFlags
+        );
 
     /// <summary>
     /// Run module initializers(TLS and entry point).
@@ -208,10 +221,11 @@ private:
     /// | hCtx | ACTCTX | file_path |
     /// -----------------------------
     /// </summary>
-    /// <param name="path">Image file path.</param>
+    /// <param name="path">Manifest container path</param>
     /// <param name="id">Manifest resource id</param>
+    /// <param name="asImage">if true - 'path' points to a valid PE file, otherwise - 'path' points to separate manifest file</param>
     /// <returns>true on success</returns>
-    bool CreateActx( const std::wstring& path, int id = 2 );
+    bool CreateActx( const std::wstring& path, int id = 2, bool asImage = true );
 
     /// <summary>
     /// Calculate and set security cookie

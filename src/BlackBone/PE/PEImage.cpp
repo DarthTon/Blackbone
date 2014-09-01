@@ -1,6 +1,7 @@
-#include "../PE/PEParser.h"
+#include "../PE/PEImage.h"
 #include "../Include/Macro.h"
 #include "../Misc/Utils.h"
+#include "../Misc/DynImport.h"
 
 #define TLS32(ptr) ((const IMAGE_TLS_DIRECTORY32*)ptr)  // TLS directory
 #define TLS64(ptr) ((const IMAGE_TLS_DIRECTORY64*)ptr)  // TLS directory
@@ -13,37 +14,151 @@ namespace blackbone
 namespace pe
 {
 
-PEParser::PEParser( void )
+PEImage::PEImage( void )
 {
 }
 
-PEParser::~PEParser( void )
+PEImage::~PEImage( void )
 {
+}
+
+/// <summary>
+/// Load image from file
+/// </summary>
+/// <param name="path">File path</param>
+/// <param name="skipActx">If true - do not initialize activation context</param>
+/// <returns>Status code</returns>
+NTSTATUS PEImage::Load( const std::wstring& path, bool skipActx /*= false*/ )
+{
+    Release();
+    _imagePath = path;
+    _noFile = false;
+
+    _hFile = CreateFileW( path.c_str(), FILE_GENERIC_READ,
+                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                          NULL, OPEN_EXISTING, 0, NULL );
+
+    if (_hFile != INVALID_HANDLE_VALUE)
+    {
+        // Try mapping as image
+        _hMapping = CreateFileMappingW( _hFile, NULL, SEC_IMAGE | PAGE_READONLY, 0, 0, NULL );
+
+        if (_hMapping && _hMapping != INVALID_HANDLE_VALUE)
+        {
+            _isPlainData = false;
+            _pFileBase = MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 );
+
+            SECTION_BASIC_INFORMATION_T SectionInfo = { 0 };
+            GET_IMPORT( NtQuerySection )(_hMapping, SectionBasicInformation, &SectionInfo, sizeof( SectionInfo ), 0);
+        }
+        // Map as simple datafile
+        else
+        {
+            _isPlainData = true;
+            _hMapping = CreateFileMappingW( _hFile, NULL, PAGE_READONLY, 0, 0, NULL );
+
+            if (_hMapping && _hMapping != INVALID_HANDLE_VALUE)
+                _pFileBase = MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 );
+        }
+
+        // Mapping failed
+        if (!_pFileBase)
+            return LastNtStatus();
+    }
+    else
+        return LastNtStatus();
+
+    auto status = Parse();
+    if (!NT_SUCCESS( status ))
+        return status;
+
+    return skipActx ? status : PrepareACTX( _imagePath.c_str() );
+}
+
+/// <summary>
+/// Load image from memory location
+/// </summary>
+/// <param name="pData">Image data</param>
+/// <param name="size">Data size.</param>
+/// <param name="plainData">If false - data has image layout</param>
+/// <returns>Status code</returns>
+NTSTATUS PEImage::Load( void* pData, size_t size, bool plainData /*= true */ )
+{
+    Release();
+
+    _noFile = true;
+    _pFileBase = pData;
+    _isPlainData = plainData;
+
+    auto status = Parse();
+    if (!NT_SUCCESS( status ))
+        return status;
+
+    return PrepareACTX();
+}
+
+/// <summary>
+/// Release mapping, if any
+/// </summary>
+void PEImage::Release()
+{
+    if (_hctx != INVALID_HANDLE_VALUE)
+    {
+        ReleaseActCtx( _hctx );
+        _hctx = INVALID_HANDLE_VALUE;
+    }
+
+    if (_hMapping && _hMapping != INVALID_HANDLE_VALUE)
+    {
+        if (_pFileBase)
+        {
+            UnmapViewOfFile( _pFileBase );
+            _pFileBase = nullptr;
+        }
+
+        CloseHandle( _hMapping );
+        _hMapping = NULL;
+    }
+
+    if (_hFile != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle( _hFile );
+        _hFile = INVALID_HANDLE_VALUE;
+    }
+
+    // Reset pointers to data
+    _pImageHdr32 = nullptr;
+    _pImageHdr64 = nullptr;
+
+    _imagePath.clear();
+
+    // Ensure temporary file is deleted
+    DeleteFileW( _manifestPath.c_str() );
+    _manifestPath.clear();
 }
 
 /// <summary>
 /// Parses PE image
 /// </summary>
-/// <param name="pFileBase">File memory location</param>
-/// <param name="isPlainData">Treat file as plain datafile</param>
-/// <returns>true on success</returns>
-bool PEParser::Parse( const void* pFileBase, bool isPlainData /*= false*/ )
+/// <returns>Status code</returns>
+NTSTATUS PEImage::Parse( void* pImageBase /*= nullptr*/ )
 {
     const IMAGE_DOS_HEADER *pDosHdr = nullptr;
     const IMAGE_SECTION_HEADER *pSection = nullptr;
 
-    if (!pFileBase)
-        return false;
+    if (pImageBase != nullptr)
+        _pFileBase = pImageBase;
 
-    _isPlainData = isPlainData;
+    // Something went wrong
+    if (!_pFileBase)
+        return STATUS_INVALID_ADDRESS;
 
     // Get DOS header
-    _pFileBase = pFileBase;
     pDosHdr = reinterpret_cast<const IMAGE_DOS_HEADER*>(_pFileBase);
 
     // File not a valid PE file
     if (pDosHdr->e_magic != IMAGE_DOS_SIGNATURE)
-        return false;
+        return STATUS_INVALID_IMAGE_FORMAT;
 
     // Get image header
     _pImageHdr32 = reinterpret_cast<PCHDR32>(reinterpret_cast<const uint8_t*>(pDosHdr) + pDosHdr->e_lfanew);
@@ -51,7 +166,7 @@ bool PEParser::Parse( const void* pFileBase, bool isPlainData /*= false*/ )
 
     // File not a valid PE file
     if (_pImageHdr32->Signature != IMAGE_NT_SIGNATURE)
-        return false;
+        return STATUS_INVALID_IMAGE_FORMAT;
 
     // Detect x64 image
     if (_pImageHdr32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
@@ -89,7 +204,7 @@ bool PEParser::Parse( const void* pFileBase, bool isPlainData /*= false*/ )
     for (int i = 0; i < _pImageHdr32->FileHeader.NumberOfSections; ++i, ++pSection)
         _sections.push_back( *pSection );
 
-    return true;
+    return STATUS_SUCCESS;
 }
 
 /// <summary>
@@ -97,7 +212,7 @@ bool PEParser::Parse( const void* pFileBase, bool isPlainData /*= false*/ )
 /// </summary>
 /// <param name="useDelayed">Process delayed import instead</param>
 /// <returns>Import data</returns>
-mapImports& PEParser::ProcessImports( bool useDelayed /*= false*/ )
+mapImports& PEImage::GetImports( bool useDelayed /*= false*/ )
 {
     if(useDelayed)
     {
@@ -211,7 +326,7 @@ mapImports& PEParser::ProcessImports( bool useDelayed /*= false*/ )
 /// Retrieve all exported functions with names
 /// </summary>
 /// <param name="names">Found exports</param>
-void PEParser::GetExportNames( std::list<std::string>& names )
+void PEImage::GetExportNames( std::list<std::string>& names )
 {
     names.clear();
 
@@ -233,7 +348,7 @@ void PEParser::GetExportNames( std::list<std::string>& names )
 /// <param name="index">Directory index</param>
 /// <param name="keepRelative">Keep address relative to image base</param>
 /// <returns>Directory address</returns>
-size_t PEParser::DirectoryAddress( int index, bool keepRelative /*= false*/ ) const
+size_t PEImage::DirectoryAddress( int index, bool keepRelative /*= false*/ ) const
 {
     // Sanity check
     if (index < 0 || index >= IMAGE_NUMBEROF_DIRECTORY_ENTRIES)
@@ -254,7 +369,7 @@ size_t PEParser::DirectoryAddress( int index, bool keepRelative /*= false*/ ) co
 /// <param name="Rva">Memory address</param>
 /// <param name="keepRelative">Keep address relative to file start</param>
 /// <returns>Resolved address</returns>
-size_t PEParser::ResolveRVAToVA( size_t Rva, bool keepRelative /*= false*/ ) const
+size_t PEImage::ResolveRVAToVA( size_t Rva, bool keepRelative /*= false*/ ) const
 {
     if (_isPlainData)
     {
@@ -280,7 +395,7 @@ size_t PEParser::ResolveRVAToVA( size_t Rva, bool keepRelative /*= false*/ ) con
 /// </summary>
 /// <param name="index">Data directory index</param>
 /// <returns>Data directory size</returns>
-size_t PEParser::DirectorySize( int index ) const
+size_t PEImage::DirectorySize( int index ) const
 {
     // Sanity check
     if (index < 0 || index >= IMAGE_NUMBEROF_DIRECTORY_ENTRIES)
@@ -303,7 +418,7 @@ size_t PEParser::DirectorySize( int index ) const
 /// <param name="targetBase">Target image base</param>
 /// <param name="result">Found callbacks</param>
 /// <returns>Number of TLS callbacks in image</returns>
-int PEParser::GetTLSCallbacks( module_t targetBase, std::vector<ptr_t>& result ) const
+int PEImage::GetTLSCallbacks( module_t targetBase, std::vector<ptr_t>& result ) const
 {
     uint8_t *pTls = reinterpret_cast<uint8_t*>(DirectoryAddress( IMAGE_DIRECTORY_ENTRY_TLS ));
     uint64_t* pCallback = 0;
@@ -330,6 +445,149 @@ int PEParser::GetTLSCallbacks( module_t targetBase, std::vector<ptr_t>& result )
     }
 
     return (int)result.size();
+}
+
+/// <summary>
+/// Prepare activation context
+/// </summary>
+/// <param name="filepath">Path to PE file. If nullptr - manifest is extracted from memory to disk</param>
+/// <returns>Status code</returns>
+NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
+{
+    wchar_t tempPath[256] = { 0 };
+    uint32_t manifestSize = 0;
+
+    ACTCTXW act = { 0 };
+    act.cbSize = sizeof( act );
+
+    // No manifest found, skip
+    auto pManifest = GetManifest( manifestSize, _manifestIdx );
+    if (!pManifest)
+        return STATUS_SUCCESS;
+
+    //
+    // Dump manifest to TMP folder
+    //
+    if (filepath == nullptr)
+    {
+        wchar_t tempDir[256] = { 0 };
+
+        GetTempPathW( ARRAYSIZE( tempDir ), tempDir );
+        if (GetTempFileNameW( tempDir, L"ImageManifest", 0, tempPath ) == 0)
+            return STATUS_UNSUCCESSFUL;
+     
+        HANDLE hTmpFile = CreateFileW( tempPath, FILE_GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, 0, NULL );
+        if (hTmpFile != INVALID_HANDLE_VALUE)
+        {
+            DWORD bytes = 0;
+            WriteFile( hTmpFile, pManifest, manifestSize, &bytes, NULL );
+            CloseHandle( hTmpFile );
+
+            act.lpSource = tempPath;
+            _manifestPath = tempPath;
+        }
+        else
+            return LastNtStatus();
+    }
+    else
+    {
+        act.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
+        act.lpResourceName = MAKEINTRESOURCEW( _manifestIdx );
+        act.lpSource = filepath;
+
+        _manifestPath = _imagePath;
+    }  
+   
+    // Create ACTX
+    _hctx = CreateActCtxW( &act );
+
+    return _hctx != INVALID_HANDLE_VALUE ? STATUS_SUCCESS : LastNtStatus();
+}
+
+/// <summary>
+/// Get manifest from image data
+/// </summary>
+/// <param name="size">Manifest size</param>
+/// <param name="manifestID">Mmanifest ID</param>
+/// <returns>Manifest data</returns>
+void* PEImage::GetManifest( uint32_t& size, int& manifestID )
+{
+    // 3 levels of pointers to nodes
+    const IMAGE_RESOURCE_DIRECTORY_ENTRY *pDirNode1 = nullptr;
+    const IMAGE_RESOURCE_DIRECTORY_ENTRY *pDirNode2 = nullptr;
+    const IMAGE_RESOURCE_DIRECTORY_ENTRY *pDirNode3 = nullptr;
+
+    // 3 levels of nodes
+    const IMAGE_RESOURCE_DIRECTORY       *pDirNodePtr1 = nullptr;
+    const IMAGE_RESOURCE_DIRECTORY       *pDirNodePtr2 = nullptr;
+    const IMAGE_RESOURCE_DIRECTORY       *pDirNodePtr3 = nullptr;
+
+    // resource entry data
+    const IMAGE_RESOURCE_DATA_ENTRY      *pDataNode = nullptr;
+
+    size_t ofst_1 = 0;  // first level nodes offset
+    size_t ofst_2 = 0;  // second level nodes offset
+    size_t ofst_3 = 0;  // third level nodes offset
+
+    // Get section base
+    auto secBase = DirectoryAddress( IMAGE_DIRECTORY_ENTRY_RESOURCE );
+    if (secBase == 0)
+    {
+        size = 0;
+        manifestID = 0;
+        return nullptr;
+    }
+
+    pDirNodePtr1 = reinterpret_cast<const IMAGE_RESOURCE_DIRECTORY*>(secBase);
+    ofst_1 += sizeof( IMAGE_RESOURCE_DIRECTORY );
+
+    // first-level nodes
+    for (int i = 0; i < pDirNodePtr1->NumberOfIdEntries + pDirNodePtr1->NumberOfNamedEntries; ++i)
+    {
+        pDirNode1 = reinterpret_cast<const IMAGE_RESOURCE_DIRECTORY_ENTRY*>(secBase + ofst_1);
+
+        // Not a manifest directory
+        if (!pDirNode1->DataIsDirectory || pDirNode1->Id != 0x18)
+        {
+            ofst_1 += sizeof( IMAGE_RESOURCE_DIRECTORY_ENTRY );
+            continue;
+        }
+
+        pDirNodePtr2 = reinterpret_cast<const IMAGE_RESOURCE_DIRECTORY*>(secBase + pDirNode1->OffsetToDirectory);
+        ofst_2 = pDirNode1->OffsetToDirectory + sizeof( IMAGE_RESOURCE_DIRECTORY );
+
+        // second-level nodes
+        for (int j = 0; j < pDirNodePtr2->NumberOfIdEntries + pDirNodePtr2->NumberOfNamedEntries; ++j)
+        {
+            pDirNode2 = reinterpret_cast<const IMAGE_RESOURCE_DIRECTORY_ENTRY*>(secBase + ofst_2);
+
+            if (!pDirNode2->DataIsDirectory)
+            {
+                ofst_2 += sizeof( IMAGE_RESOURCE_DIRECTORY_ENTRY );
+                continue;
+            }
+
+            // Check if this is a valid manifest resource
+            if (pDirNode2->Id == 1 || pDirNode2->Id == 2 || pDirNode2->Id == 3)
+            {
+                pDirNodePtr3 = reinterpret_cast<const IMAGE_RESOURCE_DIRECTORY*>(secBase + pDirNode2->OffsetToDirectory);
+                ofst_3 = pDirNode2->OffsetToDirectory + sizeof( IMAGE_RESOURCE_DIRECTORY );
+                pDirNode3 = reinterpret_cast<const IMAGE_RESOURCE_DIRECTORY_ENTRY*>(secBase + ofst_3);
+                pDataNode = reinterpret_cast<const IMAGE_RESOURCE_DATA_ENTRY*>(secBase + pDirNode3->OffsetToData);
+
+                manifestID = pDirNode2->Id;
+                size = pDataNode->Size;
+
+                return reinterpret_cast<void*>(ResolveRVAToVA( pDataNode->OffsetToData ));
+            }
+
+            ofst_2 += sizeof( IMAGE_RESOURCE_DIRECTORY_ENTRY );
+        }
+
+        ofst_1 += sizeof( IMAGE_RESOURCE_DIRECTORY_ENTRY );
+    }
+
+    return nullptr;
 }
 
 }
