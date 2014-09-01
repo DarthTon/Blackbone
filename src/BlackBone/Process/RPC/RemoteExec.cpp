@@ -294,7 +294,7 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool noThread /*= false*/ )
     auto& barrier = _proc.core().native()->GetWow64Barrier();
     if (barrier.type != wow_32_64)
         status = CreateAPCEvent( thdID );
-
+        
     if ((noThread == false && thdID == 0) || status == false)
         dwResult = LastNtStatus();
 
@@ -548,6 +548,10 @@ void RemoteExec::AddReturnWithEvent(
     uint32_t retOffset /*= RET_OFFSET*/ 
     )
 {
+    // Allocate block if missing
+    if (!_userData.valid())
+        _userData = _memory.Allocate( 0x4000, PAGE_READWRITE );
+
     size_t ptr = _userData.ptr<size_t>();
     auto pSetEvent = _proc.modules().GetExport( _proc.modules().GetModule( L"ntdll.dll", LdrList, mt ), "NtSetEvent" );
     a.SaveRetValAndSignalEvent( (size_t)pSetEvent.procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );

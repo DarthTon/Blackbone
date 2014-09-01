@@ -31,10 +31,12 @@ MMap::~MMap(void)
 /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
 /// <param name="ldrContext">User-supplied Loader callback context</param>
 /// <returns>Mapped image info </returns>
-const ModuleData* MMap::MapImage( const std::wstring& path, 
-                                  eLoadFlags flags /*= NoFlags*/, 
-                                  LdrCallback ldrCallback /*= nullptr*/,
-                                  void* ldrContext /*= nullptr*/ )
+const ModuleData* MMap::MapImage(
+    const std::wstring& path,
+    eLoadFlags flags /*= NoFlags*/,
+    LdrCallback ldrCallback /*= nullptr*/,
+    void* ldrContext /*= nullptr*/
+    )
 {
     return MapImage( path, nullptr, 0, false, flags, ldrCallback, ldrContext );
 }
@@ -49,11 +51,13 @@ const ModuleData* MMap::MapImage( const std::wstring& path,
 /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
 /// <param name="ldrContext">User-supplied Loader callback context</param>
 /// <returns>Mapped image info</returns>
-const ModuleData* MMap::MapImage( void* buffer, size_t size,
-                                  bool asImage /*= false*/,
-                                  eLoadFlags flags /*= NoFlags*/,
-                                  LdrCallback ldrCallback /*= nullptr*/,
-                                  void* ldrContext /*= nullptr */ )
+const ModuleData* MMap::MapImage(
+    void* buffer, size_t size,
+    bool asImage /*= false*/,
+    eLoadFlags flags /*= NoFlags*/,
+    LdrCallback ldrCallback /*= nullptr*/,
+    void* ldrContext /*= nullptr */
+    )
 {
     // Create fake path
     wchar_t path[64];
@@ -73,12 +77,14 @@ const ModuleData* MMap::MapImage( void* buffer, size_t size,
 /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
 /// <param name="ldrContext">User-supplied Loader callback context</param>
 /// <returns>Mapped image info</returns>
-const ModuleData* MMap::MapImage( const std::wstring& path,
-                                  void* buffer,size_t size,
-                                  bool asImage /*= false*/,
-                                  eLoadFlags flags /*= NoFlags*/,
-                                  LdrCallback ldrCallback /*= nullptr*/,
-                                  void* ldrContext /*= nullptr*/ )
+const ModuleData* MMap::MapImage(
+    const std::wstring& path,
+    void* buffer, size_t size,
+    bool asImage /*= false*/,
+    eLoadFlags flags /*= NoFlags*/,
+    LdrCallback ldrCallback /*= nullptr*/,
+    void* ldrContext /*= nullptr*/
+    )
 {
     // Already loaded
     if (auto hMod = _process.modules().GetModule( path ))
@@ -86,7 +92,10 @@ const ModuleData* MMap::MapImage( const std::wstring& path,
 
     // Prepare target process
     if (_process.remote().CreateRPCEnvironment() != STATUS_SUCCESS)
+    {
+        Cleanup();
         return nullptr;
+    }
 
     // No need to support exceptions if DEP is disabled
     if (_process.core().DEP() == false)
@@ -105,7 +114,10 @@ const ModuleData* MMap::MapImage( const std::wstring& path,
     // Map module and all dependencies
     auto mod = FindOrMapModule( path, buffer, size, asImage, flags );
     if (mod == nullptr)
+    {
+        Cleanup();
         return nullptr;
+    }
 
     // Change process base module address if needed
     if (flags & RebaseProcess && !_images.empty() && _images.rbegin()->get()->PEImage.IsExe())
@@ -133,6 +145,8 @@ const ModuleData* MMap::MapImage( const std::wstring& path,
             img->initialized = true;
         }
     }
+
+    Cleanup();
 
     return mod;
 }
@@ -224,21 +238,12 @@ const ModuleData* MMap::FindOrMapModule( const std::wstring& path,
     if (!(flags & NoSxS))
         CreateActx( path, pImage->FileImage.manifestID() );
 
-    // Manual Debug tests only
-    /*if (!(flags & NoExceptions))
-    {
-        MExcept::pImageBase = pImage->image.ptr<void*>( );
-        MExcept::imageSize = pImage->PEImage.imageSize( );
-    }*/
-
     // Core image mapping operations
     if (!CopyImage( pImage.get() ) || !RelocateImage( pImage.get() ))
         return nullptr;
 
     auto mt = pImage->PEImage.mType();
-    auto pMod = _process.modules().AddManualModule( pImage->FilePath, 
-                                                    pImage->imgMem.ptr<module_t>(),
-                                                    pImage->imgMem.size(), mt );
+    auto pMod = _process.modules().AddManualModule( pImage->FilePath, pImage->imgMem.ptr<module_t>(), pImage->imgMem.size(), mt );
 
     // Import tables
     if (!ResolveImport( pImage.get() ) || (!(flags & NoDelayLoad) && !ResolveImport( pImage.get(), true )))
@@ -352,13 +357,8 @@ bool MMap::UnmapAllModules()
         _process.modules().RemoveManualModule( pImage->FilePath, pImage->PEImage.mType() );
     } 
 
-    // Free activation context memory
-    _pAContext.Free();
-
-    // Terminate worker thread
-    _process.remote().TerminateWorker();
-
-    _images.clear();
+    Cleanup();
+    reset();
 
     return true;
 }
@@ -1061,6 +1061,17 @@ NTSTATUS MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
 
     return status;
 }
+
+/// <summary>
+/// Remove any traces from remote process
+/// </summary>
+/// <returns></returns>
+void MMap::Cleanup()
+{
+    _pAContext.Reset();
+    _process.remote().reset();
+}
+
 
 /// <summary>
 /// Gets VadPurge handle.

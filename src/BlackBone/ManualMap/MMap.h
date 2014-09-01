@@ -109,6 +109,12 @@ public:
     BLACKBONE_API bool UnmapAllModules();
 
     /// <summary>
+    /// Remove any traces from remote process
+    /// </summary>
+    /// <returns></returns>
+    BLACKBONE_API void Cleanup();
+
+    /// <summary>
     /// Reset local data
     /// </summary>
     BLACKBONE_API inline void reset() { _images.clear(); _pAContext.Reset(); _usedBlocks.clear(); }
