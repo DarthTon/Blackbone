@@ -374,6 +374,13 @@ NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY
             // Set initial protection
             BBProtectVAD( PsGetCurrentProcess(), pResult->address, BBConvertProtection( pAllocFree->protection, FALSE ) );
 
+            // Make pages executable
+            if (pAllocFree->protection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE))
+            {
+                for (ULONG_PTR pAdress = pResult->address; pAdress < pResult->address + pResult->size; pAdress += PAGE_SIZE)
+                    GetPTEForVA( (PVOID)pAdress )->NoExecute = 0;
+            }
+
             // Add to list
             pEntry = BBLookupPhysProcessEntry( (HANDLE)pAllocFree->pid );
             if (pEntry == NULL)
@@ -499,7 +506,7 @@ NTSTATUS BBHideVAD( IN PHIDE_VAD pData )
 
     status = PsLookupProcessByProcessId( (HANDLE)pData->pid, &pProcess );
     if (NT_SUCCESS( status ))
-        status = BBUnlinkVAD( pProcess, pData->base );
+        status = BBProtectVAD( pProcess, pData->base, MM_ZERO_ACCESS );
     else
         DPRINT( "BlackBone: %s: PsLookupProcessByProcessId failed with status 0x%X\n", __FUNCTION__, status );
 

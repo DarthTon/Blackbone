@@ -20,8 +20,8 @@ enum eLoadFlags
     NoFlags         = 0x00,     // No flags
     ManualImports   = 0x01,     // Manually map import libraries
     CreateLdrRef    = 0x02,     // Create module references for native loader
-    WipeHeader      = 0x04,     // Wipe image PE headers    WipeRelocs      = 0x08,     // Wipe relocations section
-    UnlinkVAD       = 0x10,     // Unlink image VAD from process VAD tree
+    WipeHeader      = 0x04,     // Wipe image PE headers
+    HideVAD         = 0x10,     // Make image appear as PAGE_NOACESS region
     MapInHighMem    = 0x20,     // Try to map image in address space beyond 4GB limit
     RebaseProcess   = 0x40,     // If target image is an .exe file, process base address will be replaced with mapped module value
 
@@ -32,7 +32,7 @@ enum eLoadFlags
     NoTLS           = 0x10000,   // Skip TLS initialization and don't execute TLS callbacks
 };
 
-ENUM_OPS(eLoadFlags)
+ENUM_OPS( eLoadFlags )
 
 // Native loader flags callback
 typedef enum LdrRefFlags( *LdrCallback )(void* context, const ModuleData& modInfo);
@@ -235,11 +235,11 @@ private:
     bool InitializeCookie( ImageContext* pImage );
 
     /// <summary>
-    /// Unlink memory VAD node
+    /// Hide memory VAD node
     /// </summary>
     /// <param name="imageMem">Image to purge</param>
     /// <returns>Status code</returns>
-    NTSTATUS HideVad( const MemBlock& imageMem );
+    NTSTATUS ConcealVad( const MemBlock& imageMem );
 
     /// <summary>
     /// Allocates memory region beyond 4GB limit
@@ -270,12 +270,6 @@ private:
     /// <param name="characteristics">Section characteristics</param>
     /// <returns>Memory protection value</returns>
     DWORD GetSectionProt( DWORD characteristics );
-
-    /// <summary>
-    /// Gets VadPurge handle.
-    /// </summary>
-    /// <returns>Driver object handle, INVALID_HANDLE_VALUE if failed</returns>
-    HANDLE GetDriverHandle();
 
 private:
     vecImageCtx     _images;                // Mapped images

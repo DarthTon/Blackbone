@@ -185,7 +185,14 @@ public:
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS InjectDll( DWORD pid, const std::wstring& path, InjectType itype, bool wait = true );
 
-    BLACKBONE_API NTSTATUS HideVAD( DWORD pid, ptr_t base, uint32_t size );
+    /// <summary>
+    /// Make VAD region appear as PAGE_NO_ACESS to NtQueryVirtualMemory
+    /// </summary>
+    /// <param name="pid">Target process ID</param>
+    /// <param name="base">Region base</param>
+    /// <param name="size">Region size</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS ConcealVAD( DWORD pid, ptr_t base, uint32_t size );
 
 private:
     DriverControl( const DriverControl& ) = delete;

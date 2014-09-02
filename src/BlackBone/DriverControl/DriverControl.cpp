@@ -1,5 +1,6 @@
 #include "DriverControl.h"
 #include "../Misc/Utils.h"
+#include "../Misc/Trace.hpp"
 #include "../Misc/DynImport.h"
 #include "../Include/Macro.h"
 
@@ -80,13 +81,19 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
 
     status = LoadDriver( DRIVER_SVC_NAME, path );
     if (!NT_SUCCESS( status ))
+    {
+        BLACBONE_TRACE( L"Failed to load driver %ls. Status 0x%X", path.c_str(), status );
         return LastNtStatus( status );
+    }
 
     _hDriver = CreateFile( BLACKBONE_DEVICE_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                            NULL, OPEN_EXISTING, 0, NULL );
 
     if (_hDriver == INVALID_HANDLE_VALUE)
+    {
+        BLACBONE_TRACE( L"Failed to open driver handle. Status 0x%X", status );
         return LastNtStatus();
+    }
 
     return STATUS_SUCCESS;
 }
@@ -490,7 +497,14 @@ NTSTATUS DriverControl::InjectDll( DWORD pid, const std::wstring& path, InjectTy
     return STATUS_SUCCESS;
 }
 
-NTSTATUS DriverControl::HideVAD( DWORD pid, ptr_t base, uint32_t size )
+/// <summary>
+/// Make VAD region appear as PAGE_NO_ACESS to NtQueryVirtualMemory
+/// </summary>
+/// <param name="pid">Target process ID</param>
+/// <param name="base">Region base</param>
+/// <param name="size">Region size</param>
+/// <returns>Status code</returns>
+NTSTATUS DriverControl::ConcealVAD( DWORD pid, ptr_t base, uint32_t size )
 {
     DWORD bytes = 0;
     HIDE_VAD hideVAD = { 0 };

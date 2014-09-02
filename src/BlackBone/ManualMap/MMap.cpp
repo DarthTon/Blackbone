@@ -192,18 +192,21 @@ const ModuleData* MMap::FindOrMapModule(
         AllocateInHighMem( pImage->imgMem, pImage->peImage.imageSize() );
     }
     // Try to map image at it's original ASRL-aware base
-    else if (flags & UnlinkVAD)
+    else if (flags & HideVAD)
     {      
         ptr_t base = pImage->peImage.imageBase();
         ptr_t size = pImage->peImage.imageSize();
 
-        // Allocate as physical
-        Driver().EnsureLoaded();
+        if (!NT_SUCCESS( Driver().EnsureLoaded() ))
+             return nullptr;
+
+        // Allocate as physical at desired base
         auto status = Driver().AllocateMem( _process.pid(), base, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
 
         // Allocate at any base
         if (!NT_SUCCESS( status ))
         {
+            base = 0;
             size = pImage->peImage.imageSize();
             status = Driver().AllocateMem( _process.pid(), base, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
         }
@@ -213,11 +216,12 @@ const ModuleData* MMap::FindOrMapModule(
         {
             pImage->imgMem = MemBlock( &_process.memory(), base, static_cast<size_t>(size), PAGE_EXECUTE_READWRITE, true, true );
         }
-        // Remove flag if failed
+        // Stop mapping
         else
         {
+            //flags &= ~HideVAD;
             BLACBONE_TRACE( L"ManualMap: Failed to allocate physical memory for image, status 0x%d", status );
-            flags &= ~UnlinkVAD;
+            return nullptr;
         }
     }
 
@@ -252,18 +256,23 @@ const ModuleData* MMap::FindOrMapModule(
     }
 
     // Apply proper memory protection for sections
-    ProtectImageMemory( pImage.get() );
+    if (!(flags & HideVAD))
+        ProtectImageMemory( pImage.get() );
 
     // Make exception handling possible (C and C++)
     if (!(flags & NoExceptions) && !EnableExceptions( pImage.get() ))
     {
+        BLACBONE_TRACE( L"ManualMap: Failed to enable exception handling for image %ls", pImage->FileName.c_str() );
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return nullptr;
     }
 
     // Unlink image from VAD list
-    if (flags & UnlinkVAD)
-        HideVad( pImage->imgMem );
+    if (flags & HideVAD && !NT_SUCCESS( ConcealVad( pImage->imgMem ) ))
+    {
+        _process.modules().RemoveManualModule( pImage->FileName, mt );
+        return nullptr;
+    }
 
     // Initialize security cookie
     if (!InitializeCookie( pImage.get() ))
@@ -361,20 +370,27 @@ bool MMap::UnmapAllModules()
 /// <returns>true on success</returns>
 bool MMap::CopyImage( ImageContext* pImage )
 {
+    NTSTATUS status = STATUS_SUCCESS;
+
     BLACBONE_TRACE( L"ManualMap: Performing image copy" );
 
     // offset to first section equals to header size
     size_t dwHeaderSize = pImage->peImage.headersSize();
 
     // Copy header
-    if (pImage->imgMem.Write( 0, dwHeaderSize, pImage->peImage.base() ) != STATUS_SUCCESS)
+    if (pImage->flags & HideVAD)
+        status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr(), dwHeaderSize, pImage->peImage.base() );
+    else
+        status = pImage->imgMem.Write( 0, dwHeaderSize, pImage->peImage.base() );
+
+    if (!NT_SUCCESS( status ))
     {
-        BLACBONE_TRACE( L"ManualMap: Failed to copy image headers. Status = 0x%x", LastNtStatus() );
+        BLACBONE_TRACE( L"ManualMap: Failed to copy image headers. Status = 0x%x", status );
         return false;
     }
 
     // Set header protection
-    if (pImage->imgMem.Protect( PAGE_READONLY, 0, dwHeaderSize ) != STATUS_SUCCESS)
+    if (!(pImage->flags & HideVAD) && pImage->imgMem.Protect( PAGE_READONLY, 0, dwHeaderSize ) != STATUS_SUCCESS)
     {
         BLACBONE_TRACE( L"ManualMap: Failed to set header memory protection. Status = 0x%x", LastNtStatus() );
         return false;
@@ -389,13 +405,25 @@ bool MMap::CopyImage( ImageContext* pImage )
         if (section.Characteristics & (IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE) &&
              !(section.Characteristics & IMAGE_SCN_MEM_DISCARDABLE))
         {
-            uint8_t* pSource = reinterpret_cast<uint8_t*>(pImage->peImage.ResolveRVAToVA( section.VirtualAddress ));
+            if (section.SizeOfRawData == 0)
+                continue;
 
-            if (section.SizeOfRawData != 0 && 
-                 pImage->imgMem.Write( section.VirtualAddress, section.SizeOfRawData, pSource ) != STATUS_SUCCESS)
+            uint8_t* pSource = reinterpret_cast<uint8_t*>(pImage->peImage.ResolveRVAToVA( section.VirtualAddress ));
+            
+            // Copy section data
+            if (pImage->flags & HideVAD)
             {
-                BLACBONE_TRACE( L"ManualMap: Failed to copy image section at offset 0x%x. Status = 0x%x", 
-                                section.VirtualAddress, LastNtStatus() );
+                status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + section.VirtualAddress,
+                                            section.SizeOfRawData, pSource );
+            }
+            else
+            {
+                status = pImage->imgMem.Write( section.VirtualAddress, section.SizeOfRawData, pSource );
+            }
+
+            if (!NT_SUCCESS( status ))
+            {
+                BLACBONE_TRACE( L"ManualMap: Failed to copy image section at offset 0x%x. Status = 0x%x", section.VirtualAddress, status );
                 return false;
             }
         } 
@@ -482,13 +510,20 @@ bool MMap::RelocateImage( ImageContext* pImage )
             // add delta 
             if (fixtype == IMAGE_REL_BASED_HIGHLOW || fixtype == IMAGE_REL_BASED_DIR64)
             {
-                size_t fixRVA = static_cast<ULONG>(fixoffset) + fixrec->PageRVA;
+                size_t fixRVA = fixoffset + fixrec->PageRVA;
                 size_t val = *reinterpret_cast<size_t*>(pImage->peImage.ResolveRVAToVA( fixoffset + fixrec->PageRVA )) + Delta;
 
+                auto status = STATUS_SUCCESS;
+
+                if (pImage->flags & HideVAD)
+                    status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + fixRVA, sizeof( val ), &val );
+                else
+                    status = pImage->imgMem.Write( fixRVA, val );
+
                 // Apply relocation
-                if (pImage->imgMem.Write( fixRVA, val ) != STATUS_SUCCESS)
+                if (!NT_SUCCESS( status ))
                 {
-                    BLACBONE_TRACE( L"ManualMap: Failed to apply relocation at offset 0x%x. Status = 0x%x", fixRVA, LastNtStatus() );
+                    BLACBONE_TRACE( L"ManualMap: Failed to apply relocation at offset 0x%x. Status = 0x%x", fixRVA, status );
                     return false;
                 }
             }
@@ -616,11 +651,21 @@ bool MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
                 return false;
             }
 
+            auto status = STATUS_SUCCESS;
+
+            if (pImage->flags & HideVAD)
+            {
+                size_t address = static_cast<size_t>(expData.procAddress);
+                status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + importFn.ptrRVA, sizeof( address ), &address );
+            }
+            else
+                status = pImage->imgMem.Write( importFn.ptrRVA, static_cast<size_t>(expData.procAddress) );
+
             // Write function address
-            if (pImage->imgMem.Write( importFn.ptrRVA, static_cast<size_t>(expData.procAddress) ) != STATUS_SUCCESS)
+            if (!NT_SUCCESS( status ))
             {
                 BLACBONE_TRACE( L"ManualMap: Failed to write import function address at offset 0x%x. Status = 0x%x",
-                                importFn.ptrRVA, LastNtStatus() );
+                                importFn.ptrRVA, status );
                 return false;
             }
         }
@@ -738,9 +783,7 @@ bool MMap::InitStaticTLS( ImageContext* pImage )
     // Use native TLS initialization
     if (pTls && pTls->AddressOfIndex)
     {
-        BLACBONE_TRACE( L"ManualMap: Performing statatic TLS initialization for image '%ls'", 
-                        pImage->FileName.c_str() );
-
+        BLACBONE_TRACE( L"ManualMap: Performing static TLS initialization for image '%ls'", pImage->FileName.c_str() );
         _process.nativeLdr().AddStaticTLSEntry( pImage->imgMem.ptr<void*>(), pRebasedTls );
     }
 
@@ -754,7 +797,7 @@ bool MMap::InitStaticTLS( ImageContext* pImage )
 /// <returns>true on success</returns>
 bool MMap::InitializeCookie( ImageContext* pImage )
 {
-    IMAGE_LOAD_CONFIG_DIRECTORY *pLC = reinterpret_cast<decltype(pLC)>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG ));
+    auto pLC = reinterpret_cast<PIMAGE_LOAD_CONFIG_DIRECTORY>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG ));
 
     //
     // Cookie generation based on MSVC++ compiler
@@ -993,18 +1036,13 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
 }
 
 /// <summary>
-/// Unlink memory VAD node
+/// Hide memory VAD node
 /// </summary>
 /// <param name="imageMem">Image to purge</param>
-/// <returns>bool on success</returns>
-NTSTATUS MMap::HideVad( const MemBlock& imageMem)
+/// <returns>Status code</returns>
+NTSTATUS MMap::ConcealVad( const MemBlock& imageMem)
 {
-    NTSTATUS status = Driver().EnsureLoaded();
-
-    if (NT_SUCCESS( status ))
-        status = Driver().HideVAD( _process.pid(), imageMem.ptr(), static_cast<uint32_t>(imageMem.size()) );
-
-    return status;
+    return Driver().ConcealVAD( _process.pid(), imageMem.ptr(), static_cast<uint32_t>(imageMem.size()) );
 }
 
 /// <summary>
@@ -1015,47 +1053,43 @@ NTSTATUS MMap::HideVad( const MemBlock& imageMem)
 /// <returns>Status code</returns>
 NTSTATUS MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
 {
-    NTSTATUS status = Driver().EnsureLoaded();
+    ptr_t ptr = 0;
 
+    // Align on page boundary
+    size = Align( size, 0x1000 );
+
+    //
+    // Get random address 
+    //
+    bool found = true;
+    static std::random_device rd;
+    std::uniform_int_distribution<ptr_t> dist( 0x100000, 0x7FFFFFFF );
+
+    // Make sure address is unused
+    for (ptr = dist( rd ) * 0x1000; found; ptr = dist( rd ) * 0x1000)
+    {
+        found = false;
+        for (auto& entry : _usedBlocks)
+        {
+            if (ptr >= entry.first && ptr < entry.first + entry.second)
+            {
+                found = true;
+                break;
+            }
+        }
+    }
+
+    // Not implemented yet
+    NTSTATUS status = STATUS_NOT_IMPLEMENTED;
+
+    // Change protection and save address
     if (NT_SUCCESS( status ))
     {
-        ptr_t ptr = 0;
+        _usedBlocks.emplace_back( std::make_pair( ptr, size ) );
 
-        // Align on page boundary
-        size = Align( size, 0x1000 );
-
-        //
-        // Get random address 
-        //
-        bool found = true;
-        static std::random_device rd;
-        std::uniform_int_distribution<ptr_t> dist( 0x100000, 0x7FFFFFFF );
-
-        // Make sure address is unused
-        for (ptr = dist( rd ) * 0x1000; found; ptr = dist( rd ) * 0x1000)
-        {
-            found = false;
-
-            for (auto& entry : _usedBlocks)
-                if (ptr >= entry.first && ptr < entry.first + entry.second)
-                {
-                    found = true;
-                    break;
-                }
-        }
-
-        // Not implemented yet
-        status = STATUS_NOT_IMPLEMENTED;
-
-        // Change protection and save address
-        if (NT_SUCCESS( status ))
-        {
-            _usedBlocks.emplace_back( std::make_pair( ptr, size ) );
-
-            imageMem = MemBlock( &_process.memory(), ptr, size, PAGE_READWRITE, false );
-            _process.memory( ).Protect( ptr, size, PAGE_READWRITE );
-            return true;
-        }
+        imageMem = MemBlock( &_process.memory(), ptr, size, PAGE_READWRITE, false );
+        _process.memory().Protect( ptr, size, PAGE_READWRITE );
+        return true;
     }
 
     return status;
@@ -1069,27 +1103,6 @@ void MMap::Cleanup()
 {
     _pAContext.Reset();
     _process.remote().reset();
-}
-
-
-/// <summary>
-/// Gets VadPurge handle.
-/// </summary>
-/// <returns>Driver object handle, INVALID_HANDLE_VALUE if failed</returns>
-HANDLE MMap::GetDriverHandle()
-{
-    std::wstring drvPath = Utils::GetExeDirectory() + L"\\";
-
-    if (IsWindows8Point1OrGreater())
-        drvPath += L"BlackBoneDrv81.sys";
-    else if (IsWindows8OrGreater())
-        drvPath += L"BlackBoneDrv8.sys";
-    else if (IsWindows7OrGreater())
-        drvPath += L"BlackBoneDrv7.sys";
-
-    //NTSTATUS status = DriverControl::Instance().EnsureLoaded( drvPath );
-
-    return INVALID_HANDLE_VALUE;
 }
 
 
