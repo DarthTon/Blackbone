@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Imports.h"
-#include "VadHelpers.h"
 
 #ifdef DBG
 #define DPRINT(format, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, format, __VA_ARGS__)
@@ -54,6 +53,11 @@
 #define MiGetHardwarePteAddress(va) \
     ((PMMPTE_HARDWARE64)(((((ULONG_PTR)(va) & VIRTUAL_ADDRESS_MASK) >> PTI_SHIFT) << PTE_SHIFT) + PTE_BASE))
 
+#define VA_SHIFT (63 - 47)              // address sign extend shift count
+
+#define MiGetVirtualAddressMappedByPte(PTE) \
+    ((PVOID)((LONG_PTR)(((LONG_PTR)(PTE) - PTE_BASE) << (PAGE_SHIFT + VA_SHIFT - PTE_SHIFT)) >> VA_SHIFT))
+
 typedef ULONG WIN32_PROTECTION_MASK;
 typedef PULONG PWIN32_PROTECTION_MASK;
 
@@ -64,6 +68,8 @@ typedef enum _WinVer
     WINVER_8     = 0x620,
     WINVER_81    = 0x630,
 } WinVer;
+
+extern PLIST_ENTRY PsLoadedModuleList;
 
 /// <summary>
 /// OS-dependent stuff
@@ -177,23 +183,6 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry( IN PHANDLE_TABLE HandleTable, IN 
 /// </summary>
 /// <returns>Found address, NULL if not found</returns>
 PVOID GetKernelBase();
-
-/// <summary>
-/// Get module base address by name
-/// </summary>
-/// <param name="pProcess">Target process</param>
-/// <param name="ModuleName">Nodule name to search for</param>
-/// <param name="isWow64">If TRUE - search in 32-bit PEB</param>
-/// <returns>Found address, NULL if not found</returns>
-PVOID GetModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 );
-
-/// <summary>
-/// Get exported function address
-/// </summary>
-/// <param name="pBase">Module base</param>
-/// <param name="name_ord">Function name or ordinal</param>
-/// <returns>Found address, NULL if not found</returns>
-PVOID GetModuleExport( IN PVOID pBase, IN PCCHAR name_ord );
 
 /// <summary>
 /// Gets SSDT base - KiSystemServiceTable

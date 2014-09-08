@@ -212,6 +212,24 @@
 #define IOCTL_BLACKBONE_INJECT_DLL  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80B, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
 
+/*
+    Manually map system driver
+
+    Input:
+       MMAP_DRIVER
+
+    Input size: 
+        sizeof(MMAP_DRIVER)
+
+    Output:
+        NULL
+
+    Output size:
+        0
+*/
+#define IOCTL_BLACKBONE_MAP_DRIVER  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80C, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+
 /// <summary>
 /// Input for IOCTL_BLACKBONE_DISABLE_DEP
 /// </summary>
@@ -387,3 +405,11 @@ typedef struct _INJECT_DLL
     BOOLEAN    wait;                // Wait on injection thread
     InjectType type;                // Type of injection
 } INJECT_DLL, *PINJECT_DLL;
+
+/// <summary>
+/// Input for IOCTL_BLACKBONE_MAP_DRIVER
+/// </summary>
+typedef struct _MMAP_DRIVER
+{
+    wchar_t    FullPath[512];    // Fully-qualified path to the driver
+} MMAP_DRIVER, *PMMAP_DRIVER;

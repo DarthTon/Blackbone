@@ -10,6 +10,8 @@
     <ClCompile Include="Routines.c" />
     <ClCompile Include="NotifyRoutine.c" />
     <ClCompile Include="Inject.c" />
+    <ClCompile Include="Loader.c" />
+    <ClCompile Include="ldrreloc.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Remap.h">
@@ -50,6 +52,12 @@
     </ClInclude>
     <ClInclude Include="Imports.h">
       <Filter>Include\Native</Filter>
+    </ClInclude>
+    <ClInclude Include="PEStructs.h">
+      <Filter>Include\Native</Filter>
+    </ClInclude>
+    <ClInclude Include="Loader.h">
+      <Filter>Include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

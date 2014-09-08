@@ -1,5 +1,6 @@
 #include "Private.h"
 #include "Routines.h"
+#include "Loader.h"
 #include <Ntstrsafe.h>
 
 #define CODE_OFFSET     0x000
@@ -57,7 +58,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         RtlInitUnicodeString( &ustrNtdll, L"Ntdll.dll" );
 
         // Get ntdll base
-        pNtdll = GetModuleBase( pProcess, &ustrNtdll, isWow64 );
+        pNtdll = GetUserModuleBase( pProcess, &ustrNtdll, isWow64 );
 
         if (!pNtdll)
         {

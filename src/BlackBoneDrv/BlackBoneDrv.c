@@ -1,5 +1,6 @@
 #include "BlackBoneDrv.h"
 #include "Remap.h"
+#include "Loader.h"
 #include <Ntstrsafe.h>
 
 // OS Dependant data
@@ -35,7 +36,6 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registr
     UNICODE_STRING deviceName;
     UNICODE_STRING deviceLink;
 
-    UNREFERENCED_PARAMETER( DriverObject );
     UNREFERENCED_PARAMETER( RegistryPath );
 
     // Get OS Dependant offsets
@@ -46,6 +46,10 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registr
         return status;
     }
 
+    // Initialize some loader structures
+    status = InitLdrData( (PKLDR_DATA_TABLE_ENTRY)DriverObject->DriverSection );
+    if (!NT_SUCCESS( status ))
+        return status;
     //
     // Globals init
     //

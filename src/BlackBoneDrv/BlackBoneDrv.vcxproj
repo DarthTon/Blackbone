@@ -172,7 +172,7 @@
       <PreprocessorDefinitions>_WIN7_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>copy /y "$(TargetPath)" \\192.168.56.101\c$\$(TargetFileName)</Command>
+      <Command>copy /y "$(TargetPath)" \\192.168.28.128\c$\$(TargetFileName)</Command>
     </PostBuildEvent>
     <Link>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
@@ -224,6 +224,8 @@
     <ClCompile Include="BlackBoneDrv.c" />
     <ClCompile Include="Dispatch.c" />
     <ClCompile Include="Inject.c" />
+    <ClCompile Include="ldrreloc.c" />
+    <ClCompile Include="Loader.c" />
     <ClCompile Include="NotifyRoutine.c" />
     <ClCompile Include="Private.c" />
     <ClCompile Include="Remap.c" />
@@ -235,11 +237,13 @@
     <ClInclude Include="BlackBoneDrv.h" />
     <ClInclude Include="BlackBoneDef.h" />
     <ClInclude Include="Imports.h" />
+    <ClInclude Include="Loader.h" />
     <ClInclude Include="NativeStructs.h" />
     <ClInclude Include="NativeStructs7.h" />
     <ClInclude Include="NativeStructs8.h" />
     <ClInclude Include="NativeStructs81.h" />
     <ClInclude Include="NativeEnums.h" />
+    <ClInclude Include="PEStructs.h" />
     <ClInclude Include="Remap.h" />
     <ClInclude Include="Private.h" />
     <ClInclude Include="Routines.h" />

@@ -1,5 +1,8 @@
 #include "BlackBoneDrv.h"
 #include "Remap.h"
+#include "Loader.h"
+
+#include <ntstrsafe.h>
 
 #pragma alloc_text(PAGE, BBDispatch)
 
@@ -204,6 +207,22 @@ NTSTATUS BBDispatch( IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp )
                     {
                         if (inputBufferLength >= sizeof( INJECT_DLL ) && ioBuffer)
                             Irp->IoStatus.Status = BBInjectDll( (PINJECT_DLL)ioBuffer );
+                        else
+                            Irp->IoStatus.Status = STATUS_INFO_LENGTH_MISMATCH;
+                    }
+                    break;
+
+                case IOCTL_BLACKBONE_MAP_DRIVER:
+                    {
+                        if (inputBufferLength >= sizeof( MMAP_DRIVER ) && ioBuffer)
+                        {
+                            wchar_t buf[sizeof( ((PMMAP_DRIVER)ioBuffer)->FullPath )];
+                            UNICODE_STRING ustrPath;
+
+                            RtlCopyMemory( buf, ((PMMAP_DRIVER)ioBuffer)->FullPath, sizeof( ((PMMAP_DRIVER)ioBuffer)->FullPath ) );
+                            RtlUnicodeStringInit( &ustrPath, buf );
+                            Irp->IoStatus.Status = BBMMapDriver( &ustrPath );
+                        }
                         else
                             Irp->IoStatus.Status = STATUS_INFO_LENGTH_MISMATCH;
                     }

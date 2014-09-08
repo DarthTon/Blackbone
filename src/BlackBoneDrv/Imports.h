@@ -14,6 +14,15 @@ ZwQuerySystemInformation(
     );
 
 NTSYSAPI
+NTSTATUS
+NTAPI
+ZwSetSystemInformation(
+    IN SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    IN PVOID SystemInformation,
+    IN ULONG SystemInformationLength
+    );
+
+NTSYSAPI
 NTSTATUS 
 NTAPI
 ZwQueryInformationProcess(
@@ -116,4 +125,19 @@ KeInsertQueueApc(
     PVOID SystemArgument1,
     PVOID SystemArgument2,
     KPRIORITY Increment
+    );
+
+NTSYSAPI
+PIMAGE_NT_HEADERS
+NTAPI
+RtlImageNtHeader( PVOID Base );
+
+NTSYSAPI
+PVOID
+NTAPI
+RtlImageDirectoryEntryToData(
+    PVOID ImageBase,
+    BOOLEAN MappedAsImage,
+    USHORT DirectoryEntry,
+    PULONG Size
     );

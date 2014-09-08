@@ -1,4 +1,5 @@
 #include "VadRoutines.h"
+#include "VadHelpers.h"
 
 #pragma alloc_text(PAGE, BBProtectVAD)
 #pragma alloc_text(PAGE, BBUnlinkVAD)
