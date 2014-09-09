@@ -1,7 +1,6 @@
 #include "Loader.h"
 #include "NativeStructs.h"
 
-
 /*++
 
 Copyright (c) Microsoft Corporation. All rights reserved. 

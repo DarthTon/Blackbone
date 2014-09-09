@@ -3,10 +3,21 @@
 #include "Imports.h"
 #include "NativeStructs.h"
 
+/// <summary>
+/// Initialize loader stuff
+/// </summary>
+/// <param name="pThisModule">Any valid system module</param>
+/// <returns>Status code</returns>
+NTSTATUS BBInitLdrData( IN PKLDR_DATA_TABLE_ENTRY pThisModule );
 
-NTSTATUS InitLdrData( IN PKLDR_DATA_TABLE_ENTRY pThisModule );
-
-PKLDR_DATA_TABLE_ENTRY GetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAddress );
+/// <summary>
+/// Get address of a system module
+/// Either 'pName' or 'pAddress' is required to perform search
+/// </summary>
+/// <param name="pName">Base name of the image (e.g. hal.dll)</param>
+/// <param name="pAddress">Address inside module</param>
+/// <returns>Found loader entry. NULL if nothing found</returns>
+PKLDR_DATA_TABLE_ENTRY BBGetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAddress );
 
 /// <summary>
 /// Get module base address by name
@@ -15,7 +26,7 @@ PKLDR_DATA_TABLE_ENTRY GetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAddr
 /// <param name="ModuleName">Nodule name to search for</param>
 /// <param name="isWow64">If TRUE - search in 32-bit PEB</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID GetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 );
+PVOID BBGetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 );
 
 /// <summary>
 /// Get exported function address
@@ -23,12 +34,21 @@ PVOID GetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, I
 /// <param name="pBase">Module base</param>
 /// <param name="name_ord">Function name or ordinal</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID GetModuleExport( IN PVOID pBase, IN PCCHAR name_ord );
+PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord );
 
+/// <summary>
+/// Resolve module references and fill the IAT
+/// </summary>
+/// <param name="pImageBase">Image base to be processed</param>
+/// <returns>Status code</returns>
+NTSTATUS BBResolveReferences( IN PVOID pImageBase );
+
+/// <summary>
+/// Manually map driver into system space
+/// </summary>
+/// <param name="pPath">Fully qualified native path to the driver</param>
+/// <returns>Status code</returns>
 NTSTATUS BBMMapDriver( IN PUNICODE_STRING pPath );
-
-
-NTSTATUS ResolveReferences( IN PVOID pImageBase );
 
 PIMAGE_BASE_RELOCATION
 LdrProcessRelocationBlockLongLong(

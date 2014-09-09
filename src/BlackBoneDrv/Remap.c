@@ -547,12 +547,12 @@ NTSTATUS BBMapRegionIntoCurrentProcess( IN PMAP_ENTRY pEntry, IN PMAP_ENTRY pPre
         // So PTEs are updated directly
         for (ULONG_PTR pAdress = pEntry->newPtr; pAdress < pEntry->newPtr + pEntry->size; pAdress += PAGE_SIZE)
         {
-            PMMPTE_HARDWARE64 pPTE = GetPTEForVA( (PVOID)pAdress );
+            PMMPTE pPTE = GetPTEForVA( (PVOID)pAdress );
 
             if (pEntry->readonly)
-                pPTE->Dirty1 = pPTE->Write = 0;
+                pPTE->u.Hard.Dirty1 = pPTE->u.Hard.Write = 0;
             else
-                pPTE->NoExecute = 0;
+                pPTE->u.Hard.NoExecute = 0;
         }
     }
     else
@@ -660,7 +660,7 @@ NTSTATUS BBMapSharedPage( IN PMDL pMDL, OUT PVOID* pResult )
 
             // Make executable
             BBProtectVAD( PsGetCurrentProcess(), (ULONG_PTR)*pResult, MM_EXECUTE_READWRITE );
-            GetPTEForVA( *pResult )->NoExecute = 0;
+            GetPTEForVA( *pResult )->u.Hard.NoExecute = 0;
         }
     }
     __except (EXCEPTION_EXECUTE_HANDLER)

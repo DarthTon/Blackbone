@@ -25,6 +25,19 @@
 #define MM_EXECUTE_READWRITE   6
 #define MM_EXECUTE_WRITECOPY   7
 
+#define MM_PTE_VALID_MASK         0x1
+#define MM_PTE_WRITE_MASK         0x800
+#define MM_PTE_OWNER_MASK         0x4
+#define MM_PTE_WRITE_THROUGH_MASK 0x8
+#define MM_PTE_CACHE_DISABLE_MASK 0x10
+#define MM_PTE_ACCESS_MASK        0x20
+#define MM_PTE_DIRTY_MASK         0x42
+#define MM_PTE_LARGE_PAGE_MASK    0x80
+#define MM_PTE_GLOBAL_MASK        0x100
+#define MM_PTE_COPY_ON_WRITE_MASK 0x200
+#define MM_PTE_PROTOTYPE_MASK     0x400
+#define MM_PTE_TRANSITION_MASK    0x800
+
 #define VIRTUAL_ADDRESS_BITS 48
 #define VIRTUAL_ADDRESS_MASK ((((ULONG_PTR)1) << VIRTUAL_ADDRESS_BITS) - 1)
 
@@ -41,22 +54,27 @@
 #define MiGetPxeOffset(va) \
     ((ULONG)(((ULONG_PTR)(va) >> PXI_SHIFT) & PXI_MASK))
 
-#define MiGetHardwarePxeAddress(va)   \
-    ((PMMPTE_HARDWARE64)PXE_BASE + MiGetPxeOffset(va))
+#define MiGetPxeAddress(va)   \
+    ((PMMPTE)PXE_BASE + MiGetPxeOffset(va))
 
-#define MiGetHardwarePpeAddress(va)   \
-    ((PMMPTE_HARDWARE64)(((((ULONG_PTR)(va) & VIRTUAL_ADDRESS_MASK) >> PPI_SHIFT) << PTE_SHIFT) + PPE_BASE))
+#define MiGetPpeAddress(va)   \
+    ((PMMPTE)(((((ULONG_PTR)(va) & VIRTUAL_ADDRESS_MASK) >> PPI_SHIFT) << PTE_SHIFT) + PPE_BASE))
 
-#define MiGetHardwarePdeAddress(va) \
-    ((PMMPTE_HARDWARE64)(((((ULONG_PTR)(va) & VIRTUAL_ADDRESS_MASK) >> PDI_SHIFT) << PTE_SHIFT) + PDE_BASE))
+#define MiGetPdeAddress(va) \
+    ((PMMPTE)(((((ULONG_PTR)(va) & VIRTUAL_ADDRESS_MASK) >> PDI_SHIFT) << PTE_SHIFT) + PDE_BASE))
 
-#define MiGetHardwarePteAddress(va) \
-    ((PMMPTE_HARDWARE64)(((((ULONG_PTR)(va) & VIRTUAL_ADDRESS_MASK) >> PTI_SHIFT) << PTE_SHIFT) + PTE_BASE))
+#define MiGetPteAddress(va) \
+    ((PMMPTE)(((((ULONG_PTR)(va) & VIRTUAL_ADDRESS_MASK) >> PTI_SHIFT) << PTE_SHIFT) + PTE_BASE))
 
 #define VA_SHIFT (63 - 47)              // address sign extend shift count
 
 #define MiGetVirtualAddressMappedByPte(PTE) \
     ((PVOID)((LONG_PTR)(((LONG_PTR)(PTE) - PTE_BASE) << (PAGE_SHIFT + VA_SHIFT - PTE_SHIFT)) >> VA_SHIFT))
+
+#define MI_IS_PHYSICAL_ADDRESS(Va) \
+    ((MiGetPxeAddress(Va)->u.Hard.Valid == 1) && \
+     (MiGetPpeAddress(Va)->u.Hard.Valid == 1) && \
+     ((MiGetPdeAddress(Va)->u.Long & 0x81) == 0x81) || (MiGetPteAddress(Va)->u.Hard.Valid == 1))
 
 typedef ULONG WIN32_PROTECTION_MASK;
 typedef PULONG PWIN32_PROTECTION_MASK;
@@ -70,6 +88,7 @@ typedef enum _WinVer
 } WinVer;
 
 extern PLIST_ENTRY PsLoadedModuleList;
+extern MMPTE ValidKernelPte;
 
 /// <summary>
 /// OS-dependent stuff
@@ -87,6 +106,7 @@ typedef struct _DYNAMIC_DATA
     ULONG PrevMode;         // PreviousMode offset in KTHREAD
     ULONG ApcState;         // KTHREAD ApcState field
     ULONG ExitStatus;       // ETHREAD ExitStatus field
+    ULONG MiAllocPage;      // MiAllocateDriver page offset
 } DYNAMIC_DATA, *PDYNAMIC_DATA;
 
 
@@ -105,22 +125,7 @@ typedef NTSTATUS( NTAPI* fnNtCreateThreadEx )
         OUT PVOID lpBytesBuffer
     );
 
-
-NTSTATUS 
-NTAPI 
-ZwCreateThreadEx(
-    OUT PHANDLE hThread,
-    IN ACCESS_MASK DesiredAccess,
-    IN PVOID ObjectAttributes,
-    IN HANDLE ProcessHandle,
-    IN PVOID lpStartAddress,
-    IN PVOID lpParameter,
-    IN ULONG Flags,
-    IN SIZE_T StackZeroBits,
-    IN SIZE_T SizeOfStackCommit,
-    IN SIZE_T SizeOfStackReserve,
-    IN PNT_PROC_THREAD_ATTRIBUTE_LIST AttributeList
-    );
+typedef PFN_NUMBER( NTAPI* fnMiAllocateDriverPage )(PMMPTE pPTE);
 
 #if defined(_WIN8_) || defined (_WIN7_)
 
@@ -203,4 +208,4 @@ PVOID GetSSDTEntry( IN ULONG index );
 /// </summary>
 /// <param name="pAddress">Target address</param>
 /// <returns>Found PTE</returns>
-PMMPTE_HARDWARE64 GetPTEForVA( IN PVOID pAddress );
+PMMPTE GetPTEForVA( IN PVOID pAddress );

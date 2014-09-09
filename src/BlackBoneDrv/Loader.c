@@ -2,16 +2,26 @@
 #include "Loader.h"
 #include <Ntstrsafe.h>
 
+NTSTATUS BBAllocateInDiscardedMemory( IN ULONG SizeOfImage, OUT PVOID* ppFoundBase );
+NTSTATUS BBMapWorker( IN PVOID pArg );
+
 PLIST_ENTRY PsLoadedModuleList;
+extern DYNAMIC_DATA dynData;
 
-#pragma alloc_text(PAGE, InitLdrData)
-#pragma alloc_text(PAGE, GetSystemModule)
-#pragma alloc_text(PAGE, GetUserModuleBase)
-#pragma alloc_text(PAGE, GetModuleExport)
+#pragma alloc_text(PAGE, BBInitLdrData)
+#pragma alloc_text(PAGE, BBGetSystemModule)
+#pragma alloc_text(PAGE, BBGetUserModuleBase)
+#pragma alloc_text(PAGE, BBGetModuleExport)
+#pragma alloc_text(PAGE, BBResolveReferences)
+#pragma alloc_text(PAGE, BBMapWorker)
 #pragma alloc_text(PAGE, BBMMapDriver)
-#pragma alloc_text(PAGE, ResolveReferences)
 
-NTSTATUS InitLdrData( IN PKLDR_DATA_TABLE_ENTRY pThisModule )
+/// <summary>
+/// Initialize loader stuff
+/// </summary>
+/// <param name="pThisModule">Any valid system module</param>
+/// <returns>Status code</returns>
+NTSTATUS BBInitLdrData( IN PKLDR_DATA_TABLE_ENTRY pThisModule )
 {
     PVOID kernelBase = GetKernelBase();
     if (kernelBase == NULL)
@@ -46,7 +56,14 @@ NTSTATUS InitLdrData( IN PKLDR_DATA_TABLE_ENTRY pThisModule )
     return STATUS_SUCCESS;
 }
 
-PKLDR_DATA_TABLE_ENTRY GetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAddress )
+/// <summary>
+/// Get address of a system module
+/// Either 'pName' or 'pAddress' is required to perform search
+/// </summary>
+/// <param name="pName">Base name of the image (e.g. hal.dll)</param>
+/// <param name="pAddress">Address inside module</param>
+/// <returns>Found loader entry. NULL if nothing found</returns>
+PKLDR_DATA_TABLE_ENTRY BBGetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAddress )
 {
     ASSERT( (pName != NULL || pAddress != NULL) && PsLoadedModuleList != NULL );
     if ((pName == NULL && pAddress == NULL) || PsLoadedModuleList == NULL)
@@ -79,7 +96,7 @@ PKLDR_DATA_TABLE_ENTRY GetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAddr
 /// <param name="ModuleName">Nodule name to search for</param>
 /// <param name="isWow64">If TRUE - search in 32-bit PEB</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID GetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 )
+PVOID BBGetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 )
 {
     ASSERT( pProcess != NULL );
     if (pProcess == NULL)
@@ -143,7 +160,7 @@ PVOID GetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, I
 /// <param name="pBase">Module base</param>
 /// <param name="name_ord">Function name or ordinal</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID GetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
+PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
 {
     PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)pBase;
     PIMAGE_NT_HEADERS32 pNtHdr32 = NULL;
@@ -231,7 +248,12 @@ PVOID GetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
     return (PVOID)pAddress;
 }
 
-NTSTATUS ResolveReferences( IN PVOID pImageBase )
+/// <summary>
+/// Resolve module references and fill the IAT
+/// </summary>
+/// <param name="pImageBase">Image base to be processed</param>
+/// <returns>Status code</returns>
+NTSTATUS BBResolveReferences( IN PVOID pImageBase )
 {
     NTSTATUS status = STATUS_SUCCESS;
     ULONG impSize = 0;
@@ -251,7 +273,7 @@ NTSTATUS ResolveReferences( IN PVOID pImageBase )
         RtlAnsiStringToUnicodeString( &ustrImpDll, &strImpDll, TRUE );
 
         // Get import module
-        pModule = GetSystemModule( &ustrImpDll, NULL );
+        pModule = BBGetSystemModule( &ustrImpDll, NULL );
         if (!pModule)
         {
             DPRINT( "BlackBone: %s: Failed to resolve import module: '%wZ'\n", __FUNCTION__, ustrImpDll );
@@ -272,7 +294,7 @@ NTSTATUS ResolveReferences( IN PVOID pImageBase )
             else
                 impFunc = (PCCHAR)(pThunk->u1.AddressOfData & 0xFFFF);
 
-            pFunc = GetModuleExport( pModule->DllBase, impFunc );
+            pFunc = BBGetModuleExport( pModule->DllBase, impFunc );
 
             // No export found
             if (!pFunc)
@@ -304,24 +326,27 @@ NTSTATUS ResolveReferences( IN PVOID pImageBase )
     return status;
 }
 
-NTSTATUS BBMMapDriver( IN PUNICODE_STRING pPath )
+/// <summary>
+/// System worker thread that performs actual mapping
+/// </summary>
+/// <param name="pArg">Path to the driver - PUNICODE_STRING type</param>
+/// <returns>Status code</returns>
+NTSTATUS BBMapWorker( IN PVOID pArg )
 {
     NTSTATUS status = STATUS_SUCCESS;
     HANDLE hFile = NULL;
+    PUNICODE_STRING pPath = (PUNICODE_STRING)pArg;
     OBJECT_ATTRIBUTES obAttr = { 0 };
     IO_STATUS_BLOCK statusBlock = { 0 };
     PVOID fileData = NULL;
     PIMAGE_NT_HEADERS pNTHeader = NULL;
-    PVOID imageData = NULL;
+    PVOID imageSection = NULL;
+    PMDL pMDL = NULL;
     FILE_STANDARD_INFORMATION fileInfo = { 0 };
-
-    ASSERT( pPath != NULL );
-    if (pPath == NULL)
-        return STATUS_INVALID_PARAMETER;
 
     InitializeObjectAttributes( &obAttr, pPath, OBJ_KERNEL_HANDLE, NULL, NULL );
 
-    status = ZwCreateFile( &hFile, FILE_READ_DATA | SYNCHRONIZE, &obAttr, &statusBlock, NULL, FILE_ATTRIBUTE_NORMAL, 
+    status = ZwCreateFile( &hFile, FILE_READ_DATA | SYNCHRONIZE, &obAttr, &statusBlock, NULL, FILE_ATTRIBUTE_NORMAL,
                            FILE_SHARE_READ, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0 );
     if (!NT_SUCCESS( status ))
     {
@@ -350,48 +375,118 @@ NTSTATUS BBMMapDriver( IN PUNICODE_STRING pPath )
 
     ZwClose( hFile );
 
-    if (NT_SUCCESS( status ))
+    __try
     {
-        imageData = ExAllocatePoolWithTag( NonPagedPoolExecute, pNTHeader->OptionalHeader.SizeOfImage, BB_POOL_TAG );
-
-        // Copy header
-        RtlCopyMemory( imageData, fileData, pNTHeader->OptionalHeader.SizeOfHeaders );
-
-        // Copy sections
-        for (PIMAGE_SECTION_HEADER pSection = (PIMAGE_SECTION_HEADER)(pNTHeader + 1);
-              pSection < (PIMAGE_SECTION_HEADER)(pNTHeader + 1) + pNTHeader->FileHeader.NumberOfSections;
-              pSection++)
+        if (NT_SUCCESS( status ))
         {
-            RtlCopyMemory( (PUCHAR)imageData + pSection->VirtualAddress, 
-                           (PUCHAR)fileData + pSection->PointerToRawData, 
-                           pSection->SizeOfRawData );
+            //
+            // Allocate memory from System PTEs
+            //
+            PHYSICAL_ADDRESS start = { 0 }, end = { 0 };
+            end.QuadPart = MAXULONG64;
+
+            pMDL = MmAllocatePagesForMdl( start, end, start, pNTHeader->OptionalHeader.SizeOfImage );
+            imageSection = MmGetSystemAddressForMdlSafe( pMDL, NormalPagePriority );
+
+            if (imageSection)
+            {
+                // Copy header
+                RtlCopyMemory( imageSection, fileData, pNTHeader->OptionalHeader.SizeOfHeaders );
+
+                // Copy sections
+                for (PIMAGE_SECTION_HEADER pSection = (PIMAGE_SECTION_HEADER)(pNTHeader + 1);
+                      pSection < (PIMAGE_SECTION_HEADER)(pNTHeader + 1) + pNTHeader->FileHeader.NumberOfSections;
+                      pSection++)
+                {
+                    RtlCopyMemory( (PUCHAR)imageSection + pSection->VirtualAddress,
+                                   (PUCHAR)fileData + pSection->PointerToRawData,
+                                   pSection->SizeOfRawData );
+                }
+
+                // Relocate image
+                status = LdrRelocateImage( imageSection, STATUS_SUCCESS, STATUS_CONFLICTING_ADDRESSES, STATUS_INVALID_IMAGE_FORMAT );
+                if (!NT_SUCCESS( status ))
+                    DPRINT( "BlackBone: %s: Failed to relocate image '%wZ'. Status: 0x%X\n", __FUNCTION__, pPath, status );
+
+                if (NT_SUCCESS( status ))
+                    status = BBResolveReferences( imageSection );
+
+                // Wipe header
+                if (NT_SUCCESS( status ))
+                    RtlZeroMemory( imageSection, pNTHeader->OptionalHeader.SizeOfHeaders );
+            }
+            else
+            {
+                DPRINT( "BlackBone: %s: Failed to allocate memory for image '%wZ'\n", __FUNCTION__, pPath );
+                status = STATUS_MEMORY_NOT_ALLOCATED;
+            }
         }
 
-        // Relocate image
-        status = LdrRelocateImage( imageData, STATUS_SUCCESS, STATUS_CONFLICTING_ADDRESSES, STATUS_INVALID_IMAGE_FORMAT );
-        if (!NT_SUCCESS(status))
-            DPRINT( "BlackBone: %s: Failed to relocate '%wZ'. Status: 0x%X\n", __FUNCTION__, pPath, status );
-
-        if (NT_SUCCESS(status))
-            status = ResolveReferences( imageData );
-    }
-
-    // Call entrypoint
-    if (NT_SUCCESS( status ))
-    {
-        PDRIVER_INITIALIZE pEntryPoint = (PDRIVER_INITIALIZE)((ULONG_PTR)imageData + pNTHeader->OptionalHeader.AddressOfEntryPoint);
-        if (pEntryPoint)
+        // Call entrypoint
+        if (NT_SUCCESS( status ) && pNTHeader->OptionalHeader.AddressOfEntryPoint)
+        {
+            PDRIVER_INITIALIZE pEntryPoint = (PDRIVER_INITIALIZE)((ULONG_PTR)imageSection + pNTHeader->OptionalHeader.AddressOfEntryPoint);
             pEntryPoint( NULL, NULL );
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        status = GetExceptionCode();
+        DPRINT( "BlackBone: %s: Exception: 0x%X \n", __FUNCTION__, status );
     }
 
-    if (imageData)
-        ExFreePoolWithTag( imageData, BB_POOL_TAG );
+    // Free image memory in case of failure
+    if (!NT_SUCCESS( status ) && pMDL)
+    {
+        MmFreePagesFromMdl( pMDL );
+        ExFreePool( pMDL );
+    }
 
     if (fileData)
         ExFreePoolWithTag( fileData, BB_POOL_TAG );
 
-    if (NT_SUCCESS(status))
-        DPRINT( "BlackBone: %s: Successfully mapped '%wZ' at 0x%p\n", __FUNCTION__, pPath, imageData );
+    if (NT_SUCCESS( status ))
+        DPRINT( "BlackBone: %s: Successfully mapped '%wZ' at 0x%p\n", __FUNCTION__, pPath, imageSection );
+
+    return status;
+}
+
+/// <summary>
+/// Manually map driver into system space
+/// </summary>
+/// <param name="pPath">Fully qualified native path to the driver</param>
+/// <returns>Status code</returns>
+NTSTATUS BBMMapDriver( IN PUNICODE_STRING pPath )
+{
+    HANDLE hThread = NULL;
+    CLIENT_ID clientID = { 0 };
+    OBJECT_ATTRIBUTES obAttr = { 0 };
+    PETHREAD pThread = NULL;
+    OBJECT_HANDLE_INFORMATION handleInfo = { 0 };
+
+    InitializeObjectAttributes( &obAttr, NULL, OBJ_KERNEL_HANDLE, NULL, NULL );
+
+    ASSERT( pPath != NULL );
+    if (pPath == NULL)
+        return STATUS_INVALID_PARAMETER;
+
+    NTSTATUS status = PsCreateSystemThread( &hThread, THREAD_ALL_ACCESS, &obAttr, NULL, &clientID, &BBMapWorker, pPath );
+    if (!NT_SUCCESS( status ))
+    {
+        DPRINT( "BlackBone: %s: Failed to create worker thread. Status: 0x%X\n", __FUNCTION__, status );
+        return status;
+    }
+
+    // Wait on worker thread
+    status = ObReferenceObjectByHandle( hThread, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, &pThread, &handleInfo );
+    if (NT_SUCCESS( status ))
+    {
+        status = KeWaitForSingleObject( pThread, Executive, KernelMode, TRUE, NULL );
+        status = *(NTSTATUS*)((PUCHAR)pThread + dynData.ExitStatus);
+    }
+
+    if (pThread)
+        ObDereferenceObject( pThread );
 
     return status;
 }

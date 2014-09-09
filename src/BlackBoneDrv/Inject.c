@@ -58,7 +58,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         RtlInitUnicodeString( &ustrNtdll, L"Ntdll.dll" );
 
         // Get ntdll base
-        pNtdll = GetUserModuleBase( pProcess, &ustrNtdll, isWow64 );
+        pNtdll = BBGetUserModuleBase( pProcess, &ustrNtdll, isWow64 );
 
         if (!pNtdll)
         {
@@ -69,7 +69,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         // Get LdrLoadDll address
         if (NT_SUCCESS( status ))
         {
-            LdrLoadDll = GetModuleExport( pNtdll, "LdrLoadDll" );
+            LdrLoadDll = BBGetModuleExport( pNtdll, "LdrLoadDll" );
             if (!LdrLoadDll)
             {
                 DPRINT( "BlackBone: %s: Failed to get LdrLoadDll address\n", __FUNCTION__ );

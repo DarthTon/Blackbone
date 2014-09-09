@@ -378,7 +378,7 @@ NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY
             if (pAllocFree->protection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE))
             {
                 for (ULONG_PTR pAdress = pResult->address; pAdress < pResult->address + pResult->size; pAdress += PAGE_SIZE)
-                    GetPTEForVA( (PVOID)pAdress )->NoExecute = 0;
+                    GetPTEForVA( (PVOID)pAdress )->u.Hard.NoExecute = 0;
             }
 
             // Add to list
@@ -468,15 +468,15 @@ NTSTATUS BBProtectMemory( IN PPROTECT_MEMORY pProtect )
                 // Update PTE
                 for (ULONG_PTR pAdress = pProtect->base; pAdress < pProtect->base + pProtect->size; pAdress += PAGE_SIZE)
                 {
-                    PMMPTE_HARDWARE64 pPTE = GetPTEForVA( (PVOID)pAdress );
+                    PMMPTE pPTE = GetPTEForVA( (PVOID)pAdress );
 
                     // Executable
                     if (pProtect->newProtection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))
-                        pPTE->NoExecute = 0;
+                        pPTE->u.Hard.NoExecute = 0;
 
                     // Read-only
                     if (pProtect->newProtection & (PAGE_READONLY | PAGE_EXECUTE | PAGE_EXECUTE_READ))
-                        pPTE->Dirty1 = pPTE->Write = 0;
+                        pPTE->u.Hard.Dirty1 = pPTE->u.Hard.Write = 0;
                 }
             }
             else

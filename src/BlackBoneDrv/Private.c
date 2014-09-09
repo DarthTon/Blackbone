@@ -12,6 +12,12 @@ extern DYNAMIC_DATA dynData;
 PVOID g_KernelBase = NULL;
 PVOID g_SSDT = NULL;
 
+MMPTE ValidKernelPte = { MM_PTE_VALID_MASK |
+                         MM_PTE_WRITE_MASK |
+                         MM_PTE_GLOBAL_MASK |
+                         MM_PTE_DIRTY_MASK |
+                         MM_PTE_ACCESS_MASK };
+
 
 /// <summary>
 /// Lookup handle in the process handle table
@@ -137,7 +143,9 @@ PVOID GetSSDTBase()
         for (PIMAGE_SECTION_HEADER pSec = pFirstSec; pSec < pFirstSec + pHdr->FileHeader.NumberOfSections; pSec++)
         {
             // Non-paged, non-discardable, executable sections
-            if (pSec->Characteristics & 0x08000000 && pSec->Characteristics & 0x20000000 && !(pSec->Characteristics & 0x02000000))
+            if ( pSec->Characteristics & IMAGE_SCN_MEM_NOT_PAGED && 
+                 pSec->Characteristics & IMAGE_SCN_MEM_EXECUTE &&
+               !(pSec->Characteristics & IMAGE_SCN_MEM_DISCARDABLE))
             {
                 // Scan section
                 for (ULONG_PTR* pPtr = (ULONG_PTR*)(ntosBase + pSec->VirtualAddress);
@@ -180,18 +188,16 @@ PVOID GetSSDTEntry( IN ULONG index )
 /// </summary>
 /// <param name="pAddress">Target address</param>
 /// <returns>Found PTE</returns>
-PMMPTE_HARDWARE64 GetPTEForVA( IN PVOID pAddress )
+PMMPTE GetPTEForVA( IN PVOID pAddress )
 {
     // Check if large page
-    PMMPTE_HARDWARE64 pPDE = MiGetHardwarePdeAddress( pAddress );
-    if (pPDE->LargePage)
+    PMMPTE pPDE = MiGetPdeAddress( pAddress );
+    if (pPDE->u.Hard.LargePage)
         return pPDE;
 
-    return MiGetHardwarePteAddress( pAddress );
+    return MiGetPteAddress( pAddress );
 }
 
-// 'type cast' : from data pointer 'PVOID' to function pointer 'fnNtProtectVirtualMemory'
-#pragma warning(disable : 4055)
 
 #if defined(_WIN8_) || defined (_WIN7_)
 
@@ -207,7 +213,7 @@ ZwProtectVirtualMemory(
 {
     NTSTATUS status = STATUS_SUCCESS;
 
-    fnNtProtectVirtualMemory NtProtectVirtualMemory = (fnNtProtectVirtualMemory)GetSSDTEntry( dynData.NtProtectIndex );
+    fnNtProtectVirtualMemory NtProtectVirtualMemory = (fnNtProtectVirtualMemory)(ULONG_PTR)GetSSDTEntry( dynData.NtProtectIndex );
     if (NtProtectVirtualMemory)
     {
         //
@@ -247,7 +253,7 @@ ZwCreateThreadEx(
 {
     NTSTATUS status = STATUS_SUCCESS;
 
-    fnNtCreateThreadEx NtCreateThreadEx = (fnNtCreateThreadEx)GetSSDTEntry( dynData.NtThdIndex );
+    fnNtCreateThreadEx NtCreateThreadEx = (fnNtCreateThreadEx)(ULONG_PTR)GetSSDTEntry( dynData.NtThdIndex );
     if (NtCreateThreadEx)
     {
         //
@@ -270,4 +276,3 @@ ZwCreateThreadEx(
     return status;
 }
 
-#pragma  warning(default: 4055)

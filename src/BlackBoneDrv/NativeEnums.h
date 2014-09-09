@@ -198,7 +198,7 @@ typedef enum _KAPC_ENVIRONMENT
     InsertApcEnvironment
 } KAPC_ENVIRONMENT, *PKAPC_ENVIRONMENT;
 
-typedef enum _MI_VAD_TYPE 
+typedef enum _MI_VAD_TYPE
 {
     VadNone,
     VadDevicePhysicalMemory,
@@ -209,3 +209,10 @@ typedef enum _MI_VAD_TYPE
     VadRotatePhysical,
     VadLargePageSection
 } MI_VAD_TYPE, *PMI_VAD_TYPE;
+
+typedef enum _MMSYSTEM_PTE_POOL_TYPE
+{
+    SystemPteSpace,
+    NonPagedPoolExpansion,
+    MaximumPtePoolTypes
+} MMSYSTEM_PTE_POOL_TYPE;

@@ -268,6 +268,17 @@ typedef struct _MMPTE_HARDWARE64
     ULONGLONG SoftwareWsIndex : 11;
     ULONGLONG NoExecute : 1;
 } MMPTE_HARDWARE64, *PMMPTE_HARDWARE64;
+
+typedef struct _MMPTE 
+{
+    union  
+    {
+        ULONG_PTR Long;
+        MMPTE_HARDWARE64 Hard;
+    } u;
+} MMPTE;
+typedef MMPTE *PMMPTE;
+
 #pragma warning(default : 4214)
 
 typedef struct _NT_PROC_THREAD_ATTRIBUTE_ENTRY

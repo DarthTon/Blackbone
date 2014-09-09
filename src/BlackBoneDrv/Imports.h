@@ -45,6 +45,21 @@ ZwQueryVirtualMemory(
     OUT PULONG ResultLength 
     );
 
+NTSTATUS 
+NTAPI 
+ZwCreateThreadEx(
+    OUT PHANDLE hThread,
+    IN ACCESS_MASK DesiredAccess,
+    IN PVOID ObjectAttributes,
+    IN HANDLE ProcessHandle,
+    IN PVOID lpStartAddress,
+    IN PVOID lpParameter,
+    IN ULONG Flags,
+    IN SIZE_T StackZeroBits,
+    IN SIZE_T SizeOfStackCommit,
+    IN SIZE_T SizeOfStackReserve,
+    IN PNT_PROC_THREAD_ATTRIBUTE_LIST AttributeList
+    );
 
 NTKERNELAPI
 NTSTATUS

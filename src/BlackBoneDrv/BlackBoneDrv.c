@@ -47,7 +47,7 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registr
     }
 
     // Initialize some loader structures
-    status = InitLdrData( (PKLDR_DATA_TABLE_ENTRY)DriverObject->DriverSection );
+    status = BBInitLdrData( (PKLDR_DATA_TABLE_ENTRY)DriverObject->DriverSection );
     if (!NT_SUCCESS( status ))
         return status;
     //
@@ -151,6 +151,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         switch (ver_short)
         {
                 // Windows 7
+                // Windows 7 SP1
             case WINVER_7:
             case WINVER_7_SP1:
                 pData->KExecOpt       = 0x0D2;
@@ -162,6 +163,9 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->PrevMode       = 0x1F6;
                 pData->ApcState       = 0x050;
                 pData->ExitStatus     = 0x380;
+                pData->MiAllocPage    = 0x40A9C0;
+                if (ver_short == WINVER_7_SP1)
+                    pData->MiAllocPage = 0x410D70;
                 break;
 
                 // Windows 8
@@ -175,6 +179,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->PrevMode       = 0x232;
                 pData->ApcState       = 0x098;
                 pData->ExitStatus     = 0x450;
+                pData->MiAllocPage    = 0x3AF374;
                 break;
 
                 // Windows 8.1
@@ -187,6 +192,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->PrevMode       = 0x232;
                 pData->ApcState       = 0x098;
                 pData->ExitStatus     = 0x6D8;
+                pData->MiAllocPage    = 0x4BDDF4;
                 break;
 
             default:
