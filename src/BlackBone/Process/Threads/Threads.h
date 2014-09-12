@@ -55,10 +55,14 @@ public:
     /// <returns>Pointer to thread object, nullptr if failed</returns>
     BLACKBONE_API Thread* get( DWORD id );
 
+    /// <summary>
+    /// Reset data
+    /// </summary>
+    BLACKBONE_API inline void reset() { _threads.clear(); }
+
 private:
     ProcessThreads( const ProcessThreads& ) = delete;
     ProcessThreads& operator =(const ProcessThreads&) = delete;
-
 private:
     class ProcessCore& _core;       // Core process functions
     std::vector<Thread> _threads;   // Process thread snapshot

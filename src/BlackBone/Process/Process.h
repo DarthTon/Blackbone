@@ -66,6 +66,12 @@ public:
         );
 
     /// <summary>
+    /// Detach form current process, if any
+    /// </summary>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Detach();
+
+    /// <summary>
     /// Get process ID
     /// </summary>
     /// <returns>Process ID</returns>

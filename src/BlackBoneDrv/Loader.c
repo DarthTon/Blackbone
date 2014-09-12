@@ -2,7 +2,6 @@
 #include "Loader.h"
 #include <Ntstrsafe.h>
 
-NTSTATUS BBAllocateInDiscardedMemory( IN ULONG SizeOfImage, OUT PVOID* ppFoundBase );
 NTSTATUS BBMapWorker( IN PVOID pArg );
 
 PLIST_ENTRY PsLoadedModuleList;
@@ -321,7 +320,7 @@ NTSTATUS BBResolveReferences( IN PVOID pImageBase )
         }
 
         RtlFreeUnicodeString( &ustrImpDll );
-    }	
+    }
 
     return status;
 }
@@ -388,7 +387,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
             pMDL = MmAllocatePagesForMdl( start, end, start, pNTHeader->OptionalHeader.SizeOfImage );
             imageSection = MmGetSystemAddressForMdlSafe( pMDL, NormalPagePriority );
 
-            if (imageSection)
+            if (NT_SUCCESS( status ) && imageSection)
             {
                 // Copy header
                 RtlCopyMemory( imageSection, fileData, pNTHeader->OptionalHeader.SizeOfHeaders );
@@ -408,6 +407,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
                 if (!NT_SUCCESS( status ))
                     DPRINT( "BlackBone: %s: Failed to relocate image '%wZ'. Status: 0x%X\n", __FUNCTION__, pPath, status );
 
+                // Fill IAT
                 if (NT_SUCCESS( status ))
                     status = BBResolveReferences( imageSection );
 

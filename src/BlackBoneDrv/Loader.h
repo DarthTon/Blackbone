@@ -66,7 +66,6 @@ LdrRelocateImage (
     IN NTSTATUS Invalid
     );
 
-
 NTSTATUS
 LdrRelocateImageWithBias(
     IN PVOID NewBase,

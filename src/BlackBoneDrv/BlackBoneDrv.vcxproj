@@ -185,7 +185,8 @@
       <PreprocessorDefinitions>_WIN7_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>copy /y "$(TargetPath)" \\192.168.56.101\c$\$(TargetFileName)</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
     <Link>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>

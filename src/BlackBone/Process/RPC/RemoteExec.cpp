@@ -157,7 +157,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     CONTEXT_T ctx;
 
     // Prepare for remote exec
-    CreateRPCEnvironment( true );
+    CreateRPCEnvironment( false, true );
 
     // Write code
     dwResult = CopyCode( pCode, size );
@@ -264,12 +264,13 @@ DWORD RemoteExec::ExecDirect( ptr_t pCode, ptr_t arg )
 /// |       8/8 bytes       |   8/8 bytes  |      8/8 bytes     |   16/16 bytes   |                                          |
 /// --------------------------------------------------------------------------------------------------------------------------
 /// </summary>
-/// <param name="noThread">Create only codecave and sync event, without thread</param>
+/// <param name="bThread">Create worker thread</param>
+/// <param name="bEvent">Create sync event for worker thread</param>
 /// <returns>Status</returns>
-NTSTATUS RemoteExec::CreateRPCEnvironment( bool noThread /*= false*/ )
+NTSTATUS RemoteExec::CreateRPCEnvironment( bool bThread /*= true*/, bool bEvent /*= true*/ )
 {
     NTSTATUS dwResult = STATUS_SUCCESS;
-    DWORD thdID = 0;
+    DWORD thdID = GetTickCount();       // randomize thread id
     bool status = true;
 
     //
@@ -284,18 +285,25 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool noThread /*= false*/ )
     if (!_userCode.valid())
         _userCode = _memory.Allocate( 0x1000 );
 
-    // Create RPC thread and sync event
-    if (noThread == false)
+    // Create RPC thread
+    if (bThread)
         thdID = CreateWorkerThread();
-    else
-    // Randomize thread id for event name
-        thdID = GetTickCount();
-             
-    auto& barrier = _proc.core().native()->GetWow64Barrier();
-    if (barrier.type != wow_32_64)
-        status = CreateAPCEvent( thdID );
-        
-    if ((noThread == false && thdID == 0) || status == false)
+
+    // Create RPC sync event
+    if (bEvent)
+    {
+        if (_proc.core().native()->GetWow64Barrier().type != wow_32_64)
+        {
+            status = CreateAPCEvent( thdID );
+        }
+        else
+        {
+            status = false;
+            LastNtStatus( STATUS_NOT_SUPPORTED );
+        }
+    }
+   
+    if ((bThread && thdID == 0) || !status)
         dwResult = LastNtStatus();
 
     return dwResult;
@@ -575,6 +583,7 @@ void RemoteExec::TerminateWorker()
     {
         _hWorkThd.Terminate();
         _hWorkThd.Join();
+        _hWorkThd.Close();
         _workerCode.Free();
     }
 }
@@ -585,8 +594,6 @@ void RemoteExec::TerminateWorker()
 void RemoteExec::reset()
 {
     TerminateWorker();
-
-    _hWorkThd = Thread( (HANDLE)NULL, &_proc.core() );
 
     _userCode.Reset();
     _userData.Reset();

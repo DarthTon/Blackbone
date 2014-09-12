@@ -94,6 +94,15 @@ typedef NTSTATUS( NTAPI *fnRtlDosApplyFileIsolationRedirection_Ustr )
         IN PSIZE_T RequiredLength
     );
 
+// RtlDosPathNameToNtPathName_U
+typedef BOOLEAN( NTAPI *fnRtlDosPathNameToNtPathName_U )
+    (
+        IN PCWSTR DosFileName,
+        OUT PUNICODE_STRING NtFileName,
+        OUT OPTIONAL PWSTR *FilePart,
+        OUT OPTIONAL PVOID RelativeName
+    );
+
 // RtlHashUnicodeString
 typedef NTSTATUS( NTAPI *fnRtlHashUnicodeString )
     ( 

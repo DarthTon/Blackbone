@@ -47,7 +47,7 @@ protected:
         AsmJitHelper a;
 
         // Ensure RPC environment exists
-        if (_process.remote().CreateRPCEnvironment( contextThread != nullptr ) != STATUS_SUCCESS)
+        if (!NT_SUCCESS( _process.remote().CreateRPCEnvironment( contextThread == _process.remote().getWorker(), contextThread != nullptr ) ))
             return LastNtStatus();
 
         // FPU check

@@ -207,6 +207,12 @@ public:
     BLACKBONE_API inline int manifestID() const { return _manifestIdx; }
 
     /// <summary>
+    /// Get image subsystem
+    /// </summary>
+    /// <returns>Image subsystem</returns>
+    BLACKBONE_API inline uint32_t subsystem() const { return _subsystem; }
+
+    /// <summary>
     /// Get manifest resource file
     /// </summary>
     /// <returns>Manifest resource file</returns>
@@ -259,6 +265,7 @@ private:
     uint32_t    _hdrSize = 0;                   // Size of headers
     HANDLE      _hctx = INVALID_HANDLE_VALUE;   // Activation context
     int         _manifestIdx = 0;               // Manifest resource ID
+    uint32_t    _subsystem;                     // Image subsystem
 
     vecSections _sections;                      // Section info
     mapImports  _imports;                       // Import functions

@@ -186,6 +186,13 @@ public:
     BLACKBONE_API NTSTATUS InjectDll( DWORD pid, const std::wstring& path, InjectType itype, bool wait = true );
 
     /// <summary>
+    /// Manually map another system driver into system space
+    /// </summary>
+    /// <param name="path">Fully quialified path to the drver</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS MMapDriver( const std::wstring& path );
+
+    /// <summary>
     /// Make VAD region appear as PAGE_NO_ACESS to NtQueryVirtualMemory
     /// </summary>
     /// <param name="pid">Target process ID</param>
@@ -193,6 +200,12 @@ public:
     /// <param name="size">Region size</param>
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS ConcealVAD( DWORD pid, ptr_t base, uint32_t size );
+
+    /// <summary>
+    /// Check if driver is loaded
+    /// </summary>
+    /// <returns></returns>
+    BLACKBONE_API inline bool loaded() const { return _hDriver != INVALID_HANDLE_VALUE; }
 
 private:
     DriverControl( const DriverControl& ) = delete;

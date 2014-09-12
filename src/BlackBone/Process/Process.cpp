@@ -35,18 +35,13 @@ Process::~Process(void)
 /// <returns>Status code</returns>
 NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 {
-    // Reset data
-    _memory.reset();
-    _modules.reset();
-    _remote.reset();
-    _mmap.reset();
-    _hooks.reset();
+    Detach();
 
     auto status = _core.Open( pid, access );
     if (NT_SUCCESS( status ))
     {
         _nativeLdr.Init();
-        _remote.CreateRPCEnvironment( true );
+        _remote.CreateRPCEnvironment( false, false );
     }
 
     return status;
@@ -59,18 +54,13 @@ NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 /// <returns>Status code</returns>
 NTSTATUS Process::Attach( HANDLE hProc )
 {
-    // Reset data
-    _memory.reset();
-    _modules.reset();
-    _remote.reset();
-    _mmap.reset();
-    _hooks.reset();
+    Detach();
 
     auto status = _core.Open( hProc );
     if (NT_SUCCESS( status ))
     {
         _nativeLdr.Init();
-        _remote.CreateRPCEnvironment( true );
+        _remote.CreateRPCEnvironment( false, false );
     }
 
     return status;
@@ -95,6 +85,8 @@ NTSTATUS Process::CreateAndAttach(
     STARTUPINFOW* pStartup /*= nullptr*/
     )
 {
+    Detach();
+
     STARTUPINFOW si = { 0 };
     PROCESS_INFORMATION pi = { 0 };
     if (!pStartup)
@@ -104,14 +96,7 @@ NTSTATUS Process::CreateAndAttach(
                          FALSE, CREATE_SUSPENDED, NULL, currentDir, pStartup, &pi ))
     {
         return LastNtStatus();
-    }
-
-    // Reset data
-    _memory.reset();
-    _modules.reset();
-    _remote.reset();
-    _mmap.reset();
-    _hooks.reset();
+    } 
 
     // Get handle ownership
     auto status = _core.Open( pi.hProcess );
@@ -140,6 +125,24 @@ NTSTATUS Process::CreateAndAttach(
     return status;
 }
 
+/// <summary>
+/// Detach form current process, if any
+/// </summary>
+/// <returns>Status code</returns>
+NTSTATUS Process::Detach()
+{
+    // Reset data
+    _memory.reset();
+    _modules.reset();
+    _remote.reset();
+    _mmap.reset();
+    _threads.reset();
+    _hooks.reset();
+    _core.Close();
+
+    return STATUS_SUCCESS;
+}
+
 
 /// <summary>
 /// Checks if process still exists
@@ -149,7 +152,7 @@ bool Process::valid()
 {
     DWORD dwExitCode = 0;
 
-    if (!GetExitCodeProcess( _core.handle(), &dwExitCode ))
+    if (!_core.handle() || !GetExitCodeProcess( _core.handle(), &dwExitCode ))
         return false;
 
     return (dwExitCode == STILL_ACTIVE);

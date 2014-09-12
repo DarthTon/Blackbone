@@ -4,7 +4,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
     <SignMode>TestSign</SignMode>
-    <TestCertificate>CN=BlackBoneSPC | DB31B6A1218B0E1953CCA5310EA30FD1719645B6</TestCertificate>
+    <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Vista Debug|x64'">
     <DbgengKernelMachineName>127.0.0.1</DbgengKernelMachineName>
@@ -15,7 +15,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
     <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TestCertificate>CN=BlackBoneSPC | DB31B6A1218B0E1953CCA5310EA30FD1719645B6</TestCertificate>
+    <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Vista Release|Win32'">
     <DbgengKernelMachineName>127.0.0.1</DbgengKernelMachineName>
@@ -25,7 +25,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|x64'">
     <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
-    <TestCertificate>CN=BlackBoneSPC | DB31B6A1218B0E1953CCA5310EA30FD1719645B6</TestCertificate>
+    <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
     <SignMode>TestSign</SignMode>
     <ProductionCertificate>
     </ProductionCertificate>
@@ -35,17 +35,17 @@
     <SignMode>TestSign</SignMode>
     <ProductionCertificate>
     </ProductionCertificate>
-    <TestCertificate>CN=BlackBoneSPC | DB31B6A1218B0E1953CCA5310EA30FD1719645B6</TestCertificate>
+    <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
     <SignMode>TestSign</SignMode>
     <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <TestCertificate>CN=BlackBoneSPC | DB31B6A1218B0E1953CCA5310EA30FD1719645B6</TestCertificate>
+    <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
     <SignMode>TestSign</SignMode>
     <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
-    <TestCertificate>CN=BlackBoneSPC | DB31B6A1218B0E1953CCA5310EA30FD1719645B6</TestCertificate>
+    <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
   </PropertyGroup>
 </Project>

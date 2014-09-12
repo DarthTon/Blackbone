@@ -15,13 +15,13 @@ DriverControl::DriverControl()
 {
     DynImport::load( "NtLoadDriver", GetModuleHandleW( L"ntdll.dll" ) );
     DynImport::load( "NtUnloadDriver", GetModuleHandleW( L"ntdll.dll" ) );
+    DynImport::load( "RtlDosPathNameToNtPathName_U", GetModuleHandleW( L"ntdll.dll" ) );   
 }
 
 
 DriverControl::~DriverControl()
 {
-    if (_hDriver != INVALID_HANDLE_VALUE)
-        CloseHandle( _hDriver );
+    Unload();
 }
 
 DriverControl& DriverControl::Instance()
@@ -496,6 +496,35 @@ NTSTATUS DriverControl::InjectDll( DWORD pid, const std::wstring& path, InjectTy
 
     return STATUS_SUCCESS;
 }
+
+/// <summary>
+/// Manually map another system driver into system space
+/// </summary>
+/// <param name="path">Fully quialified path to the drver</param>
+/// <returns>Status code</returns>
+NTSTATUS DriverControl::MMapDriver( const std::wstring& path )
+{
+    DWORD bytes = 0;
+    MMAP_DRIVER data = { 0 };
+    UNICODE_STRING ustr = { 0 };
+
+    // Not loaded
+    if (_hDriver == INVALID_HANDLE_VALUE)
+        return STATUS_DEVICE_DOES_NOT_EXIST;
+
+    // Convert path to native format
+    GET_IMPORT( RtlDosPathNameToNtPathName_U )(path.c_str(), &ustr, NULL, NULL);
+
+    wcscpy_s( data.FullPath, ustr.Buffer );
+
+    GET_IMPORT( RtlFreeUnicodeString )(&ustr);
+
+    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_MAP_DRIVER, &data, sizeof( data ), nullptr, 0, &bytes, NULL ))
+        return LastNtStatus();
+
+    return STATUS_SUCCESS;
+}
+
 
 /// <summary>
 /// Make VAD region appear as PAGE_NO_ACESS to NtQueryVirtualMemory

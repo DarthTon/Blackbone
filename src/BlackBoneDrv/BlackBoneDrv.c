@@ -10,21 +10,9 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING registr
 NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData );
 VOID     BBUnload( IN PDRIVER_OBJECT DriverObject );
 
-
 #pragma alloc_text(PAGE, DriverEntry)
 #pragma alloc_text(PAGE, BBUnload)
 #pragma alloc_text(PAGE, BBInitDynamicData)
-
-
-typedef struct _KSERVICE_TABLE_DESCRIPTOR 
-{
-    PULONG_PTR Base;
-    PULONG Count;
-    ULONG Limit;
-    PUCHAR Number;
-} KSERVICE_TABLE_DESCRIPTOR, *PKSERVICE_TABLE_DESCRIPTOR;
-
-DECLSPEC_CACHEALIGN KSERVICE_TABLE_DESCRIPTOR KeServiceDescriptorTable[2];
 
 
 /*
@@ -139,6 +127,18 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         ULONG ver_short = (verInfo.dwMajorVersion << 8) | (verInfo.dwMinorVersion << 4) | verInfo.wServicePackMajor;
 
         pData->ver = (WinVer)ver_short;
+
+        // Validate current driver version
+    #if defined(_WIN7_)
+        if (ver_short != WINVER_7 && ver_short != WINVER_7_SP1)
+            return STATUS_NOT_SUPPORTED;
+    #elif defined(_WIN8_)
+        if (ver_short != WINVER_8)
+            return STATUS_NOT_SUPPORTED;
+    #elif defined (_WIN81_)
+        if (ver_short != WINVER_81)
+            return STATUS_NOT_SUPPORTED;
+    #endif
 
         DPRINT( "BlackBone: OS version %d.%d.%d.%d.%d - 0x%x\n",
                 verInfo.dwMajorVersion,

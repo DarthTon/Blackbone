@@ -38,9 +38,10 @@ public:
     /// |       8/8 bytes       |   8/8 bytes  |      8/8 bytes     |   16/16 bytes   |                                          |
     /// --------------------------------------------------------------------------------------------------------------------------
     /// </summary>
-    /// <param name="noThread">Create only codecave and sync event, without thread</param>
+    /// <param name="bThread">Create worker thread</param>
+    /// <param name="bEvent">Create sync event for worker thread</param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS CreateRPCEnvironment( bool noThread = false );
+    BLACKBONE_API NTSTATUS CreateRPCEnvironment( bool bThread = true, bool bEvent = true );
 
     /// <summary>
     /// Create new thread and execute code in it. Wait until execution ends

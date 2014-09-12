@@ -453,23 +453,33 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node(
     auto StringBuf = _process.memory().Allocate( MAX_PATH, PAGE_READWRITE );
     StringBuf.Release();
 
-    eModType mt = _process.core().native()->GetWow64Barrier().sourceWow64 ? mt_mod32 : mt_mod64;
+    if (_LdrHeapBase)
+    {
+        eModType mt = _process.core().native()->GetWow64Barrier().sourceWow64 ? mt_mod32 : mt_mod64;
 
-    auto RtlAllocateHeap = _process.modules().GetExport(
-        _process.modules().GetModule( L"ntdll.dll", LdrList, mt ), "RtlAllocateHeap" ).procAddress;
+        auto RtlAllocateHeap = _process.modules().GetExport(
+            _process.modules().GetModule( L"ntdll.dll", LdrList, mt ), "RtlAllocateHeap" ).procAddress;
 
-    //
-    // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
-    //
-    a.GenPrologue();
 
-    a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W7) } );
+        //
+        // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
+        //
+        a.GenPrologue();
 
-    _process.remote().AddReturnWithEvent( a, mt );
-    a.GenEpilogue();
+        a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W7 ) } );
 
-    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-    pEntry = reinterpret_cast<decltype(pEntry)>(result);
+        _process.remote().AddReturnWithEvent( a, mt );
+        a.GenEpilogue();
+
+        _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
+        pEntry = reinterpret_cast<decltype(pEntry)>(result);
+    }
+    else
+    {
+        auto block = _process.memory().Allocate( sizeof( _LDR_DATA_TABLE_ENTRY_W8 ), PAGE_READWRITE );
+        pEntry = block.ptr<_LDR_DATA_TABLE_ENTRY_W7*>();
+        block.Release();
+    }
 
     if(pEntry)
     {

@@ -30,8 +30,7 @@ Thread::Thread( const Thread& other )
 
 Thread::~Thread()
 {
-    if (_handle != NULL)
-        CloseHandle( _handle );
+    Close();
 }
 
 /// <summary>
@@ -330,6 +329,19 @@ uint64_t Thread::execTime()
              + ((static_cast<uint64_t>(times[3].dwHighDateTime) << 32) | times[3].dwLowDateTime);
 
     return MAXULONG64_2;
+}
+
+/// <summary>
+/// Close handle
+/// </summary>
+BLACKBONE_API void Thread::Close()
+{
+    if (_handle)
+    {
+        CloseHandle( _handle );
+        _handle = NULL;
+        _id = 0;
+    }
 }
 
 

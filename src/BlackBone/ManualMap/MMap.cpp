@@ -91,7 +91,7 @@ const ModuleData* MMap::MapImage(
         return hMod;
 
     // Prepare target process
-    if (_process.remote().CreateRPCEnvironment() != STATUS_SUCCESS)
+    if (!NT_SUCCESS( _process.remote().CreateRPCEnvironment() ))
     {
         Cleanup();
         return nullptr;
@@ -138,8 +138,19 @@ const ModuleData* MMap::MapImage(
             // Wipe header
             if (img->flags & WipeHeader)
             {
-                if (img->imgMem.Free( img->peImage.headersSize() ) != STATUS_SUCCESS)
-                    img->imgMem.Protect( PAGE_NOACCESS, 0, img->peImage.headersSize() );
+                uint8_t zeroBuf[0x1000] = { 0 };
+
+                // Fill with 0 
+                if (img->flags & HideVAD)
+                {
+                    Driver().WriteMem( _process.pid(), img->imgMem.ptr(), sizeof( zeroBuf ), zeroBuf );
+                }
+                else
+                {
+                    img->imgMem.Write( 0, zeroBuf );
+                    if (!NT_SUCCESS( img->imgMem.Free( img->peImage.headersSize() ) ))
+                        img->imgMem.Protect( PAGE_NOACCESS, 0, img->peImage.headersSize() );
+                }
             }
 
             img->initialized = true;

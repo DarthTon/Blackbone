@@ -188,6 +188,11 @@ public:
     /// <returns>true on success</returns>
     BLACKBONE_API bool RemoveHWBP( ptr_t ptr );
 
+    /// <summary>
+    /// Close handle
+    /// </summary>
+    BLACKBONE_API void Close();
+
     BLACKBONE_API inline bool operator ==(const Thread& other) { return (_id == other._id); }
 
     BLACKBONE_API Thread& operator =(const Thread& other)

@@ -47,9 +47,6 @@ NTSTATUS PEImage::Load( const std::wstring& path, bool skipActx /*= false*/ )
         {
             _isPlainData = false;
             _pFileBase = MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 );
-
-            SECTION_BASIC_INFORMATION_T SectionInfo = { 0 };
-            GET_IMPORT( NtQuerySection )(_hMapping, SectionBasicInformation, &SectionInfo, sizeof( SectionInfo ), 0);
         }
         // Map as simple datafile
         else
@@ -179,6 +176,7 @@ NTSTATUS PEImage::Parse( void* pImageBase /*= nullptr*/ )
         _imgSize = _pImageHdr64->OptionalHeader.SizeOfImage;
         _hdrSize = _pImageHdr64->OptionalHeader.SizeOfHeaders;
         _epRVA   = _pImageHdr64->OptionalHeader.AddressOfEntryPoint;
+        _subsystem = _pImageHdr64->OptionalHeader.Subsystem;
 
         pSection = reinterpret_cast<const IMAGE_SECTION_HEADER*>(_pImageHdr64 + 1);
     }
@@ -190,6 +188,7 @@ NTSTATUS PEImage::Parse( void* pImageBase /*= nullptr*/ )
         _imgSize = _pImageHdr32->OptionalHeader.SizeOfImage;
         _hdrSize = _pImageHdr32->OptionalHeader.SizeOfHeaders;
         _epRVA   = _pImageHdr32->OptionalHeader.AddressOfEntryPoint;
+        _subsystem = _pImageHdr32->OptionalHeader.Subsystem;
 
         pSection = reinterpret_cast<const IMAGE_SECTION_HEADER*>(_pImageHdr32 + 1);
     }
