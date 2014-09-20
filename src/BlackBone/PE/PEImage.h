@@ -47,6 +47,7 @@ struct ImportData
 // Imports and sections related
 typedef std::unordered_map<std::wstring, std::vector<ImportData>> mapImports;
 typedef std::vector<IMAGE_SECTION_HEADER> vecSections;
+typedef std::list<std::pair<std::string, uint32_t>> listExports;
 
 /// <summary>
 /// Primitive PE parsing class
@@ -99,7 +100,7 @@ public:
     /// Retrieve all exported functions with names
     /// </summary>
     /// <param name="names">Found exports</param>
-    BLACKBONE_API void GetExportNames( std::list<std::string>& names );
+    BLACKBONE_API void GetExports( listExports& exports );
 
     /// <summary>
     /// Retrieve image TLS callbacks

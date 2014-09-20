@@ -327,18 +327,20 @@ mapImports& PEImage::GetImports( bool useDelayed /*= false*/ )
 /// Retrieve all exported functions with names
 /// </summary>
 /// <param name="names">Found exports</param>
-void PEImage::GetExportNames( std::list<std::string>& names )
+BLACKBONE_API void PEImage::GetExports( listExports& exports )
 {
-    names.clear();
+    exports.clear();
 
     auto pExport = reinterpret_cast<PIMAGE_EXPORT_DIRECTORY>(DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXPORT ));
     if (pExport == 0)
         return;
 
     DWORD *pAddressOfNames = reinterpret_cast<DWORD*>(pExport->AddressOfNames + reinterpret_cast<size_t>(_pFileBase));
+    DWORD *pAddressOfFuncs = reinterpret_cast<DWORD*>(pExport->AddressOfFunctions + reinterpret_cast<size_t>(_pFileBase));
+    WORD  *pAddressOfOrds  = reinterpret_cast<WORD*> (pExport->AddressOfNameOrdinals + reinterpret_cast<size_t>(_pFileBase));
 
     for (DWORD i = 0; i < pExport->NumberOfNames; ++i)
-        names.push_back( reinterpret_cast<const char*>(_pFileBase) + pAddressOfNames[i] );
+        exports.push_back( std::make_pair( reinterpret_cast<const char*>(_pFileBase)+pAddressOfNames[i], pAddressOfFuncs[pAddressOfOrds[i]] ) );
 
     return;
 }
@@ -502,7 +504,17 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
     // Create ACTX
     _hctx = CreateActCtxW( &act );
 
-    return _hctx != INVALID_HANDLE_VALUE ? STATUS_SUCCESS : LastNtStatus();
+    if (_hctx != INVALID_HANDLE_VALUE)
+        return STATUS_SUCCESS;
+
+    // Return success if current process is protected
+    if (LastNtStatus() == STATUS_ACCESS_DENIED)
+    {
+        _manifestIdx = 0;
+        return STATUS_SUCCESS;
+    }
+
+    return LastNtStatus();
 }
 
 /// <summary>

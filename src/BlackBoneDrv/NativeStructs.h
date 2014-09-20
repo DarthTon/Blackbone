@@ -175,7 +175,6 @@ typedef struct _OBJECT_HEADER // Size=56
     struct _QUAD Body; // Size=8 Offset=48
 } OBJECT_HEADER, *POBJECT_HEADER;
 
-
 typedef struct _MEMORY_BASIC_INFORMATION
 {
     PVOID BaseAddress;
@@ -208,6 +207,16 @@ typedef struct _SYSTEM_THREAD_INFORMATION
     ULONG ThreadState;
     KWAIT_REASON WaitReason;
 }SYSTEM_THREAD_INFORMATION, *PSYSTEM_THREAD_INFORMATION;
+
+typedef struct _THREAD_BASIC_INFORMATION
+{
+    NTSTATUS ExitStatus;
+    PVOID TebBaseAddress;
+    CLIENT_ID ClientId;
+    ULONG_PTR AffinityMask;
+    LONG Priority;
+    LONG BasePriority;
+} THREAD_BASIC_INFORMATION, *PTHREAD_BASIC_INFORMATION;
 
 typedef struct _SYSTEM_PROCESS_INFO
 {

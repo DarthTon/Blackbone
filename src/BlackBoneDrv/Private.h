@@ -104,7 +104,6 @@ typedef struct _DYNAMIC_DATA
     ULONG NtProtectIndex;   // NtProtectVirtualMemory SSDT index
     ULONG NtThdIndex;       // NtCreateThreadEx SSDT index
     ULONG PrevMode;         // PreviousMode offset in KTHREAD
-    ULONG ApcState;         // KTHREAD ApcState field
     ULONG ExitStatus;       // ETHREAD ExitStatus field
     ULONG MiAllocPage;      // MiAllocateDriver page offset
 } DYNAMIC_DATA, *PDYNAMIC_DATA;

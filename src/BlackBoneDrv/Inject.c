@@ -155,35 +155,43 @@ NTSTATUS BBExecuteInNewThread(
 {
     HANDLE hThread = NULL;
     OBJECT_ATTRIBUTES ob = { 0 };
-    ob.Length = sizeof( ob );
+    
+    InitializeObjectAttributes( &ob, NULL, OBJ_KERNEL_HANDLE, NULL, NULL );
 
-    NTSTATUS status = ZwCreateThreadEx( &hThread, THREAD_ALL_ACCESS, &ob, ZwCurrentProcess(), pBaseAddress,
-                                        pParam, flags, 0, 0x1000, 0x100000, NULL );
+    // Kernel-mode handles ignore access checks, so it's safe to create handle without any DesiredAccess
+    NTSTATUS status = ZwCreateThreadEx( &hThread, 0, &ob, ZwCurrentProcess(), pBaseAddress, pParam, flags, 0, 0x1000, 0x100000, NULL );
 
     // Wait for completion
     if (NT_SUCCESS( status ) && wait != FALSE)
     {
-        PETHREAD pThread = NULL;
-        status = ObReferenceObjectByHandle( hThread, THREAD_ALL_ACCESS, *PsThreadType, UserMode, &pThread, NULL );
+        // Force 60 sec timeout
+        LARGE_INTEGER timeout = { 0 };
+        timeout.QuadPart = -(60ll * 10 * 1000 * 1000);
 
-        if (NT_SUCCESS( status ))
+        status = ZwWaitForSingleObject( hThread, TRUE, &timeout );
+        if (NT_SUCCESS(status))
         {
-            // Force 60 sec timeout
-            LARGE_INTEGER timeout = { 0 };
-            timeout.QuadPart = -(60ll * 10 * 1000 * 1000);
+            THREAD_BASIC_INFORMATION info = { 0 };
+            ULONG bytes = 0;
 
-            KeWaitForSingleObject( pThread, Executive, KernelMode, TRUE, &timeout );
-
-            // Get exit code
-            if (pExitStatus)
-                *pExitStatus = *(NTSTATUS*)((PUCHAR)pThread + dynData.ExitStatus);
+            status = ZwQueryInformationThread( hThread, ThreadBasicInformation, &info, sizeof( info ), &bytes );
+            if (NT_SUCCESS( status ) && pExitStatus)
+            {
+                *pExitStatus = info.ExitStatus;
+            }
+            else if (!NT_SUCCESS( status ))
+            {
+                DPRINT( "BlackBone: %s: ZwQueryInformationThread failed with status 0x%X\n", __FUNCTION__, status );
+            }
         }
-
-        if (pThread)
-            ObDereferenceObject( pThread );
+        else
+            DPRINT( "BlackBone: %s: ZwWaitForSingleObject failed with status 0x%X\n", __FUNCTION__, status ); 
     }
     else
         DPRINT( "BlackBone: %s: ZwCreateThreadEx failed with status 0x%X\n", __FUNCTION__, status );
+
+    if (hThread)
+        ZwClose( hThread );
 
     return status;
 }
@@ -450,7 +458,7 @@ NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
     {
         status = PsLookupThreadByThreadId( pInfo->Threads[0].ClientId.UniqueThread, ppThread );
 
-        // Does not allow usage of currently executing thread
+        // Do not allow usage of currently executing thread
         if (NT_SUCCESS( status ) && *ppThread == PsGetCurrentThread())
         {
             // Try next thread

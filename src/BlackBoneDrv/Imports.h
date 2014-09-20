@@ -36,6 +36,17 @@ ZwQueryInformationProcess(
 NTSYSAPI
 NTSTATUS
 NTAPI
+ZwQueryInformationThread(
+    IN HANDLE ThreadHandle,
+    IN THREADINFOCLASS ThreadInformationClass,
+    OUT PVOID ThreadInformation,
+    IN ULONG ThreadInformationLength,
+    OUT PULONG ReturnLength OPTIONAL
+    );
+
+NTSYSAPI
+NTSTATUS
+NTAPI
 ZwQueryVirtualMemory(
     IN HANDLE  ProcessHandle,
     IN PVOID   BaseAddress,

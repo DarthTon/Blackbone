@@ -481,8 +481,12 @@ NTSTATUS BBMMapDriver( IN PUNICODE_STRING pPath )
     status = ObReferenceObjectByHandle( hThread, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, &pThread, &handleInfo );
     if (NT_SUCCESS( status ))
     {
+        THREAD_BASIC_INFORMATION info = { 0 };
+        ULONG bytes = 0;
+
         status = KeWaitForSingleObject( pThread, Executive, KernelMode, TRUE, NULL );
-        status = *(NTSTATUS*)((PUCHAR)pThread + dynData.ExitStatus);
+        status = ZwQueryInformationThread( hThread, ThreadBasicInformation, &info, sizeof( info ), &bytes );
+        status = info.ExitStatus;
     }
 
     if (pThread)
