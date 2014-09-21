@@ -111,9 +111,8 @@ NTSTATUS BBExecuteInNewThread(
 /// <param name="pThread">Target thread</param>
 /// <param name="pUserFunc">APC function</param>
 /// <param name="Arg1">Argument 1</param>
-/// <param name="Arg2">Argument 2</param>
 /// <returns>Status code</returns>
-NTSTATUS BBQueueUserApc( IN PETHREAD pThread, IN PVOID pUserFunc, IN PVOID Arg1, IN PVOID Arg2 );
+NTSTATUS BBQueueUserApc( IN PETHREAD pThread, IN PVOID pUserFunc, IN PVOID Arg1);
 
 /// <summary>
 /// Process termination handler

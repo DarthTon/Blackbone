@@ -338,7 +338,7 @@ NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCW
 
     if (NT_SUCCESS( status ))
     {
-        status = BBQueueUserApc( pThread, pUserBuf, NULL, NULL );
+        status = BBQueueUserApc( pThread, pUserBuf, NULL );
 
         // Wait for completion
         if (NT_SUCCESS( status ))
@@ -361,7 +361,11 @@ NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCW
                 if (modBase != 0 && initRVA != 0)
                 {
                     RtlCopyMemory( (PUCHAR)pUserBuf + STRING_OFFSET, InitArg, 512 * sizeof( WCHAR ) );
-                    BBQueueUserApc( pThread, (PUCHAR)modBase + initRVA, (PUCHAR)pUserBuf + STRING_OFFSET, (PUCHAR)pUserBuf + STRING_OFFSET );
+                    BBQueueUserApc( pThread, (PUCHAR)modBase + initRVA, (PUCHAR)pUserBuf + STRING_OFFSET );
+
+                    // Wait some time for routine to finish
+                    interval.QuadPart = -(100LL * 10 * 1000);
+                    KeDelayExecutionThread( KernelMode, FALSE, &interval );
                 }
                 else if (modBase == 0)
                     DPRINT( "BlackBone: %s: Module base = 0. Aborting\n", __FUNCTION__ );
@@ -391,9 +395,8 @@ NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCW
 /// <param name="pThread">Target thread</param>
 /// <param name="pUserFunc">APC function</param>
 /// <param name="Arg1">Argument 1</param>
-/// <param name="Arg2">Argument 2</param>
 /// <returns>Status code</returns>
-NTSTATUS BBQueueUserApc( IN PETHREAD pThread, IN PVOID pUserFunc, IN PVOID Arg1, IN PVOID Arg2 )
+NTSTATUS BBQueueUserApc( IN PETHREAD pThread, IN PVOID pUserFunc, IN PVOID Arg1 )
 {
     ASSERT( pThread != NULL );
     if (pThread == NULL)
@@ -415,10 +418,10 @@ NTSTATUS BBQueueUserApc( IN PETHREAD pThread, IN PVOID pUserFunc, IN PVOID Arg1,
 
     // Actual APC
     KeInitializeApc( pInjectApc, (PKTHREAD)pThread, OriginalApcEnvironment, &KernelApcInjectCallback,
-                     NULL, (PKNORMAL_ROUTINE)pUserFunc, UserMode, NULL );
+                     NULL, (PKNORMAL_ROUTINE)pUserFunc, UserMode, Arg1 );
 
     // Enforce kernel APC
-    if (KeInsertQueueApc( pInjectApc, Arg1, Arg2, 0 ))
+    if (KeInsertQueueApc( pInjectApc, NULL, NULL, 0 ))
     {
         KeInsertQueueApc( pPrepareApc, NULL, NULL, 0 );
         return STATUS_SUCCESS;
