@@ -475,9 +475,18 @@ NTSTATUS DriverControl::ProtectMem( DWORD pid, ptr_t base, ptr_t size, DWORD pro
 /// <param name="pid">Target PID.</param>
 /// <param name="path">Full qualified dll path.</param>
 /// <param name="itype">Injection type</param>
+/// <param name="initRVA">Init routine RVA</param>
+/// <param name="initArg">Init routine argument</param>
 /// <param name="wait">Wait for injection</param>
 /// <returns>Status code</returns>
-NTSTATUS DriverControl::InjectDll( DWORD pid, const std::wstring& path, InjectType itype, bool wait /*= true */ )
+NTSTATUS DriverControl::InjectDll(
+    DWORD pid,
+    const std::wstring& path,
+    InjectType itype,
+    uint32_t initRVA /*= 0*/,
+    const std::wstring& initArg /*= L""*/,
+    bool wait /*= true*/
+    )
 {
     DWORD bytes = 0;
     INJECT_DLL data = { 0 };
@@ -487,7 +496,9 @@ NTSTATUS DriverControl::InjectDll( DWORD pid, const std::wstring& path, InjectTy
         return STATUS_DEVICE_DOES_NOT_EXIST;
 
     wcscpy_s( data.FullDllPath, path.c_str() );
+    wcscpy_s( data.initArg, initArg.c_str() );
     data.pid = pid;
+    data.initRVA = initRVA;
     data.wait = wait;
     data.type = itype;
 

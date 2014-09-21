@@ -143,8 +143,7 @@ NTSTATUS MemBlock::Free( size_t size /*= 0*/ )
     {
         size = Align( size, 0x1000 );
 
-        NTSTATUS status = _physical ? Driver().FreeMem( _memory->core().pid(), _ptr, size, MEM_RELEASE ) : 
-                                      _memory->Free( _ptr, size );
+        NTSTATUS status = _physical ? Driver().FreeMem( _memory->core().pid(), _ptr, size, MEM_RELEASE ) : _memory->Free( _ptr, size, size == 0 ? MEM_RELEASE : MEM_DECOMMIT );
 
         if (!NT_SUCCESS( status ))
             return LastNtStatus();

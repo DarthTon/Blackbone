@@ -15,7 +15,7 @@ extern DYNAMIC_DATA dynData;
 PVOID BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath );
 PVOID BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath );
 
-NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid );
+NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCWCHAR InitArg );
 NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread );
 
 VOID KernelApcPrepareCallback( PKAPC, PKNORMAL_ROUTINE*, PVOID*, PVOID*, PVOID* );
@@ -40,9 +40,10 @@ VOID ApcWaitThread( IN PVOID pUserBuf );
 NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
 {
     NTSTATUS status = STATUS_SUCCESS;
+    NTSTATUS threadStatus = STATUS_SUCCESS;
     PEPROCESS pProcess = NULL;
 
-    status = PsLookupProcessByProcessId( (HANDLE)pData->pid, &pProcess);
+    status = PsLookupProcessByProcessId( (HANDLE)pData->pid, &pProcess );
     if (NT_SUCCESS( status ))
     {
         KAPC_STATE apc;
@@ -93,8 +94,6 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
 
             if (pData->type == IT_Thread)
             {
-                NTSTATUS threadStatus = STATUS_SUCCESS;
-
                 status = BBExecuteInNewThread( pUserBuf, NULL, THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER, pData->wait, &threadStatus );
 
                 // Injection failed
@@ -103,10 +102,24 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
                     status = threadStatus;
                     DPRINT( "BlackBone: %s: User thread failed with status - 0x%X\n", __FUNCTION__, status );
                 }
+                // Call Init routine
+                else
+                {
+                    ULONG_PTR modBase = *(PULONG_PTR)((PUCHAR)pUserBuf + MOD_OFFSET);
+
+                    if (modBase != 0 && pData->initRVA != 0)
+                    {
+                        RtlCopyMemory( (PUCHAR)pUserBuf + STRING_OFFSET, pData->initArg, sizeof( pData->initArg ) );
+                        BBExecuteInNewThread( (PUCHAR)modBase + pData->initRVA, (PUCHAR)pUserBuf + STRING_OFFSET,
+                                              THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER, TRUE, &threadStatus );
+                    }
+                    else if (modBase == 0)
+                        DPRINT( "BlackBone: %s: Module base = 0. Aborting\n", __FUNCTION__ );
+                }
             }
             else if (pData->type == IT_Apc)
             {
-                status = BBApcInject( pUserBuf, (HANDLE)pData->pid );                       
+                status = BBApcInject( pUserBuf, (HANDLE)pData->pid, pData->initRVA, pData->initArg );
             }
             else
             {
@@ -312,8 +325,10 @@ PVOID BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
 /// </summary>
 /// <param name="pUserBuf">Injcetion code</param>
 /// <param name="pid">Target process ID</param>
-/// <returns></returns>
-NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid )
+/// <param name="initRVA">Init routine RVA</param>
+/// <param name="InitArg">Init routine argument</param>
+/// <returns>Status code</returns>
+NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCWCHAR InitArg )
 {
     NTSTATUS status = STATUS_SUCCESS;
     PETHREAD pThread = NULL;
@@ -340,6 +355,16 @@ NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid )
                     KeDelayExecutionThread( KernelMode, FALSE, &interval );
                     val = *(PULONG)((PUCHAR)pUserBuf + COMPLETE_OFFSET);
                 }
+
+                // Call init routine
+                ULONG_PTR modBase = *(PULONG_PTR)((PUCHAR)pUserBuf + MOD_OFFSET);
+                if (modBase != 0 && initRVA != 0)
+                {
+                    RtlCopyMemory( (PUCHAR)pUserBuf + STRING_OFFSET, InitArg, 512 * sizeof( WCHAR ) );
+                    BBQueueUserApc( pThread, (PUCHAR)modBase + initRVA, (PUCHAR)pUserBuf + STRING_OFFSET, (PUCHAR)pUserBuf + STRING_OFFSET );
+                }
+                else if (modBase == 0)
+                    DPRINT( "BlackBone: %s: Module base = 0. Aborting\n", __FUNCTION__ );
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {

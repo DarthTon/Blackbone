@@ -181,9 +181,18 @@ public:
     /// <param name="pid">Target PID.</param>
     /// <param name="path">Full qualified dll path.</param>
     /// <param name="itype">Injection type</param>
+    /// <param name="initRVA">Init routine RVA</param>
+    /// <param name="initArg">Init routine argument</param>
     /// <param name="wait">Wait for injection</param>
     /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS InjectDll( DWORD pid, const std::wstring& path, InjectType itype, bool wait = true );
+    BLACKBONE_API NTSTATUS InjectDll(
+        DWORD pid, 
+        const std::wstring& path, 
+        InjectType itype, 
+        uint32_t initRVA = 0, 
+        const std::wstring& initArg = L"", 
+        bool wait = true
+        );
 
     /// <summary>
     /// Manually map another system driver into system space
