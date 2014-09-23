@@ -1,5 +1,6 @@
 #include "Process.h"
 #include "../Misc/NameResolve.h"
+#include "../Misc/DynImport.h"
 
 #include <memory>
 
@@ -18,9 +19,8 @@ Process::Process()
 {
     GrantPriviledge( SE_DEBUG_NAME );
     GrantPriviledge( SE_LOAD_DRIVER_NAME );
-    GrantPriviledge( SE_LOCK_MEMORY_NAME );
 
-    NameResolve::Instance().Initialize();
+    NameResolve::Instance().Initialize(); 
 }
 
 Process::~Process(void)
@@ -235,5 +235,95 @@ void Process::EnumByName( const std::wstring& name, std::vector<DWORD>& found )
     }
 }
 
+/// <summary>
+/// Search for process by executable name or by process ID
+/// </summary>
+/// <param name="pid">Target process ID. rocess name. If empty - function will retrieve all existing processes</param>
+/// <param name="name">Process executable name. If empty - function will retrieve all existing processes</param>
+/// <param name="found">Found processses</param>
+/// <param name="includeThreads">If set to true, function will retrieve info ablout process threads</param>
+/// <returns>Status code</returns>
+NTSTATUS Process::EnumByNameOrPID(
+    uint32_t pid,
+    const std::wstring& name,
+    std::vector<ProcessInfo>& found,
+    bool includeThreads /*= false*/
+    )
+{
+    ULONG bufSize = 0x100;
+    uint8_t tmpbuf[0x100];
+    uint8_t* buffer = tmpbuf;
+    ULONG returnLength = 0;
+
+    found.clear();
+
+    // Query process info
+    NTSTATUS status = GET_IMPORT( NtQuerySystemInformation )((SYSTEM_INFORMATION_CLASS)57, buffer, bufSize, &returnLength);
+    if (!NT_SUCCESS( status ))
+    {
+        bufSize = returnLength;
+        buffer = (uint8_t*)VirtualAlloc( NULL, bufSize, MEM_COMMIT, PAGE_READWRITE );
+        status = GET_IMPORT( NtQuerySystemInformation )((SYSTEM_INFORMATION_CLASS)57, buffer, bufSize, &returnLength);
+        if (!NT_SUCCESS( status ))
+        {
+            VirtualFree( buffer, 0, MEM_RELEASE );
+            return status;
+        }
+    }
+
+    // Parse info
+    for (auto pInfo = reinterpret_cast<_SYSTEM_PROCESS_INFORMATION_T<DWORD_PTR>*>(buffer);;)
+    {
+        //  Skip idle process, compare name or compare pid
+        if (pInfo->UniqueProcessId != 0 && (
+            name.empty() && pid == 0 ||
+            _wcsicmp( name.c_str(), (wchar_t*)pInfo->ImageName.Buffer ) == 0 ||
+            pid == pInfo->UniqueProcessId))
+        {
+            ProcessInfo info;
+
+            info.pid = static_cast<uint32_t>(pInfo->UniqueProcessId);
+
+            if (pInfo->ImageName.Buffer)
+                info.imageName = reinterpret_cast<wchar_t*>(pInfo->ImageName.Buffer);
+
+            // Get threads info
+            if (includeThreads)
+            {
+                int64_t minTime = 0xFFFFFFFFFFFFFFFF;
+                ULONG mainIdx = 0;
+
+                for (ULONG i = 0; i < pInfo->NumberOfThreads; i++)
+                {
+                    ThreadInfo tinfo;
+                    auto& thd = pInfo->Threads[i];
+
+                    tinfo.tid = static_cast<uint32_t>(thd.ThreadInfo.ClientId.UniqueThread);
+                    tinfo.startAddress = static_cast<uintptr_t>(thd.ThreadInfo.StartAddress);
+
+                    // Check for main thread
+                    if (thd.ThreadInfo.CreateTime.QuadPart < minTime)
+                    {
+                        minTime = thd.ThreadInfo.CreateTime.QuadPart;
+                        mainIdx = i;
+                    }
+
+                    info.threads.emplace_back( tinfo );
+                    info.threads[mainIdx].mainThread = true;
+                }
+            }
+
+            found.emplace_back( info );
+        }
+
+        if (pInfo->NextEntryOffset)
+            pInfo = reinterpret_cast<_SYSTEM_PROCESS_INFORMATION_T<DWORD_PTR>*>((uint8_t*)pInfo + pInfo->NextEntryOffset);
+        else
+            break;        
+    }
+
+    VirtualFree( buffer, 0, MEM_RELEASE );
+    return status;
+}
 
 }

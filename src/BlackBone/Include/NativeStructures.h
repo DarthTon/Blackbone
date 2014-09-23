@@ -35,15 +35,8 @@ namespace blackbone
     template <typename T>
     struct _UNICODE_STRING_T
     {
-        union
-        {
-            struct
-            {
-                WORD Length;
-                WORD MaximumLength;
-            };
-            T dummy;
-        };
+        WORD Length;
+        WORD MaximumLength;
         T Buffer;
     };
 
@@ -318,18 +311,78 @@ namespace blackbone
     template<typename T>
     struct _THREAD_BASIC_INFORMATION_T
     {
-        NTSTATUS  ExitStatus;
-        T         TebBaseAddress;
+        NTSTATUS ExitStatus;
+        T TebBaseAddress;
+        _CLIENT_ID_T<T> ClientID;
+        T AffinityMask;
+        LONG Priority;
+        LONG BasePriority;
+    };
 
-        struct
-        {
-            T  UniqueProcess;
-            T  UniqueThread;
-        } ClientId;
+    struct VM_COUNTERS
+    {
+        SIZE_T PeakVirtualSize;
+        SIZE_T VirtualSize;
+        ULONG PageFaultCount;
+        SIZE_T PeakWorkingSetSize;
+        SIZE_T WorkingSetSize;
+        SIZE_T QuotaPeakPagedPoolUsage;
+        SIZE_T QuotaPagedPoolUsage;
+        SIZE_T QuotaPeakNonPagedPoolUsage;
+        SIZE_T QuotaNonPagedPoolUsage;
+        SIZE_T PagefileUsage;
+        SIZE_T PeakPagefileUsage;
+    };
 
-        T      AffinityMask;
-        LONG   Priority;
-        LONG   BasePriority;
+    template<typename T>
+    struct _SYSTEM_THREAD_INFORMATION_T
+    {
+        LARGE_INTEGER KernelTime;
+        LARGE_INTEGER UserTime;
+        LARGE_INTEGER CreateTime;
+        ULONG WaitTime;
+        T StartAddress;
+        _CLIENT_ID_T<T> ClientId;
+        LONG Priority;
+        LONG BasePriority;
+        ULONG ContextSwitches;
+        ULONG ThreadState;
+        ULONG WaitReason;
+    };
+
+    template<typename T>
+    struct _SYSTEM_EXTENDED_THREAD_INFORMATION_T
+    {
+        _SYSTEM_THREAD_INFORMATION_T<T> ThreadInfo;
+        T StackBase;
+        T StackLimit;
+        T Win32StartAddress;
+        T Reserved[4];
+    };
+
+    template<typename T>
+    struct _SYSTEM_PROCESS_INFORMATION_T
+    {
+        ULONG NextEntryOffset;
+        ULONG NumberOfThreads;
+        LARGE_INTEGER WorkingSetPrivateSize;
+        ULONG HardFaultCount;
+        ULONG NumberOfThreadsHighWatermark;
+        ULONGLONG CycleTime;
+        LARGE_INTEGER CreateTime;
+        LARGE_INTEGER UserTime;
+        LARGE_INTEGER KernelTime;
+        _UNICODE_STRING_T<T> ImageName;
+        LONG BasePriority;
+        T UniqueProcessId;
+        T InheritedFromUniqueProcessId;
+        ULONG HandleCount;
+        ULONG SessionId;
+        ULONG_PTR UniqueProcessKey;
+        VM_COUNTERS VmCounters;
+        SIZE_T PrivatePageCount;
+        IO_COUNTERS IoCounters;
+        _SYSTEM_EXTENDED_THREAD_INFORMATION_T<T> Threads[1];
     };
 
     struct _XSAVE_FORMAT64

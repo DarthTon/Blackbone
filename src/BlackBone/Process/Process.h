@@ -17,6 +17,21 @@
 namespace blackbone
 {
 
+struct ThreadInfo
+{
+    uint32_t tid = 0;
+    uintptr_t startAddress = 0;
+    bool mainThread = false;
+};
+
+struct ProcessInfo
+{
+    uint32_t pid = 0;
+    std::wstring imageName;
+    std::vector<ThreadInfo> threads;
+};
+
+
 #define DEFAULT_ACCESS_P  PROCESS_QUERY_INFORMATION | \
                           PROCESS_VM_READ           | \
                           PROCESS_VM_WRITE          | \
@@ -96,6 +111,21 @@ public:
     /// <param name="name">Process name. If empty - function will retrieve all existing processes</param>
     /// <param name="found">Found processses</param>
     BLACKBONE_API static void EnumByName( const std::wstring& name, std::vector<DWORD>& found );
+
+    /// <summary>
+    /// Search for process by executable name or by process ID
+    /// </summary>
+    /// <param name="pid">Target process ID. rocess name. If empty - function will retrieve all existing processes</param>
+    /// <param name="name">Process executable name. If empty - function will retrieve all existing processes</param>
+    /// <param name="found">Found processses</param>
+    /// <param name="includeThreads">If set to true, function will retrieve info ablout process threads</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API static NTSTATUS EnumByNameOrPID( 
+        uint32_t pid,
+        const std::wstring& name, 
+        std::vector<ProcessInfo>& found, 
+        bool includeThreads = false
+        );
 
     //
     // Subroutines

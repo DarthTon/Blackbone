@@ -225,6 +225,9 @@ typedef decltype(&RtlInitUnicodeString) fnRtlInitUnicodeString;
 // RtlFreeUnicodeString
 typedef decltype(&RtlFreeUnicodeString) fnRtlFreeUnicodeString;
 
+// NtQuerySystemInformation
+typedef decltype(&NtQuerySystemInformation) fnNtQuerySystemInformation;
+
 // NtQueryInformationProcess
 typedef decltype(&NtQueryInformationProcess) fnNtQueryInformationProcess;
 

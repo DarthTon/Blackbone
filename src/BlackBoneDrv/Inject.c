@@ -467,17 +467,21 @@ NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
         return status;
     }
 
-    // Find a target thread
+    // Find target thread
     if (NT_SUCCESS( status ))
     {
         status = STATUS_NOT_FOUND;
-        for (; pInfo->NextEntryOffset; pInfo = (PSYSTEM_PROCESS_INFO)((PUCHAR)pInfo + pInfo->NextEntryOffset))
+        for (;;)
         {
             if (pInfo->UniqueProcessId == pid)
             {
                 status = STATUS_SUCCESS;
                 break;
             }
+            else if (pInfo->NextEntryOffset)
+                pInfo = (PSYSTEM_PROCESS_INFO)((PUCHAR)pInfo + pInfo->NextEntryOffset);
+            else
+                break;
         }
     }
 

@@ -13,9 +13,12 @@ namespace blackbone
 
 NameResolve::NameResolve()
 {
-    DynImport::load( "RtlDosApplyFileIsolationRedirection_Ustr", L"ntdll.dll" );
-    DynImport::load( "RtlInitUnicodeString", L"ntdll.dll" );
-    DynImport::load( "RtlFreeUnicodeString", L"ntdll.dll" );
+    HMODULE ntdll = GetModuleHandleW( L"ntdll.dll" );
+
+    DynImport::load( "NtQuerySystemInformation", ntdll );
+    DynImport::load( "RtlDosApplyFileIsolationRedirection_Ustr", ntdll );
+    DynImport::load( "RtlInitUnicodeString", ntdll );
+    DynImport::load( "RtlFreeUnicodeString", ntdll );
 }
 
 NameResolve::~NameResolve()
