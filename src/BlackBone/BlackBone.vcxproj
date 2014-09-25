@@ -499,6 +499,7 @@
     <ClInclude Include="ManualMap\Native\NtLoader.h" />
     <ClInclude Include="Misc\DynImport.h" />
     <ClInclude Include="Misc\NameResolve.h" />
+    <ClInclude Include="Misc\Thunk.hpp" />
     <ClInclude Include="Misc\Trace.hpp" />
     <ClInclude Include="Misc\Utils.h" />
     <ClInclude Include="Patterns\PatternSearch.h" />

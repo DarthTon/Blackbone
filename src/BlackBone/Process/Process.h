@@ -29,6 +29,11 @@ struct ProcessInfo
     uint32_t pid = 0;
     std::wstring imageName;
     std::vector<ThreadInfo> threads;
+
+    bool operator < (const ProcessInfo& other)
+    {
+        return this->pid < other.pid;
+    }
 };
 
 
@@ -85,6 +90,12 @@ public:
     /// </summary>
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS Detach();
+
+    /// <summary>
+    /// Ensure LdrInitializeProcess gets called
+    /// </summary>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS EnsureInit();
 
     /// <summary>
     /// Get process ID

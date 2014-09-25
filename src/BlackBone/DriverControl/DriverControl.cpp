@@ -477,6 +477,7 @@ NTSTATUS DriverControl::ProtectMem( DWORD pid, ptr_t base, ptr_t size, DWORD pro
 /// <param name="itype">Injection type</param>
 /// <param name="initRVA">Init routine RVA</param>
 /// <param name="initArg">Init routine argument</param>
+/// <param name="unlink">Unlink module after injection</param>
 /// <param name="wait">Wait for injection</param>
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::InjectDll(
@@ -485,6 +486,7 @@ NTSTATUS DriverControl::InjectDll(
     InjectType itype,
     uint32_t initRVA /*= 0*/,
     const std::wstring& initArg /*= L""*/,
+    bool unlink /*= false*/,
     bool wait /*= true*/
     )
 {
@@ -500,6 +502,7 @@ NTSTATUS DriverControl::InjectDll(
     data.pid = pid;
     data.initRVA = initRVA;
     data.wait = wait;
+    data.unlink = unlink;
     data.type = itype;
 
     if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_INJECT_DLL, &data, sizeof( data ), nullptr, 0, &bytes, NULL ))

@@ -127,6 +127,13 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
                 status = STATUS_INVALID_PARAMETER;
             }
 
+            // Unlink module
+            if (pData->unlink && NT_SUCCESS( status ))
+            {
+                PVOID modBase = *(PVOID*)((PUCHAR)pUserBuf + MOD_OFFSET);
+                BBUnlinkFromLoader( pProcess, modBase, isWow64 );
+            }
+
             ZwFreeVirtualMemory( ZwCurrentProcess(), &pUserBuf, &size, MEM_RELEASE );
         }
 

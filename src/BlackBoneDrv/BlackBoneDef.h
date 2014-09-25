@@ -405,6 +405,7 @@ typedef struct _INJECT_DLL
     ULONG      initRVA;             // Init routine RVA, if 0 - no init routine
     ULONG      pid;                 // Target process ID
     BOOLEAN    wait;                // Wait on injection thread
+    BOOLEAN    unlink;              // Unlink module after injection
     InjectType type;                // Type of injection
 } INJECT_DLL, *PINJECT_DLL;
 

@@ -104,14 +104,25 @@ PVOID BBGetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName,
     // Protect from UserMode AV
     __try
     {
+        LARGE_INTEGER time = { 0 };
+        time.QuadPart = -50ll * 100 * 1000;
 
         // Wow64 process
         if (isWow64)
         {
-            PPEB32 pPeb32 = NULL;
-            ZwQueryInformationProcess( ZwCurrentProcess(), ProcessWow64Information, &pPeb32, sizeof( pPeb32 ), NULL );
+            PPEB32 pPeb32 = (PPEB32)PsGetProcessWow64Process( pProcess );
             if (pPeb32 == NULL)
+            {
+                DPRINT( "BlackBone: %s: No PEB present. Aborting\n", __FUNCTION__ );
                 return NULL;
+            }
+
+            // Wait for loader a bit
+            for (INT i = 10; !pPeb32->Ldr && i > 0; i++)
+            {
+                DPRINT( "BlackBone: %s: Loader not intialiezd, waiting\n", __FUNCTION__ );
+                KeDelayExecutionThread( KernelMode, TRUE, &time );
+            }
 
             // Search in InLoadOrderModuleList
             for (PLIST_ENTRY32 pListEntry = (PLIST_ENTRY32)((PPEB_LDR_DATA32)pPeb32->Ldr)->InLoadOrderModuleList.Flink;
@@ -132,7 +143,17 @@ PVOID BBGetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName,
         {
             PPEB pPeb = PsGetProcessPeb( pProcess );
             if (!pPeb)
+            {
+                DPRINT( "BlackBone: %s: No PEB present. Aborting\n", __FUNCTION__ );
                 return NULL;
+            }
+
+            // Wait for loader a bit
+            for (INT i = 10; !pPeb->Ldr && i > 0; i++)
+            {
+                DPRINT( "BlackBone: %s: Loader not intialiezd, waiting\n", __FUNCTION__ );
+                KeDelayExecutionThread( KernelMode, TRUE, &time );
+            }
 
             // Search in InLoadOrderModuleList
             for (PLIST_ENTRY pListEntry = pPeb->Ldr->InLoadOrderModuleList.Flink;
@@ -147,10 +168,104 @@ PVOID BBGetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName,
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
-        DPRINT( "BlackBone: %s: Exception\n", __FUNCTION__ );
+        DPRINT( "BlackBone: %s: Exception, Code: 0x%X\n", __FUNCTION__, GetExceptionCode() );
     }
 
     return NULL;
+}
+
+/// <summary>
+/// Remove list entry
+/// </summary>
+/// <param name="Entry">Entry link</param>
+FORCEINLINE VOID RemoveEntryList32( IN PLIST_ENTRY32 Entry )
+{
+    ((PLIST_ENTRY32)Entry->Blink)->Flink = Entry->Flink;
+    ((PLIST_ENTRY32)Entry->Flink)->Blink = Entry->Blink;
+}
+
+/// <summary>
+/// Unlink user-mode module from Loader lists
+/// </summary>
+/// <param name="pProcess">Target process</param>
+/// <param name="pBase">Module base</param>
+/// <param name="isWow64">If TRUE - unlink from PEB32 Loader, otherwise use PEB64</param>
+/// <returns>Status code</returns>
+NTSTATUS BBUnlinkFromLoader( IN PEPROCESS pProcess, IN PVOID pBase, IN BOOLEAN isWow64 )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    ASSERT( pProcess != NULL );
+    if (pProcess == NULL)
+        return STATUS_INVALID_PARAMETER;
+
+    // Protect from UserMode AV
+    __try
+    {
+        // Wow64 process
+        if (isWow64)
+        {
+            PPEB32 pPeb32 = (PPEB32)PsGetProcessWow64Process( pProcess );
+            if (pPeb32 == NULL)
+            {
+                DPRINT( "BlackBone: %s: No PEB present. Aborting\n", __FUNCTION__ );
+                return STATUS_NOT_FOUND;
+            }
+
+            // Search in InLoadOrderModuleList
+            for (PLIST_ENTRY32 pListEntry = (PLIST_ENTRY32)((PPEB_LDR_DATA32)pPeb32->Ldr)->InLoadOrderModuleList.Flink;
+                  pListEntry != &((PPEB_LDR_DATA32)pPeb32->Ldr)->InLoadOrderModuleList;
+                  pListEntry = (PLIST_ENTRY32)pListEntry->Flink)
+            {
+                PLDR_DATA_TABLE_ENTRY32 pEntry = CONTAINING_RECORD( pListEntry, LDR_DATA_TABLE_ENTRY32, InLoadOrderLinks );
+
+                // Unlink
+                if ((PVOID)pEntry->DllBase == pBase)
+                {
+                    RemoveEntryList32( &pEntry->InLoadOrderLinks );
+                    RemoveEntryList32( &pEntry->InInitializationOrderLinks );
+                    RemoveEntryList32( &pEntry->InMemoryOrderLinks );
+                    RemoveEntryList32( &pEntry->HashLinks );
+
+                    break;
+                }
+            }
+        }
+        // Native process
+        else
+        {
+            PPEB pPeb = PsGetProcessPeb( pProcess );
+            if (!pPeb)
+            {
+                DPRINT( "BlackBone: %s: No PEB present. Aborting\n", __FUNCTION__ );
+                return STATUS_NOT_FOUND;
+            }
+
+            // Search in InLoadOrderModuleList
+            for (PLIST_ENTRY pListEntry = pPeb->Ldr->InLoadOrderModuleList.Flink;
+                  pListEntry != &pPeb->Ldr->InLoadOrderModuleList;
+                  pListEntry = pListEntry->Flink)
+            {
+                PLDR_DATA_TABLE_ENTRY pEntry = CONTAINING_RECORD( pListEntry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks );
+                
+                // Unlink
+                if (pEntry->DllBase == pBase)
+                {
+                    RemoveEntryList( &pEntry->InLoadOrderLinks );
+                    RemoveEntryList( &pEntry->InInitializationOrderLinks );
+                    RemoveEntryList( &pEntry->InMemoryOrderLinks );
+                    RemoveEntryList( &pEntry->HashLinks );
+
+                    break;
+                }
+            }
+        }
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        DPRINT( "BlackBone: %s: Exception, Code: 0x%X\n", __FUNCTION__, GetExceptionCode() );
+    }
+
+    return status;
 }
 
 /// <summary>
@@ -345,6 +460,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
 
     InitializeObjectAttributes( &obAttr, pPath, OBJ_KERNEL_HANDLE, NULL, NULL );
 
+    // Open driver file
     status = ZwCreateFile( &hFile, FILE_READ_DATA | SYNCHRONIZE, &obAttr, &statusBlock, NULL, FILE_ATTRIBUTE_NORMAL,
                            FILE_SHARE_READ, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0 );
     if (!NT_SUCCESS( status ))
@@ -353,12 +469,14 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
         return status;
     }
 
+    // Allocate memory for file contents
     status = ZwQueryInformationFile( hFile, &statusBlock, &fileInfo, sizeof( fileInfo ), FileStandardInformation );
     if (NT_SUCCESS( status ))
         fileData = ExAllocatePoolWithTag( PagedPool, fileInfo.EndOfFile.QuadPart, BB_POOL_TAG );
     else
         DPRINT( "BlackBone: %s: Failed to get '%wZ' size. Status: 0x%X\n", __FUNCTION__, pPath, status );
 
+    // Get file contents
     status = ZwReadFile( hFile, NULL, NULL, NULL, &statusBlock, fileData, fileInfo.EndOfFile.LowPart, NULL, NULL );
     if (NT_SUCCESS( status ))
     {
@@ -410,10 +528,6 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
                 // Fill IAT
                 if (NT_SUCCESS( status ))
                     status = BBResolveReferences( imageSection );
-
-                // Wipe header
-                if (NT_SUCCESS( status ))
-                    RtlZeroMemory( imageSection, pNTHeader->OptionalHeader.SizeOfHeaders );
             }
             else
             {
@@ -428,17 +542,23 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
             PDRIVER_INITIALIZE pEntryPoint = (PDRIVER_INITIALIZE)((ULONG_PTR)imageSection + pNTHeader->OptionalHeader.AddressOfEntryPoint);
             pEntryPoint( NULL, NULL );
         }
+
+        // Wipe header
+        if (NT_SUCCESS( status ) && imageSection)
+            RtlZeroMemory( imageSection, pNTHeader->OptionalHeader.SizeOfHeaders );
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
-        status = GetExceptionCode();
-        DPRINT( "BlackBone: %s: Exception: 0x%X \n", __FUNCTION__, status );
+        DPRINT( "BlackBone: %s: Exception: 0x%X \n", __FUNCTION__, GetExceptionCode() );
     }
 
-    // Free image memory in case of failure
-    if (!NT_SUCCESS( status ) && pMDL)
+    // Erase info about allocated region
+    if (pMDL)
     {
-        MmFreePagesFromMdl( pMDL );
+        // Free image memory in case of failure
+        if(!NT_SUCCESS( status ))
+            MmFreePagesFromMdl( pMDL );
+
         ExFreePool( pMDL );
     }
 

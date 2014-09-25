@@ -109,11 +109,7 @@ NTSTATUS Process::CreateAndAttach(
         {
             // Create new thread to make sure LdrInitializeProcess gets called
             if (forceInit)
-            {
-                auto pProc = _modules.GetExport( _modules.GetModule( L"ntdll.dll", Sections ), "NtYieldExecution" ).procAddress;
-                if (pProc)
-                    _remote.ExecDirect( pProc, 0 );
-            }
+                EnsureInit();
         }
         else
             ResumeThread( pi.hThread );
@@ -141,6 +137,19 @@ NTSTATUS Process::Detach()
     _core.Close();
 
     return STATUS_SUCCESS;
+}
+
+/// <summary>
+/// Ensure LdrInitializeProcess gets called
+/// </summary>
+/// <returns>Status code</returns>
+NTSTATUS Process::EnsureInit()
+{
+    auto pProc = _modules.GetExport( _modules.GetModule( L"ntdll.dll", blackbone::Sections ), "NtYieldExecution" ).procAddress;
+    if (pProc)
+        return _remote.ExecDirect( pProc, 0 );
+
+    return STATUS_NOT_FOUND;
 }
 
 
@@ -322,8 +331,12 @@ NTSTATUS Process::EnumByNameOrPID(
             break;        
     }
 
+    // Sort results
+    std::sort( found.begin(), found.end() );
+
     VirtualFree( buffer, 0, MEM_RELEASE );
     return status;
 }
+
 
 }

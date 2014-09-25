@@ -269,9 +269,8 @@ DWORD RemoteExec::ExecDirect( ptr_t pCode, ptr_t arg )
 /// <returns>Status</returns>
 NTSTATUS RemoteExec::CreateRPCEnvironment( bool bThread /*= true*/, bool bEvent /*= true*/ )
 {
-    NTSTATUS dwResult = STATUS_SUCCESS;
     DWORD thdID = GetTickCount();       // randomize thread id
-    bool status = true;
+    NTSTATUS status = STATUS_SUCCESS;
 
     //
     // Allocate environment codecave
@@ -298,15 +297,14 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool bThread /*= true*/, bool bEvent 
         }
         else
         {
-            status = false;
-            LastNtStatus( STATUS_NOT_SUPPORTED );
+            status = LastNtStatus( STATUS_NOT_SUPPORTED );
         }
     }
    
-    if ((bThread && thdID == 0) || !status)
-        dwResult = LastNtStatus();
+    if (bThread && thdID == 0)
+        status = LastNtStatus();
 
-    return dwResult;
+    return status;
 }
 
 /// <summary>
@@ -381,9 +379,11 @@ DWORD RemoteExec::CreateWorkerThread()
 /// Create event to synchronize APC procedures
 /// </summary>
 /// <param name="threadID">The thread identifier.</param>
-/// <returns>true on success</returns>
-bool RemoteExec::CreateAPCEvent( DWORD threadID )
+/// <returns>Status code</returns>
+NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
 {         
+    NTSTATUS status = STATUS_SUCCESS;
+
     if(_hWaitEvent == NULL)
     {
         AsmJitHelper a;
@@ -415,7 +415,7 @@ bool RemoteExec::CreateAPCEvent( DWORD threadID )
             return false;
 
         a.GenCall( static_cast<size_t>(pCreateEvent), { 
-            _userData.ptr<size_t>( ) + EVENT_OFFSET, EVENT_ALL_ACCESS,
+            _userData.ptr<size_t>() + EVENT_OFFSET, EVENT_ALL_ACCESS,
             _userData.ptr<size_t>() + ARGS_OFFSET, 0, FALSE } );
 
         // Save status
@@ -424,30 +424,27 @@ bool RemoteExec::CreateAPCEvent( DWORD threadID )
 
         a->ret();
 
-        NTSTATUS status = _userData.Write( ARGS_OFFSET, obAttr );
+        status = _userData.Write( ARGS_OFFSET, obAttr );
         status |= _userData.Write( ARGS_OFFSET + sizeof(obAttr), ustr );
         status |= _userData.Write( ARGS_OFFSET + sizeof(obAttr) + sizeof(ustr), len, pEventName );
 
-        if (status != STATUS_SUCCESS)
-            return false;
+        if (!NT_SUCCESS( status ))
+            return LastNtStatus( status );
 
         ExecInNewThread( a->make(), a->getCodeSize(), dwResult );
 
         status = _userData.Read<NTSTATUS>( ERR_OFFSET, -1 );
-        if (status != STATUS_SUCCESS)
-            return false;
+        if (!NT_SUCCESS( status ))
+            return LastNtStatus( status );
 
         ustr.Buffer = pEventName;
         obAttr.ObjectName = &ustr;
 
         // Open created event
         status = GET_IMPORT( NtOpenEvent )( &_hWaitEvent, SYNCHRONIZE | EVENT_MODIFY_STATE, &obAttr );
-
-        if (status != STATUS_SUCCESS)
-            return false;
     }
 
-    return true;
+    return status;
 }
 
 /// <summary>

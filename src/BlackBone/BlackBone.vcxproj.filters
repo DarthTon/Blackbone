@@ -468,5 +468,8 @@
     <ClInclude Include="PE\PEImage.h">
       <Filter>PE</Filter>
     </ClInclude>
+    <ClInclude Include="Misc\Thunk.hpp">
+      <Filter>Misc</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -432,6 +432,11 @@ typedef struct _PEB32
     ULONG ProcessParameters;
 } PEB32, *PPEB32;
 
+typedef struct _WOW64_PROCESS 
+{
+    PPEB32 Wow64;
+} WOW64_PROCESS, *PWOW64_PROCESS;
+
 typedef union _WOW64_APC_CONTEXT 
 {
     struct 

@@ -29,6 +29,15 @@ PKLDR_DATA_TABLE_ENTRY BBGetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAd
 PVOID BBGetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 );
 
 /// <summary>
+/// Unlink user-mode module from Loader lists
+/// </summary>
+/// <param name="pProcess">Target process</param>
+/// <param name="pBase">Module base</param>
+/// <param name="isWow64">If TRUE - unlink from PEB32 Loader, otherwise use PEB64</param>
+/// <returns>Status code</returns>
+NTSTATUS BBUnlinkFromLoader( IN PEPROCESS pProcess, IN PVOID pBase, IN BOOLEAN isWow64 );
+
+/// <summary>
 /// Get exported function address
 /// </summary>
 /// <param name="pBase">Module base</param>
