@@ -28,25 +28,41 @@ MMPTE ValidKernelPte = { MM_PTE_VALID_MASK |
 PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry( IN PHANDLE_TABLE HandleTable, IN EXHANDLE tHandle )
 {
     ULONG_PTR TableCode = HandleTable->TableCode & 3;
+    ULONG_PTR Diff = HandleTable->TableCode - TableCode;
+    UNREFERENCED_PARAMETER( Diff );
 
     if (tHandle.Value >= HandleTable->NextHandleNeedingPool)
         return NULL;
 
+    tHandle.Value &= 0xFFFFFFFFFFFFFFFC;
     if (TableCode != 0)
     {
         if (TableCode == 1)
         {
-            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 10) - 1) + 4 * tHandle.Value & 0x3FF);
+#ifdef _WIN7_
+            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(Diff + ((tHandle.Value - tHandle.Value & 0x7FC) >> 9)) + 4 * (tHandle.Value & 0x7FC));
+#else
+            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 10) - 1) + 4 * (tHandle.Value & 0x3FF));
+#endif
         }
         else
         {
+#ifdef _WIN7_
+            ULONG_PTR tmp = (tHandle.Value - tHandle.Value & 0x7FC) >> 9;
+            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(*(ULONG_PTR*)(Diff + ((tHandle.Value - tmp - tmp & 0xFFF) >> 10)) + (tmp & 0xFFF)) + 4 * (tHandle.Value & 0x7FC));
+#else
             ULONG_PTR tmp = tHandle.Value >> 10;
             return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 19) - 2) + 8 * (tmp & 0x1FF)) + 4 * (tHandle.Value & 0x3FF));
+#endif
         }
     }
     else
     {
+#ifdef _WIN7_
+        return (PHANDLE_TABLE_ENTRY)(Diff + 4 * tHandle.Value);
+#else
         return (PHANDLE_TABLE_ENTRY)(HandleTable->TableCode + 4 * tHandle.Value);
+#endif
     }
 }
 

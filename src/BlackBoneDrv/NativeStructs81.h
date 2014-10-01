@@ -161,6 +161,14 @@ typedef struct _POOL_HEADER // Size=16
 } POOL_HEADER, *PPOOL_HEADER;
 #pragma pack(pop)
 
+typedef struct _HANDLE_TABLE
+{
+    ULONG NextHandleNeedingPool;
+    long ExtraInfoPages;
+    LONG_PTR TableCode;
+    // More fields here...
+} HANDLE_TABLE, *PHANDLE_TABLE;
+
 #pragma warning(default : 4214 4201)
 
 #define GET_VAD_ROOT(Table) Table->BalancedRoot

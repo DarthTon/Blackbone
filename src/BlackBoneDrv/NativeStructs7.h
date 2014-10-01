@@ -181,6 +181,24 @@ typedef struct _POOL_HEADER // Size=16
     };
 } POOL_HEADER, *PPOOL_HEADER;
 
+typedef struct _HANDLE_TABLE
+{
+    ULONG_PTR TableCode;
+    struct _EPROCESS *QuotaProcess;
+    HANDLE UniqueProcessId;
+    void* HandleLock;
+    struct _LIST_ENTRY HandleTableList;
+    void* HandleContentionEvent;
+    struct _HANDLE_TRACE_DEBUG_INFO *DebugInfo;
+    int ExtraInfoPages;
+    ULONG Flags;
+    ULONG FirstFreeHandle;
+    struct _HANDLE_TABLE_ENTRY *LastFreeHandleEntry;
+    ULONG HandleCount;
+    ULONG NextHandleNeedingPool;
+    // More fields here...
+} HANDLE_TABLE, *PHANDLE_TABLE;
+
 #pragma warning(default : 4214 4201)
 
 #define GET_VAD_ROOT(Table) &Table->BalancedRoot

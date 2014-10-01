@@ -86,49 +86,6 @@ typedef struct _HANDLE_TABLE_ENTRY // Size=16
 } HANDLE_TABLE_ENTRY, *PHANDLE_TABLE_ENTRY;
 
 
-typedef struct _HANDLE_TABLE_FREE_LIST // Size=64
-{
-    void* FreeListLock; // Size=8 Offset=0
-    struct _HANDLE_TABLE_ENTRY * FirstFreeHandleEntry; // Size=8 Offset=8
-    struct _HANDLE_TABLE_ENTRY * LastFreeHandleEntry; // Size=8 Offset=16
-    long HandleCount; // Size=4 Offset=24
-    ULONG HighWaterMark; // Size=4 Offset=28
-    ULONG Reserved[8]; // Size=32 Offset=32
-} HANDLE_TABLE_FREE_LIST, *PHANDLE_TABLE_FREE_LIST;
-
-
-typedef struct _HANDLE_TABLE // Size=128
-{
-    ULONG NextHandleNeedingPool; // Size=4 Offset=0
-    long ExtraInfoPages; // Size=4 Offset=4
-    LONG_PTR TableCode; // Size=8 Offset=8
-    struct _EPROCESS * QuotaProcess; // Size=8 Offset=16
-    struct _LIST_ENTRY HandleTableList; // Size=16 Offset=24
-    ULONG UniqueProcessId; // Size=4 Offset=40
-    union
-    {
-        ULONG Flags; // Size=4 Offset=44
-        struct
-        {
-            UCHAR StrictFIFO : 1; // Size=1 Offset=44 BitOffset=0 BitCount=1
-            UCHAR EnableHandleExceptions : 1; // Size=1 Offset=44 BitOffset=1 BitCount=1
-            UCHAR Rundown : 1; // Size=1 Offset=44 BitOffset=2 BitCount=1
-            UCHAR Duplicated : 1; // Size=1 Offset=44 BitOffset=3 BitCount=1
-        } u1;
-    } u2;
-    void* HandleContentionEvent; // Size=8 Offset=48
-    void* HandleTableLock; // Size=8 Offset=56
-    union
-    {
-        struct _HANDLE_TABLE_FREE_LIST FreeLists[1]; // Size=64 Offset=64
-        struct
-        {
-            UCHAR ActualEntry[32]; // Size=32 Offset=64
-            struct _HANDLE_TRACE_DEBUG_INFO * DebugInfo; // Size=8 Offset=96
-        } u3;
-    } u4;
-} HANDLE_TABLE, *PHANDLE_TABLE;
-
 
 typedef struct _OBJECT_HEADER // Size=56
 {
