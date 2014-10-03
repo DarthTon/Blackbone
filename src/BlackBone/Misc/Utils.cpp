@@ -55,6 +55,25 @@ std::string Utils::WstringToAnsi( const std::wstring& input, DWORD locale /*= CP
 }
 
 /// <summary>
+/// Format string
+/// </summary>
+/// <param name="fmt">Format specifier</param>
+/// <param name="">Arguments</param>
+/// <returns>Formatted string</returns>
+std::wstring Utils::FormatString( const wchar_t* fmt, ... )
+{
+    wchar_t buf[4096] = { 0 };
+
+    va_list vl;
+    va_start( vl, fmt );
+    vswprintf_s( buf, fmt, vl );
+    va_end( vl );
+
+    return buf;
+}
+
+
+/// <summary>
 /// Get filename from full-qualified path
 /// </summary>
 /// <param name="path">File path</param>

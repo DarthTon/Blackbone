@@ -43,6 +43,12 @@ public:
     BLACKBONE_API Thread* getLeastExecuted();
 
     /// <summary>
+    /// Get most executed thread
+    /// </summary>
+    /// <returns>Pointer to thread object, nullptr if failed</returns>
+    BLACKBONE_API Thread* getMostExecuted();
+
+    /// <summary>
     /// Get least executed thread
     /// </summary>
     /// <returns>Pointer to thread object, nullptr if failed</returns>

@@ -46,7 +46,7 @@ NTSTATUS DriverControl::EnsureLoaded( const std::wstring& path /*= L"" */ )
                            NULL, OPEN_EXISTING, 0, NULL );
 
     if (_hDriver != INVALID_HANDLE_VALUE)
-        return STATUS_SUCCESS;
+        return _loadStatus = STATUS_SUCCESS;
 
     // Start new instance
     return Reload( path );
@@ -67,7 +67,10 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
     if (path.empty())
     {
         const wchar_t* filename = nullptr;
-        if (IsWindows8Point1OrGreater())
+
+        if (IsWindows10OrGreater())
+            filename = L"BlackBoneDrv10.sys";
+        else if (IsWindows8Point1OrGreater())
             filename = L"BlackBoneDrv81.sys";
         else if (IsWindows8OrGreater())
             filename = L"BlackBoneDrv8.sys";
@@ -79,7 +82,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
         path = Utils::GetExeDirectory() + L"\\" + filename;
     }
 
-    status = LoadDriver( DRIVER_SVC_NAME, path );
+    status = _loadStatus = LoadDriver( DRIVER_SVC_NAME, path );
     if (!NT_SUCCESS( status ))
     {
         BLACBONE_TRACE( L"Failed to load driver %ls. Status 0x%X", path.c_str(), status );
@@ -478,6 +481,7 @@ NTSTATUS DriverControl::ProtectMem( DWORD pid, ptr_t base, ptr_t size, DWORD pro
 /// <param name="initRVA">Init routine RVA</param>
 /// <param name="initArg">Init routine argument</param>
 /// <param name="unlink">Unlink module after injection</param>
+/// <param name="erasePE">Erase PE headers after injection</param>
 /// <param name="wait">Wait for injection</param>
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::InjectDll(
@@ -487,11 +491,12 @@ NTSTATUS DriverControl::InjectDll(
     uint32_t initRVA /*= 0*/,
     const std::wstring& initArg /*= L""*/,
     bool unlink /*= false*/,
+    bool erasePE /*= false*/,
     bool wait /*= true*/
     )
 {
     DWORD bytes = 0;
-    INJECT_DLL data = { 0 };
+    INJECT_DLL data = { IT_Thread };
 
     // Not loaded
     if (_hDriver == INVALID_HANDLE_VALUE)
@@ -499,11 +504,12 @@ NTSTATUS DriverControl::InjectDll(
 
     wcscpy_s( data.FullDllPath, path.c_str() );
     wcscpy_s( data.initArg, initArg.c_str() );
+    data.type = itype;
     data.pid = pid;
     data.initRVA = initRVA;
     data.wait = wait;
     data.unlink = unlink;
-    data.type = itype;
+    data.erasePE = erasePE;
 
     if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_INJECT_DLL, &data, sizeof( data ), nullptr, 0, &bytes, NULL ))
         return LastNtStatus();

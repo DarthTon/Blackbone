@@ -71,7 +71,7 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
     // Execute code in newly created thread
     if (_userCode.Write( size, a->getCodeSize(), a->make() ) == STATUS_SUCCESS)
     {
-        auto thread = _threads.CreateNew( _userCode.ptr<ptr_t>() + size, _userData.ptr<ptr_t>() );
+        auto thread = _threads.CreateNew( _userCode.ptr<ptr_t>() + size, _userData.ptr<ptr_t>(), HideFromDebug );
 
         dwResult = thread.Join();
         callResult = _userData.Read<uint64_t>( INTRET_OFFSET, 0 );
@@ -200,7 +200,10 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         a->popf();
         a->add( asmjit::host::rsp, count * WordSize );
 
-        a->jmp( asmjit::Imm( ctx.Rip ) );
+        // jmp [rip]
+        a->dw( '\xFF\x25' );
+        a->dd( 0 );
+        a->dq( ctx.Rip );
     #else
         a->pusha();
         a->pushf();
@@ -248,7 +251,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
 /// <returns>Thread exit code</returns>
 DWORD RemoteExec::ExecDirect( ptr_t pCode, ptr_t arg )
 {
-    auto thread = _threads.CreateNew( pCode, arg );
+    auto thread = _threads.CreateNew( pCode, arg, HideFromDebug );
 
     thread.Join();
     return thread.ExitCode();
@@ -369,7 +372,7 @@ DWORD RemoteExec::CreateWorkerThread()
         _workerCode.Write( 0, liDelay );
         _workerCode.Write( sizeof(LARGE_INTEGER), a->getCodeSize(), a->make() );
 
-        _hWorkThd = _threads.CreateNew( _workerCode.ptr<size_t>() + sizeof(LARGE_INTEGER), _userData.ptr<size_t>() );
+        _hWorkThd = _threads.CreateNew( _workerCode.ptr<size_t>() + sizeof(LARGE_INTEGER), _userData.ptr<size_t>(), HideFromDebug );
     }
 
     return _hWorkThd.id();

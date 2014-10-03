@@ -106,7 +106,7 @@ NTSTATUS BBSetProtection( IN PSET_PROC_PROTECTION pProtection )
                 *((PUCHAR)pProcess + dynData.Protection) = pProtection->enableState;
             }
             // Win8.1
-            else if (dynData.ver == WINVER_81)
+            else if (dynData.ver >= WINVER_81)
             {
                 PS_PROTECTION protBuf = { 0 };
 
@@ -122,6 +122,8 @@ NTSTATUS BBSetProtection( IN PSET_PROC_PROTECTION pProtection )
 
                 *((PUCHAR)pProcess + dynData.Protection) = protBuf.Level;
             }
+            else
+                status = STATUS_NOT_SUPPORTED;
         }
         else
         {

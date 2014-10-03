@@ -184,10 +184,8 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
                 wchar_t sys_path[255] = { 0 };
                 dwSize = 255;
 
-                /*res = SHRegGetValueW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs",
-                                      L"DllDirectory", RRF_RT_ANY, &dwType, sys_path, &dwSize );*/
-                res = RegGetValueW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs",
-                                    L"DllDirectory", RRF_RT_ANY, &dwType, sys_path, &dwSize );
+                // In Win10 DllDirectory value got screwed, so less reliable method is used
+                GetSystemDirectoryW( sys_path, dwSize );
 
                 if (res == ERROR_SUCCESS)
                 {

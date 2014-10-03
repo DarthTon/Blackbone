@@ -183,7 +183,8 @@ public:
     /// <param name="itype">Injection type</param>
     /// <param name="initRVA">Init routine RVA</param>
     /// <param name="initArg">Init routine argument</param>
-    /// <param name="unlink">Unlonk module after injection</param>
+    /// <param name="unlink">Unlink module after injection</param>
+    /// <param name="erasePE">Erase PE headers after injection</param>
     /// <param name="wait">Wait for injection</param>
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS InjectDll(
@@ -193,6 +194,7 @@ public:
         uint32_t initRVA = 0, 
         const std::wstring& initArg = L"", 
         bool unlink = false,
+        bool erasePE = false,
         bool wait = true
         );
 
@@ -217,6 +219,7 @@ public:
     /// </summary>
     /// <returns></returns>
     BLACKBONE_API inline bool loaded() const { return _hDriver != INVALID_HANDLE_VALUE; }
+    BLACKBONE_API inline NTSTATUS status() const { return _loadStatus; }
 
 private:
     DriverControl( const DriverControl& ) = delete;
@@ -247,6 +250,7 @@ private:
 
 private:
     HANDLE _hDriver = INVALID_HANDLE_VALUE;
+    NTSTATUS _loadStatus = STATUS_NOT_FOUND;
 };
 
 // Syntax sugar

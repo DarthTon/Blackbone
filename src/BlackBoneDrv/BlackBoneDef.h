@@ -400,13 +400,14 @@ typedef enum _InjectType
 /// </summary>
 typedef struct _INJECT_DLL
 {
+    InjectType type;                // Type of injection
     wchar_t    FullDllPath[512];    // Fully-qualified path to the target dll
     wchar_t    initArg[512];        // Init routine argument
     ULONG      initRVA;             // Init routine RVA, if 0 - no init routine
     ULONG      pid;                 // Target process ID
     BOOLEAN    wait;                // Wait on injection thread
     BOOLEAN    unlink;              // Unlink module after injection
-    InjectType type;                // Type of injection
+    BOOLEAN    erasePE;             // Erase PE headers after injection   
 } INJECT_DLL, *PINJECT_DLL;
 
 /// <summary>

@@ -2,7 +2,9 @@
 
 #include "PEStructs.h"
 
-#ifdef _WIN81_
+#ifdef _WIN10_
+#include "NativeStructs10.h"
+#elif _WIN81_
 #include "NativeStructs81.h"
 #elif _WIN8_
 #include "NativeStructs8.h"

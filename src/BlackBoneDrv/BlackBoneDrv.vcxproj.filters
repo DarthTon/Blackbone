@@ -59,6 +59,9 @@
     <ClInclude Include="Loader.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="NativeStructs10.h">
+      <Filter>Include\Native</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Include">

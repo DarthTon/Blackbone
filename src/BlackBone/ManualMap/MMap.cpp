@@ -735,7 +735,6 @@ bool MMap::EnableExceptions( ImageContext* pImage )
     else
         return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType() ) == STATUS_SUCCESS);
 #endif
-
 }
 
 /// <summary>

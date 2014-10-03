@@ -1,6 +1,14 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Win10Debug|x64">
+      <Configuration>Win10Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Win10Release|x64">
+      <Configuration>Win10Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
     <ProjectConfiguration Include="Win8.1 Debug|x64">
       <Configuration>Win8.1 Debug</Configuration>
       <Platform>x64</Platform>
@@ -49,12 +57,22 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Debug|x64'" Label="Configuration">
+    <TargetVersion>WindowsV6.3</TargetVersion>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'" Label="Configuration">
     <TargetVersion>Windows8</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
+    <TargetVersion>WindowsV6.3</TargetVersion>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Release|x64'" Label="Configuration">
     <TargetVersion>WindowsV6.3</TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
@@ -90,6 +108,12 @@
     <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
     <TargetName>$(TargetName.Replace(' ',''))81</TargetName>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Debug|x64'">
+    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <TimeStampServer>http://timestamp.verisign.com/scripts/timstamp.dll</TimeStampServer>
+    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName.Replace(' ',''))10</TargetName>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
     <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
     <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
@@ -109,6 +133,11 @@
     <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
     <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
     <TargetName>$(TargetName.Replace(' ',''))81</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Release|x64'">
+    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName.Replace(' ',''))10</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'">
     <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
@@ -139,6 +168,18 @@
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_WIN81_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win10Debug|x64'">
+    <ClCompile>
+      <CompileAs>CompileAsC</CompileAs>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_WIN10_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
     </ClCompile>
     <Link>
@@ -203,6 +244,17 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win10Release|x64'">
+    <ClCompile>
+      <CompileAs>CompileAsC</CompileAs>
+      <AdditionalIncludeDirectories>
+      </AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_WIN10_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'">
     <ClCompile>
       <CompileAs>CompileAsC</CompileAs>
@@ -240,6 +292,7 @@
     <ClInclude Include="Imports.h" />
     <ClInclude Include="Loader.h" />
     <ClInclude Include="NativeStructs.h" />
+    <ClInclude Include="NativeStructs10.h" />
     <ClInclude Include="NativeStructs7.h" />
     <ClInclude Include="NativeStructs8.h" />
     <ClInclude Include="NativeStructs81.h" />

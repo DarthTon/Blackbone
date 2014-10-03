@@ -138,6 +138,9 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
     #elif defined (_WIN81_)
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
+    #elif defined (_WIN10_)
+        if (ver_short != WINVER_10)
+            return STATUS_NOT_SUPPORTED;
     #endif
 
         DPRINT( "BlackBone: OS version %d.%d.%d.%d.%d - 0x%x\n",
@@ -162,9 +165,9 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtThdIndex     = 0x0A5;
                 pData->PrevMode       = 0x1F6;
                 pData->ExitStatus     = 0x380;
-                pData->MiAllocPage    = 0x40A9C0;
-                if (ver_short == WINVER_7_SP1)
-                    pData->MiAllocPage = 0x410D70;
+                //pData->MiAllocPage    = 0x40A9C0;
+                //if (ver_short == WINVER_7_SP1)
+                    //pData->MiAllocPage = 0x410D70;
                 break;
 
                 // Windows 8
@@ -177,7 +180,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtThdIndex     = 0x0AF; 
                 pData->PrevMode       = 0x232;
                 pData->ExitStatus     = 0x450;
-                pData->MiAllocPage    = 0x3AF374;
+                //pData->MiAllocPage    = 0x3AF374;
                 break;
 
                 // Windows 8.1
@@ -189,7 +192,19 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtThdIndex     = 0x0B0;
                 pData->PrevMode       = 0x232;
                 pData->ExitStatus     = 0x6D8;
-                pData->MiAllocPage    = 0x4BDDF4;
+                //pData->MiAllocPage    = 0x4BDDF4;
+                break;
+
+                // Windows 10, technical preview, build 9841
+            case WINVER_10:
+                pData->KExecOpt       = 0x1BF;
+                pData->Protection     = 0x692;
+                pData->ObjTable       = 0x410;
+                pData->VadRoot        = 0x5F0;
+                pData->NtThdIndex     = 0x0B0;
+                pData->PrevMode       = 0x232;
+                pData->ExitStatus     = 0x6D8;
+                //pData->MiAllocPage    = 0x5191BC;
                 break;
 
             default:

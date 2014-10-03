@@ -28,42 +28,65 @@ MMPTE ValidKernelPte = { MM_PTE_VALID_MASK |
 PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry( IN PHANDLE_TABLE HandleTable, IN EXHANDLE tHandle )
 {
     ULONG_PTR TableCode = HandleTable->TableCode & 3;
-    ULONG_PTR Diff = HandleTable->TableCode - TableCode;
-    UNREFERENCED_PARAMETER( Diff );
-
     if (tHandle.Value >= HandleTable->NextHandleNeedingPool)
         return NULL;
 
     tHandle.Value &= 0xFFFFFFFFFFFFFFFC;
+
+#if defined ( _WIN10_ )
     if (TableCode != 0)
     {
         if (TableCode == 1)
         {
-#ifdef _WIN7_
-            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(Diff + ((tHandle.Value - tHandle.Value & 0x7FC) >> 9)) + 4 * (tHandle.Value & 0x7FC));
-#else
-            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 10) - 1) + 4 * (tHandle.Value & 0x3FF));
-#endif
+            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 11) - 1) + 4 * (tHandle.Value & 0x7FC));
         }
         else
         {
-#ifdef _WIN7_
-            ULONG_PTR tmp = (tHandle.Value - tHandle.Value & 0x7FC) >> 9;
-            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(*(ULONG_PTR*)(Diff + ((tHandle.Value - tmp - tmp & 0xFFF) >> 10)) + (tmp & 0xFFF)) + 4 * (tHandle.Value & 0x7FC));
-#else
-            ULONG_PTR tmp = tHandle.Value >> 10;
-            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 19) - 2) + 8 * (tmp & 0x1FF)) + 4 * (tHandle.Value & 0x3FF));
-#endif
+            ULONG_PTR tmp = tHandle.Value >> 11;
+            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 21) - 2) + 8 * (tmp & 0x3FF)) + 4 * (tHandle.Value & 0x7FC));
         }
     }
     else
     {
-#ifdef _WIN7_
-        return (PHANDLE_TABLE_ENTRY)(Diff + 4 * tHandle.Value);
-#else
         return (PHANDLE_TABLE_ENTRY)(HandleTable->TableCode + 4 * tHandle.Value);
-#endif
     }
+#elif defined ( _WIN7_ )
+    ULONG_PTR Diff = HandleTable->TableCode - TableCode;
+
+    if (TableCode != 0)
+    {
+        if (TableCode == 1)
+        {
+            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(Diff + ((tHandle.Value - tHandle.Value & 0x7FC) >> 9)) + 4 * (tHandle.Value & 0x7FC));
+        }
+        else
+        {
+            ULONG_PTR tmp = (tHandle.Value - tHandle.Value & 0x7FC) >> 9;
+            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(*(ULONG_PTR*)(Diff + ((tHandle.Value - tmp - tmp & 0xFFF) >> 10)) + (tmp & 0xFFF)) + 4 * (tHandle.Value & 0x7FC));
+        }
+    }
+    else
+    {
+        return (PHANDLE_TABLE_ENTRY)(Diff + 4 * tHandle.Value);
+    }
+#else
+    if (TableCode != 0)
+    {
+        if (TableCode == 1)
+        {
+            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 10) - 1) + 4 * (tHandle.Value & 0x3FF));
+        }
+        else
+        {
+            ULONG_PTR tmp = tHandle.Value >> 10;
+            return (PHANDLE_TABLE_ENTRY)(*(ULONG_PTR*)(*(ULONG_PTR*)(HandleTable->TableCode + 8 * (tHandle.Value >> 19) - 2) + 8 * (tmp & 0x1FF)) + 4 * (tHandle.Value & 0x3FF));
+        }
+    }
+    else
+    {
+        return (PHANDLE_TABLE_ENTRY)(HandleTable->TableCode + 4 * tHandle.Value);
+    }
+#endif
 }
 
 /// <summary>
@@ -138,30 +161,35 @@ PVOID GetKernelBase()
 /// <returns>SSDT base, NULL if not found</returns>
 PVOID GetSSDTBase()
 {
-    UNICODE_STRING fnName;
+    UNICODE_STRING fnName, fnZwName;
     PUCHAR ntosBase = NULL;
-    PUCHAR pFn = NULL;
+    PUCHAR pFn = NULL, pZwFn = NULL;
 
     // Already found
     if (g_SSDT != NULL)
         return g_SSDT;
 
     ntosBase = GetKernelBase();
-    RtlUnicodeStringInit( &fnName, L"NtSetSecurityObject" );
-    pFn = MmGetSystemRoutineAddress( &fnName );
+    RtlUnicodeStringInit( &fnName,   L"NtSetSecurityObject" );
+    RtlUnicodeStringInit( &fnZwName, L"ZwSetSecurityObject" );
 
-    if (ntosBase && pFn)
+    pFn   = MmGetSystemRoutineAddress( &fnName );
+    pZwFn = MmGetSystemRoutineAddress( &fnZwName );
+
+    if (ntosBase && pFn && pZwFn)
     {
-        PIMAGE_DOS_HEADER pDos = (PIMAGE_DOS_HEADER)ntosBase;
-        PIMAGE_NT_HEADERS pHdr = (PIMAGE_NT_HEADERS)(ntosBase + pDos->e_lfanew);
+        PIMAGE_NT_HEADERS pHdr = RtlImageNtHeader( ntosBase );
         PIMAGE_SECTION_HEADER pFirstSec = (PIMAGE_SECTION_HEADER)(pHdr + 1);
 
         for (PIMAGE_SECTION_HEADER pSec = pFirstSec; pSec < pFirstSec + pHdr->FileHeader.NumberOfSections; pSec++)
         {
-            // Non-paged, non-discardable, executable sections
-            if ( pSec->Characteristics & IMAGE_SCN_MEM_NOT_PAGED && 
-                 pSec->Characteristics & IMAGE_SCN_MEM_EXECUTE &&
-               !(pSec->Characteristics & IMAGE_SCN_MEM_DISCARDABLE))
+            // Non-paged, non-discardable, readable sections
+            // Probably still not fool-proof enough...
+            if (pSec->Characteristics & IMAGE_SCN_MEM_NOT_PAGED &&
+                 pSec->Characteristics & IMAGE_SCN_MEM_READ &&
+                 !(pSec->Characteristics & IMAGE_SCN_MEM_DISCARDABLE) &&
+                 (*(PULONG)pSec->Name != 'TINI') &&
+                 (*(PULONG)pSec->Name != 'EGAP'))
             {
                 // Scan section
                 for (ULONG_PTR* pPtr = (ULONG_PTR*)(ntosBase + pSec->VirtualAddress);
@@ -170,10 +198,13 @@ PVOID GetSSDTBase()
                 {
                     // Found NtSetSecurityObject address
                     if (*pPtr == (ULONG_PTR)pFn)
-                        // Search for SSDT start
-                        for (ULONG_PTR* pPtr2 = pPtr; pPtr2 > ( ULONG_PTR* )(ntosBase + pSec->VirtualAddress); pPtr2--)
-                            if (*pPtr2 == 0x9090909090909090 || *pPtr2 == 0xCCCCCCCCCCCCCCCC)
-                                return g_SSDT = pPtr2 + 1;
+                    {
+                        // Get NtSetSecurityObject index from ZwSetSecurityObject code
+                        ULONG idx = *(PULONG)(pZwFn + 0x15);
+
+                        // Get SSDT base
+                        return g_SSDT = (PUCHAR)pPtr - idx * sizeof( PVOID );
+                    }
                 }
             }
         }

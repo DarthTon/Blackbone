@@ -43,9 +43,21 @@
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
     <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Debug|x64'">
+    <SignMode>TestSign</SignMode>
+    <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
     <SignMode>TestSign</SignMode>
     <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
     <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Release|x64'">
+    <SignMode>TestSign</SignMode>
+    <DbgengKernelMachineName>192.168.56.101</DbgengKernelMachineName>
+    <TestCertificate>CN=BlackBoneSPC | 66E9598AEA3A5E82D0754DB9FC04790F82301D5D</TestCertificate>
+    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
   </PropertyGroup>
 </Project>

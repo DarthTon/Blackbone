@@ -20,7 +20,7 @@ namespace blackbone
     {
         ULONG Count;
         ULONG MaxCount;
-        ULONG Pad[0x1];
+        ULONG Epoch;
         RTL_INVERTED_FUNCTION_TABLE_ENTRY Entries[0x200];
 
     } RTL_INVERTED_FUNCTION_TABLE7, *PRTL_INVERTED_FUNCTION_TABLE7;

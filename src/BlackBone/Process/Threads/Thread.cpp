@@ -82,6 +82,17 @@ bool Thread::Resume()
 }
 
 /// <summary>
+/// Check if thread is suspended
+/// </summary>
+/// <returns>true if suspended</returns>
+bool Thread::Suspended()
+{
+    auto count = _core->isWow64() ? GET_IMPORT( Wow64SuspendThread )(_handle) : SuspendThread( _handle );
+    ResumeThread( _handle );
+    return count > 0;
+}
+
+/// <summary>
 /// Get WOW64 thread context
 /// </summary>
 /// <param name="ctx">Returned context</param>

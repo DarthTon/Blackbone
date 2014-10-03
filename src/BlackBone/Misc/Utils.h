@@ -40,6 +40,14 @@ public:
     BLACKBONE_API static std::string WstringToAnsi( const std::wstring& input, DWORD locale = CP_ACP );
 
     /// <summary>
+    /// Format string
+    /// </summary>
+    /// <param name="fmt">Format specifier</param>
+    /// <param name="">Arguments</param>
+    /// <returns>Formatted string</returns>
+    BLACKBONE_API static std::wstring FormatString( const wchar_t* fmt, ... );
+
+    /// <summary>
     /// Get filename from full-qualified path
     /// </summary>
     /// <param name="path">File path</param>

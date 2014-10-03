@@ -3,6 +3,8 @@
 #include "../Misc/Utils.h"
 #include "../Misc/DynImport.h"
 
+#include <algorithm>
+
 #define TLS32(ptr) ((const IMAGE_TLS_DIRECTORY32*)ptr)  // TLS directory
 #define TLS64(ptr) ((const IMAGE_TLS_DIRECTORY64*)ptr)  // TLS directory
 #define THK32(ptr) ((const IMAGE_THUNK_DATA32*)ptr)     // Import thunk data
@@ -327,7 +329,7 @@ mapImports& PEImage::GetImports( bool useDelayed /*= false*/ )
 /// Retrieve all exported functions with names
 /// </summary>
 /// <param name="names">Found exports</param>
-BLACKBONE_API void PEImage::GetExports( listExports& exports )
+BLACKBONE_API void PEImage::GetExports( vecExports& exports )
 {
     exports.clear();
 
@@ -340,8 +342,9 @@ BLACKBONE_API void PEImage::GetExports( listExports& exports )
     WORD  *pAddressOfOrds  = reinterpret_cast<WORD*> (pExport->AddressOfNameOrdinals + reinterpret_cast<size_t>(_pFileBase));
 
     for (DWORD i = 0; i < pExport->NumberOfNames; ++i)
-        exports.push_back( std::make_pair( reinterpret_cast<const char*>(_pFileBase)+pAddressOfNames[i], pAddressOfFuncs[pAddressOfOrds[i]] ) );
+        exports.push_back( ExportData( reinterpret_cast<const char*>(_pFileBase)+pAddressOfNames[i], pAddressOfFuncs[pAddressOfOrds[i]] ) );
 
+    std::sort( exports.begin(), exports.end() );
     return;
 }
 

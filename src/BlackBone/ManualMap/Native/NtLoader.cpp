@@ -5,7 +5,7 @@
 #include "../../Include/Macro.h"
 #include "../../Misc/DynImport.h"
 
-#include <versionhelpers.h>
+#include "../contrib/VersionHelpers.h"
 
 namespace blackbone
 {
@@ -270,12 +270,20 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
             block.Release();
             pImgEntry = block.ptr<decltype(pImgEntry)>();
 
+            auto pEncoded = EncodeSystemPointer( pImgEntry );
+
             // m_LdrpInvertedFunctionTable->Entries[i].ExceptionDirectory
             size_t field_ofst = reinterpret_cast<size_t>(&Entries[i].ExceptionDirectory) 
                               - reinterpret_cast<size_t>(&table);
 
-            return (_process.memory().Write( _LdrpInvertedFunctionTable + field_ofst,
-                                             GET_IMPORT( RtlEncodeSystemPointer )(pImgEntry) ) == STATUS_SUCCESS);
+            // In Win10 _LdrpInvertedFunctionTable is located in mrdata section
+            // mrdata is read-only by default 
+            // LdrProtectMrdata is used to make it writable when needed
+            DWORD flOld = 0;
+            _process.memory().Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), PAGE_EXECUTE_READWRITE, &flOld );
+            auto status = _process.memory().Write( _LdrpInvertedFunctionTable + field_ofst, pEncoded );
+
+            return NT_SUCCESS( status );
         }
     }
 
@@ -818,8 +826,52 @@ bool NtLdr::ScanPatterns( )
     if(pStart == nullptr)
         return false;
 
+    // Win 10 and later
+    if (IsWindows10OrGreater())
+    {
+    #ifdef USE64
+        // LdrpHandleTlsData
+        // 44 8D 43 09 4C 8D 4C 24 38
+        PatternSearch ps2( "\x44\x8d\x43\x09\x4c\x8d\x4c\x24\x38" );
+        ps2.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x43);
+    #else
+        // RtlInsertInvertedFunctionTable
+        // 53 56 57 8B DA 8B F9 50 
+        PatternSearch ps1( "\x53\x56\x57\x8b\xda\x8b\xf9\x50" );
+        ps1.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+        {
+            _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
+            _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x23);
+            foundData.clear();
+        }
+
+        // LdrpHandleTlsData
+        // 8D 45 A8 50 6A 09
+        PatternSearch ps2( "\x8d\x45\xa8\x50\x6a\x09" );
+        ps2.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+        {
+            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x18);
+            foundData.clear();
+        }
+
+        // LdrProtectMrdata
+        // 83 7D 08 00 8B 35    
+        PatternSearch ps3( "\x83\x7d\x08\x00\x8b\x35", 6 );
+        ps3.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+            _LdrProtectMrdata = static_cast<size_t>(foundData.front() - 0x12);
+    #endif
+    }
     // Win 8.1 and later
-    if (IsWindows8Point1OrGreater())
+    else if (IsWindows8Point1OrGreater())
     {
     #ifdef USE64
         // LdrpHandleTlsData
@@ -1078,7 +1130,7 @@ ptr_t NtLdr::UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, size_t of
 {
     auto native = _process.core().native();
 
-    for (T entry = pListEntry.Flink; entry != head; native->ReadProcessMemoryT( static_cast<size_t>(entry), &entry, sizeof(entry), 0 ))
+    for (T entry = pListEntry.Flink; entry != head; native->ReadProcessMemoryT( entry, &entry, sizeof( entry ) ))
     {
         _LDR_DATA_TABLE_ENTRY_BASE<T> modData = { 0 };
 

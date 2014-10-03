@@ -82,7 +82,8 @@ public:
     BLACKBONE_API inline size_t LdrpInvertedFunctionTable( ) const { return _LdrpInvertedFunctionTable; }
     BLACKBONE_API inline size_t LdrKernel32PatchAddress() const { return _LdrKernel32PatchAddress; }
     BLACKBONE_API inline size_t APC64PatchAddress() const { return _APC64PatchAddress; }
-
+    BLACKBONE_API inline size_t LdrProtectMrdata() const { return _LdrProtectMrdata; }
+    
 private:
 
     /// <summary>
@@ -223,13 +224,13 @@ private:
 
     size_t _LdrpHashTable = 0;                      // LdrpHashTable address
     size_t _LdrpModuleIndexBase = 0;                // LdrpModuleIndex address
-    size_t _LdrpModuleBase = 0;                     // PEB->Ldr->InLoadOrderModuleList address
     size_t _LdrHeapBase = 0;                        // Loader heap base address
     size_t _LdrKernel32PatchAddress = 0;            // Address to patch to enable kernel32 loading under win7
-    size_t _APC64PatchAddress = 0;                  // Address to patch to x64->WOW64 APC dispatching under win7
+    size_t _APC64PatchAddress = 0;                  // Address to patch for x64->WOW64 APC dispatching under win7
     size_t _LdrpHandleTlsData = 0;                  // LdrpHandleTlsData address
     size_t _LdrpInvertedFunctionTable = 0;          // LdrpInvertedFunctionTable address
     size_t _RtlInsertInvertedFunctionTable = 0;     // RtlInsertInvertedFunctionTable address
+    size_t _LdrProtectMrdata = 0;                   // LdrProtectMrdata address
 
     std::map<HMODULE, void*> _nodeMap;              // Allocated native structures
 };

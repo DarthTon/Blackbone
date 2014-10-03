@@ -41,7 +41,8 @@ enum eModType
 {
     mt_mod32,       // 64 bit module
     mt_mod64,       // 32 bit module
-    mt_default      // type is deduced from target process
+    mt_default,     // type is deduced from target process
+    mt_unknown      // Failed to detect type
 };
 
 // Module search method
@@ -62,9 +63,14 @@ struct ModuleData
     eModType type;          // Module type
     bool manual;            // Image is manually mapped
 
-    bool operator ==(const ModuleData& value) const
+    bool operator ==(const ModuleData& other) const
     {
-        return (baseAddress == value.baseAddress);
+        return (baseAddress == other.baseAddress);
+    }
+
+    bool operator <(const ModuleData& other)
+    {
+        return baseAddress < other.baseAddress;
     }
 };
 

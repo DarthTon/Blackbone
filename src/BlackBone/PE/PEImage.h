@@ -3,6 +3,7 @@
 #include "../Config.h"
 #include "../Include/Winheaders.h"
 #include "../Include/Types.h"
+#include "../Misc/Utils.h"
 
 #ifdef COMPILER_MSVC
 #include "ImageNET.h"
@@ -34,8 +35,10 @@ struct RelocData
         WORD Type   : 4; 
     }Item[1];
 };
-
-// Import information
+ 
+/// <summary>
+/// Import information
+/// </summary>
 struct ImportData
 {
     std::string importName;     // Function name
@@ -44,10 +47,33 @@ struct ImportData
     bool importByOrd;           // Function is imported by ordinal
 };
 
+/// <summary>
+/// Export function info
+/// </summary>
+struct ExportData
+{
+    std::string name;
+    uint32_t RVA = 0;
+
+    ExportData( const std::string& name_, uint32_t rva_ )
+        : name( name_ )
+        , RVA( rva_ ) { }
+
+    bool operator == (const ExportData& other)
+    {
+        return name == other.name;
+    }
+
+    bool operator < (const ExportData& other)
+    {
+        return name < other.name;
+    }
+};
+
 // Imports and sections related
 typedef std::unordered_map<std::wstring, std::vector<ImportData>> mapImports;
 typedef std::vector<IMAGE_SECTION_HEADER> vecSections;
-typedef std::list<std::pair<std::string, uint32_t>> listExports;
+typedef std::vector<ExportData> vecExports;
 
 /// <summary>
 /// Primitive PE parsing class
@@ -100,7 +126,7 @@ public:
     /// Retrieve all exported functions with names
     /// </summary>
     /// <param name="names">Found exports</param>
-    BLACKBONE_API void GetExports( listExports& exports );
+    BLACKBONE_API void GetExports( vecExports& exports );
 
     /// <summary>
     /// Retrieve image TLS callbacks
@@ -133,6 +159,18 @@ public:
     /// <param name="keepRelative">Keep address relative to file start</param>
     /// <returns>Resolved address</returns>
     BLACKBONE_API size_t ResolveRVAToVA( size_t Rva, bool keepRelative = false ) const;
+
+    /// <summary>
+    /// Get image path
+    /// </summary>
+    /// <returns>Image path</returns>
+    BLACKBONE_API inline const std::wstring& path() const { return _imagePath; }
+
+    /// <summary>
+    /// Get image name
+    /// </summary>
+    /// <returns>Image name</returns>
+    BLACKBONE_API inline std::wstring name() const { return Utils::StripPath( _imagePath ); }
 
     /// <summary>
     /// Get image load address

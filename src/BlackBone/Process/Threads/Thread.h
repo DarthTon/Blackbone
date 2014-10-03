@@ -112,6 +112,12 @@ public:
     BLACKBONE_API bool Resume();
 
     /// <summary>
+    /// Check if thread is suspended
+    /// </summary>
+    /// <returns>true if suspended</returns>
+    BLACKBONE_API bool Suspended();
+
+    /// <summary>
     /// Get WOW64 thread context
     /// </summary>
     /// <param name="ctx">Returned context</param>

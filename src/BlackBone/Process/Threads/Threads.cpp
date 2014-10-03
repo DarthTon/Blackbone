@@ -114,6 +114,30 @@ Thread* ProcessThreads::getLeastExecuted()
 }
 
 /// <summary>
+/// Get most executed thread
+/// </summary>
+/// <returns>Pointer to thread object, nullptr if failed</returns>
+Thread* ProcessThreads::getMostExecuted()
+{
+    uint64_t maxtime = 0;
+    Thread* pThread = getMain();
+    if (pThread->Suspended())
+        pThread = nullptr;
+
+    for (auto& thread : getAll( true ))
+    {
+        uint64_t time = thread.execTime();
+        if (!thread.Suspended() && time > maxtime)
+        {
+            maxtime = time;
+            pThread = &thread;
+        }
+    }
+
+    return pThread;
+}
+
+/// <summary>
 /// Get random thread
 /// </summary>
 /// <returns>Pointer to thread object, nullptr if failed</returns>

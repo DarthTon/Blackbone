@@ -412,7 +412,7 @@ size_t Native::EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool
     {
         auto status = VirtualQueryExT( memptr, &mbi );
 
-        if (status == STATUS_INVALID_PARAMETER)
+        if (status == STATUS_INVALID_PARAMETER || status == STATUS_ACCESS_DENIED)
             break;
         else if (status != STATUS_SUCCESS)
             continue;
@@ -481,7 +481,7 @@ size_t Native::EnumSections( listModules& result )
     {
         auto status = VirtualQueryExT( memptr, &mbi );
 
-        if (status == STATUS_INVALID_PARAMETER)
+        if (status == STATUS_INVALID_PARAMETER || status == STATUS_ACCESS_DENIED)
             break;
         else if (status != STATUS_SUCCESS)
             continue;
@@ -496,7 +496,7 @@ size_t Native::EnumSections( listModules& result )
         status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof(buf) / 2 );
 
         // Get additional 
-        if (status == STATUS_SUCCESS)
+        if (NT_SUCCESS( status ))
         {
             ModuleData data;
 
@@ -510,12 +510,21 @@ size_t Native::EnumSections( listModules& result )
             phdrNt32 = reinterpret_cast<PIMAGE_NT_HEADERS32>(buf + phdrDos->e_lfanew);
             phdrNt64 = reinterpret_cast<PIMAGE_NT_HEADERS64>(phdrNt32);
 
-            if (phdrDos->e_magic != IMAGE_DOS_SIGNATURE)
-                continue;
-            if (phdrNt32->Signature != IMAGE_NT_SIGNATURE)
-                continue;
+            // If no PE header present
+            if (phdrDos->e_magic != IMAGE_DOS_SIGNATURE || phdrNt32->Signature != IMAGE_NT_SIGNATURE)
+            {
+                // Iterate until region end
+                MEMORY_BASIC_INFORMATION64 mbi2 = { 0 };
+                for (ptr_t memptr2 = mbi.AllocationBase; memptr2 < maxAddr(); memptr2 = mbi2.BaseAddress + mbi2.RegionSize)
+                    if (!NT_SUCCESS( VirtualQueryExT( memptr2, &mbi2 ) ) || mbi2.Type != SEC_IMAGE)
+                    {
+                        data.size = (size_t)(mbi2.BaseAddress - mbi.AllocationBase);
+                        break;
+                    }
 
-            if (phdrNt32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC)
+                data.type = mt_unknown;
+            }
+            else if( phdrNt32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC )
             {
                 data.size = phdrNt32->OptionalHeader.SizeOfImage;
                 data.type = mt_mod32;
@@ -525,6 +534,8 @@ size_t Native::EnumSections( listModules& result )
                 data.size = phdrNt64->OptionalHeader.SizeOfImage;
                 data.type = mt_mod64;
             }
+            else 
+                continue;
 
             // Hack for x86 OS
             if (_wowBarrier.x86OS == true)
@@ -565,7 +576,7 @@ size_t Native::EnumPEHeaders( listModules& result )
     {
         auto status = VirtualQueryExT( memptr, &mbi );
 
-        if (status == STATUS_INVALID_PARAMETER)
+        if (status == STATUS_INVALID_PARAMETER || status == STATUS_ACCESS_DENIED)
             break;
         else if (status != STATUS_SUCCESS)
             continue;
@@ -591,9 +602,7 @@ size_t Native::EnumPEHeaders( listModules& result )
         phdrNt32 = reinterpret_cast<PIMAGE_NT_HEADERS32>(buf + phdrDos->e_lfanew);
         phdrNt64 = reinterpret_cast<PIMAGE_NT_HEADERS64>(phdrNt32);
 
-        if (phdrDos->e_magic != IMAGE_DOS_SIGNATURE)
-            continue;
-        if (phdrNt32->Signature != IMAGE_NT_SIGNATURE)
+        if (phdrDos->e_magic != IMAGE_DOS_SIGNATURE || phdrNt32->Signature != IMAGE_NT_SIGNATURE)
             continue;
 
         if (phdrNt32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC)

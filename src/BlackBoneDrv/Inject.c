@@ -127,11 +127,44 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
                 status = STATUS_INVALID_PARAMETER;
             }
 
-            // Unlink module
-            if (pData->unlink && NT_SUCCESS( status ))
+            // Post-inject stuff
+            if (NT_SUCCESS( status ))
             {
                 PVOID modBase = *(PVOID*)((PUCHAR)pUserBuf + MOD_OFFSET);
-                BBUnlinkFromLoader( pProcess, modBase, isWow64 );
+
+                // Unlink module
+                if (pData->unlink)
+                    BBUnlinkFromLoader( pProcess, modBase, isWow64 );
+
+                // Erase header
+                if (pData->erasePE)
+                {
+                    __try
+                    {
+                        PIMAGE_NT_HEADERS64 pHdr = RtlImageNtHeader( modBase );
+                        if (pHdr)
+                        {
+                            ULONG oldProt = 0;
+                            SIZE_T size = (pHdr->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) ? 
+                                            ((PIMAGE_NT_HEADERS32)pHdr)->OptionalHeader.SizeOfHeaders :
+                                            pHdr->OptionalHeader.SizeOfHeaders;
+
+                            if (NT_SUCCESS( ZwProtectVirtualMemory( ZwCurrentProcess(), &modBase, &size, PAGE_EXECUTE_READWRITE, &oldProt ) ))
+                            {
+                                RtlZeroMemory( modBase, size );
+                                ZwProtectVirtualMemory( ZwCurrentProcess(), &modBase, &size, oldProt, &oldProt );
+
+                                DPRINT( "BlackBone: %s: PE headers erased. \n", __FUNCTION__ );
+                            }
+                        }
+                        else
+                            DPRINT( "BlackBone: %s: Failed to retrieve PE headers for image\n", __FUNCTION__ );
+                    }
+                    __except (EXCEPTION_EXECUTE_HANDLER)
+                    {
+                        DPRINT( "BlackBone: %s: Exception during PE header erease: 0x%X\n", __FUNCTION__, GetExceptionCode() );
+                    }
+                }
             }
 
             ZwFreeVirtualMemory( ZwCurrentProcess(), &pUserBuf, &size, MEM_RELEASE );
@@ -178,7 +211,8 @@ NTSTATUS BBExecuteInNewThread(
     
     InitializeObjectAttributes( &ob, NULL, OBJ_KERNEL_HANDLE, NULL, NULL );
 
-    // Kernel-mode handles ignore access checks, so it's safe to create handle without any DesiredAccess
+    // If PreviousMode == KernelMode, handle granted access is ignored.
+    // So it's safe to create handle without any DesiredAccess
     NTSTATUS status = ZwCreateThreadEx( &hThread, 0, &ob, ZwCurrentProcess(), pBaseAddress, pParam, flags, 0, 0x1000, 0x100000, NULL );
 
     // Wait for completion

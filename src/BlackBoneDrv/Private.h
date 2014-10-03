@@ -85,6 +85,7 @@ typedef enum _WinVer
     WINVER_7_SP1 = 0x611,
     WINVER_8     = 0x620,
     WINVER_81    = 0x630,
+    WINVER_10    = 0x640,
 } WinVer;
 
 extern PLIST_ENTRY PsLoadedModuleList;
@@ -97,15 +98,15 @@ typedef struct _DYNAMIC_DATA
 {
     WinVer ver;             // OS version
 
-    ULONG KExecOpt;         // KEXECUTE_OPTIONS offset in KPROCESS
-    ULONG Protection;       // Process protection flag offset in EPROCESS
-    ULONG ObjTable;         // Process handle table offset in EPROCESS
-    ULONG VadRoot;          // VadRoot offset in EPROCESS
+    ULONG KExecOpt;         // KPROCESS::ExecuteOptions 
+    ULONG Protection;       // EPROCESS::Protection
+    ULONG ObjTable;         // EPROCESS::ObjectTable
+    ULONG VadRoot;          // EPROCESS::VadRoot
     ULONG NtProtectIndex;   // NtProtectVirtualMemory SSDT index
     ULONG NtThdIndex;       // NtCreateThreadEx SSDT index
-    ULONG PrevMode;         // PreviousMode offset in KTHREAD
-    ULONG ExitStatus;       // ETHREAD ExitStatus field
-    ULONG MiAllocPage;      // MiAllocateDriver page offset
+    ULONG PrevMode;         // KTHREAD::PreviousMode
+    ULONG ExitStatus;       // ETHREAD::ExitStatus
+    ULONG MiAllocPage;      // MiAllocateDriverPage offset
 } DYNAMIC_DATA, *PDYNAMIC_DATA;
 
 

@@ -653,7 +653,7 @@ MiRemoveNode(
     // if the depth of the tree actually decreased.
     //
 
-#ifdef _WIN81_
+#if defined( _WIN81_ ) || defined ( _WIN10_ )
     Table->BalancedRoot->u1.Balance = 0;
 #else
     Table->BalancedRoot.u1.Balance = 0;
@@ -693,7 +693,7 @@ MiRemoveNode(
             // the tree really has one less level.
             //
 
-#ifndef _WIN81_
+#if !defined( _WIN81_ ) && !defined ( _WIN10_ )
             if (Table->BalancedRoot.u1.Balance != 0) {
                 Table->DepthOfTree -= 1;
             }
@@ -856,7 +856,7 @@ MiFindNodeOrParent(
         startVpn = VpnCompare->StartingVpn;
         endVpn = VpnCompare->EndingVpn;
 
-#ifdef _WIN81_
+#if defined( _WIN81_ ) || defined( _WIN10_ )
         startVpn |= (ULONG_PTR)VpnCompare->StartingVpnHigh << 32;
         endVpn |= (ULONG_PTR)VpnCompare->EndingVpnHigh << 32;
 #endif  

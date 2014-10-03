@@ -122,6 +122,13 @@ IsWindows8Point1OrGreater()
 }
 
 VERSIONHELPERAPI
+IsWindows10OrGreater()
+{
+    return IsWindowsVersionOrGreater( HIBYTE( 0x604 ), LOBYTE( 0x604 ), 0 );
+}
+
+
+VERSIONHELPERAPI
 IsWindowsServer()
 {
     OSVERSIONINFOEXW osvi = { sizeof(osvi), 0, 0, 0, 0, {0}, 0, 0, 0, VER_NT_WORKSTATION };

@@ -92,7 +92,7 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt /
     // Resolve compiler incremental table address if any
     void *pFunc = ResolveJmp( &VectoredHandler );
     size_t fnSize = static_cast<size_t>(SizeOfProc( pFunc ));
-    size_t dataOfs = 0, code_ofs = 0;
+    size_t dataOfs = 0, code_ofs = 0, code_ofs2 = 0;;
 
     // Find and replace magic values
     for (uint8_t *pData = reinterpret_cast<uint8_t*>(pFunc);
@@ -112,12 +112,20 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt /
             code_ofs = pData - reinterpret_cast<uint8_t*>(pFunc);
             break;
         }  
+
+        // LdrProtectMrdata address
+        if (*(size_t*)pData == 0xDEADC0D2)
+        {
+            code_ofs2 = pData - reinterpret_cast<uint8_t*>(pFunc);
+            continue;
+        }
     }
 
     // Write handler data into target process
     if (_pVEHCode.Write( 0, fnSize, pFunc ) != STATUS_SUCCESS ||
          _pVEHCode.Write( dataOfs, _proc.nativeLdr().LdrpInvertedFunctionTable() ) != STATUS_SUCCESS ||
-         _pVEHCode.Write( code_ofs, &DecodeSystemPointer ) != STATUS_SUCCESS)
+         _pVEHCode.Write( code_ofs, &DecodeSystemPointer ) != STATUS_SUCCESS ||
+         _pVEHCode.Write( code_ofs2, _proc.nativeLdr().LdrProtectMrdata() ) != STATUS_SUCCESS)
     {
         _pVEHCode.Free();
         return LastNtStatus();
@@ -223,8 +231,9 @@ LONG CALLBACK VectoredHandler( PEXCEPTION_POINTERS ExceptionInfo )
 LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*ExceptionInfo*/ )
 {
     PEXCEPTION_REGISTRATION_RECORD pFs;
-    PRTL_INVERTED_FUNCTION_TABLE7 pTable; //= (PRTL_INVERTED_FUNCTION_TABLE7)0x773dc000;
+    PRTL_INVERTED_FUNCTION_TABLE7 pTable;//= (PRTL_INVERTED_FUNCTION_TABLE7)0x77b27270;
     PRTL_INVERTED_FUNCTION_TABLE_ENTRY pEntries;
+    void( __stdcall* LdrProtectMrdata )(int a);
     PDWORD pDec, pStart;
     DWORD verMajor, verMinor;
     DWORD tmp;
@@ -239,6 +248,8 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
         pushad
         mov eax, 0xDEADDA7A
         mov pTable, eax
+        mov eax, 0xDEADC0D2
+        mov LdrProtectMrdata, eax
     }
 
     pFs = reinterpret_cast<decltype(pFs)>(__readfsdword( 0 ));
@@ -252,6 +263,11 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
         pEntries = reinterpret_cast<decltype(pEntries)>(GET_FIELD_PTR( reinterpret_cast<PRTL_INVERTED_FUNCTION_TABLE8>(pTable), Entries ));
     else
         pEntries = reinterpret_cast<decltype(pEntries)>(GET_FIELD_PTR( pTable, Entries ));
+
+
+    //LdrProtectMrdata = (decltype(LdrProtectMrdata))0x77A64FB2;
+    if(LdrProtectMrdata)
+        LdrProtectMrdata( 0 );
 
     //
     // Add each handler to LdrpInvertedFunctionTable
@@ -309,9 +325,12 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
         }
     }
 
+    if(LdrProtectMrdata)
+        LdrProtectMrdata( 1 );
+
     // Return control to SEH
     //return EXCEPTION_CONTINUE_SEARCH;
-    __asm
+     __asm
     {
         popad
         mov esp, ebp
