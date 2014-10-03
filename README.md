@@ -73,5 +73,17 @@ Blackbone
  - Increase reference counter for import libraries in case of manual import mapping
  - Cyclic dependencies are handled properly 
  
+ 
+- **Driver features**
+- Allocate/free/protect user memory
+- Read/write user and kernel memory
+- Disable permanent DEP for WOW64 processes
+- Change process protection flag
+- Change handle access rights
+- Remap process memory
+- Hiding allocated user-mode memory
+- User-mode dll injection
+- Manual mapping of drivers
+
 ## License ##
 Blackbone is licensed under the MIT License. Dependencies are under their respective licenses.
