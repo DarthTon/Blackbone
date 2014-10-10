@@ -4,12 +4,12 @@
 
     #define COMPILER_MSVC
 
-    #if defined(BLACKBONE_STATIC)
-        #define BLACKBONE_API
+    #if defined(BLACKBONE_IMPORTS)
+        #define BLACKBONE_API __declspec(dllimport)
     #elif defined(BLACKBONE_EXPORTS)
         #define BLACKBONE_API __declspec(dllexport)
     #else
-        #define BLACKBONE_API __declspec(dllimport)
+        #define BLACKBONE_API
     #endif
 
 #elif defined(__GNUC__)

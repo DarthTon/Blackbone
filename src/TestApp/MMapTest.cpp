@@ -58,7 +58,7 @@ void TestMMapFromMem()
         CloseHandle( hFile );
     }
 
-    if (thisProc.mmap().MapImage( buf, size, false, CreateLdrRef | RebaseProcess | NoDelayLoad ) == 0)
+    if (thisProc.mmap().MapImage( size, buf, false, CreateLdrRef | RebaseProcess | NoDelayLoad ) == 0)
     {
         std::wcout << L"Mapping failed with error 0x" << std::hex << LastNtStatus()
                    << L". " << Utils::GetErrorDescription( LastNtStatus() ) << std::endl << std::endl;

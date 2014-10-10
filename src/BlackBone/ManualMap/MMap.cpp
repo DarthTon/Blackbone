@@ -38,7 +38,7 @@ const ModuleData* MMap::MapImage(
     void* ldrContext /*= nullptr*/
     )
 {
-    return MapImage( path, nullptr, 0, false, flags, ldrCallback, ldrContext );
+    return MapImageInternal( path, nullptr, 0, false, flags, ldrCallback, ldrContext );
 }
 
 /// <summary>
@@ -52,7 +52,7 @@ const ModuleData* MMap::MapImage(
 /// <param name="ldrContext">User-supplied Loader callback context</param>
 /// <returns>Mapped image info</returns>
 const ModuleData* MMap::MapImage(
-    void* buffer, size_t size,
+    size_t size, void* buffer,
     bool asImage /*= false*/,
     eLoadFlags flags /*= NoFlags*/,
     LdrCallback ldrCallback /*= nullptr*/,
@@ -63,7 +63,7 @@ const ModuleData* MMap::MapImage(
     wchar_t path[64];
     wsprintfW( path, L"MemoryImage_0x%p", buffer );
 
-    return MapImage( path, buffer, size, asImage, flags, ldrCallback, ldrContext );
+    return MapImageInternal( path, buffer, size, asImage, flags, ldrCallback, ldrContext );
 }
 
 /// <summary>
@@ -77,7 +77,7 @@ const ModuleData* MMap::MapImage(
 /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
 /// <param name="ldrContext">User-supplied Loader callback context</param>
 /// <returns>Mapped image info</returns>
-const ModuleData* MMap::MapImage(
+const ModuleData* MMap::MapImageInternal(
     const std::wstring& path,
     void* buffer, size_t size,
     bool asImage /*= false*/,
@@ -187,13 +187,17 @@ const ModuleData* MMap::FindOrMapModule(
     status = buffer ? pImage->peImage.Load( buffer, size, !asImage ) : pImage->peImage.Load( path, flags & NoSxS ? true : false );
     if (!NT_SUCCESS( status ))
     {
-        BLACBONE_TRACE( L"ManualMap: Failed to load image '%ls'/0x%p", path.c_str(), buffer  );
+        BLACBONE_TRACE( L"ManualMap: Failed to load image '%ls'/0x%p. Status 0x%X", path.c_str(), buffer, status );
+        pImage->peImage.Release();
         return nullptr;
     }
 
     // Check if already loaded
     if (auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType() ))
+    {
+        pImage->peImage.Release();
         return hMod;
+    }
 
     BLACBONE_TRACE( L"ManualMap: Loading new image '%ls'", path.c_str() );
 
@@ -209,7 +213,10 @@ const ModuleData* MMap::FindOrMapModule(
         ptr_t size = pImage->peImage.imageSize();
 
         if (!NT_SUCCESS( Driver().EnsureLoaded() ))
-             return nullptr;
+        {
+            pImage->peImage.Release();
+            return nullptr;
+        }
 
         // Allocate as physical at desired base
         auto status = Driver().AllocateMem( _process.pid(), base, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
@@ -232,6 +239,7 @@ const ModuleData* MMap::FindOrMapModule(
         {
             //flags &= ~HideVAD;
             BLACBONE_TRACE( L"ManualMap: Failed to allocate physical memory for image, status 0x%d", status );
+            pImage->peImage.Release();
             return nullptr;
         }
     }
@@ -254,7 +262,10 @@ const ModuleData* MMap::FindOrMapModule(
 
     // Core image mapping operations
     if (!CopyImage( pImage.get() ) || !RelocateImage( pImage.get() ))
+    {
+        pImage->peImage.Release();
         return nullptr;
+    }
 
     auto mt = pImage->peImage.mType();
     auto pMod = _process.modules().AddManualModule( pImage->FilePath, pImage->imgMem.ptr<module_t>(), pImage->imgMem.size(), mt );
@@ -262,6 +273,7 @@ const ModuleData* MMap::FindOrMapModule(
     // Import tables
     if (!ResolveImport( pImage.get() ) || (!(flags & NoDelayLoad) && !ResolveImport( pImage.get(), true )))
     {
+        pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return nullptr;
     }
@@ -274,6 +286,8 @@ const ModuleData* MMap::FindOrMapModule(
     if (!(flags & NoExceptions) && !EnableExceptions( pImage.get() ))
     {
         BLACBONE_TRACE( L"ManualMap: Failed to enable exception handling for image %ls", pImage->FileName.c_str() );
+
+        pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return nullptr;
     }
@@ -281,6 +295,7 @@ const ModuleData* MMap::FindOrMapModule(
     // Unlink image from VAD list
     if (flags & HideVAD && !NT_SUCCESS( ConcealVad( pImage->imgMem ) ))
     {
+        pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return nullptr;
     }
@@ -288,6 +303,7 @@ const ModuleData* MMap::FindOrMapModule(
     // Initialize security cookie
     if (!InitializeCookie( pImage.get() ))
     {
+        pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return nullptr;
     }
@@ -301,15 +317,20 @@ const ModuleData* MMap::FindOrMapModule(
         ldrFlags = _ldrCallback( _ldrContext, *pMod );
 
     if (ldrFlags != Ldr_None)
-        _process.nativeLdr().CreateNTReference( pImage->imgMem.ptr<HMODULE>(), 
-                                                pImage->peImage.imageSize(), 
-                                                pImage->FilePath, 
-                                                static_cast<size_t>(pImage->EntryPoint),
-                                                ldrFlags );
+    {
+        _process.nativeLdr().CreateNTReference(
+            pImage->imgMem.ptr<HMODULE>(),
+            pImage->peImage.imageSize(),
+            pImage->FilePath,
+            static_cast<size_t>(pImage->EntryPoint),
+            ldrFlags
+            );
+    }
 
     // Static TLS data
     if (!(flags & NoTLS) &&! InitStaticTLS( pImage.get( ) ))
     {
+        pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return nullptr;
     }
@@ -320,7 +341,7 @@ const ModuleData* MMap::FindOrMapModule(
     // Unload local copy
     pImage->peImage.Release();
 
-    // Release image memory block
+    // Release ownership of image memory block
     pImage->imgMem.Release();
 
     // Store image

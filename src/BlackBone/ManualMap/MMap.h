@@ -15,6 +15,7 @@ namespace blackbone
 {
 
 // Loader flags
+
 enum eLoadFlags
 {
     NoFlags         = 0x00,     // No flags
@@ -94,7 +95,7 @@ public:
     /// <param name="ldrContext">User-supplied Loader callback context</param>
     /// <returns>Mapped image info</returns>
     BLACKBONE_API const ModuleData* MapImage(
-        void* buffer, size_t size,
+        size_t size, void* buffer,
         bool asImage = false,
         eLoadFlags flags = NoFlags,
         LdrCallback ldrCallback = nullptr,
@@ -130,7 +131,7 @@ private:
     /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
     /// <param name="ldrContext">User-supplied Loader callback context</param>
     /// <returns>Mapped image info</returns>
-    const ModuleData* MapImage(
+    const ModuleData* MapImageInternal(
         const std::wstring& path,
         void* buffer, size_t size,
         bool asImage = false,
