@@ -228,6 +228,15 @@ NTSTATUS BBDispatch( IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp )
                     }
                     break;
 
+                case IOCTL_BLACKBONE_UNLINK_HTABLE:
+                    {
+                        if (inputBufferLength >= sizeof( UNLINK_HTABLE ) && ioBuffer)
+                            Irp->IoStatus.Status = BBUnlinkHandleTable( (PUNLINK_HTABLE)ioBuffer );
+                        else
+                            Irp->IoStatus.Status = STATUS_INFO_LENGTH_MISMATCH;
+                    }
+                    break;
+
                 default:
                     DPRINT( "BlackBone: %s: Unknown IRP_MJ_DEVICE_CONTROL 0x%X\n", __FUNCTION__, ioControlCode );
                     Irp->IoStatus.Status = STATUS_INVALID_PARAMETER;

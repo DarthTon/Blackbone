@@ -21,7 +21,7 @@ DriverControl::DriverControl()
 
 DriverControl::~DriverControl()
 {
-    Unload();
+    //Unload();
 }
 
 DriverControl& DriverControl::Instance()
@@ -502,7 +502,18 @@ NTSTATUS DriverControl::InjectDll(
     if (_hDriver == INVALID_HANDLE_VALUE)
         return STATUS_DEVICE_DOES_NOT_EXIST;
 
-    wcscpy_s( data.FullDllPath, path.c_str() );
+    if (itype == IT_MMap)
+    {
+        UNICODE_STRING ustr = { 0 };
+
+        // Convert path to native format
+        GET_IMPORT( RtlDosPathNameToNtPathName_U )(path.c_str(), &ustr, NULL, NULL);
+        wcscpy_s( data.FullDllPath, ustr.Buffer );
+        GET_IMPORT( RtlFreeUnicodeString )(&ustr);
+    }
+    else
+        wcscpy_s( data.FullDllPath, path.c_str() );
+
     wcscpy_s( data.initArg, initArg.c_str() );
     data.type = itype;
     data.pid = pid;
@@ -534,9 +545,7 @@ NTSTATUS DriverControl::MMapDriver( const std::wstring& path )
 
     // Convert path to native format
     GET_IMPORT( RtlDosPathNameToNtPathName_U )(path.c_str(), &ustr, NULL, NULL);
-
     wcscpy_s( data.FullPath, ustr.Buffer );
-
     GET_IMPORT( RtlFreeUnicodeString )(&ustr);
 
     if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_MAP_DRIVER, &data, sizeof( data ), nullptr, 0, &bytes, NULL ))
@@ -571,6 +580,29 @@ NTSTATUS DriverControl::ConcealVAD( DWORD pid, ptr_t base, uint32_t size )
 
     return STATUS_SUCCESS;
 }
+
+/// <summary>
+/// Unlink process handle table from HandleListHead
+/// </summary>
+/// <param name="pid">Target process ID</param>
+/// <returns>Status code</returns>
+NTSTATUS DriverControl::UnlinkHandleTable( DWORD pid )
+{
+    DWORD bytes = 0;
+    UNLINK_HTABLE unlink = { pid };
+
+    // Not loaded
+    if (_hDriver == INVALID_HANDLE_VALUE)
+        return STATUS_DEVICE_DOES_NOT_EXIST;
+
+    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_UNLINK_HTABLE, &unlink, sizeof( unlink ), nullptr, 0, &bytes, NULL ))
+        return LastNtStatus();
+
+    return STATUS_SUCCESS;
+}
+
+
+
 
 /// <summary>
 /// Load arbitrary driver

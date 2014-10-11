@@ -3,6 +3,29 @@
 #include "Imports.h"
 #include "NativeStructs.h"
 
+// Module type
+typedef enum _ModType
+{
+    mt_mod32,       // 64 bit module
+    mt_mod64,       // 32 bit module
+    mt_default,     // type is deduced from target process
+    mt_unknown      // Failed to detect type
+} ModType;
+
+typedef struct _MODULE_DATA
+{
+    LIST_ENTRY link;            // List link
+    PUCHAR baseAddress;         // Base image address in target process
+    PUCHAR localBase;           // Base image address in system space
+    UNICODE_STRING name;        // File name
+    UNICODE_STRING fullPath;    // Full file path
+    SIZE_T size;                // Size of image
+    ModType type;               // Module type
+    enum MMapFlags flags;       // Flags
+    BOOLEAN manual;             // Image is manually mapped
+    BOOLEAN initialized;        // DllMain was already called
+} MODULE_DATA, *PMODULE_DATA;
+
 /// <summary>
 /// Initialize loader stuff
 /// </summary>
@@ -26,7 +49,7 @@ PKLDR_DATA_TABLE_ENTRY BBGetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAd
 /// <param name="ModuleName">Nodule name to search for</param>
 /// <param name="isWow64">If TRUE - search in 32-bit PEB</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID BBGetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 );
+PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 );
 
 /// <summary>
 /// Unlink user-mode module from Loader lists
@@ -46,11 +69,55 @@ NTSTATUS BBUnlinkFromLoader( IN PEPROCESS pProcess, IN PVOID pBase, IN BOOLEAN i
 PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord );
 
 /// <summary>
-/// Resolve module references and fill the IAT
+/// Map new user module
 /// </summary>
-/// <param name="pImageBase">Image base to be processed</param>
+/// <param name="pProcess">Target process</param>
+/// <param name="path">Image path</param>
+/// <param name="buffer">Image buffer</param>
+/// <param name="size">Image buffer size</param>
+/// <param name="asImage">Buffer has image memory layout</param>
+/// <param name="flags">Mapping flags</param>
+/// <param name="pImage">Mapped image data</param>
 /// <returns>Status code</returns>
-NTSTATUS BBResolveReferences( IN PVOID pImageBase );
+NTSTATUS BBMapUserImage(
+    IN PEPROCESS pProcess,
+    IN PUNICODE_STRING path,
+    IN PVOID buffer, IN ULONG_PTR size,
+    IN BOOLEAN asImage,
+    IN INT flags,
+    OUT PMODULE_DATA pImage
+    );
+
+
+NTSTATUS BBResolveReferences( IN PVOID pImageBase, IN BOOLEAN systemImage, IN PEPROCESS pProcess, IN BOOLEAN wow64Image );
+
+/// <summary>
+/// Find first thread of the target process
+/// </summary>
+/// <param name="pid">Target PID.</param>
+/// <param name="ppThread">Found thread. Thread object reference count is increased by 1</param>
+/// <returns>Status code</returns>
+NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread );
+
+/// <summary>
+/// Queue user-mode APC to the target thread
+/// </summary>
+/// <param name="pThread">Target thread</param>
+/// <param name="pUserFunc">APC function</param>
+/// <param name="Arg1">Argument 1</param>
+/// <param name="Arg2">Argument 2</param>
+/// <param name="Arg3">Argument 3</param>
+/// <param name="bForce">If TRUE - force delivery by issuing special kernel APC</param>
+/// <returns>Status code</returns>
+NTSTATUS BBQueueUserApc(
+    IN PETHREAD pThread,
+    IN PVOID pUserFunc,
+    IN PVOID Arg1,
+    IN PVOID Arg2,
+    IN PVOID Arg3,
+    BOOLEAN bForce
+    );
+
 
 /// <summary>
 /// Manually map driver into system space

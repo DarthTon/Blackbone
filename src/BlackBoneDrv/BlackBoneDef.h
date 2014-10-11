@@ -229,6 +229,24 @@
 */
 #define IOCTL_BLACKBONE_MAP_DRIVER  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80C, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
+/*
+    Unlink process handle table from handle table list
+
+    Input:
+       UNLINK_HTABLE
+
+    Input size: 
+        sizeof(UNLINK_HTABLE)
+
+    Output:
+        NULL
+
+    Output size:
+        0
+*/
+#define IOCTL_BLACKBONE_UNLINK_HTABLE  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80D, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
+
+
 
 /// <summary>
 /// Input for IOCTL_BLACKBONE_DISABLE_DEP
@@ -393,7 +411,25 @@ typedef enum _InjectType
 {
     IT_Thread,      // CreateThread into LdrLoadDll
     IT_Apc,         // Force user APC into LdrLoadDll
+    IT_MMap,        // Manual map
 } InjectType;
+
+typedef enum _MMmapFlags
+{
+    KNoFlags         = 0x00,     // No flags
+    KManualImports   = 0x01,     // Manually map import libraries
+    KCreateLdrRef    = 0x02,     // Create module references for native loader
+    KWipeHeader      = 0x04,     // Wipe image PE headers
+    KHideVAD         = 0x10,     // Make image appear as PAGE_NOACESS region
+    KMapInHighMem    = 0x20,     // Try to map image in address space beyond 4GB limit
+    KRebaseProcess   = 0x40,     // If target image is an .exe file, process base address will be replaced with mapped module value
+
+    KNoExceptions    = 0x01000,   // Do not create custom exception handler
+    KPartialExcept   = 0x02000,   // Only create Inverted function table, without VEH
+    KNoDelayLoad     = 0x04000,   // Do not resolve delay import
+    KNoSxS           = 0x08000,   // Do not apply SxS activation context
+    KNoTLS           = 0x10000,   // Skip TLS initialization and don't execute TLS callbacks
+} MMmapFlags;
 
 /// <summary>
 /// Input for IOCTL_BLACKBONE_INJECT_DLL
@@ -417,3 +453,11 @@ typedef struct _MMAP_DRIVER
 {
     wchar_t    FullPath[512];    // Fully-qualified path to the driver
 } MMAP_DRIVER, *PMMAP_DRIVER;
+
+/// <summary>
+/// Input for IOCTL_BLACKBONE_UNLINK_HTABLE
+/// </summary>
+typedef struct _UNLINK_HTABLE
+{
+    ULONG      pid;         // Process ID
+} UNLINK_HTABLE, *PUNLINK_HTABLE;

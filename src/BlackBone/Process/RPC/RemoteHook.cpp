@@ -259,17 +259,6 @@ DWORD RemoteHook::EventThread()
                 status = OnDebugEvent( DebugEv );
                 break;
 
-                // Close received handles
-            case CREATE_PROCESS_DEBUG_EVENT:
-                if (DebugEv.u.CreateProcessInfo.hFile)
-                    CloseHandle( DebugEv.u.CreateProcessInfo.hFile );
-                break;
-
-            case LOAD_DLL_DEBUG_EVENT:
-                if (DebugEv.u.LoadDll.hFile)
-                    CloseHandle( DebugEv.u.LoadDll.hFile );
-                break;
-
                 // Add HWBP to created thread
             case CREATE_THREAD_DEBUG_EVENT:
                 for(auto& hook : _hooks)

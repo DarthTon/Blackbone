@@ -12,11 +12,14 @@ extern DYNAMIC_DATA dynData;
 PVOID g_KernelBase = NULL;
 PVOID g_SSDT = NULL;
 
-MMPTE ValidKernelPte = { MM_PTE_VALID_MASK |
-                         MM_PTE_WRITE_MASK |
-                         MM_PTE_GLOBAL_MASK |
-                         MM_PTE_DIRTY_MASK |
-                         MM_PTE_ACCESS_MASK };
+MMPTE ValidKernelPte =
+{
+    MM_PTE_VALID_MASK  |
+    MM_PTE_WRITE_MASK  |
+    MM_PTE_GLOBAL_MASK |
+    MM_PTE_DIRTY_MASK  |
+    MM_PTE_ACCESS_MASK
+};
 
 
 /// <summary>
@@ -88,6 +91,7 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry( IN PHANDLE_TABLE HandleTable, IN 
     }
 #endif
 }
+
 
 /// <summary>
 /// Get ntoskrnl base address
@@ -170,8 +174,8 @@ PVOID GetSSDTBase()
         return g_SSDT;
 
     ntosBase = GetKernelBase();
-    RtlUnicodeStringInit( &fnName,   L"NtSetSecurityObject" );
-    RtlUnicodeStringInit( &fnZwName, L"ZwSetSecurityObject" );
+    RtlUnicodeStringInit( &fnName,   L"NtRollbackTransaction" );
+    RtlUnicodeStringInit( &fnZwName, L"ZwRollbackTransaction" );
 
     pFn   = MmGetSystemRoutineAddress( &fnName );
     pZwFn = MmGetSystemRoutineAddress( &fnZwName );
@@ -196,10 +200,10 @@ PVOID GetSSDTBase()
                       pPtr < (ULONG_PTR*)(ntosBase + pSec->VirtualAddress + pSec->Misc.VirtualSize);
                       pPtr++)
                 {
-                    // Found NtSetSecurityObject address
+                    // Found NtRollbackTransaction address
                     if (*pPtr == (ULONG_PTR)pFn)
                     {
-                        // Get NtSetSecurityObject index from ZwSetSecurityObject code
+                        // Get NtSetSecurityObject index from ZwRollbackTransaction code
                         ULONG idx = *(PULONG)(pZwFn + 0x15);
 
                         // Get SSDT base

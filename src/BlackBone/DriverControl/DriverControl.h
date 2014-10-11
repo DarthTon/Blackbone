@@ -215,6 +215,13 @@ public:
     BLACKBONE_API NTSTATUS ConcealVAD( DWORD pid, ptr_t base, uint32_t size );
 
     /// <summary>
+    /// Unlink process handle table from HandleListHead
+    /// </summary>
+    /// <param name="pid">Target process ID</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS UnlinkHandleTable( DWORD pid );
+
+    /// <summary>
     /// Check if driver is loaded
     /// </summary>
     /// <returns></returns>
@@ -247,7 +254,6 @@ private:
     /// <param name="path">Driver path</param>
     /// <returns>Status code</returns>
     LSTATUS PrepareDriverRegEntry( const std::wstring& svcName, const std::wstring& path );
-
 private:
     HANDLE _hDriver = INVALID_HANDLE_VALUE;
     NTSTATUS _loadStatus = STATUS_NOT_FOUND;

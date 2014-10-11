@@ -213,7 +213,7 @@
       <PreprocessorDefinitions>_WIN7_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>copy /y "$(TargetPath)" \\192.168.28.128\c$\$(TargetFileName)</Command>
+      <Command>copy /y "$(TargetPath)" \\PC\c$\$(TargetFileName)</Command>
     </PostBuildEvent>
     <Link>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
@@ -283,12 +283,14 @@
     <ClCompile Include="Private.c" />
     <ClCompile Include="Remap.c" />
     <ClCompile Include="Routines.c" />
+    <ClCompile Include="Utils.c" />
     <ClCompile Include="VadHelpers.c" />
     <ClCompile Include="VadRoutines.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BlackBoneDrv.h" />
     <ClInclude Include="BlackBoneDef.h" />
+    <ClInclude Include="Utils.h" />
     <ClInclude Include="Imports.h" />
     <ClInclude Include="Loader.h" />
     <ClInclude Include="NativeStructs.h" />

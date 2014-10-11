@@ -89,6 +89,13 @@ NTSTATUS BBHideVAD( IN PHIDE_VAD pData );
 NTSTATUS BBInjectDll( IN PINJECT_DLL pData );
 
 /// <summary>
+/// Change handle granted access
+/// </summary>
+/// <param name="pAccess">Request params</param>
+/// <returns>Status code</returns>
+NTSTATUS BBUnlinkHandleTable( IN PUNLINK_HTABLE pUnlink );
+
+/// <summary>
 /// Create new thread in the target process
 /// </summary>
 /// <param name="pBaseAddress">Thread start address</param>
@@ -104,15 +111,6 @@ NTSTATUS BBExecuteInNewThread(
     IN BOOLEAN wait, 
     OUT PNTSTATUS pExitStatus 
     );
-
-/// <summary>
-/// Send user-mode APC to the target thread
-/// </summary>
-/// <param name="pThread">Target thread</param>
-/// <param name="pUserFunc">APC function</param>
-/// <param name="Arg1">Argument 1</param>
-/// <returns>Status code</returns>
-NTSTATUS BBQueueUserApc( IN PETHREAD pThread, IN PVOID pUserFunc, IN PVOID Arg1);
 
 /// <summary>
 /// Process termination handler

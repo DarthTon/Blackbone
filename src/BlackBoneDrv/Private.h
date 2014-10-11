@@ -45,6 +45,8 @@
 #define THREAD_CREATE_FLAGS_SKIP_THREAD_ATTACH      0x00000002
 #define THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER      0x00000004
 
+#define EX_ADDITIONAL_INFO_SIGNATURE (ULONG_PTR)(-2)
+
 #define PTE_SHIFT 3
 #define ObpDecodeGrantedAccess( Access ) \
     ((Access)& ~ObpAccessProtectCloseBit)
@@ -75,6 +77,9 @@
     ((MiGetPxeAddress(Va)->u.Hard.Valid == 1) && \
      (MiGetPpeAddress(Va)->u.Hard.Valid == 1) && \
      ((MiGetPdeAddress(Va)->u.Long & 0x81) == 0x81) || (MiGetPteAddress(Va)->u.Hard.Valid == 1))
+
+#define ExpIsValidObjectEntry(Entry) \
+    ( (Entry != NULL) && (Entry->LowValue != 0) && (Entry->HighValue != EX_ADDITIONAL_INFO_SIGNATURE) )
 
 typedef ULONG WIN32_PROTECTION_MASK;
 typedef PULONG PWIN32_PROTECTION_MASK;
@@ -107,6 +112,7 @@ typedef struct _DYNAMIC_DATA
     ULONG PrevMode;         // KTHREAD::PreviousMode
     ULONG ExitStatus;       // ETHREAD::ExitStatus
     ULONG MiAllocPage;      // MiAllocateDriverPage offset
+    ULONG ExRemoveTable;    // ExRemoveHandleTable offset
 } DYNAMIC_DATA, *PDYNAMIC_DATA;
 
 
@@ -126,6 +132,7 @@ typedef NTSTATUS( NTAPI* fnNtCreateThreadEx )
     );
 
 typedef PFN_NUMBER( NTAPI* fnMiAllocateDriverPage )(PMMPTE pPTE);
+typedef PFN_NUMBER( NTAPI* fnExRemoveHandleTable )(PHANDLE_TABLE pTable);
 
 #if defined(_WIN8_) || defined (_WIN7_)
 

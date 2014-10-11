@@ -16,11 +16,6 @@ PVOID BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath );
 PVOID BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath );
 
 NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCWCHAR InitArg );
-NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread );
-
-VOID KernelApcPrepareCallback( PKAPC, PKNORMAL_ROUTINE*, PVOID*, PVOID*, PVOID* );
-VOID KernelApcInjectCallback( PKAPC, PKNORMAL_ROUTINE*, PVOID*, PVOID*, PVOID* );
-VOID ApcWaitThread( IN PVOID pUserBuf );
 
 #pragma alloc_text(PAGE, BBInjectDll)
 #pragma alloc_text(PAGE, BBGetWow64Code)
@@ -29,7 +24,6 @@ VOID ApcWaitThread( IN PVOID pUserBuf );
 #pragma alloc_text(PAGE, BBApcInject)
 #pragma alloc_text(PAGE, BBQueueUserApc)
 #pragma alloc_text(PAGE, BBLookupProcessThread)
-#pragma alloc_text(PAGE, ApcWaitThread)
 
 /// <summary>
 /// Inject dll into process
@@ -59,7 +53,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         RtlInitUnicodeString( &ustrNtdll, L"Ntdll.dll" );
 
         // Get ntdll base
-        pNtdll = BBGetUserModuleBase( pProcess, &ustrNtdll, isWow64 );
+        pNtdll = BBGetUserModule( pProcess, &ustrNtdll, isWow64 );
 
         if (!pNtdll)
         {
@@ -120,6 +114,11 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
             else if (pData->type == IT_Apc)
             {
                 status = BBApcInject( pUserBuf, (HANDLE)pData->pid, pData->initRVA, pData->initArg );
+            }
+            else if (pData->type == IT_MMap)
+            {
+                MODULE_DATA mod = { 0 };
+                status = BBMapUserImage( pProcess, &ustrPath, NULL, 0, FALSE, 0, &mod );
             }
             else
             {
@@ -213,7 +212,11 @@ NTSTATUS BBExecuteInNewThread(
 
     // If PreviousMode == KernelMode, handle granted access is ignored.
     // So it's safe to create handle without any DesiredAccess
-    NTSTATUS status = ZwCreateThreadEx( &hThread, 0, &ob, ZwCurrentProcess(), pBaseAddress, pParam, flags, 0, 0x1000, 0x100000, NULL );
+    NTSTATUS status = ZwCreateThreadEx(
+        &hThread, THREAD_QUERY_LIMITED_INFORMATION, &ob,
+        ZwCurrentProcess(), pBaseAddress, pParam, flags,
+        0, 0x1000, 0x100000, NULL
+        );
 
     // Wait for completion
     if (NT_SUCCESS( status ) && wait != FALSE)
@@ -379,7 +382,7 @@ NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCW
 
     if (NT_SUCCESS( status ))
     {
-        status = BBQueueUserApc( pThread, pUserBuf, NULL );
+        status = BBQueueUserApc( pThread, pUserBuf, NULL, NULL, NULL, TRUE );
 
         // Wait for completion
         if (NT_SUCCESS( status ))
@@ -402,7 +405,7 @@ NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCW
                 if (modBase != 0 && initRVA != 0)
                 {
                     RtlCopyMemory( (PUCHAR)pUserBuf + STRING_OFFSET, InitArg, 512 * sizeof( WCHAR ) );
-                    BBQueueUserApc( pThread, (PUCHAR)modBase + initRVA, (PUCHAR)pUserBuf + STRING_OFFSET );
+                    BBQueueUserApc( pThread, (PUCHAR)modBase + initRVA, (PUCHAR)pUserBuf + STRING_OFFSET, NULL, NULL, TRUE );
 
                     // Wait some time for routine to finish
                     interval.QuadPart = -(100LL * 10 * 1000);
@@ -427,177 +430,6 @@ NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCW
     return status;
 }
 
-// 'type cast' : from data pointer 'PVOID' to function pointer 'PKNORMAL_ROUTINE'
-#pragma warning(disable: 4055)
 
-/// <summary>
-/// Send user-mode APC to the target thread
-/// </summary>
-/// <param name="pThread">Target thread</param>
-/// <param name="pUserFunc">APC function</param>
-/// <param name="Arg1">Argument 1</param>
-/// <returns>Status code</returns>
-NTSTATUS BBQueueUserApc( IN PETHREAD pThread, IN PVOID pUserFunc, IN PVOID Arg1 )
-{
-    ASSERT( pThread != NULL );
-    if (pThread == NULL)
-        return STATUS_INVALID_PARAMETER;
 
-    // Allocate APC
-    PKAPC pInjectApc = ExAllocatePoolWithTag( NonPagedPool, sizeof( KAPC ), BB_POOL_TAG );
-    PKAPC pPrepareApc = ExAllocatePoolWithTag( NonPagedPool, sizeof( KAPC ), BB_POOL_TAG );
 
-    if (pInjectApc == NULL)
-    {
-        DPRINT( "BlackBone: %s: Failed to allocate APC\n", __FUNCTION__ );
-        return STATUS_NO_MEMORY;
-    }
-
-    // This APC will make thread alertable
-    KeInitializeApc( pPrepareApc, (PKTHREAD)pThread, OriginalApcEnvironment, &KernelApcPrepareCallback,
-                     NULL, NULL, KernelMode, NULL );
-
-    // Actual APC
-    KeInitializeApc( pInjectApc, (PKTHREAD)pThread, OriginalApcEnvironment, &KernelApcInjectCallback,
-                     NULL, (PKNORMAL_ROUTINE)pUserFunc, UserMode, Arg1 );
-
-    // Enforce kernel APC
-    if (KeInsertQueueApc( pInjectApc, NULL, NULL, 0 ))
-    {
-        KeInsertQueueApc( pPrepareApc, NULL, NULL, 0 );
-        return STATUS_SUCCESS;
-    }
-    else
-    {
-        DPRINT( "BlackBone: %s: Failed to insert APC\n", __FUNCTION__ );
-
-        ExFreePoolWithTag( pInjectApc, BB_POOL_TAG );
-        return STATUS_NOT_CAPABLE;
-    }
-}
-
-#pragma warning(default: 4055)
-
-/// <summary>
-/// Find first thread of the target process
-/// </summary>
-/// <param name="pid">Target PID.</param>
-/// <param name="ppThread">Found thread. Thread object reference count is increased by 1</param>
-/// <returns>Status code</returns>
-NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
-{
-    NTSTATUS status = STATUS_SUCCESS;
-    PVOID pBuf = ExAllocatePoolWithTag( NonPagedPool, 1024 * 1024, BB_POOL_TAG );
-    PSYSTEM_PROCESS_INFO pInfo = (PSYSTEM_PROCESS_INFO)pBuf;
-
-    ASSERT( ppThread != NULL );
-    if (ppThread == NULL)
-        return STATUS_INVALID_PARAMETER;
-
-    if (!pInfo)
-    {
-        DPRINT( "BlackBone: %s: Failed to allocate memory for process list\n", __FUNCTION__ );
-        return STATUS_NO_MEMORY;
-    }
-
-    // Get the process thread list
-    status = ZwQuerySystemInformation( SystemProcessInformation, pInfo, 1024 * 1024, NULL );
-    if (!NT_SUCCESS( status ))
-    {
-        ExFreePoolWithTag( pBuf, BB_POOL_TAG );
-        return status;
-    }
-
-    // Find target thread
-    if (NT_SUCCESS( status ))
-    {
-        status = STATUS_NOT_FOUND;
-        for (;;)
-        {
-            if (pInfo->UniqueProcessId == pid)
-            {
-                status = STATUS_SUCCESS;
-                break;
-            }
-            else if (pInfo->NextEntryOffset)
-                pInfo = (PSYSTEM_PROCESS_INFO)((PUCHAR)pInfo + pInfo->NextEntryOffset);
-            else
-                break;
-        }
-    }
-
-    // Reference target thread
-    if (NT_SUCCESS( status ))
-    {
-        status = PsLookupThreadByThreadId( pInfo->Threads[0].ClientId.UniqueThread, ppThread );
-
-        // Do not allow usage of currently executing thread
-        if (NT_SUCCESS( status ) && *ppThread == PsGetCurrentThread())
-        {
-            // Try next thread
-            if (pInfo->NumberOfThreads > 1)
-            {
-                ObDereferenceObject( *ppThread );
-                *ppThread = NULL;
-
-                status = PsLookupThreadByThreadId( pInfo->Threads[1].ClientId.UniqueThread, ppThread );
-            }
-            else
-                status = STATUS_INVALID_THREAD;
-        }
-    }
-    else
-        DPRINT( "BlackBone: %s: Failed to locate process\n", __FUNCTION__ );
-
-    if (pBuf)
-        ExFreePoolWithTag( pBuf, BB_POOL_TAG );
-
-    return status;
-}
-
-//
-// Injection APC routines
-//
-VOID KernelApcPrepareCallback(
-    PKAPC Apc,
-    PKNORMAL_ROUTINE* NormalRoutine,
-    PVOID* NormalContext,
-    PVOID* SystemArgument1,
-    PVOID* SystemArgument2
-    )
-{
-    UNREFERENCED_PARAMETER( NormalRoutine );
-    UNREFERENCED_PARAMETER( NormalContext );
-    UNREFERENCED_PARAMETER( SystemArgument1 );
-    UNREFERENCED_PARAMETER( SystemArgument2 );
-
-    DPRINT( "BlackBone: %s: Called\n", __FUNCTION__ );
-
-    // Alert current thread
-    KeTestAlertThread( UserMode );
-    ExFreePoolWithTag( Apc, BB_POOL_TAG );
-}
-
-VOID KernelApcInjectCallback(
-    PKAPC Apc,
-    PKNORMAL_ROUTINE* NormalRoutine,
-    PVOID* NormalContext,
-    PVOID* SystemArgument1,
-    PVOID* SystemArgument2
-    )
-{
-    UNREFERENCED_PARAMETER( SystemArgument1 );
-    UNREFERENCED_PARAMETER( SystemArgument2 );
-
-    DPRINT( "BlackBone: %s: Called\n", __FUNCTION__ );
-
-    // Skip execution
-    if (PsIsThreadTerminating( PsGetCurrentThread() ))
-        *NormalRoutine = NULL;
-
-    // Fix Wow64 APC
-    if (PsGetCurrentProcessWow64Process() != NULL)
-        PsWrapApcWow64Thread( NormalContext, (PVOID*)NormalRoutine );
-
-    ExFreePoolWithTag( Apc, BB_POOL_TAG );
-}

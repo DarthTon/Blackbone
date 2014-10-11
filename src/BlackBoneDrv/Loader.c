@@ -1,6 +1,33 @@
 #include "Private.h"
 #include "Loader.h"
+#include "BlackBoneDef.h"
+#include "Utils.h"
 #include <Ntstrsafe.h>
+
+#define IMAGE32(hdr) hdr->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC
+#define IMAGE64(hdr) hdr->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC
+#define HEADER_VAL_T(hdr, val) (IMAGE64(hdr) ? ((PIMAGE_NT_HEADERS64)hdr)->OptionalHeader.val : ((PIMAGE_NT_HEADERS32)hdr)->OptionalHeader.val)
+
+
+VOID KernelApcPrepareCallback( PKAPC, PKNORMAL_ROUTINE*, PVOID*, PVOID*, PVOID* );
+VOID KernelApcInjectCallback( PKAPC, PKNORMAL_ROUTINE*, PVOID*, PVOID*, PVOID* );
+
+NTSTATUS BBFindOrMapModule(
+    IN PEPROCESS pProcess,
+    IN PUNICODE_STRING path,
+    IN PVOID buffer, IN ULONG_PTR size,
+    IN BOOLEAN asImage,
+    IN MMmapFlags flags,
+    IN PLIST_ENTRY pModList,
+    OUT PMODULE_DATA pImage
+    );
+
+NTSTATUS BBResolveReferences( IN PVOID pImageBase, IN BOOLEAN systemImage, IN PEPROCESS pProcess, IN BOOLEAN wow64Image );
+void BBCallInitRoutine( IN PEPROCESS pProcess, IN PLIST_ENTRY modList );
+NTSTATUS BBLoadLocalImage( IN PUNICODE_STRING path, OUT PVOID* pBase );
+PMODULE_DATA BBLookupMappedModule( IN PLIST_ENTRY pList, IN PUNICODE_STRING pName, IN ModType type );
+ULONG BBCastSectionProtection( ULONG characteristics );
+
 
 NTSTATUS BBMapWorker( IN PVOID pArg );
 
@@ -9,11 +36,28 @@ extern DYNAMIC_DATA dynData;
 
 #pragma alloc_text(PAGE, BBInitLdrData)
 #pragma alloc_text(PAGE, BBGetSystemModule)
-#pragma alloc_text(PAGE, BBGetUserModuleBase)
+#pragma alloc_text(PAGE, BBGetUserModule)
 #pragma alloc_text(PAGE, BBGetModuleExport)
+
+#pragma alloc_text(PAGE, BBFindOrMapModule)
 #pragma alloc_text(PAGE, BBResolveReferences)
+#pragma alloc_text(PAGE, BBCallInitRoutine)
+#pragma alloc_text(PAGE, BBLoadLocalImage)
+#pragma alloc_text(PAGE, BBLookupMappedModule)
+#pragma alloc_text(PAGE, BBCastSectionProtection)
+
 #pragma alloc_text(PAGE, BBMapWorker)
 #pragma alloc_text(PAGE, BBMMapDriver)
+
+/// <summary>
+/// Remove list entry
+/// </summary>
+/// <param name="Entry">Entry link</param>
+FORCEINLINE VOID RemoveEntryList32( IN PLIST_ENTRY32 Entry )
+{
+    ((PLIST_ENTRY32)Entry->Blink)->Flink = Entry->Flink;
+    ((PLIST_ENTRY32)Entry->Flink)->Blink = Entry->Blink;
+}
 
 /// <summary>
 /// Initialize loader stuff
@@ -95,7 +139,7 @@ PKLDR_DATA_TABLE_ENTRY BBGetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAd
 /// <param name="ModuleName">Nodule name to search for</param>
 /// <param name="isWow64">If TRUE - search in 32-bit PEB</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID BBGetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 )
+PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 )
 {
     ASSERT( pProcess != NULL );
     if (pProcess == NULL)
@@ -172,16 +216,6 @@ PVOID BBGetUserModuleBase( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName,
     }
 
     return NULL;
-}
-
-/// <summary>
-/// Remove list entry
-/// </summary>
-/// <param name="Entry">Entry link</param>
-FORCEINLINE VOID RemoveEntryList32( IN PLIST_ENTRY32 Entry )
-{
-    ((PLIST_ENTRY32)Entry->Blink)->Flink = Entry->Flink;
-    ((PLIST_ENTRY32)Entry->Flink)->Blink = Entry->Blink;
 }
 
 /// <summary>
@@ -362,12 +396,336 @@ PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
     return (PVOID)pAddress;
 }
 
+NTSTATUS BBCallRoutine( IN HANDLE pid, IN PVOID pRoutine, IN INT argc, ... )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+
+    if (argc < 4)
+    {
+        PETHREAD pThread = NULL;
+        status = BBLookupProcessThread( pid, &pThread );
+        if (NT_SUCCESS( status ))
+        {
+            va_list vl;
+            va_start( vl, argc );
+
+            PVOID Arg1 = argc > 0 ? va_arg( vl, PVOID ) : NULL;
+            PVOID Arg2 = argc > 0 ? va_arg( vl, PVOID ) : NULL;
+            PVOID Arg3 = argc > 0 ? va_arg( vl, PVOID ) : NULL;
+
+            status = BBQueueUserApc( pThread, pRoutine, Arg1, Arg2, Arg3, TRUE );
+        }
+
+        if (pThread)
+            ObDereferenceObject( pThread );
+    }
+    else
+    {
+        status = STATUS_NOT_IMPLEMENTED;
+    }
+
+    return status;
+}
+
+
 /// <summary>
-/// Resolve module references and fill the IAT
+/// Map new user module
 /// </summary>
-/// <param name="pImageBase">Image base to be processed</param>
+/// <param name="pProcess">Target process</param>
+/// <param name="path">Image path</param>
+/// <param name="buffer">Image buffer</param>
+/// <param name="size">Image buffer size</param>
+/// <param name="asImage">Buffer has image memory layout</param>
+/// <param name="flags">Mapping flags</param>
+/// <param name="pImage">Mapped image data</param>
 /// <returns>Status code</returns>
-NTSTATUS BBResolveReferences( IN PVOID pImageBase )
+NTSTATUS BBMapUserImage(
+    IN PEPROCESS pProcess,
+    IN PUNICODE_STRING path,
+    IN PVOID buffer, IN ULONG_PTR size,
+    IN BOOLEAN asImage,
+    IN MMmapFlags flags,
+    OUT PMODULE_DATA pImage
+    )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    PVOID systemBuffer = NULL;
+    LIST_ENTRY modList = { 0 };
+
+    ASSERT( pProcess != NULL );
+    if (pProcess == NULL)
+    {
+        DPRINT( "BlackBone: %s: No process provided\n", __FUNCTION__ );
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    InitializeListHead( &modList );
+
+    // Copy buffer to system space
+    if (buffer)
+    {
+        __try
+        {
+            ProbeForRead( buffer, size, 0 );
+            systemBuffer = ExAllocatePoolWithTag( PagedPool, size, BB_POOL_TAG );
+            RtlCopyMemory( systemBuffer, buffer, size );
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            DPRINT( "BlackBone: %s: AV in user buffer: 0x%p - 0x%p\n", __FUNCTION__, buffer, (PUCHAR)buffer + size );
+        }   
+    }
+
+    DPRINT( "BlackBone: %s: Mapping image '%wZ' with flags 0x%X\n", __FUNCTION__, path, flags );
+
+    // Map module
+    status = BBFindOrMapModule( pProcess, path, systemBuffer, size, asImage, flags, &modList, pImage );
+
+    // Rebase process
+    if (NT_SUCCESS( status ) && flags & KRebaseProcess)
+    {
+        PUCHAR pPeb = (PUCHAR)PsGetProcessPeb( pProcess );
+        PUCHAR pPeb32 = (PUCHAR)PsGetProcessWow64Process( pProcess );
+
+        *(PVOID*)(pPeb + 2 * sizeof( ULONG_PTR )) = pImage->baseAddress;
+        if (pPeb32)
+            *(ULONG*)(pPeb + 2 * sizeof( ULONG )) = (ULONG)pImage->baseAddress;
+    }
+
+    // Run module initializers
+    if (NT_SUCCESS( status ))
+        BBCallInitRoutine( pProcess, &modList );
+
+ 
+    //
+    // Cleanup
+    //
+
+    if (systemBuffer)
+        ExFreePoolWithTag( systemBuffer, BB_POOL_TAG );
+
+    while (!IsListEmpty( &modList ))
+    {
+        PVOID pListEntry = modList.Flink;
+        PMODULE_DATA pEntry = (PMODULE_DATA)CONTAINING_RECORD( pListEntry, MODULE_DATA, link );
+
+        RemoveHeadList( &modList );
+
+        RtlFreeUnicodeString( &pEntry->fullPath );
+        ExFreePoolWithTag( pListEntry, BB_POOL_TAG );
+    }
+
+    return status;
+}
+
+
+/// <summary>
+/// Map new module or return existing
+/// </summary>
+/// <param name="pProcess">Target process</param>
+/// <param name="path">Image path</param>
+/// <param name="buffer">Image buffer</param>
+/// <param name="size">Image buffer size</param>
+/// <param name="asImage">Buffer has image memory layout</param>
+/// <param name="flags">Mapping flags</param>
+/// <param name="pModList">Manual modules list</param>
+/// <param name="pImage">Mapped image data</param>
+/// <returns>Status code</returns>
+NTSTATUS BBFindOrMapModule(
+    IN PEPROCESS pProcess,
+    IN PUNICODE_STRING path,
+    IN PVOID buffer, IN ULONG_PTR size,
+    IN BOOLEAN asImage,
+    IN MMmapFlags flags,
+    IN PLIST_ENTRY pModList,
+    OUT PMODULE_DATA pImage
+    )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    PMODULE_DATA pLocalImage = NULL;
+    PIMAGE_NT_HEADERS pHeaders = NULL;
+
+    UNREFERENCED_PARAMETER( size );
+
+    // Allocate image context record
+    pLocalImage = ExAllocatePoolWithTag( PagedPool, sizeof( MODULE_DATA ), BB_POOL_TAG );
+    RtlZeroMemory( pLocalImage, sizeof( MODULE_DATA ) );
+
+    RtlCreateUnicodeString( &pLocalImage->fullPath, path->Buffer );
+    StripPath( &pLocalImage->fullPath, &pLocalImage->name );
+    pLocalImage->flags = flags;
+
+    // Load image info 
+    if (buffer == NULL)
+    {
+        status = BBLoadLocalImage( path, &pLocalImage->localBase );
+        asImage = FALSE;
+    }
+    else
+        pLocalImage->localBase = buffer;
+
+    // Validate PE
+    if (NT_SUCCESS( status ))
+    {
+        pHeaders = RtlImageNtHeader( pLocalImage->localBase );
+        if (!pHeaders)
+            status = STATUS_INVALID_IMAGE_FORMAT;
+    }
+
+    // Check if image already loaded
+    if (NT_SUCCESS( status ))
+    {
+        pLocalImage->type = IMAGE64( pHeaders ) ? mt_mod64 : mt_mod32;
+        PMODULE_DATA pFoundMod = BBLookupMappedModule( pModList, &pLocalImage->name, pLocalImage->type );
+        if (pFoundMod != NULL)
+        {
+            RtlFreeUnicodeString( &pLocalImage->fullPath );
+            if (pLocalImage->localBase)
+                ExFreePoolWithTag( pLocalImage->localBase, BB_POOL_TAG );
+
+            ExFreePoolWithTag( pLocalImage, BB_POOL_TAG );
+            return STATUS_SUCCESS;
+        }
+    }
+
+    // Allocate memory in target process
+    if (NT_SUCCESS( status ))
+    {
+        pLocalImage->baseAddress = (PUCHAR)HEADER_VAL_T( pHeaders, ImageBase );
+        pLocalImage->size = HEADER_VAL_T( pHeaders, SizeOfImage );
+        status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, 0, &pLocalImage->size, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+
+        // Retry with arbitrary base
+        if (!NT_SUCCESS( status ))
+        {
+            pLocalImage->baseAddress = NULL;
+            pLocalImage->size = HEADER_VAL_T( pHeaders, SizeOfImage );
+            status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, 0, &pLocalImage->size, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+        }
+    }
+
+    // Copy image memory
+    if (NT_SUCCESS( status ))
+    {
+        // Copy header
+        RtlCopyMemory( pLocalImage->baseAddress, pLocalImage->localBase, HEADER_VAL_T( pHeaders, SizeOfHeaders ) );
+
+        //
+        // Copy sections
+        //
+        PIMAGE_SECTION_HEADER pFirstSection = (PIMAGE_SECTION_HEADER)(pHeaders + 1);
+        if (IMAGE32( pHeaders ))
+            pFirstSection = (PIMAGE_SECTION_HEADER)((PIMAGE_NT_HEADERS32)pHeaders + 1);
+
+        for (PIMAGE_SECTION_HEADER pSection = pFirstSection;
+              pSection < pFirstSection + pHeaders->FileHeader.NumberOfSections;
+              pSection++)
+        {
+            // Skip discardable sections
+            if (!(pSection->Characteristics & (IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE)) ||
+                 (pSection->Characteristics & IMAGE_SCN_MEM_DISCARDABLE) || pSection->SizeOfRawData == 0)
+            {
+                continue;
+            }
+
+            RtlCopyMemory(
+                pLocalImage->baseAddress + pSection->VirtualAddress,
+                pLocalImage->localBase + pSection->PointerToRawData,
+                pSection->SizeOfRawData
+                );
+        }
+    }
+
+    // Relocate image
+    if (NT_SUCCESS( status ))
+    {
+        status = LdrRelocateImage( pLocalImage->baseAddress, STATUS_SUCCESS, STATUS_CONFLICTING_ADDRESSES, STATUS_INVALID_IMAGE_FORMAT );
+        if (!NT_SUCCESS( status ))
+            DPRINT( "BlackBone: %s: Failed to relocate image '%wZ'. Status: 0x%X\n", __FUNCTION__, path, status );
+    }
+
+    // Resolve imports
+    if (NT_SUCCESS( status ))
+        status = BBResolveReferences( pLocalImage->baseAddress, FALSE, pProcess, IMAGE32( pHeaders ) );
+
+    // Set image memory protection
+    if (NT_SUCCESS( status ))
+    {
+        SIZE_T tmpSize = 0;
+
+        // Protect header
+        tmpSize = HEADER_VAL_T( pHeaders, SizeOfHeaders );
+        status = ZwProtectVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, &tmpSize, PAGE_READONLY, NULL );
+
+        //
+        // Protect sections
+        //
+        PIMAGE_SECTION_HEADER pFirstSection = (PIMAGE_SECTION_HEADER)(pHeaders + 1);
+        if (IMAGE32( pHeaders ))
+            pFirstSection = (PIMAGE_SECTION_HEADER)((PIMAGE_NT_HEADERS32)pHeaders + 1);
+
+        for (PIMAGE_SECTION_HEADER pSection = pFirstSection;
+              pSection < pFirstSection + pHeaders->FileHeader.NumberOfSections;
+              pSection++)
+        {
+            ULONG prot = BBCastSectionProtection( pSection->Characteristics );
+            PUCHAR pAddr = pLocalImage->baseAddress + pSection->VirtualAddress;
+            tmpSize = pSection->Misc.VirtualSize;
+
+            // Decommit pages with NO_ACCESS protection
+            if (prot != PAGE_NOACCESS)
+                status |= ZwProtectVirtualMemory( ZwCurrentProcess(), &pAddr, &tmpSize, prot, NULL );
+            else
+                ZwFreeVirtualMemory( ZwCurrentProcess(), &pAddr, &tmpSize, MEM_DECOMMIT );
+        }
+    }
+
+    //
+    // Cleanup
+    //
+
+
+    // Free system-space image memory
+    if (pLocalImage->localBase)
+    {
+        ExFreePoolWithTag( pLocalImage->localBase, BB_POOL_TAG );
+        pLocalImage->localBase = NULL;
+    }
+
+    if (NT_SUCCESS( status ))
+    {
+        // Copy image info
+        if (pImage)
+            *pImage = *pLocalImage;
+
+        InsertTailList( pModList, &pLocalImage->link );
+    }
+    else if (pLocalImage)
+    {
+        // Delete remote image
+        if (pLocalImage->baseAddress)
+        {
+            SIZE_T tmpSize = 0;
+            ZwFreeVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, &tmpSize, MEM_RELEASE );
+        }
+
+        RtlFreeUnicodeString( &pLocalImage->fullPath );
+        ExFreePoolWithTag( pLocalImage, BB_POOL_TAG );
+    }
+
+    return status;
+}
+
+
+/// <summary>
+/// Resolve import table and load missing dependencies
+/// </summary>
+/// <param name="pImageBase">Target image base</param>
+/// <param name="systemImage">If TRUE - image is driver</param>
+/// <param name="pProcess">Target process</param>
+/// <param name="wow64Image">Iamge is 32bit image</param>
+/// <returns>Status code</returns>
+NTSTATUS BBResolveReferences( IN PVOID pImageBase, IN BOOLEAN systemImage, IN PEPROCESS pProcess, IN BOOLEAN wow64Image )
 {
     NTSTATUS status = STATUS_SUCCESS;
     ULONG impSize = 0;
@@ -382,12 +740,14 @@ NTSTATUS BBResolveReferences( IN PVOID pImageBase )
         ULONG IAT_Index = 0;
         PCCHAR impFunc = NULL;
         PKLDR_DATA_TABLE_ENTRY pModule = NULL;
+        PLDR_DATA_TABLE_ENTRY pUserModule = NULL;
 
         RtlInitAnsiString( &strImpDll, (PCHAR)pImageBase + pImportTbl->Name );
         RtlAnsiStringToUnicodeString( &ustrImpDll, &strImpDll, TRUE );
 
         // Get import module
-        pModule = BBGetSystemModule( &ustrImpDll, NULL );
+        pModule = systemImage ? BBGetSystemModule( &ustrImpDll, NULL ) : BBGetUserModule( pProcess, &ustrImpDll, wow64Image );
+        pUserModule = (PLDR_DATA_TABLE_ENTRY)pModule;
         if (!pModule)
         {
             DPRINT( "BlackBone: %s: Failed to resolve import module: '%wZ'\n", __FUNCTION__, ustrImpDll );
@@ -408,7 +768,7 @@ NTSTATUS BBResolveReferences( IN PVOID pImageBase )
             else
                 impFunc = (PCCHAR)(pThunk->u1.AddressOfData & 0xFFFF);
 
-            pFunc = BBGetModuleExport( pModule->DllBase, impFunc );
+            pFunc = BBGetModuleExport( systemImage ? pModule->DllBase : pModule, impFunc );
 
             // No export found
             if (!pFunc)
@@ -439,6 +799,361 @@ NTSTATUS BBResolveReferences( IN PVOID pImageBase )
 
     return status;
 }
+
+/// <summary>
+/// Call module initialization routines
+/// </summary>
+/// <param name="pProcess">Taget process</param>
+/// <param name="modList">Module list to be initialized</param>
+void BBCallInitRoutine( IN PEPROCESS pProcess, IN PLIST_ENTRY modList )
+{
+    for (PLIST_ENTRY pListEntry = modList->Flink; pListEntry != modList; pListEntry = pListEntry->Flink)
+    {
+        PMODULE_DATA pEntry = (PMODULE_DATA)CONTAINING_RECORD( pListEntry, MODULE_DATA, link );
+        if (pEntry->initialized)
+            continue;
+
+        PIMAGE_NT_HEADERS pHeaders = RtlImageNtHeader( pEntry->baseAddress );
+        if (HEADER_VAL_T( pHeaders, AddressOfEntryPoint ))
+        {
+            PUCHAR entrypoint = pEntry->baseAddress + HEADER_VAL_T( pHeaders, AddressOfEntryPoint );
+            BBCallRoutine( PsGetProcessId( pProcess ), entrypoint, 3, pEntry->baseAddress, (PVOID)1, NULL );
+        }
+
+        if (pEntry->flags & KWipeHeader)
+            RtlZeroMemory( &pEntry->baseAddress, HEADER_VAL_T( pHeaders, SizeOfHeaders ) );
+
+        pEntry->initialized = TRUE;
+    }
+}
+
+/// <summary>
+/// Load image from disk into system memory
+/// </summary>
+/// <param name="path">Image path</param>
+/// <param name="pBase">Mapped base</param>
+/// <returns>Status code</returns>
+NTSTATUS BBLoadLocalImage( IN PUNICODE_STRING path, OUT PVOID* pBase )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    HANDLE hFile = NULL;
+    OBJECT_ATTRIBUTES obAttr = { 0 };
+    IO_STATUS_BLOCK statusBlock = { 0 };
+    FILE_STANDARD_INFORMATION fileInfo = { 0 };
+
+    ASSERT( path != NULL && pBase != NULL );
+    if (path == NULL || pBase == NULL)
+    {
+        DPRINT( "BlackBone: %s: No image path or output base\n", __FUNCTION__ );
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    InitializeObjectAttributes( &obAttr, path, OBJ_KERNEL_HANDLE, NULL, NULL );
+
+    // Open image file
+    status = ZwCreateFile(
+        &hFile, FILE_READ_DATA | SYNCHRONIZE, &obAttr,
+        &statusBlock, NULL, FILE_ATTRIBUTE_NORMAL,
+        FILE_SHARE_READ, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0
+        );
+
+    if (!NT_SUCCESS( status ))
+    {
+        DPRINT( "BlackBone: %s: Failed to open '%wZ'. Status: 0x%X\n", __FUNCTION__, path, status );
+        return status;
+    }
+
+    // Allocate memory for file contents
+    status = ZwQueryInformationFile( hFile, &statusBlock, &fileInfo, sizeof( fileInfo ), FileStandardInformation );
+    if (NT_SUCCESS( status ))
+        *pBase = ExAllocatePoolWithTag( PagedPool, fileInfo.EndOfFile.QuadPart, BB_POOL_TAG );
+    else
+        DPRINT( "BlackBone: %s: Failed to get '%wZ' size. Status: 0x%X\n", __FUNCTION__, path, status );
+
+    // Get file contents
+    status = ZwReadFile( hFile, NULL, NULL, NULL, &statusBlock, *pBase, fileInfo.EndOfFile.LowPart, NULL, NULL );
+    if (NT_SUCCESS( status ))
+    {
+        PIMAGE_NT_HEADERS pNTHeader = RtlImageNtHeader( *pBase );
+        if (!pNTHeader)
+        {
+            DPRINT( "BlackBone: %s: Failed to obtaint NT Header for '%wZ'\n", __FUNCTION__, path );
+            status = STATUS_INVALID_IMAGE_FORMAT;
+        }
+    }
+    else
+        DPRINT( "BlackBone: %s: Failed to read '%wZ'. Status: 0x%X\n", __FUNCTION__, path, status );
+
+    ZwClose( hFile );
+
+    if (!NT_SUCCESS( status ) && *pBase)
+        ExFreePoolWithTag( *pBase, BB_POOL_TAG );
+
+    return status;
+}
+
+/// <summary>
+/// Find existing module in the list
+/// </summary>
+/// <param name="pList">Module list</param>
+/// <param name="pName">Module name</param>
+/// <param name="type">Module type</param>
+/// <returns>Module info address; NULL if not found</returns>
+PMODULE_DATA BBLookupMappedModule( IN PLIST_ENTRY pList, IN PUNICODE_STRING pName, IN ModType type )
+{
+    // Sanity check
+    ASSERT( pList != NULL && pName != NULL );
+    if (pList == NULL || pName == NULL)
+        return NULL;
+
+    if (IsListEmpty( pList ))
+        return NULL;
+
+    // Walk list
+    for (PLIST_ENTRY pListEntry = pList->Flink; pListEntry != pList; pListEntry = pListEntry->Flink)
+    {
+        PMODULE_DATA pEntry = (PMODULE_DATA)CONTAINING_RECORD( pListEntry, MODULE_DATA, link );
+        if (type == pEntry->type && RtlCompareUnicodeString( &pEntry->name, pName, TRUE ) == 0)
+            return pEntry;
+    }
+
+    return NULL;
+}
+
+/// <summary>
+/// Get memory protection form section characteristics
+/// </summary>
+/// <param name="characteristics">Characteristics</param>
+/// <returns>Memory protection value</returns>
+ULONG BBCastSectionProtection( ULONG characteristics )
+{
+    ULONG dwResult = PAGE_NOACCESS;
+
+    if (characteristics & IMAGE_SCN_MEM_DISCARDABLE)
+    {
+        dwResult = PAGE_NOACCESS;
+    }
+    else if (characteristics & IMAGE_SCN_MEM_EXECUTE)
+    {
+        if (characteristics & IMAGE_SCN_MEM_WRITE)
+            dwResult = PAGE_EXECUTE_READWRITE;
+        else if (characteristics & IMAGE_SCN_MEM_READ)
+            dwResult = PAGE_EXECUTE_READ;
+        else
+            dwResult = PAGE_EXECUTE;
+    }
+    else
+    {
+        if (characteristics & IMAGE_SCN_MEM_WRITE)
+            dwResult = PAGE_READWRITE;
+        else if (characteristics & IMAGE_SCN_MEM_READ)
+            dwResult = PAGE_READONLY;
+        else
+            dwResult = PAGE_NOACCESS;
+    }
+
+    return dwResult;
+}
+
+
+
+/// <summary>
+/// Find first thread of the target process
+/// </summary>
+/// <param name="pid">Target PID.</param>
+/// <param name="ppThread">Found thread. Thread object reference count is increased by 1</param>
+/// <returns>Status code</returns>
+NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    PVOID pBuf = ExAllocatePoolWithTag( NonPagedPool, 1024 * 1024, BB_POOL_TAG );
+    PSYSTEM_PROCESS_INFO pInfo = (PSYSTEM_PROCESS_INFO)pBuf;
+
+    ASSERT( ppThread != NULL );
+    if (ppThread == NULL)
+        return STATUS_INVALID_PARAMETER;
+
+    if (!pInfo)
+    {
+        DPRINT( "BlackBone: %s: Failed to allocate memory for process list\n", __FUNCTION__ );
+        return STATUS_NO_MEMORY;
+    }
+
+    // Get the process thread list
+    status = ZwQuerySystemInformation( SystemProcessInformation, pInfo, 1024 * 1024, NULL );
+    if (!NT_SUCCESS( status ))
+    {
+        ExFreePoolWithTag( pBuf, BB_POOL_TAG );
+        return status;
+    }
+
+    // Find target thread
+    if (NT_SUCCESS( status ))
+    {
+        status = STATUS_NOT_FOUND;
+        for (;;)
+        {
+            if (pInfo->UniqueProcessId == pid)
+            {
+                status = STATUS_SUCCESS;
+                break;
+            }
+            else if (pInfo->NextEntryOffset)
+                pInfo = (PSYSTEM_PROCESS_INFO)((PUCHAR)pInfo + pInfo->NextEntryOffset);
+            else
+                break;
+        }
+    }
+
+    // Reference target thread
+    if (NT_SUCCESS( status ))
+    {
+        status = STATUS_NOT_FOUND;
+
+        // Get first non-suspended thread
+        for (ULONG i = 0; i < pInfo->NumberOfThreads; i++)
+        {
+            // Skip suspended and current thread
+            if (pInfo->Threads[i].WaitReason == Suspended ||
+                 pInfo->Threads[i].ThreadState == 5 ||
+                 pInfo->Threads[i].ClientId.UniqueThread == PsGetCurrentThread())
+            {
+                continue;
+            }
+
+            status = PsLookupThreadByThreadId( pInfo->Threads[i].ClientId.UniqueThread, ppThread );
+            break;
+        }
+    }
+    else
+        DPRINT( "BlackBone: %s: Failed to locate process\n", __FUNCTION__ );
+
+    if (pBuf)
+        ExFreePoolWithTag( pBuf, BB_POOL_TAG );
+
+    return status;
+}
+
+
+/// <summary>
+/// Queue user-mode APC to the target thread
+/// </summary>
+/// <param name="pThread">Target thread</param>
+/// <param name="pUserFunc">APC function</param>
+/// <param name="Arg1">Argument 1</param>
+/// <param name="Arg2">Argument 2</param>
+/// <param name="Arg3">Argument 3</param>
+/// <param name="bForce">If TRUE - force delivery by issuing special kernel APC</param>
+/// <returns>Status code</returns>
+NTSTATUS BBQueueUserApc(
+    IN PETHREAD pThread,
+    IN PVOID pUserFunc,
+    IN PVOID Arg1,
+    IN PVOID Arg2,
+    IN PVOID Arg3,
+    IN BOOLEAN bForce )
+{
+    ASSERT( pThread != NULL );
+    if (pThread == NULL)
+        return STATUS_INVALID_PARAMETER;
+
+    // Allocate APC
+    PKAPC pPrepareApc = NULL;
+    PKAPC pInjectApc = ExAllocatePoolWithTag( NonPagedPool, sizeof( KAPC ), BB_POOL_TAG );
+
+    if (pInjectApc == NULL)
+    {
+        DPRINT( "BlackBone: %s: Failed to allocate APC\n", __FUNCTION__ );
+        return STATUS_NO_MEMORY;
+    }
+
+    // Actual APC
+    KeInitializeApc(
+        pInjectApc, (PKTHREAD)pThread,
+        OriginalApcEnvironment, &KernelApcInjectCallback,
+        NULL, (PKNORMAL_ROUTINE)(ULONG_PTR)pUserFunc, UserMode, Arg1
+        );
+
+    // Setup force-delivery APC
+    if (bForce)
+    {
+        pPrepareApc = ExAllocatePoolWithTag( NonPagedPool, sizeof( KAPC ), BB_POOL_TAG );
+        KeInitializeApc(
+            pPrepareApc, (PKTHREAD)pThread,
+            OriginalApcEnvironment, &KernelApcPrepareCallback,
+            NULL, NULL, KernelMode, NULL
+            );
+    }
+
+    // Insert APC
+    if (KeInsertQueueApc( pInjectApc, Arg2, Arg3, 0 ))
+    {
+        if (pPrepareApc)
+            KeInsertQueueApc( pPrepareApc, NULL, NULL, 0 );
+
+        return STATUS_SUCCESS;
+    }
+    else
+    {
+        DPRINT( "BlackBone: %s: Failed to insert APC\n", __FUNCTION__ );
+
+        ExFreePoolWithTag( pInjectApc, BB_POOL_TAG );
+
+        if (pPrepareApc)
+            ExFreePoolWithTag( pPrepareApc, BB_POOL_TAG );
+
+        return STATUS_NOT_CAPABLE;
+    }
+}
+
+
+//
+// Injection APC routines
+//
+VOID KernelApcPrepareCallback(
+    PKAPC Apc,
+    PKNORMAL_ROUTINE* NormalRoutine,
+    PVOID* NormalContext,
+    PVOID* SystemArgument1,
+    PVOID* SystemArgument2
+    )
+{
+    UNREFERENCED_PARAMETER( NormalRoutine );
+    UNREFERENCED_PARAMETER( NormalContext );
+    UNREFERENCED_PARAMETER( SystemArgument1 );
+    UNREFERENCED_PARAMETER( SystemArgument2 );
+
+    DPRINT( "BlackBone: %s: Called\n", __FUNCTION__ );
+
+    // Alert current thread
+    KeTestAlertThread( UserMode );
+    ExFreePoolWithTag( Apc, BB_POOL_TAG );
+}
+
+VOID KernelApcInjectCallback(
+    PKAPC Apc,
+    PKNORMAL_ROUTINE* NormalRoutine,
+    PVOID* NormalContext,
+    PVOID* SystemArgument1,
+    PVOID* SystemArgument2
+    )
+{
+    UNREFERENCED_PARAMETER( SystemArgument1 );
+    UNREFERENCED_PARAMETER( SystemArgument2 );
+
+    DPRINT( "BlackBone: %s: Called\n", __FUNCTION__ );
+
+    // Skip execution
+    if (PsIsThreadTerminating( PsGetCurrentThread() ))
+        *NormalRoutine = NULL;
+
+    // Fix Wow64 APC
+    if (PsGetCurrentProcessWow64Process() != NULL)
+        PsWrapApcWow64Thread( NormalContext, (PVOID*)NormalRoutine );
+
+    ExFreePoolWithTag( Apc, BB_POOL_TAG );
+}
+
 
 /// <summary>
 /// System worker thread that performs actual mapping
@@ -527,7 +1242,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
 
                 // Fill IAT
                 if (NT_SUCCESS( status ))
-                    status = BBResolveReferences( imageSection );
+                    status = BBResolveReferences( imageSection, TRUE, NULL, FALSE );
             }
             else
             {

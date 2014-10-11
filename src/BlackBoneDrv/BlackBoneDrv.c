@@ -166,8 +166,12 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->PrevMode       = 0x1F6;
                 pData->ExitStatus     = 0x380;
                 //pData->MiAllocPage    = 0x40A9C0;
-                //if (ver_short == WINVER_7_SP1)
+                pData->ExRemoveTable  = 0x32E6B8;
+                if (ver_short == WINVER_7_SP1)
+                {
                     //pData->MiAllocPage = 0x410D70;
+                    pData->ExRemoveTable = 0x32E6B8;
+                }
                 break;
 
                 // Windows 8
@@ -193,6 +197,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->PrevMode       = 0x232;
                 pData->ExitStatus     = 0x6D8;
                 //pData->MiAllocPage    = 0x4BDDF4;
+                pData->ExRemoveTable  = 0x38E320;
                 break;
 
                 // Windows 10, technical preview, build 9841

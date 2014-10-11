@@ -12,6 +12,7 @@
     <ClCompile Include="Inject.c" />
     <ClCompile Include="Loader.c" />
     <ClCompile Include="ldrreloc.c" />
+    <ClCompile Include="Utils.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Remap.h">
@@ -61,6 +62,9 @@
     </ClInclude>
     <ClInclude Include="NativeStructs10.h">
       <Filter>Include\Native</Filter>
+    </ClInclude>
+    <ClInclude Include="Utils.h">
+      <Filter>Include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

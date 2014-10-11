@@ -153,6 +153,13 @@ NTSTATUS BBGrantAccess( IN PHANDLE_GRANT_ACCESS pAccess )
     PHANDLE_TABLE_ENTRY pHandleEntry = NULL;
     EXHANDLE exHandle;
 
+    // Validate dynamic offset
+    if (dynData.ObjTable == 0)
+    {
+        DPRINT( "BlackBone: %s: Invalid ObjTable address\n", __FUNCTION__ );
+        return STATUS_INVALID_ADDRESS;
+    }
+
     status = PsLookupProcessByProcessId( (HANDLE)pAccess->pid, &pProcess );
     if (NT_SUCCESS( status ))
     {
@@ -162,23 +169,58 @@ NTSTATUS BBGrantAccess( IN PHANDLE_GRANT_ACCESS pAccess )
         if (pTable)
             pHandleEntry = ExpLookupHandleTableEntry( pTable, exHandle );
 
-        if (pHandleEntry)
+        if (ExpIsValidObjectEntry( pHandleEntry ))
         {
-            /*POBJECT_HEADER pHeader = (POBJECT_HEADER)ObpDecodeObject( pHandleEntry->LowValue );
-
-            DPRINT( "BlackBone: %s: pHandleEntry = 0x%p -> 0x%p : 0x%X\n", __FUNCTION__,
-                    pHandleEntry, &pHeader->Body, pHandleEntry->GrantedAccessBits );*/
-
             pHandleEntry->GrantedAccessBits = pAccess->access;
         }
         else
         {
-            DPRINT( "BlackBone: %s: ExpLookupHandleTableEntry failed\n", __FUNCTION__ );
+            DPRINT( "BlackBone: %s: 0x%X:0x%X handle is invalid. HandleEntry = 0x%p\n", 
+                    __FUNCTION__, pAccess->pid, pAccess->handle, pHandleEntry );
+
             status = STATUS_UNSUCCESSFUL;
         }
     }
     else
         DPRINT( "BlackBone: %s: PsLookupProcessByProcessId failed with status 0x%X\n", __FUNCTION__, status );
+
+    if (pProcess)
+        ObDereferenceObject( pProcess );
+
+    return status;
+}
+
+/// <summary>
+/// Change handle granted access
+/// </summary>
+/// <param name="pAccess">Request params</param>
+/// <returns>Status code</returns>
+NTSTATUS BBUnlinkHandleTable( IN PUNLINK_HTABLE pUnlink )
+{
+    NTSTATUS  status = STATUS_SUCCESS;
+    PEPROCESS pProcess = NULL;
+
+    // Validate dynamic offset
+    if (dynData.ExRemoveTable == 0 || dynData.ObjTable == 0)
+    {
+        DPRINT( "BlackBone: %s: Invalid ExRemoveTable/ObjTable address\n", __FUNCTION__ );
+        return STATUS_INVALID_ADDRESS;
+    }
+
+    status = PsLookupProcessByProcessId( (HANDLE)pUnlink->pid, &pProcess );
+    if (NT_SUCCESS( status ))
+    {
+        PHANDLE_TABLE pTable = *(PHANDLE_TABLE*)((PUCHAR)pProcess + dynData.ObjTable);
+
+        // Unlink process handle table
+        fnExRemoveHandleTable ExRemoveHandleTable = (fnExRemoveHandleTable)((ULONG_PTR)GetKernelBase() + dynData.ExRemoveTable);
+        ExRemoveHandleTable( pTable );
+    }
+    else
+        DPRINT( "BlackBone: %s: PsLookupProcessByProcessId failed with status 0x%X\n", __FUNCTION__, status );
+
+    if (pProcess)
+        ObDereferenceObject( pProcess );
 
     return status;
 }
