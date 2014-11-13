@@ -3,19 +3,29 @@
 #include "Loader.h"
 #include <Ntstrsafe.h>
 
-#define CODE_OFFSET     0x000
-#define STRING_OFFSET   0x200
-#define MOD_OFFSET      0x1F0
-#define COMPLETE_OFFSET 0x1E0
 
 #define CALL_COMPLETE   0xC0371E7E
 
+typedef struct _INJECT_BUFFER
+{
+    UCHAR code[0x200];
+    union
+    {
+        UNICODE_STRING path;
+        UNICODE_STRING32 path32;
+    };
+
+    wchar_t buffer[488];
+    PVOID module;
+    ULONG complete;
+} INJECT_BUFFER, *PINJECT_BUFFER;
+
 extern DYNAMIC_DATA dynData;
 
-PVOID BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath );
-PVOID BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath );
+PINJECT_BUFFER BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath );
+PINJECT_BUFFER BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath );
 
-NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCWCHAR InitArg );
+NTSTATUS BBApcInject( IN PINJECT_BUFFER pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCWCHAR InitArg );
 
 #pragma alloc_text(PAGE, BBInjectDll)
 #pragma alloc_text(PAGE, BBGetWow64Code)
@@ -46,6 +56,17 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         PVOID pNtdll = NULL;
         PVOID LdrLoadDll = NULL;
         BOOLEAN isWow64 = (PsGetProcessWow64Process( pProcess ) != NULL) ? TRUE : FALSE;
+        LARGE_INTEGER procTimeout = { 0 };
+
+        // Process in signaled state, abort any operations
+        if (KeWaitForSingleObject( pProcess, Executive, KernelMode, FALSE, &procTimeout ) == STATUS_WAIT_0)
+        {
+            DPRINT( "BlackBone: %s: Process %u is terminating. Abort\n", __FUNCTION__, pData->pid );
+
+            if (pProcess)
+                ObDereferenceObject( pProcess );
+            return STATUS_PROCESS_IS_TERMINATING;
+        }
 
         KeStackAttachProcess( pProcess, &apc );
 
@@ -53,7 +74,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         RtlInitUnicodeString( &ustrNtdll, L"Ntdll.dll" );
 
         // Get ntdll base
-        pNtdll = BBGetUserModule( pProcess, &ustrNtdll, isWow64 );
+        pNtdll = BBGetUserModule( pProcess, &ustrNtdll, isWow64, NULL );
 
         if (!pNtdll)
         {
@@ -64,7 +85,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         // Get LdrLoadDll address
         if (NT_SUCCESS( status ))
         {
-            LdrLoadDll = BBGetModuleExport( pNtdll, "LdrLoadDll" );
+            LdrLoadDll = BBGetModuleExport( pNtdll, "LdrLoadDll", pProcess, NULL );
             if (!LdrLoadDll)
             {
                 DPRINT( "BlackBone: %s: Failed to get LdrLoadDll address\n", __FUNCTION__ );
@@ -84,7 +105,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         if (NT_SUCCESS( status ))
         {
             SIZE_T size = 0;
-            PVOID pUserBuf = isWow64 ? BBGetWow64Code( LdrLoadDll, &ustrPath ) : BBGetNativeCode( LdrLoadDll, &ustrPath );
+            PINJECT_BUFFER pUserBuf = isWow64 ? BBGetWow64Code( LdrLoadDll, &ustrPath ) : BBGetNativeCode( LdrLoadDll, &ustrPath );
 
             if (pData->type == IT_Thread)
             {
@@ -99,15 +120,13 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
                 // Call Init routine
                 else
                 {
-                    ULONG_PTR modBase = *(PULONG_PTR)((PUCHAR)pUserBuf + MOD_OFFSET);
-
-                    if (modBase != 0 && pData->initRVA != 0)
+                    if (pUserBuf->module != 0 && pData->initRVA != 0)
                     {
-                        RtlCopyMemory( (PUCHAR)pUserBuf + STRING_OFFSET, pData->initArg, sizeof( pData->initArg ) );
-                        BBExecuteInNewThread( (PUCHAR)modBase + pData->initRVA, (PUCHAR)pUserBuf + STRING_OFFSET,
+                        RtlCopyMemory( pUserBuf->buffer, pData->initArg, sizeof( pUserBuf->buffer ) );
+                        BBExecuteInNewThread( (PUCHAR)pUserBuf->module + pData->initRVA, pUserBuf->buffer,
                                               THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER, TRUE, &threadStatus );
                     }
-                    else if (modBase == 0)
+                    else if (pUserBuf->module == 0)
                         DPRINT( "BlackBone: %s: Module base = 0. Aborting\n", __FUNCTION__ );
                 }
             }
@@ -129,18 +148,16 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
             // Post-inject stuff
             if (NT_SUCCESS( status ))
             {
-                PVOID modBase = *(PVOID*)((PUCHAR)pUserBuf + MOD_OFFSET);
-
                 // Unlink module
                 if (pData->unlink)
-                    BBUnlinkFromLoader( pProcess, modBase, isWow64 );
+                    BBUnlinkFromLoader( pProcess, pUserBuf->module, isWow64 );
 
                 // Erase header
                 if (pData->erasePE)
                 {
                     __try
                     {
-                        PIMAGE_NT_HEADERS64 pHdr = RtlImageNtHeader( modBase );
+                        PIMAGE_NT_HEADERS64 pHdr = RtlImageNtHeader( pUserBuf->module );
                         if (pHdr)
                         {
                             ULONG oldProt = 0;
@@ -148,10 +165,10 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
                                             ((PIMAGE_NT_HEADERS32)pHdr)->OptionalHeader.SizeOfHeaders :
                                             pHdr->OptionalHeader.SizeOfHeaders;
 
-                            if (NT_SUCCESS( ZwProtectVirtualMemory( ZwCurrentProcess(), &modBase, &size, PAGE_EXECUTE_READWRITE, &oldProt ) ))
+                            if (NT_SUCCESS( ZwProtectVirtualMemory( ZwCurrentProcess(), &pUserBuf->module, &size, PAGE_EXECUTE_READWRITE, &oldProt ) ))
                             {
-                                RtlZeroMemory( modBase, size );
-                                ZwProtectVirtualMemory( ZwCurrentProcess(), &modBase, &size, oldProt, &oldProt );
+                                RtlZeroMemory( pUserBuf->module, size );
+                                ZwProtectVirtualMemory( ZwCurrentProcess(), &pUserBuf->module, &size, oldProt, &oldProt );
 
                                 DPRINT( "BlackBone: %s: PE headers erased. \n", __FUNCTION__ );
                             }
@@ -260,10 +277,10 @@ NTSTATUS BBExecuteInNewThread(
 /// <param name="LdrLoadDll">LdrLoadDll address</param>
 /// <param name="pPath">Path to the dll</param>
 /// <returns>Code pointer. When not needed, it should be freed with ZwFreeVirtualMemory</returns>
-PVOID BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
+PINJECT_BUFFER BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
 {
     NTSTATUS status = STATUS_SUCCESS;
-    PVOID pBuffer = NULL;
+    PINJECT_BUFFER pBuffer = NULL;
     SIZE_T size = PAGE_SIZE;
 
     // Code
@@ -283,10 +300,10 @@ PVOID BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
     if (NT_SUCCESS( status ))
     { 
         // Copy path
-        PUNICODE_STRING32 pUserPath = (PUNICODE_STRING32)((PUCHAR)pBuffer + STRING_OFFSET);
+        PUNICODE_STRING32 pUserPath = &pBuffer->path32;
         pUserPath->Length = pPath->Length;
         pUserPath->MaximumLength = pPath->MaximumLength;
-        pUserPath->Buffer = (ULONG)(pUserPath + 1);
+        pUserPath->Buffer = (ULONG)pBuffer->buffer;
 
         // Copy path
         memcpy( (PVOID)pUserPath->Buffer, pPath->Buffer, pPath->Length );
@@ -295,10 +312,10 @@ PVOID BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
         memcpy( pBuffer, code, sizeof( code ) );
 
         // Fill stubs
-        *(ULONG*)((PUCHAR)pBuffer + 1)  = (ULONG)pBuffer + MOD_OFFSET;
+        *(ULONG*)((PUCHAR)pBuffer + 1)  = (ULONG)&pBuffer->module;
         *(ULONG*)((PUCHAR)pBuffer + 6)  = (ULONG)pUserPath;
         *(ULONG*)((PUCHAR)pBuffer + 15) = (ULONG)((ULONG_PTR)LdrLoadDll - ((ULONG_PTR)pBuffer + 15) - 5 + 1);
-        *(ULONG*)((PUCHAR)pBuffer + 20) = (ULONG)pBuffer + COMPLETE_OFFSET;
+        *(ULONG*)((PUCHAR)pBuffer + 20) = (ULONG)&pBuffer->complete;
 
         return pBuffer;
     }
@@ -314,10 +331,10 @@ PVOID BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
 /// <param name="LdrLoadDll">LdrLoadDll address</param>
 /// <param name="pPath">Path to the dll</param>
 /// <returns>Code pointer. When not needed it should be freed with ZwFreeVirtualMemory</returns>
-PVOID BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
+PINJECT_BUFFER BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
 {
     NTSTATUS status = STATUS_SUCCESS;
-    PVOID pBuffer = NULL;
+    PINJECT_BUFFER pBuffer = NULL;
     SIZE_T size = PAGE_SIZE;
 
     // Code
@@ -340,10 +357,10 @@ PVOID BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
     if (NT_SUCCESS( status ))
     {
         // Copy path
-        PUNICODE_STRING pUserPath = (PUNICODE_STRING)((PUCHAR)pBuffer + STRING_OFFSET);
+        PUNICODE_STRING pUserPath = &pBuffer->path;
         pUserPath->Length = 0;
-        pUserPath->MaximumLength = (USHORT)size - STRING_OFFSET;
-        pUserPath->Buffer = (PWCH)(pUserPath + 1);
+        pUserPath->MaximumLength = sizeof(pBuffer->buffer);
+        pUserPath->Buffer = pBuffer->buffer;
 
         RtlUnicodeStringCopy( pUserPath, pPath );
 
@@ -352,9 +369,9 @@ PVOID BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
 
         // Fill stubs
         *(ULONGLONG*)((PUCHAR)pBuffer + 12) = (ULONGLONG)pUserPath;
-        *(ULONGLONG*)((PUCHAR)pBuffer + 22) = (ULONGLONG)pBuffer + MOD_OFFSET;
+        *(ULONGLONG*)((PUCHAR)pBuffer + 22) = (ULONGLONG)&pBuffer->module;
         *(ULONGLONG*)((PUCHAR)pBuffer + 32) = (ULONGLONG)LdrLoadDll;
-        *(ULONGLONG*)((PUCHAR)pBuffer + 44) = (ULONGLONG)pBuffer + COMPLETE_OFFSET;
+        *(ULONGLONG*)((PUCHAR)pBuffer + 44) = (ULONGLONG)&pBuffer->complete;
 
         return pBuffer;
     }
@@ -372,7 +389,7 @@ PVOID BBGetNativeCode( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
 /// <param name="initRVA">Init routine RVA</param>
 /// <param name="InitArg">Init routine argument</param>
 /// <returns>Status code</returns>
-NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCWCHAR InitArg )
+NTSTATUS BBApcInject( IN PINJECT_BUFFER pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCWCHAR InitArg )
 {
     NTSTATUS status = STATUS_SUCCESS;
     PETHREAD pThread = NULL;
@@ -393,25 +410,20 @@ NTSTATUS BBApcInject( IN PVOID pUserBuf, IN HANDLE pid, IN ULONG initRVA, IN PCW
             // Protect from UserMode AV
             __try
             {
-                ULONG val = *(PULONG)((PUCHAR)pUserBuf + COMPLETE_OFFSET);
-                for (ULONG i = 0; val != CALL_COMPLETE && i < 10000; i++)
-                {
+                for (ULONG i = 0; pUserBuf->complete != CALL_COMPLETE && i < 10000; i++)
                     KeDelayExecutionThread( KernelMode, FALSE, &interval );
-                    val = *(PULONG)((PUCHAR)pUserBuf + COMPLETE_OFFSET);
-                }
 
                 // Call init routine
-                ULONG_PTR modBase = *(PULONG_PTR)((PUCHAR)pUserBuf + MOD_OFFSET);
-                if (modBase != 0 && initRVA != 0)
+                if (pUserBuf->module != 0 && initRVA != 0)
                 {
-                    RtlCopyMemory( (PUCHAR)pUserBuf + STRING_OFFSET, InitArg, 512 * sizeof( WCHAR ) );
-                    BBQueueUserApc( pThread, (PUCHAR)modBase + initRVA, (PUCHAR)pUserBuf + STRING_OFFSET, NULL, NULL, TRUE );
+                    RtlCopyMemory( (PUCHAR)pUserBuf->buffer, InitArg, sizeof( pUserBuf->buffer ) );
+                    BBQueueUserApc( pThread, (PUCHAR)pUserBuf->module + initRVA, pUserBuf->buffer, NULL, NULL, TRUE );
 
                     // Wait some time for routine to finish
                     interval.QuadPart = -(100LL * 10 * 1000);
                     KeDelayExecutionThread( KernelMode, FALSE, &interval );
                 }
-                else if (modBase == 0)
+                else if (pUserBuf->module == 0)
                     DPRINT( "BlackBone: %s: Module base = 0. Aborting\n", __FUNCTION__ );
             }
             __except (EXCEPTION_EXECUTE_HANDLER)

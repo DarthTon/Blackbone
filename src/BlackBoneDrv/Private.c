@@ -304,7 +304,7 @@ ZwCreateThreadEx(
 {
     NTSTATUS status = STATUS_SUCCESS;
 
-    fnNtCreateThreadEx NtCreateThreadEx = (fnNtCreateThreadEx)(ULONG_PTR)GetSSDTEntry( dynData.NtThdIndex );
+    fnNtCreateThreadEx NtCreateThreadEx = (fnNtCreateThreadEx)(ULONG_PTR)GetSSDTEntry( dynData.NtCreateThdIndex );
     if (NtCreateThreadEx)
     {
         //
@@ -327,3 +327,22 @@ ZwCreateThreadEx(
     return status;
 }
 
+NTSTATUS NTAPI ZwTerminateThread( IN HANDLE ThreadHandle, IN NTSTATUS ExitStatus )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+
+    fnNtTerminateThread NtTerminateThread = (fnNtTerminateThread)(ULONG_PTR)GetSSDTEntry( dynData.NtTermThdIndex );
+    if (NtTerminateThread)
+    {
+        PUCHAR pPrevMode = (PUCHAR)PsGetCurrentThread() + dynData.PrevMode;
+        UCHAR prevMode = *pPrevMode;
+        *pPrevMode = KernelMode;
+
+        status = NtTerminateThread( ThreadHandle, ExitStatus );
+        *pPrevMode = prevMode;
+    }
+    else
+        status = STATUS_NOT_FOUND;
+
+    return status;
+}

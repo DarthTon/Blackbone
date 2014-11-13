@@ -157,16 +157,17 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 // Windows 7 SP1
             case WINVER_7:
             case WINVER_7_SP1:
-                pData->KExecOpt       = 0x0D2;
-                pData->Protection     = 0x43C;  // Bitfield, bit index - 0xB
-                pData->ObjTable       = 0x200;
-                pData->VadRoot        = 0x448;
-                pData->NtProtectIndex = 0x04D;
-                pData->NtThdIndex     = 0x0A5;
-                pData->PrevMode       = 0x1F6;
-                pData->ExitStatus     = 0x380;
+                pData->KExecOpt         = 0x0D2;
+                pData->Protection       = 0x43C;  // Bitfield, bit index - 0xB
+                pData->ObjTable         = 0x200;
+                pData->VadRoot          = 0x448;
+                pData->NtProtectIndex   = 0x04D;
+                pData->NtCreateThdIndex = 0x0A5;
+                pData->NtTermThdIndex   = 0x50;
+                pData->PrevMode         = 0x1F6;
+                pData->ExitStatus       = 0x380;
                 //pData->MiAllocPage    = 0x40A9C0;
-                pData->ExRemoveTable  = 0x32E6B8;
+                pData->ExRemoveTable    = 0x32D404;
                 if (ver_short == WINVER_7_SP1)
                 {
                     //pData->MiAllocPage = 0x410D70;
@@ -176,40 +177,45 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
 
                 // Windows 8
             case WINVER_8:
-                pData->KExecOpt       = 0x1B7;
-                pData->Protection     = 0x648;
-                pData->ObjTable       = 0x408;
-                pData->VadRoot        = 0x590;
-                pData->NtProtectIndex = 0x04E;
-                pData->NtThdIndex     = 0x0AF; 
-                pData->PrevMode       = 0x232;
-                pData->ExitStatus     = 0x450;
+                pData->KExecOpt         = 0x1B7;
+                pData->Protection       = 0x648;
+                pData->ObjTable         = 0x408;
+                pData->VadRoot          = 0x590;
+                pData->NtProtectIndex   = 0x04E;
+                pData->NtCreateThdIndex = 0x0AF;
+                pData->NtTermThdIndex   = 0x51;
+                pData->PrevMode         = 0x232;
+                pData->ExitStatus       = 0x450;
                 //pData->MiAllocPage    = 0x3AF374;
+                pData->ExRemoveTable    = 0x0;
                 break;
 
                 // Windows 8.1
             case WINVER_81:
-                pData->KExecOpt       = 0x1B7;
-                pData->Protection     = 0x67A;
-                pData->ObjTable       = 0x408;
-                pData->VadRoot        = 0x5D8;
-                pData->NtThdIndex     = 0x0B0;
-                pData->PrevMode       = 0x232;
-                pData->ExitStatus     = 0x6D8;
+                pData->KExecOpt         = 0x1B7;
+                pData->Protection       = 0x67A;
+                pData->ObjTable         = 0x408;
+                pData->VadRoot          = 0x5D8;
+                pData->NtCreateThdIndex = 0x0B0;
+                pData->NtTermThdIndex   = 0x52;
+                pData->PrevMode         = 0x232;
+                pData->ExitStatus       = 0x6D8;
                 //pData->MiAllocPage    = 0x4BDDF4;
-                pData->ExRemoveTable  = 0x38E320;
+                pData->ExRemoveTable    = 0x38E320;
                 break;
 
                 // Windows 10, technical preview, build 9841
             case WINVER_10:
-                pData->KExecOpt       = 0x1BF;
-                pData->Protection     = 0x692;
-                pData->ObjTable       = 0x410;
-                pData->VadRoot        = 0x5F0;
-                pData->NtThdIndex     = 0x0B0;
-                pData->PrevMode       = 0x232;
-                pData->ExitStatus     = 0x6D8;
+                pData->KExecOpt         = 0x1BF;
+                pData->Protection       = 0x692;
+                pData->ObjTable         = 0x410;
+                pData->VadRoot          = 0x5F0;
+                pData->NtCreateThdIndex = 0x0B0;
+                pData->NtTermThdIndex   = 0x0;
+                pData->PrevMode         = 0x232;
+                pData->ExitStatus       = 0x6D8;
                 //pData->MiAllocPage    = 0x5191BC;
+                pData->ExRemoveTable    = 0;
                 break;
 
             default:

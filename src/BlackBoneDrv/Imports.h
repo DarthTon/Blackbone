@@ -72,6 +72,15 @@ ZwCreateThreadEx(
     IN PNT_PROC_THREAD_ATTRIBUTE_LIST AttributeList
     );
 
+NTSTATUS 
+NTAPI 
+ZwTerminateThread( 
+    IN HANDLE ThreadHandle,
+    IN NTSTATUS ExitStatus 
+    );
+
+
+
 NTKERNELAPI
 NTSTATUS
 NTAPI

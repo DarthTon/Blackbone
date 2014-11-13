@@ -9,6 +9,21 @@
 #define HEADER_VAL_T(hdr, val) (IMAGE64(hdr) ? ((PIMAGE_NT_HEADERS64)hdr)->OptionalHeader.val : ((PIMAGE_NT_HEADERS32)hdr)->OptionalHeader.val)
 
 
+#if defined (_WIN81_) || defined (_WIN10_)
+typedef PAPI_SET_VALUE_ENTRY     PAPISET_VALUE_ENTRY;
+typedef PAPI_SET_VALUE_ARRAY     PAPISET_VALUE_ARRAY;
+typedef PAPI_SET_NAMESPACE_ENTRY PAPISET_NAMESPACE_ENTRY;
+typedef PAPI_SET_NAMESPACE_ARRAY PAPISET_NAMESPACE_ARRAY;
+#else
+typedef PAPI_SET_VALUE_ENTRY_V2     PAPISET_VALUE_ENTRY;
+typedef PAPI_SET_VALUE_ARRAY_V2     PAPISET_VALUE_ARRAY;
+typedef PAPI_SET_NAMESPACE_ENTRY_V2 PAPISET_NAMESPACE_ENTRY;
+typedef PAPI_SET_NAMESPACE_ARRAY_V2 PAPISET_NAMESPACE_ARRAY;
+#endif
+
+
+
+
 VOID KernelApcPrepareCallback( PKAPC, PKNORMAL_ROUTINE*, PVOID*, PVOID*, PVOID* );
 VOID KernelApcInjectCallback( PKAPC, PKNORMAL_ROUTINE*, PVOID*, PVOID*, PVOID* );
 
@@ -18,16 +33,22 @@ NTSTATUS BBFindOrMapModule(
     IN PVOID buffer, IN ULONG_PTR size,
     IN BOOLEAN asImage,
     IN MMmapFlags flags,
-    IN PLIST_ENTRY pModList,
+    IN PMMAP_CONTEXT pContext,
     OUT PMODULE_DATA pImage
     );
 
-NTSTATUS BBResolveReferences( IN PVOID pImageBase, IN BOOLEAN systemImage, IN PEPROCESS pProcess, IN BOOLEAN wow64Image );
-void BBCallInitRoutine( IN PEPROCESS pProcess, IN PLIST_ENTRY modList );
+NTSTATUS BBResolveImagePath(
+    IN PEPROCESS pProcess,
+    IN PUNICODE_STRING path,
+    IN PUNICODE_STRING baseImage,
+    OUT PUNICODE_STRING resolved
+    );
+
+void BBCallInitRoutine( IN PMMAP_CONTEXT pContext );
 NTSTATUS BBLoadLocalImage( IN PUNICODE_STRING path, OUT PVOID* pBase );
+NTSTATUS BBCreateWorkerThread( IN PMMAP_CONTEXT pContext );
 PMODULE_DATA BBLookupMappedModule( IN PLIST_ENTRY pList, IN PUNICODE_STRING pName, IN ModType type );
 ULONG BBCastSectionProtection( ULONG characteristics );
-
 
 NTSTATUS BBMapWorker( IN PVOID pArg );
 
@@ -45,6 +66,7 @@ extern DYNAMIC_DATA dynData;
 #pragma alloc_text(PAGE, BBLoadLocalImage)
 #pragma alloc_text(PAGE, BBLookupMappedModule)
 #pragma alloc_text(PAGE, BBCastSectionProtection)
+#pragma alloc_text(PAGE, BBFileExists)
 
 #pragma alloc_text(PAGE, BBMapWorker)
 #pragma alloc_text(PAGE, BBMMapDriver)
@@ -138,18 +160,25 @@ PKLDR_DATA_TABLE_ENTRY BBGetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAd
 /// <param name="pProcess">Target process</param>
 /// <param name="ModuleName">Nodule name to search for</param>
 /// <param name="isWow64">If TRUE - search in 32-bit PEB</param>
+/// <param name="baseName">Base dll name for API schema</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 )
+PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64, IN PUNICODE_STRING baseName )
 {
+    UNICODE_STRING resolved = { 0 };
     ASSERT( pProcess != NULL );
     if (pProcess == NULL)
         return NULL;
+
+    // Resolve image name
+    UNICODE_STRING resolvedName = { 0 };
+    BBResolveImagePath( pProcess, ModuleName, baseName, &resolved );
+    BBStripPath( &resolved, &resolvedName );
 
     // Protect from UserMode AV
     __try
     {
         LARGE_INTEGER time = { 0 };
-        time.QuadPart = -50ll * 100 * 1000;
+        time.QuadPart = -250ll * 10 * 1000;     // 250 msec.
 
         // Wow64 process
         if (isWow64)
@@ -158,6 +187,7 @@ PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN 
             if (pPeb32 == NULL)
             {
                 DPRINT( "BlackBone: %s: No PEB present. Aborting\n", __FUNCTION__ );
+                RtlFreeUnicodeString( &resolved );
                 return NULL;
             }
 
@@ -178,8 +208,11 @@ PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN 
 
                 RtlUnicodeStringInit( &ustr, (PWCH)pEntry->BaseDllName.Buffer );
 
-                if (RtlCompareUnicodeString( &ustr, ModuleName, TRUE ) == 0)
+                if (RtlCompareUnicodeString( &ustr, &resolvedName, TRUE ) == 0)
+                {
+                    RtlFreeUnicodeString( &resolved );
                     return (PVOID)pEntry->DllBase;
+                }
             }
         }
         // Native process
@@ -189,6 +222,7 @@ PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN 
             if (!pPeb)
             {
                 DPRINT( "BlackBone: %s: No PEB present. Aborting\n", __FUNCTION__ );
+                RtlFreeUnicodeString( &resolved );
                 return NULL;
             }
 
@@ -205,8 +239,11 @@ PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN 
                   pListEntry = pListEntry->Flink)
             {
                 PLDR_DATA_TABLE_ENTRY pEntry = CONTAINING_RECORD( pListEntry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks );
-                if (RtlCompareUnicodeString( &pEntry->BaseDllName, ModuleName, TRUE ) == 0)
+                if (RtlCompareUnicodeString( &pEntry->BaseDllName, &resolvedName, TRUE ) == 0)
+                {
+                    RtlFreeUnicodeString( &resolved );
                     return pEntry->DllBase;
+                }
             }
         }
     }
@@ -215,6 +252,7 @@ PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN 
         DPRINT( "BlackBone: %s: Exception, Code: 0x%X\n", __FUNCTION__, GetExceptionCode() );
     }
 
+    RtlFreeUnicodeString( &resolved );
     return NULL;
 }
 
@@ -307,8 +345,10 @@ NTSTATUS BBUnlinkFromLoader( IN PEPROCESS pProcess, IN PVOID pBase, IN BOOLEAN i
 /// </summary>
 /// <param name="pBase">Module base</param>
 /// <param name="name_ord">Function name or ordinal</param>
+/// <param name="pProcess">Target process for user module</param>
+/// <param name="baseName">Dll name for api schema</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
+PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord, IN PEPROCESS pProcess, IN PUNICODE_STRING modName )
 {
     PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER)pBase;
     PIMAGE_NT_HEADERS32 pNtHdr32 = NULL;
@@ -380,8 +420,44 @@ PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
                 // Check forwarded export
                 if (pAddress >= (ULONG_PTR)pExport && pAddress <= (ULONG_PTR)pExport + expSize)
                 {
-                    // TODO: Implement
-                    return NULL;
+                    WCHAR strbuf[256] = { 0 };
+                    ANSI_STRING forwarder = { 0 };
+                    ANSI_STRING import = { 0 };
+
+                    UNICODE_STRING uForwarder = { 0 };              
+                    ULONG delimIdx = 0;
+                    PVOID forwardBase = NULL;
+                    PVOID result = NULL;
+
+                    // System image, not supported
+                    if (pProcess == NULL)
+                        return NULL;
+
+                    RtlInitAnsiString( &forwarder, (PCSZ)pAddress );
+                    RtlUnicodeStringInit( &uForwarder, strbuf );
+                    uForwarder.MaximumLength = sizeof( strbuf );
+
+                    RtlAnsiStringToUnicodeString( &uForwarder, &forwarder, FALSE );
+                    for (ULONG i = 0; i < uForwarder.Length / sizeof( WCHAR ); i++)
+                    {
+                        if (uForwarder.Buffer[i] == L'.')
+                        {
+                            uForwarder.Length = (USHORT)(i * sizeof( WCHAR ));
+                            uForwarder.Buffer[i] = L'\0';
+                            delimIdx = i;
+                            break;
+                        }
+                    }
+
+                    // Get forward function name/ordinal
+                    RtlInitAnsiString( &import, forwarder.Buffer + delimIdx + 1 );
+                    RtlAppendUnicodeToString( &uForwarder, L".dll" );
+
+                    // Check forwarded module
+                    forwardBase = BBGetUserModule( pProcess, &uForwarder, PsGetProcessWow64Process( pProcess ) != NULL, modName );
+                    result = BBGetModuleExport( forwardBase, import.Buffer, pProcess, NULL );
+
+                    return result;
                 }
 
                 break;
@@ -396,33 +472,32 @@ PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord )
     return (PVOID)pAddress;
 }
 
-NTSTATUS BBCallRoutine( IN HANDLE pid, IN PVOID pRoutine, IN INT argc, ... )
+
+NTSTATUS BBCallRoutine( IN PMMAP_CONTEXT pContext, IN PVOID pRoutine, IN INT argc, ... )
 {
     NTSTATUS status = STATUS_SUCCESS;
+    va_list vl;
 
-    if (argc < 4)
+    va_start( vl, argc );
+    ULONG ofst = GenPrologue64( pContext->pCodeBuf );
+    ofst += GenCall64V( (PUCHAR)pContext->pCodeBuf + ofst, pRoutine, argc, vl );
+    ofst += GenSync64( (PUCHAR)pContext->pCodeBuf + ofst, pContext->pLastStatus, pContext->pSetEvent, pContext->hSync );
+    ofst += GenEpilogue64( (PUCHAR)pContext->pCodeBuf + ofst );
+    
+    KeResetEvent( pContext->pSync );
+    status = BBQueueUserApc( pContext->pWorker, pContext->pCodeBuf, NULL, NULL, NULL, FALSE );
+    if (NT_SUCCESS( status ))
     {
-        PETHREAD pThread = NULL;
-        status = BBLookupProcessThread( pid, &pThread );
-        if (NT_SUCCESS( status ))
-        {
-            va_list vl;
-            va_start( vl, argc );
+        LARGE_INTEGER timeout = { 0 };
+        timeout.QuadPart = -(10ll * 10 * 1000 * 1000);   // 10s
 
-            PVOID Arg1 = argc > 0 ? va_arg( vl, PVOID ) : NULL;
-            PVOID Arg2 = argc > 0 ? va_arg( vl, PVOID ) : NULL;
-            PVOID Arg3 = argc > 0 ? va_arg( vl, PVOID ) : NULL;
+        status = KeWaitForSingleObject( pContext->pSync, Executive, UserMode, TRUE, &timeout );
 
-            status = BBQueueUserApc( pThread, pRoutine, Arg1, Arg2, Arg3, TRUE );
-        }
-
-        if (pThread)
-            ObDereferenceObject( pThread );
+        timeout.QuadPart = -(1ll * 10 * 1000);          // 1ms
+        KeDelayExecutionThread( KernelMode, TRUE, &timeout );
     }
-    else
-    {
-        status = STATUS_NOT_IMPLEMENTED;
-    }
+    
+    va_end( vl );
 
     return status;
 }
@@ -450,7 +525,7 @@ NTSTATUS BBMapUserImage(
 {
     NTSTATUS status = STATUS_SUCCESS;
     PVOID systemBuffer = NULL;
-    LIST_ENTRY modList = { 0 };
+    MMAP_CONTEXT context = { 0 };
 
     ASSERT( pProcess != NULL );
     if (pProcess == NULL)
@@ -459,7 +534,8 @@ NTSTATUS BBMapUserImage(
         return STATUS_INVALID_PARAMETER;
     }
 
-    InitializeListHead( &modList );
+    context.pProcess = pProcess;
+    InitializeListHead( &context.modules );
 
     // Copy buffer to system space
     if (buffer)
@@ -478,38 +554,102 @@ NTSTATUS BBMapUserImage(
 
     DPRINT( "BlackBone: %s: Mapping image '%wZ' with flags 0x%X\n", __FUNCTION__, path, flags );
 
+    // Create worker
+    status = BBCreateWorkerThread( &context );
+    if (NT_SUCCESS( status ))
+    {
+        SIZE_T size = 0x2000;
+        status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &context.pCodeBuf, 0, &size, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+        context.pLastStatus = (PNTSTATUS)((PUCHAR)context.pCodeBuf + 0x1EF0);
+    }
+
+    // Create sync event
+    if (NT_SUCCESS( status ))
+    {
+        OBJECT_ATTRIBUTES eventAttr = { 0 };
+        InitializeObjectAttributes( &eventAttr, 0, 0, 0, 0 );
+        status = ZwCreateEvent( &context.hSync, EVENT_ALL_ACCESS, &eventAttr, NotificationEvent, FALSE );
+        if (NT_SUCCESS( status ))
+            status = ObReferenceObjectByHandle( context.hSync, EVENT_MODIFY_STATE, *ExEventObjectType, UserMode, &context.pSync, NULL );
+
+        if (!NT_SUCCESS( status ))
+            DPRINT( "BlackBone: %s: Failed to create sync event. Status 0x%X\n", __FUNCTION__, status );
+
+        UNICODE_STRING ustrNtdll;
+        RtlUnicodeStringInit( &ustrNtdll, L"ntdll.dll" );
+
+        PVOID pNtdll = BBGetUserModule( context.pProcess, &ustrNtdll, PsGetProcessWow64Process( pProcess ) != NULL, NULL );
+
+        context.pSetEvent = BBGetModuleExport( pNtdll, "NtSetEvent", pProcess, NULL );
+        context.pLoadImage = BBGetModuleExport( pNtdll, "LdrLoadDll", pProcess, NULL );
+    }
+
     // Map module
-    status = BBFindOrMapModule( pProcess, path, systemBuffer, size, asImage, flags, &modList, pImage );
+    if (NT_SUCCESS( status ))
+        status = BBFindOrMapModule( pProcess, path, systemBuffer, size, asImage, flags, &context, pImage );
 
     // Rebase process
     if (NT_SUCCESS( status ) && flags & KRebaseProcess)
     {
-        PUCHAR pPeb = (PUCHAR)PsGetProcessPeb( pProcess );
-        PUCHAR pPeb32 = (PUCHAR)PsGetProcessWow64Process( pProcess );
+        PPEB pPeb = (PPEB)PsGetProcessPeb( pProcess );
+        PPEB32 pPeb32 = (PPEB32)PsGetProcessWow64Process( pProcess );
 
-        *(PVOID*)(pPeb + 2 * sizeof( ULONG_PTR )) = pImage->baseAddress;
+        pPeb->ImageBaseAddress = pImage->baseAddress;
         if (pPeb32)
-            *(ULONG*)(pPeb + 2 * sizeof( ULONG )) = (ULONG)pImage->baseAddress;
+            pPeb32->ImageBaseAddress = (ULONG)pImage->baseAddress;
     }
 
     // Run module initializers
     if (NT_SUCCESS( status ))
-        BBCallInitRoutine( pProcess, &modList );
+        BBCallInitRoutine( &context );
 
  
     //
     // Cleanup
     //
 
+    // Event
+    if (context.pSync)
+        ObDereferenceObject( context.pSync );
+    /*if (context.hSync)
+        ZwClose( context.hSync );*/
+
+    // Worker thread
+    if (context.pWorker)
+        ObDereferenceObject( context.pWorker );
+    if (context.hWorker)
+    {
+        LARGE_INTEGER timeout = { 0 };
+        timeout.QuadPart = -(10ll * 10 * 1000);    // 10 ms
+        ZwTerminateThread( context.hWorker, 0 );
+        ZwWaitForSingleObject( context.hWorker, TRUE, &timeout );
+        ZwClose( context.hWorker );
+    }
+
+    // Worker code buffer
+    if (context.pWorkerBuf)
+    {
+        SIZE_T size = 0;
+        ZwFreeVirtualMemory( ZwCurrentProcess(), &context.pWorkerBuf, &size, MEM_RELEASE );
+    }
+
+    // Code buffer
+    if (context.pCodeBuf)
+    {
+        SIZE_T size = 0;
+        ZwFreeVirtualMemory( ZwCurrentProcess(), &context.pCodeBuf, &size, MEM_RELEASE );
+    }
+
     if (systemBuffer)
         ExFreePoolWithTag( systemBuffer, BB_POOL_TAG );
 
-    while (!IsListEmpty( &modList ))
+    // Cleanup module list
+    while (!IsListEmpty( &context.modules ))
     {
-        PVOID pListEntry = modList.Flink;
+        PVOID pListEntry = context.modules.Flink;
         PMODULE_DATA pEntry = (PMODULE_DATA)CONTAINING_RECORD( pListEntry, MODULE_DATA, link );
 
-        RemoveHeadList( &modList );
+        RemoveHeadList( &context.modules );
 
         RtlFreeUnicodeString( &pEntry->fullPath );
         ExFreePoolWithTag( pListEntry, BB_POOL_TAG );
@@ -528,7 +668,7 @@ NTSTATUS BBMapUserImage(
 /// <param name="size">Image buffer size</param>
 /// <param name="asImage">Buffer has image memory layout</param>
 /// <param name="flags">Mapping flags</param>
-/// <param name="pModList">Manual modules list</param>
+/// <param name="pContext">Manual map context</param>
 /// <param name="pImage">Mapped image data</param>
 /// <returns>Status code</returns>
 NTSTATUS BBFindOrMapModule(
@@ -537,7 +677,7 @@ NTSTATUS BBFindOrMapModule(
     IN PVOID buffer, IN ULONG_PTR size,
     IN BOOLEAN asImage,
     IN MMmapFlags flags,
-    IN PLIST_ENTRY pModList,
+    IN PMMAP_CONTEXT pContext,
     OUT PMODULE_DATA pImage
     )
 {
@@ -552,7 +692,7 @@ NTSTATUS BBFindOrMapModule(
     RtlZeroMemory( pLocalImage, sizeof( MODULE_DATA ) );
 
     RtlCreateUnicodeString( &pLocalImage->fullPath, path->Buffer );
-    StripPath( &pLocalImage->fullPath, &pLocalImage->name );
+    BBStripPath( &pLocalImage->fullPath, &pLocalImage->name );
     pLocalImage->flags = flags;
 
     // Load image info 
@@ -576,7 +716,7 @@ NTSTATUS BBFindOrMapModule(
     if (NT_SUCCESS( status ))
     {
         pLocalImage->type = IMAGE64( pHeaders ) ? mt_mod64 : mt_mod32;
-        PMODULE_DATA pFoundMod = BBLookupMappedModule( pModList, &pLocalImage->name, pLocalImage->type );
+        PMODULE_DATA pFoundMod = BBLookupMappedModule( &pContext->modules, &pLocalImage->name, pLocalImage->type );
         if (pFoundMod != NULL)
         {
             RtlFreeUnicodeString( &pLocalImage->fullPath );
@@ -621,9 +761,9 @@ NTSTATUS BBFindOrMapModule(
               pSection < pFirstSection + pHeaders->FileHeader.NumberOfSections;
               pSection++)
         {
-            // Skip discardable sections
+            // Skip invalid sections 
             if (!(pSection->Characteristics & (IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE)) ||
-                 (pSection->Characteristics & IMAGE_SCN_MEM_DISCARDABLE) || pSection->SizeOfRawData == 0)
+                 /*(pSection->Characteristics & IMAGE_SCN_MEM_DISCARDABLE) ||*/ pSection->SizeOfRawData == 0)
             {
                 continue;
             }
@@ -646,7 +786,7 @@ NTSTATUS BBFindOrMapModule(
 
     // Resolve imports
     if (NT_SUCCESS( status ))
-        status = BBResolveReferences( pLocalImage->baseAddress, FALSE, pProcess, IMAGE32( pHeaders ) );
+        status = BBResolveReferences( pLocalImage->baseAddress, path, FALSE, pProcess, IMAGE32( pHeaders ), pContext );
 
     // Set image memory protection
     if (NT_SUCCESS( status ))
@@ -698,7 +838,7 @@ NTSTATUS BBFindOrMapModule(
         if (pImage)
             *pImage = *pLocalImage;
 
-        InsertTailList( pModList, &pLocalImage->link );
+        InsertTailList( &pContext->modules, &pLocalImage->link );
     }
     else if (pLocalImage)
     {
@@ -721,11 +861,20 @@ NTSTATUS BBFindOrMapModule(
 /// Resolve import table and load missing dependencies
 /// </summary>
 /// <param name="pImageBase">Target image base</param>
+/// <param name="pName">Target image name</param>
 /// <param name="systemImage">If TRUE - image is driver</param>
 /// <param name="pProcess">Target process</param>
 /// <param name="wow64Image">Iamge is 32bit image</param>
+/// <param name="PMMAP_CONTEXT">Manual map context</param>
 /// <returns>Status code</returns>
-NTSTATUS BBResolveReferences( IN PVOID pImageBase, IN BOOLEAN systemImage, IN PEPROCESS pProcess, IN BOOLEAN wow64Image )
+NTSTATUS BBResolveReferences(
+    IN PVOID pImageBase,
+    IN PUNICODE_STRING pName,
+    IN BOOLEAN systemImage,
+    IN PEPROCESS pProcess,
+    IN BOOLEAN wow64Image,
+    IN PMMAP_CONTEXT pContext
+    )
 {
     NTSTATUS status = STATUS_SUCCESS;
     ULONG impSize = 0;
@@ -740,14 +889,31 @@ NTSTATUS BBResolveReferences( IN PVOID pImageBase, IN BOOLEAN systemImage, IN PE
         ULONG IAT_Index = 0;
         PCCHAR impFunc = NULL;
         PKLDR_DATA_TABLE_ENTRY pModule = NULL;
-        PLDR_DATA_TABLE_ENTRY pUserModule = NULL;
 
         RtlInitAnsiString( &strImpDll, (PCHAR)pImageBase + pImportTbl->Name );
         RtlAnsiStringToUnicodeString( &ustrImpDll, &strImpDll, TRUE );
 
         // Get import module
-        pModule = systemImage ? BBGetSystemModule( &ustrImpDll, NULL ) : BBGetUserModule( pProcess, &ustrImpDll, wow64Image );
-        pUserModule = (PLDR_DATA_TABLE_ENTRY)pModule;
+        pModule = systemImage ? BBGetSystemModule( &ustrImpDll, NULL ) : BBGetUserModule( pProcess, &ustrImpDll, wow64Image, pName );
+
+        // Load missing import
+        if (!pModule && !systemImage)
+        {
+            PVOID* pLoadedBase = (PVOID*)((PUCHAR)pContext->pCodeBuf + 0x1FD0);
+            PUNICODE_STRING pStr = (PUNICODE_STRING)((PUCHAR)pContext->pCodeBuf + 0x1000);
+            UNICODE_STRING resolved = { 0 };
+
+            pStr->Buffer = (PWCH)(pStr + 1);
+            pStr->MaximumLength = 0x200;
+
+            BBResolveImagePath( pProcess, &ustrImpDll, NULL, &resolved );
+            RtlCopyUnicodeString( pStr, &resolved );
+            RtlFreeUnicodeString( &resolved );
+
+            BBCallRoutine( pContext, pContext->pLoadImage, 4, (PVOID)NULL, (PVOID)0, pStr, pLoadedBase );
+            pModule = *pLoadedBase;
+        }
+
         if (!pModule)
         {
             DPRINT( "BlackBone: %s: Failed to resolve import module: '%wZ'\n", __FUNCTION__, ustrImpDll );
@@ -768,7 +934,7 @@ NTSTATUS BBResolveReferences( IN PVOID pImageBase, IN BOOLEAN systemImage, IN PE
             else
                 impFunc = (PCCHAR)(pThunk->u1.AddressOfData & 0xFFFF);
 
-            pFunc = BBGetModuleExport( systemImage ? pModule->DllBase : pModule, impFunc );
+            pFunc = BBGetModuleExport( systemImage ? pModule->DllBase : pModule, impFunc, pContext->pProcess, &ustrImpDll );
 
             // No export found
             if (!pFunc)
@@ -800,14 +966,156 @@ NTSTATUS BBResolveReferences( IN PVOID pImageBase, IN BOOLEAN systemImage, IN PE
     return status;
 }
 
+
+NTSTATUS BBResolveApiSet( 
+    IN PEPROCESS pProcess, 
+    IN PUNICODE_STRING name,
+    IN PUNICODE_STRING baseImage,
+    OUT PUNICODE_STRING resolved 
+    )
+{
+    NTSTATUS status = STATUS_NOT_FOUND;
+    PPEB32 pPeb32 = (PPEB32)PsGetProcessWow64Process( pProcess );
+    PPEB pPeb = PsGetProcessPeb( pProcess );
+    PAPISET_NAMESPACE_ARRAY pApiSetMap = (PAPISET_NAMESPACE_ARRAY)(pPeb32 != NULL ? (PVOID)pPeb32->ApiSetMap : pPeb->ApiSetMap);
+
+    if (memcmp( name->Buffer, L"ext-ms-", 7) == 0)
+    {
+        name->Buffer[0] = L'a'; 
+        name->Buffer[1] = L'p'; 
+        name->Buffer[2] = L'i'; 
+    }
+
+    // Invalid name
+    if (memcmp( name->Buffer, L"api-", 4 ) != 0)
+    {
+        return STATUS_NOT_FOUND;
+    }
+
+    // Iterate api set map
+    for (ULONG i = 0; i < pApiSetMap->Count; i++)
+    {
+        PAPISET_NAMESPACE_ENTRY pDescriptor = pApiSetMap->Array + i;
+        wchar_t apiNameBuf[255] = { 0 };
+        UNICODE_STRING apiName = { 0 };
+
+        wcscpy_s( apiNameBuf, 255, L"api-" );
+        memcpy( apiNameBuf + 4, (PUCHAR)pApiSetMap + pDescriptor->NameOffset, pDescriptor->NameLength );
+        wcscat_s( apiNameBuf, 255, L".dll" );
+
+        RtlUnicodeStringInit( &apiName, apiNameBuf );
+
+        // Check if this is a target dll
+        if (RtlCompareUnicodeString( &apiName, name, TRUE ) == 0)
+        {
+            PAPISET_VALUE_ARRAY pHostData = (PAPISET_VALUE_ARRAY)((PUCHAR)pApiSetMap + pDescriptor->DataOffset);
+            PAPISET_VALUE_ENTRY pHost = pHostData->Array;
+            wchar_t apiHostNameBuf[255] = { 0 };
+            UNICODE_STRING apiHostName = { 0 };
+
+            // Sanity check
+            if (pHostData->Count < 1)
+                return STATUS_NOT_FOUND;
+
+            memcpy( apiHostNameBuf, (PUCHAR)pApiSetMap + pHost->ValueOffset, pHost->ValueLength );
+            RtlUnicodeStringInit( &apiHostName, apiHostNameBuf );
+
+            // No base name redirection
+            if (pHostData->Count == 1 || baseImage == NULL || baseImage->Buffer[0] == 0)
+            {
+                RtlCreateUnicodeString( resolved, apiHostName.Buffer );
+                return STATUS_SUCCESS;
+            }
+            // Redirect accordingly to base name
+            else
+            {
+                UNICODE_STRING baseImageName = { 0 };
+                BBStripPath( baseImage, &baseImageName );
+
+                if (RtlCompareUnicodeString( &apiHostName, &baseImageName, TRUE ) == 0)
+                {
+                    memset( apiHostNameBuf, 0, sizeof( apiHostNameBuf ) );
+                    memcpy( apiHostNameBuf, (PUCHAR)pApiSetMap + pHost[1].ValueOffset, pHost[1].ValueLength );
+                    RtlCreateUnicodeString( resolved, apiHostNameBuf );
+                    return STATUS_SUCCESS;
+                }
+                else
+                {
+                    RtlCreateUnicodeString( resolved, apiHostName.Buffer );
+                    return STATUS_SUCCESS;
+                }
+            }
+        }
+    }
+
+    return status;
+}
+
+NTSTATUS BBResolveSxS(
+    IN PUNICODE_STRING name,
+    OUT PUNICODE_STRING resolved
+    )
+{
+    NTSTATUS status = STATUS_NOT_FOUND;
+    UNREFERENCED_PARAMETER( name );
+    UNREFERENCED_PARAMETER( resolved );
+
+    return status;
+}
+
+NTSTATUS BBResolveImagePath( 
+    IN PEPROCESS pProcess,
+    IN PUNICODE_STRING path,
+    IN PUNICODE_STRING baseImage,
+    OUT PUNICODE_STRING resolved
+    )
+{
+    NTSTATUS status = STATUS_NOT_FOUND;
+    UNICODE_STRING pathLow = { 0 };
+    UNICODE_STRING filename = { 0 };
+
+    UNREFERENCED_PARAMETER( baseImage );
+
+    ASSERT( pProcess != NULL && path != NULL && resolved != NULL );
+    if (pProcess == NULL || path == NULL || resolved == NULL)
+    {
+        DPRINT( "BlackBone: %s: Missing parameter\n", __FUNCTION__ );
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    RtlDowncaseUnicodeString( &pathLow, path, TRUE );
+    BBStripPath( &pathLow, &filename );
+
+    // API Schema
+    if (NT_SUCCESS( BBResolveApiSet( pProcess, &filename, baseImage, resolved ) ))
+    {
+        DPRINT( "BlackBone: %s: Resolved %wZ -> %wZ\n", __FUNCTION__, path, resolved );
+        RtlFreeUnicodeString( &pathLow );
+        return STATUS_SUCCESS;
+    }
+
+    // SxS
+    if (NT_SUCCESS( BBResolveSxS( &filename, resolved ) ))
+    {
+        DPRINT( "BlackBone: %s: Resolved %wZ -> %wZ\n", __FUNCTION__, path, resolved );
+        RtlFreeUnicodeString( &pathLow );
+        return STATUS_SUCCESS;
+    }
+
+
+    // Nothing found
+    DPRINT( "BlackBone: %s: Failed to resolve %wZ\n", __FUNCTION__, path );
+    *resolved = pathLow;
+    return status;
+}
+
 /// <summary>
 /// Call module initialization routines
 /// </summary>
-/// <param name="pProcess">Taget process</param>
-/// <param name="modList">Module list to be initialized</param>
-void BBCallInitRoutine( IN PEPROCESS pProcess, IN PLIST_ENTRY modList )
+/// <param name="pContext">Map context</param>
+void BBCallInitRoutine( IN PMMAP_CONTEXT pContext )
 {
-    for (PLIST_ENTRY pListEntry = modList->Flink; pListEntry != modList; pListEntry = pListEntry->Flink)
+    for (PLIST_ENTRY pListEntry = pContext->modules.Flink; pListEntry != &pContext->modules; pListEntry = pListEntry->Flink)
     {
         PMODULE_DATA pEntry = (PMODULE_DATA)CONTAINING_RECORD( pListEntry, MODULE_DATA, link );
         if (pEntry->initialized)
@@ -817,7 +1125,7 @@ void BBCallInitRoutine( IN PEPROCESS pProcess, IN PLIST_ENTRY modList )
         if (HEADER_VAL_T( pHeaders, AddressOfEntryPoint ))
         {
             PUCHAR entrypoint = pEntry->baseAddress + HEADER_VAL_T( pHeaders, AddressOfEntryPoint );
-            BBCallRoutine( PsGetProcessId( pProcess ), entrypoint, 3, pEntry->baseAddress, (PVOID)1, NULL );
+            BBCallRoutine( pContext, entrypoint, 3, pEntry->baseAddress, (PVOID)1, NULL );
         }
 
         if (pEntry->flags & KWipeHeader)
@@ -893,6 +1201,81 @@ NTSTATUS BBLoadLocalImage( IN PUNICODE_STRING path, OUT PVOID* pBase )
 }
 
 /// <summary>
+/// Create worker thread for user-mode calls
+/// </summary>
+/// <param name="pContext">Map context</param>
+/// <returns>Status code</returns>
+NTSTATUS BBCreateWorkerThread( IN PMMAP_CONTEXT pContext )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    SIZE_T codeSize = 0x1000;
+    ASSERT( pContext != NULL );
+    if (pContext == NULL )
+        return STATUS_INVALID_PARAMETER;
+
+    pContext->pWorkerBuf = NULL;
+    status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &pContext->pWorkerBuf, 0, &codeSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+    if (NT_SUCCESS( status ))
+    {
+        PUCHAR pBuf = pContext->pWorkerBuf;
+        UNICODE_STRING ustrNtdll;
+        RtlUnicodeStringInit( &ustrNtdll, L"ntdll.dll" );
+        BOOLEAN wow64 = PsGetProcessWow64Process( pContext->pProcess ) != NULL;
+
+        PVOID pNtDelayExec = BBGetModuleExport( BBGetUserModule( pContext->pProcess, &ustrNtdll, wow64, NULL ), "NtDelayExecution", NULL, NULL );
+
+        if (pNtDelayExec)
+        {
+            OBJECT_ATTRIBUTES obattr = { 0 };
+            PLARGE_INTEGER pDelay = (PLARGE_INTEGER)(pBuf + 0x100);
+            pDelay->QuadPart = -(5ll * 10 * 1000);
+            ULONG ofst = 0;
+
+            if (wow64)
+            {
+
+            }
+            else
+            {
+                *(PUSHORT)(pBuf + ofst) = 0xB948;           // mov rcx, TRUE
+                *(PULONG_PTR)(pBuf + ofst + 2) = TRUE;      //
+                ofst += 10;
+
+                *(PUSHORT)(pBuf + ofst) = 0xBA48;           // mov rdx, arg
+                *(PVOID*)(pBuf + ofst + 2) = pDelay;        //
+                ofst += 10;
+
+                *(PUSHORT)(pBuf + ofst) = 0xB848;           // mov rax, pFn
+                *(PVOID*)(pBuf + ofst + 2) = pNtDelayExec;  //
+                ofst += 10;
+
+                *(PUSHORT)(pBuf + ofst) = 0xD0FF;           // call rax
+                ofst += 2;
+
+                *(PUSHORT)(pBuf + ofst) = 0xDEEB;           // jmp
+                ofst += 2;
+            }
+
+            InitializeObjectAttributes( &obattr, NULL, OBJ_KERNEL_HANDLE, NULL, NULL );
+            status = ZwCreateThreadEx(
+                &pContext->hWorker, THREAD_ALL_ACCESS, &obattr,
+                ZwCurrentProcess(), pContext->pWorkerBuf, NULL, 0,
+                0, 0x1000, 0x100000, NULL
+                );
+
+            if (NT_SUCCESS( status ))
+                ObReferenceObjectByHandle( pContext->hWorker, THREAD_ALL_ACCESS, *PsThreadType, KernelMode, &pContext->pWorker, NULL );
+        }
+        else
+        {
+            status = STATUS_NOT_FOUND;
+        }
+    }
+
+    return status;
+}
+
+/// <summary>
 /// Find existing module in the list
 /// </summary>
 /// <param name="pList">Module list</param>
@@ -955,8 +1338,6 @@ ULONG BBCastSectionProtection( ULONG characteristics )
     return dwResult;
 }
 
-
-
 /// <summary>
 /// Find first thread of the target process
 /// </summary>
@@ -1010,12 +1391,12 @@ NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
     {
         status = STATUS_NOT_FOUND;
 
-        // Get first non-suspended thread
+        // Get first thread
         for (ULONG i = 0; i < pInfo->NumberOfThreads; i++)
         {
-            // Skip suspended and current thread
-            if (pInfo->Threads[i].WaitReason == Suspended ||
-                 pInfo->Threads[i].ThreadState == 5 ||
+            // Skip current thread
+            if (/*pInfo->Threads[i].WaitReason == Suspended ||
+                 pInfo->Threads[i].ThreadState == 5 ||*/
                  pInfo->Threads[i].ClientId.UniqueThread == PsGetCurrentThread())
             {
                 continue;
@@ -1033,7 +1414,6 @@ NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
 
     return status;
 }
-
 
 /// <summary>
 /// Queue user-mode APC to the target thread
@@ -1242,7 +1622,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
 
                 // Fill IAT
                 if (NT_SUCCESS( status ))
-                    status = BBResolveReferences( imageSection, TRUE, NULL, FALSE );
+                    status = BBResolveReferences( imageSection, NULL, TRUE, NULL, FALSE, NULL );
             }
             else
             {

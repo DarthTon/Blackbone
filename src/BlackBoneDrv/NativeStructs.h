@@ -345,12 +345,24 @@ typedef struct _LDR_DATA_TABLE_ENTRY
 
 typedef struct _PEB 
 {
-    UCHAR Reserved1[2];
+    UCHAR InheritedAddressSpace;
+    UCHAR ReadImageFileExecOptions;
     UCHAR BeingDebugged;
-    UCHAR Reserved2[1];
-    PVOID Reserved3[2];
+    UCHAR BitField;
+    PVOID Mutant;
+    PVOID ImageBaseAddress;
     PPEB_LDR_DATA Ldr;
     PVOID ProcessParameters;
+    PVOID SubSystemData;
+    PVOID ProcessHeap;
+    PVOID FastPebLock;
+    PVOID AtlThunkSListPtr;
+    PVOID IFEOKey;
+    PVOID CrossProcessFlags;
+    PVOID UserSharedInfoPtr;
+    ULONG SystemReserved;
+    ULONG AtlThunkSListPtr32;
+    PVOID ApiSetMap;
 } PEB, *PPEB;
 
 typedef struct _PEB_LDR_DATA32
@@ -382,13 +394,24 @@ typedef struct _LDR_DATA_TABLE_ENTRY32
 
 typedef struct _PEB32
 {
-    UCHAR Reserved1[2];
+    UCHAR InheritedAddressSpace;
+    UCHAR ReadImageFileExecOptions;
     UCHAR BeingDebugged;
-    UCHAR Reserved2[1];
+    UCHAR BitField;
     ULONG Mutant;
     ULONG ImageBaseAddress;
     ULONG Ldr;
     ULONG ProcessParameters;
+    ULONG SubSystemData;
+    ULONG ProcessHeap;
+    ULONG FastPebLock;
+    ULONG AtlThunkSListPtr;
+    ULONG IFEOKey;
+    ULONG CrossProcessFlags;
+    ULONG UserSharedInfoPtr;
+    ULONG SystemReserved;
+    ULONG AtlThunkSListPtr32;
+    ULONG ApiSetMap;
 } PEB32, *PPEB32;
 
 typedef struct _WOW64_PROCESS 

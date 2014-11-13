@@ -108,7 +108,8 @@ typedef struct _DYNAMIC_DATA
     ULONG ObjTable;         // EPROCESS::ObjectTable
     ULONG VadRoot;          // EPROCESS::VadRoot
     ULONG NtProtectIndex;   // NtProtectVirtualMemory SSDT index
-    ULONG NtThdIndex;       // NtCreateThreadEx SSDT index
+    ULONG NtCreateThdIndex; // NtCreateThreadEx SSDT index
+    ULONG NtTermThdIndex;   // NtTerminateThread SSDT index
     ULONG PrevMode;         // KTHREAD::PreviousMode
     ULONG ExitStatus;       // ETHREAD::ExitStatus
     ULONG MiAllocPage;      // MiAllocateDriverPage offset
@@ -131,8 +132,9 @@ typedef NTSTATUS( NTAPI* fnNtCreateThreadEx )
         OUT PVOID lpBytesBuffer
     );
 
-typedef PFN_NUMBER( NTAPI* fnMiAllocateDriverPage )(PMMPTE pPTE);
-typedef PFN_NUMBER( NTAPI* fnExRemoveHandleTable )(PHANDLE_TABLE pTable);
+typedef PFN_NUMBER( NTAPI* fnMiAllocateDriverPage )(IN PMMPTE pPTE);
+typedef NTSTATUS( NTAPI* fnNtTerminateThread)( IN HANDLE ThreadHandle, IN NTSTATUS ExitStatus );
+typedef NTSTATUS( NTAPI* fnExRemoveHandleTable )(IN PHANDLE_TABLE pTable);
 
 #if defined(_WIN8_) || defined (_WIN7_)
 

@@ -181,6 +181,14 @@ Return Value:
     while (TotalCountBytes) 
     {
         SizeOfBlock = NextBlock->SizeOfBlock;
+
+        // Prevent crash
+        if (SizeOfBlock == 0)
+        {
+            Status = Invalid;
+            goto Exit;
+        }
+
         TotalCountBytes -= SizeOfBlock;
         SizeOfBlock -= sizeof(IMAGE_BASE_RELOCATION);
         SizeOfBlock /= sizeof(USHORT);
