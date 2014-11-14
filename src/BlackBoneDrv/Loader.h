@@ -31,6 +31,39 @@ typedef struct _MODULE_DATA
 
 
 /// <summary>
+/// User-mode memory region
+/// </summary>
+typedef struct _USER_CONTEXT
+{
+    UCHAR code[0x1000];             // Code buffer
+    union 
+    {
+        UNICODE_STRING ustr;
+        UNICODE_STRING32 ustr32;
+    };
+    wchar_t buffer[0x400];          // Buffer for unicode string
+
+
+    // Activation context data
+    union
+    {
+        ACTCTXW actx;
+        ACTCTXW32 actx32;
+    };
+    HANDLE hCTX;                    
+    ULONG hCookie;
+
+    PVOID ptr;                      // Tmp data
+    union
+    {
+        NTSTATUS status;            // Last execution status
+        PVOID retVal;               // Function return value
+        ULONG retVal32;             // Function return value
+    };
+
+} USER_CONTEXT, *PUSER_CONTEXT;
+
+/// <summary>
 /// Manual map context
 /// </summary>
 typedef struct _MMAP_CONTEXT
@@ -40,8 +73,7 @@ typedef struct _MMAP_CONTEXT
     HANDLE hWorker;         // Worker thread handle
     PETHREAD pWorker;       // Worker thread object
     LIST_ENTRY modules;     // Manual module list
-    PVOID pCodeBuf;         // Tmp buffer for code execution
-    PNTSTATUS pLastStatus;  // Last NT status
+    PUSER_CONTEXT userMem;  // Tmp buffer in user space
     HANDLE hSync;           // APC sync handle
     PKEVENT pSync;          // APC sync object
     PVOID pSetEvent;        // ZwSetEvent address
@@ -71,7 +103,7 @@ PKLDR_DATA_TABLE_ENTRY BBGetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAd
 /// <param name="ModuleName">Nodule name to search for</param>
 /// <param name="isWow64">If TRUE - search in 32-bit PEB</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64, IN PUNICODE_STRING baseName );
+PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN BOOLEAN isWow64 );
 
 /// <summary>
 /// Unlink user-mode module from Loader lists
@@ -116,19 +148,26 @@ NTSTATUS BBMapUserImage(
 /// Resolve import table and load missing dependencies
 /// </summary>
 /// <param name="pImageBase">Target image base</param>
-/// <param name="pName">Target image name</param>
 /// <param name="systemImage">If TRUE - image is driver</param>
 /// <param name="pProcess">Target process</param>
 /// <param name="wow64Image">Iamge is 32bit image</param>
 /// <param name="PMMAP_CONTEXT">Manual map context</param>
 /// <returns>Status code</returns>
-NTSTATUS BBResolveReferences(
+NTSTATUS BBResolveImageRefs(
     IN PVOID pImageBase,
-    IN PUNICODE_STRING pName,
     IN BOOLEAN systemImage,
     IN PEPROCESS pProcess,
     IN BOOLEAN wow64Image,
     IN PMMAP_CONTEXT pContext
+    );
+
+NTSTATUS BBResolveImagePath(
+    IN PMMAP_CONTEXT pContext,
+    IN PEPROCESS pProcess,
+    IN ULONG flags,
+    IN PUNICODE_STRING path,
+    IN PUNICODE_STRING baseImage,
+    OUT PUNICODE_STRING resolved
     );
 
 /// <summary>

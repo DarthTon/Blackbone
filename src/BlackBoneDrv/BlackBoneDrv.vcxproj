@@ -193,7 +193,7 @@
       <PreprocessorDefinitions>_WIN8_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>copy /y "$(TargetPath)" \\192.168.56.101\c$\$(TargetFileName)</Command>
+      <Command>copy /y "$(TargetPath)" \\PC8\c$\$(TargetFileName)</Command>
     </PostBuildEvent>
     <Link>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
@@ -279,6 +279,7 @@
     <ClCompile Include="Inject.c" />
     <ClCompile Include="ldrreloc.c" />
     <ClCompile Include="Loader.c" />
+    <ClCompile Include="MMap.c" />
     <ClCompile Include="NotifyRoutine.c" />
     <ClCompile Include="Private.c" />
     <ClCompile Include="Remap.c" />

@@ -3,7 +3,6 @@
 #include "Loader.h"
 #include <Ntstrsafe.h>
 
-
 #define CALL_COMPLETE   0xC0371E7E
 
 typedef struct _INJECT_BUFFER
@@ -74,7 +73,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         RtlInitUnicodeString( &ustrNtdll, L"Ntdll.dll" );
 
         // Get ntdll base
-        pNtdll = BBGetUserModule( pProcess, &ustrNtdll, isWow64, NULL );
+        pNtdll = BBGetUserModule( pProcess, &ustrNtdll, isWow64 );
 
         if (!pNtdll)
         {
@@ -137,7 +136,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
             else if (pData->type == IT_MMap)
             {
                 MODULE_DATA mod = { 0 };
-                status = BBMapUserImage( pProcess, &ustrPath, NULL, 0, FALSE, 0, &mod );
+                status = BBMapUserImage( pProcess, &ustrPath, NULL, 0, FALSE, KRebaseProcess, &mod );
             }
             else
             {
@@ -441,7 +440,3 @@ NTSTATUS BBApcInject( IN PINJECT_BUFFER pUserBuf, IN HANDLE pid, IN ULONG initRV
 
     return status;
 }
-
-
-
-

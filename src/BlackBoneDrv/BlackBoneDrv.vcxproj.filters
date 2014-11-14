@@ -13,6 +13,7 @@
     <ClCompile Include="Loader.c" />
     <ClCompile Include="ldrreloc.c" />
     <ClCompile Include="Utils.c" />
+    <ClCompile Include="MMap.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Remap.h">
