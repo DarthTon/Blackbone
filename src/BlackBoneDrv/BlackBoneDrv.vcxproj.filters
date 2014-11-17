@@ -1,19 +1,45 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="Private.c" />
-    <ClCompile Include="Remap.c" />
-    <ClCompile Include="Dispatch.c" />
-    <ClCompile Include="VadHelpers.c" />
-    <ClCompile Include="VadRoutines.c" />
-    <ClCompile Include="BlackBoneDrv.c" />
-    <ClCompile Include="Routines.c" />
-    <ClCompile Include="NotifyRoutine.c" />
-    <ClCompile Include="Inject.c" />
-    <ClCompile Include="Loader.c" />
-    <ClCompile Include="ldrreloc.c" />
-    <ClCompile Include="Utils.c" />
-    <ClCompile Include="MMap.c" />
+    <ClCompile Include="Loader.c">
+      <Filter>ImageLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="MMap.c">
+      <Filter>ImageLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="ldrreloc.c">
+      <Filter>ImageLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="Inject.c">
+      <Filter>ImageLoader</Filter>
+    </ClCompile>
+    <ClCompile Include="BlackBoneDrv.c">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Dispatch.c">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Routines.c">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="NotifyRoutine.c">
+      <Filter>Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="Utils.c">
+      <Filter>Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="Private.c">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Remap.c">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="VadHelpers.c">
+      <Filter>Helpers</Filter>
+    </ClCompile>
+    <ClCompile Include="VadRoutines.c">
+      <Filter>Core</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Remap.h">
@@ -74,6 +100,15 @@
     </Filter>
     <Filter Include="Include\Native">
       <UniqueIdentifier>{1777770d-b977-4802-9b7d-a2c21fcfed88}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImageLoader">
+      <UniqueIdentifier>{8be939a3-549a-412d-a84a-7412ef2ad186}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{5f2d2fea-d59d-40a3-a70f-9d75f5fdedf4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Helpers">
+      <UniqueIdentifier>{2ad9b16d-24eb-4a97-bb5b-d815b83b78c7}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>

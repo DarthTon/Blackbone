@@ -596,7 +596,7 @@ VOID KernelApcInjectCallback(
     UNREFERENCED_PARAMETER( SystemArgument1 );
     UNREFERENCED_PARAMETER( SystemArgument2 );
 
-    DPRINT( "BlackBone: %s: Called\n", __FUNCTION__ );
+    //DPRINT( "BlackBone: %s: Called\n", __FUNCTION__ );
 
     // Skip execution
     if (PsIsThreadTerminating( PsGetCurrentThread() ))
@@ -697,7 +697,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
 
                 // Fill IAT
                 if (NT_SUCCESS( status ))
-                    status = BBResolveImageRefs( imageSection, TRUE, NULL, FALSE, NULL );
+                    status = BBResolveImageRefs( imageSection, TRUE, NULL, FALSE, NULL, 0 );
             }
             else
             {

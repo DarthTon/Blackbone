@@ -350,14 +350,13 @@ typedef struct _IMAGE_IMPORT_DESCRIPTOR
 } IMAGE_IMPORT_DESCRIPTOR;
 typedef IMAGE_IMPORT_DESCRIPTOR UNALIGNED *PIMAGE_IMPORT_DESCRIPTOR;
 
-#pragma warning (default : 4201)
 
 typedef struct _IMAGE_THUNK_DATA64 
 {
     union 
     {
         ULONGLONG ForwarderString;  // PBYTE 
-        ULONGLONG Function;         // PDWORD
+        ULONGLONG Function;         // PULONG
         ULONGLONG Ordinal;
         ULONGLONG AddressOfData;    // PIMAGE_IMPORT_BY_NAME
     } u1;
@@ -369,9 +368,111 @@ typedef struct _IMAGE_THUNK_DATA32
     union
     {
         ULONG ForwarderString;      // PBYTE 
-        ULONG Function;             // PDWORD
+        ULONG Function;             // PULONG
         ULONG Ordinal;
         ULONG AddressOfData;        // PIMAGE_IMPORT_BY_NAME
     } u1;
 } IMAGE_THUNK_DATA32;
 typedef IMAGE_THUNK_DATA32 * PIMAGE_THUNK_DATA32;
+
+typedef struct _IMAGE_RESOURCE_DIRECTORY {
+    ULONG   Characteristics;
+    ULONG   TimeDateStamp;
+    USHORT  MajorVersion;
+    USHORT  MinorVersion;
+    USHORT  NumberOfNamedEntries;
+    USHORT  NumberOfIdEntries;
+    //  IMAGE_RESOURCE_DIRECTORY_ENTRY DirectoryEntries[];
+} IMAGE_RESOURCE_DIRECTORY, *PIMAGE_RESOURCE_DIRECTORY; 
+
+typedef struct _IMAGE_RESOURCE_DIRECTORY_ENTRY {
+    union {
+        struct {
+            INT NameOffset : 31;
+            INT NameIsString : 1;
+        } DUMMYSTRUCTNAME;
+        ULONG   Name;
+        USHORT  Id;
+    } DUMMYUNIONNAME;
+    union {
+        ULONG   OffsetToData;
+        struct {
+            INT   OffsetToDirectory : 31;
+            INT   DataIsDirectory : 1;
+        } DUMMYSTRUCTNAME2;
+    } DUMMYUNIONNAME2;
+} IMAGE_RESOURCE_DIRECTORY_ENTRY, *PIMAGE_RESOURCE_DIRECTORY_ENTRY;
+
+typedef struct _IMAGE_RESOURCE_DATA_ENTRY {
+    ULONG OffsetToData;
+    ULONG Size;
+    ULONG CodePage;
+    ULONG Reserved;
+} IMAGE_RESOURCE_DATA_ENTRY, *PIMAGE_RESOURCE_DATA_ENTRY;
+
+typedef struct _IMAGE_RUNTIME_FUNCTION_ENTRY {
+    ULONG BeginAddress;
+    ULONG EndAddress;
+    union {
+        ULONG UnwindInfoAddress;
+        ULONG UnwindData;
+    } DUMMYUNIONNAME;
+} _IMAGE_RUNTIME_FUNCTION_ENTRY, *_PIMAGE_RUNTIME_FUNCTION_ENTRY;
+
+typedef struct _IMAGE_LOAD_CONFIG_DIRECTORY32 {
+    ULONG   Size;
+    ULONG   TimeDateStamp;
+    USHORT  MajorVersion;
+    USHORT  MinorVersion;
+    ULONG   GlobalFlagsClear;
+    ULONG   GlobalFlagsSet;
+    ULONG   CriticalSectionDefaultTimeout;
+    ULONG   DeCommitFreeBlockThreshold;
+    ULONG   DeCommitTotalFreeThreshold;
+    ULONG   LockPrefixTable;                // VA
+    ULONG   MaximumAllocationSize;
+    ULONG   VirtualMemoryThreshold;
+    ULONG   ProcessHeapFlags;
+    ULONG   ProcessAffinityMask;
+    USHORT  CSDVersion;
+    USHORT  Reserved1;
+    ULONG   EditList;                       // VA
+    ULONG   SecurityCookie;                 // VA
+    ULONG   SEHandlerTable;                 // VA
+    ULONG   SEHandlerCount;
+    ULONG   GuardCFCheckFunctionPointer;    // VA
+    ULONG   Reserved2;
+    ULONG   GuardCFFunctionTable;           // VA
+    ULONG   GuardCFFunctionCount;
+    ULONG   GuardFlags;
+} IMAGE_LOAD_CONFIG_DIRECTORY32, *PIMAGE_LOAD_CONFIG_DIRECTORY32;
+
+typedef struct _IMAGE_LOAD_CONFIG_DIRECTORY64 {
+    ULONG      Size;
+    ULONG      TimeDateStamp;
+    USHORT     MajorVersion;
+    USHORT     MinorVersion;
+    ULONG      GlobalFlagsClear;
+    ULONG      GlobalFlagsSet;
+    ULONG      CriticalSectionDefaultTimeout;
+    ULONGLONG  DeCommitFreeBlockThreshold;
+    ULONGLONG  DeCommitTotalFreeThreshold;
+    ULONGLONG  LockPrefixTable;             // VA
+    ULONGLONG  MaximumAllocationSize;
+    ULONGLONG  VirtualMemoryThreshold;
+    ULONGLONG  ProcessAffinityMask;
+    ULONG      ProcessHeapFlags;
+    USHORT     CSDVersion;
+    USHORT     Reserved1;
+    ULONGLONG  EditList;                    // VA
+    ULONGLONG  SecurityCookie;              // VA
+    ULONGLONG  SEHandlerTable;              // VA
+    ULONGLONG  SEHandlerCount;
+    ULONGLONG  GuardCFCheckFunctionPointer; // VA
+    ULONGLONG  Reserved2;
+    ULONGLONG  GuardCFFunctionTable;        // VA
+    ULONGLONG  GuardCFFunctionCount;
+    ULONG      GuardFlags;
+} IMAGE_LOAD_CONFIG_DIRECTORY64, *PIMAGE_LOAD_CONFIG_DIRECTORY64;
+
+#pragma warning (default : 4201)

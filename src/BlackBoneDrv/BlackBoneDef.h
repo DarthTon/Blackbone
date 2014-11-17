@@ -418,15 +418,15 @@ typedef enum _MMmapFlags
 {
     KNoFlags         = 0x00,     // No flags
     KManualImports   = 0x01,     // Manually map import libraries
-    KCreateLdrRef    = 0x02,     // Create module references for native loader
+    //KCreateLdrRef    = 0x02,     // Create module references for native loader
     KWipeHeader      = 0x04,     // Wipe image PE headers
-    KHideVAD         = 0x10,     // Make image appear as PAGE_NOACESS region
-    KMapInHighMem    = 0x20,     // Try to map image in address space beyond 4GB limit
+    //KHideVAD         = 0x10,     // Make image appear as PAGE_NOACESS region
+    //KMapInHighMem    = 0x20,     // Try to map image in address space beyond 4GB limit
     KRebaseProcess   = 0x40,     // If target image is an .exe file, process base address will be replaced with mapped module value
 
     KNoExceptions    = 0x01000,   // Do not create custom exception handler
     KPartialExcept   = 0x02000,   // Only create Inverted function table, without VEH
-    KNoDelayLoad     = 0x04000,   // Do not resolve delay import
+    //KNoDelayLoad     = 0x04000,   // Do not resolve delay import
     KNoSxS           = 0x08000,   // Do not apply SxS activation context
     KNoTLS           = 0x10000,   // Skip TLS initialization and don't execute TLS callbacks
 } MMmapFlags;

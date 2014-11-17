@@ -1,8 +1,59 @@
 #include "Utils.h"
 #include <ntstrsafe.h>
 
+#pragma alloc_text(PAGE, BBSafeAllocateString)
+#pragma alloc_text(PAGE, BBSafeInitString)
 #pragma alloc_text(PAGE, BBStripPath)
 #pragma alloc_text(PAGE, BBFileExists)
+
+/// <summary>
+/// Allocate new Unicode string from Paged pool
+/// </summary>
+/// <param name="result">Resulting string</param>
+/// <param name="size">Buffer size in bytes to alloacate</param>
+/// <returns>Status code</returns>
+NTSTATUS BBSafeAllocateString( OUT PUNICODE_STRING result, IN USHORT size )
+{
+    ASSERT( result != NULL );
+    if (result == NULL || size == 0)
+        return STATUS_INVALID_PARAMETER;
+
+    result->Buffer = ExAllocatePoolWithTag( PagedPool, size, 'enoB' );
+    result->Length = 0;
+    result->MaximumLength = size;
+
+    if (result->Buffer)
+        RtlZeroMemory( result->Buffer, size );
+    else
+        return STATUS_NO_MEMORY;
+
+    return STATUS_SUCCESS;
+}
+
+/// <summary>
+/// Allocate and copy string
+/// </summary>
+/// <param name="result">Resulting string</param>
+/// <param name="source">Source string</param>
+/// <returns>Status code</returns>
+NTSTATUS BBSafeInitString( OUT PUNICODE_STRING result, IN PUNICODE_STRING source )
+{
+    ASSERT( result != NULL && source != NULL );
+    if (result == NULL || source == NULL || source->Buffer == NULL)
+        return STATUS_INVALID_PARAMETER;
+
+    // No data to copy
+    if (source->Length == 0)
+        return STATUS_SUCCESS;
+
+    result->Buffer = ExAllocatePoolWithTag( PagedPool, source->MaximumLength, 'enoB' );
+    result->Length = source->Length;
+    result->MaximumLength = source->MaximumLength;
+
+    memcpy( result->Buffer, source->Buffer, source->Length );
+
+    return STATUS_SUCCESS;
+}
 
 /// <summary>
 /// Get file name from full path
@@ -20,7 +71,8 @@ NTSTATUS BBStripPath( IN PUNICODE_STRING path, OUT PUNICODE_STRING name )
     {
         if (path->Buffer[i] == L'\\' || path->Buffer[i] == L'/')
         {
-            RtlUnicodeStringInit( name, &path->Buffer[i + 1] );
+            name->Buffer = &path->Buffer[i + 1];
+            name->Length = name->MaximumLength = path->Length - (i + 1)*sizeof( WCHAR );
             return STATUS_SUCCESS;
         }
     }
@@ -28,7 +80,6 @@ NTSTATUS BBStripPath( IN PUNICODE_STRING path, OUT PUNICODE_STRING name )
     *name = *path;
     return STATUS_NOT_FOUND;
 }
-
 
 /// <summary>
 /// Check if file exists
@@ -41,7 +92,7 @@ NTSTATUS BBFileExists( IN PUNICODE_STRING path )
     IO_STATUS_BLOCK statusBlock = { 0 };
     OBJECT_ATTRIBUTES obAttr = { 0 };
     InitializeObjectAttributes( &obAttr, path, OBJ_KERNEL_HANDLE, NULL, NULL );
-    
+
     NTSTATUS status = ZwCreateFile(
         &hFile, FILE_READ_DATA | SYNCHRONIZE, &obAttr,
         &statusBlock, NULL, FILE_ATTRIBUTE_NORMAL,
@@ -59,15 +110,88 @@ ULONG GenPrologue32( IN PUCHAR pBuf )
 {
     *pBuf = 0x55;
     *(PUSHORT)(pBuf + 1) = 0xE589;
+
     return 3;
 }
 
-ULONG GenEpilogue32( IN PUCHAR pBuf)
+ULONG GenEpilogue32( IN PUCHAR pBuf, IN INT retSize )
 {
     *(PUSHORT)pBuf = 0xEC89;
-    *(pBuf + 1) = 0x5D;   
-    return 3;
+    *(pBuf + 2) = 0x5D;
+    *(pBuf + 3) = 0xC2;
+    *(PUSHORT)(pBuf + 4) = (USHORT)retSize;
+
+    return 6;
 }
+
+ULONG GenCall32( IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, ... )
+{
+    va_list vl;
+    va_start( vl, argc );
+    ULONG res = GenCall32V( pBuf, pFn, argc, vl );
+    va_end( vl );
+
+    return res;
+}
+
+ULONG GenCall32V( IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, IN va_list vl )
+{
+    ULONG ofst = 0;
+
+    PULONG pArgBuf = ExAllocatePoolWithTag( PagedPool, argc * sizeof( ULONG ), 'enoB' );
+
+    // cast args
+    for (INT i = 0; i < argc; i++)
+    {
+        PVOID arg = va_arg( vl, PVOID );
+        pArgBuf[i] = (ULONG)arg;
+    }
+
+    // push args
+    for (INT i = argc - 1; i >= 0; i--)
+    {
+        *(PUSHORT)(pBuf + ofst) = 0x68;             // push arg
+        *(PULONG)(pBuf + ofst + 1) = pArgBuf[i];    //
+        ofst += 5;
+    }
+
+    *(PUCHAR)(pBuf + ofst) = 0xB8;                  // mov eax, pFn
+    *(PULONG)(pBuf + ofst + 1) = (ULONG)pFn;        //
+    ofst += 5;
+
+    *(PUSHORT)(pBuf + ofst) = 0xD0FF;               // call eax
+    ofst += 2;
+
+    ExFreePoolWithTag( pArgBuf, 'enoB' );
+
+    return ofst;
+}
+
+ULONG GenSync32( IN PUCHAR pBuf, IN PNTSTATUS pStatus, IN PVOID pSetEvent, IN HANDLE hEvent )
+{
+    ULONG ofst = 0;
+
+    *(PUCHAR)(pBuf + ofst) = 0xA3;                  // mov [pStatus], eax
+    *(PVOID*)(pBuf + ofst + 1) = pStatus;           //
+    ofst += 5;
+
+    *(PUSHORT)(pBuf + ofst) = 0x006A;               // push FALSE
+    ofst += 2;
+
+    *(PUCHAR)(pBuf + ofst) = 0x68;                  // push hEvent
+    *(PULONG)(pBuf + ofst + 1) = (ULONG)hEvent;     //
+    ofst += 5;
+
+    *(PUCHAR)(pBuf + ofst) = 0xB8;                  // mov eax, pSetEvent
+    *(PULONG)(pBuf + ofst + 1) = (ULONG)pSetEvent;  //
+    ofst += 5;
+
+    *(PUSHORT)(pBuf + ofst) = 0xD0FF;               // call eax
+    ofst += 2;
+
+    return ofst;
+}
+
 
 
 ULONG GenPrologue64( IN PUCHAR pBuf )
@@ -83,8 +207,10 @@ ULONG GenPrologue64( IN PUCHAR pBuf )
     return 20;
 }
 
-ULONG GenEpilogue64( IN PUCHAR pBuf )
+ULONG GenEpilogue64( IN PUCHAR pBuf, IN INT retSize )
 {
+    UNREFERENCED_PARAMETER( retSize );
+
     *(PULONG)(pBuf + 0) = 0x244C8B48;       // mov rcx, [rsp + 0x08]
     *(PUCHAR)(pBuf + 4) = 0x8;              // 
     *(PULONG)(pBuf + 5) = 0x24548B48;       // mov rdx, [rsp + 0x10]
@@ -107,7 +233,7 @@ ULONG GenCall64( IN PUCHAR pBuf, IN PVOID pFn, INT argc, ... )
     return res;
 }
 
-ULONG GenCall64V( IN PUCHAR pBuf, IN PVOID pFn, INT argc, IN va_list vl )
+ULONG GenCall64V( IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, IN va_list vl )
 {
     USHORT rsp_diff = 0x28;
     ULONG ofst = 0;
@@ -205,4 +331,36 @@ ULONG GenSync64( IN PUCHAR pBuf, IN PNTSTATUS pStatus, IN PVOID pSetEvent, IN HA
     ofst += 2;
 
     return ofst;
+}
+
+
+
+ULONG GenPrologueT( IN BOOLEAN wow64, IN PUCHAR pBuf )
+{
+    return wow64 ? GenPrologue32( pBuf ) : GenPrologue64( pBuf );
+}
+
+ULONG GenEpilogueT( IN BOOLEAN wow64, IN PUCHAR pBuf, IN INT retSize )
+{
+    return wow64 ? GenEpilogue32( pBuf, retSize ) : GenEpilogue64( pBuf, retSize );
+}
+
+ULONG GenCallT( IN BOOLEAN wow64, IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, ... )
+{
+    va_list vl;
+    va_start( vl, argc );
+    ULONG res = wow64 ? GenCall32V( pBuf, pFn, argc, vl ) : GenCall64V( pBuf, pFn, argc, vl );
+    va_end( vl );
+
+    return res;
+}
+
+ULONG GenCallTV( IN BOOLEAN wow64, IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, IN va_list vl )
+{
+    return wow64 ? GenCall32V( pBuf, pFn, argc, vl ) : GenCall64V( pBuf, pFn, argc, vl );
+}
+
+ULONG GenSyncT( IN BOOLEAN wow64, IN PUCHAR pBuf, IN PNTSTATUS pStatus, IN PVOID pSetEvent, IN HANDLE hEvent )
+{
+    return wow64 ? GenSync32( pBuf, pStatus, pSetEvent, hEvent ) : GenSync64( pBuf, pStatus, pSetEvent, hEvent );
 }

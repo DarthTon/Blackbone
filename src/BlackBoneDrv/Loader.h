@@ -158,7 +158,8 @@ NTSTATUS BBResolveImageRefs(
     IN BOOLEAN systemImage,
     IN PEPROCESS pProcess,
     IN BOOLEAN wow64Image,
-    IN PMMAP_CONTEXT pContext
+    IN PMMAP_CONTEXT pContext,
+    IN enum MMapFlags flags
     );
 
 NTSTATUS BBResolveImagePath(

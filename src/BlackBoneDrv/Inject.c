@@ -136,7 +136,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
             else if (pData->type == IT_MMap)
             {
                 MODULE_DATA mod = { 0 };
-                status = BBMapUserImage( pProcess, &ustrPath, NULL, 0, FALSE, KRebaseProcess, &mod );
+                status = BBMapUserImage( pProcess, &ustrPath, NULL, 0, FALSE, KRebaseProcess | KManualImports, &mod );
             }
             else
             {
