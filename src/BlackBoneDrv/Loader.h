@@ -12,6 +12,14 @@ typedef enum _ModType
     mt_unknown      // Failed to detect type
 } ModType;
 
+// Image name resolve flags
+typedef enum _ResolveFlags
+{
+    KApiShemaOnly = 1,
+    KSkipSxS      = 2,
+    KFullPath     = 4,
+} ResolveFlags;
+
 /// <summary>
 /// Module info
 /// </summary>
@@ -24,7 +32,7 @@ typedef struct _MODULE_DATA
     UNICODE_STRING fullPath;    // Full file path
     SIZE_T size;                // Size of image
     ModType type;               // Module type
-    enum MMapFlags flags;       // Flags
+    enum KMmapFlags flags;      // Flags
     BOOLEAN manual;             // Image is manually mapped
     BOOLEAN initialized;        // DllMain was already called
 } MODULE_DATA, *PMODULE_DATA;
@@ -132,6 +140,8 @@ PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord, IN PEPROCESS pProce
 /// <param name="size">Image buffer size</param>
 /// <param name="asImage">Buffer has image memory layout</param>
 /// <param name="flags">Mapping flags</param>
+/// <param name="initRVA">Init routine RVA</param>
+/// <param name="initArg">Init argument</param>
 /// <param name="pImage">Mapped image data</param>
 /// <returns>Status code</returns>
 NTSTATUS BBMapUserImage(
@@ -139,10 +149,11 @@ NTSTATUS BBMapUserImage(
     IN PUNICODE_STRING path,
     IN PVOID buffer, IN ULONG_PTR size,
     IN BOOLEAN asImage,
-    IN INT flags,
+    IN enum KMmapFlags flags,
+    IN ULONG initRVA,
+    IN PWCH initArg,
     OUT PMODULE_DATA pImage
     );
-
 
 /// <summary>
 /// Resolve import table and load missing dependencies
@@ -159,13 +170,23 @@ NTSTATUS BBResolveImageRefs(
     IN PEPROCESS pProcess,
     IN BOOLEAN wow64Image,
     IN PMMAP_CONTEXT pContext,
-    IN enum MMapFlags flags
+    IN enum KMmapFlags flags
     );
 
+/// <summary>
+/// Resolve image name to fully qualified path
+/// </summary>
+/// <param name="pContext">Loader context</param>
+/// <param name="pProcess">Target process. Must be running in the context of this process</param>
+/// <param name="flags">Flags</param>
+/// <param name="path">Image name to resolve</param>
+/// <param name="baseImage">Base image name for API SET translation</param>
+/// <param name="resolved">Resolved image path</param>
+/// <returns>Status code</returns>
 NTSTATUS BBResolveImagePath(
     IN PMMAP_CONTEXT pContext,
     IN PEPROCESS pProcess,
-    IN ULONG flags,
+    IN ResolveFlags flags,
     IN PUNICODE_STRING path,
     IN PUNICODE_STRING baseImage,
     OUT PUNICODE_STRING resolved
@@ -178,6 +199,23 @@ NTSTATUS BBResolveImagePath(
 /// <param name="ppThread">Found thread. Thread object reference count is increased by 1</param>
 /// <returns>Status code</returns>
 NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread );
+
+/// <summary>
+/// Create new thread in the target process
+/// </summary>
+/// <param name="pBaseAddress">Thread start address</param>
+/// <param name="pParam">Thread argument</param>
+/// <param name="flags">Thread creation flags</param>
+/// <param name="wait">If set to TRUE - wait for thread completion</param>
+/// <param name="pExitStatus">Thread exit status</param>
+/// <returns>Status code</returns>
+NTSTATUS BBExecuteInNewThread(
+    IN PVOID pBaseAddress,
+    IN PVOID pParam,
+    IN ULONG flags,
+    IN BOOLEAN wait,
+    OUT PNTSTATUS pExitStatus
+    );
 
 /// <summary>
 /// Queue user-mode APC to the target thread

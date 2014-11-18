@@ -31,13 +31,13 @@ typedef union _KEXECUTE_OPTIONS
 {
     struct
     {
-        int ExecuteDisable : 1;
-        int ExecuteEnable : 1;
-        int DisableThunkEmulation : 1;
-        int Permanent : 1;
-        int ExecuteDispatchEnable : 1;
-        int ImageDispatchEnable : 1;
-        int DisableExceptionChainValidation : 1;
+        int ExecuteDisable : 1;                     // 0x01
+        int ExecuteEnable : 1;                      // 0x02
+        int DisableThunkEmulation : 1;              // 0x04
+        int Permanent : 1;                          // 0x08
+        int ExecuteDispatchEnable : 1;              // 0x10
+        int ImageDispatchEnable : 1;                // 0x20
+        int DisableExceptionChainValidation : 1;    // 0x40
         int Spare : 1;
     } Flags;
 

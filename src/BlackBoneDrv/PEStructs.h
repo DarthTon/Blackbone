@@ -475,4 +475,41 @@ typedef struct _IMAGE_LOAD_CONFIG_DIRECTORY64 {
     ULONG      GuardFlags;
 } IMAGE_LOAD_CONFIG_DIRECTORY64, *PIMAGE_LOAD_CONFIG_DIRECTORY64;
 
+typedef struct _IMAGE_TLS_DIRECTORY64 {
+    ULONGLONG StartAddressOfRawData;
+    ULONGLONG EndAddressOfRawData;
+    ULONGLONG AddressOfIndex;         // PULONG
+    ULONGLONG AddressOfCallBacks;     // PIMAGE_TLS_CALLBACK *;
+    ULONG SizeOfZeroFill;
+    union {
+        ULONG Characteristics;
+        struct {
+            INT Reserved0 : 20;
+            INT Alignment : 4;
+            INT Reserved1 : 8;
+        } DUMMYSTRUCTNAME;
+    } DUMMYUNIONNAME;
+
+} IMAGE_TLS_DIRECTORY64;
+
+typedef IMAGE_TLS_DIRECTORY64 * PIMAGE_TLS_DIRECTORY64;
+
+typedef struct _IMAGE_TLS_DIRECTORY32 {
+    ULONG   StartAddressOfRawData;
+    ULONG   EndAddressOfRawData;
+    ULONG   AddressOfIndex;             // PULONG
+    ULONG   AddressOfCallBacks;         // PIMAGE_TLS_CALLBACK *
+    ULONG   SizeOfZeroFill;
+    union {
+        ULONG Characteristics;
+        struct {
+            INT Reserved0 : 20;
+            INT Alignment : 4;
+            INT Reserved1 : 8;
+        } DUMMYSTRUCTNAME;
+    } DUMMYUNIONNAME;
+
+} IMAGE_TLS_DIRECTORY32;
+typedef IMAGE_TLS_DIRECTORY32 * PIMAGE_TLS_DIRECTORY32;
+
 #pragma warning (default : 4201)

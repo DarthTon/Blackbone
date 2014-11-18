@@ -392,7 +392,7 @@ PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord, IN PEPROCESS pProce
                     //
                     UNICODE_STRING resolved = { 0 };
                     UNICODE_STRING resolvedName = { 0 };
-                    BBResolveImagePath( NULL, pProcess, 1, &uForwarder, baseName, &resolved );
+                    BBResolveImagePath( NULL, pProcess, KApiShemaOnly, &uForwarder, baseName, &resolved );
                     BBStripPath( &resolved, &resolvedName );
 
                     forwardBase = BBGetUserModule( pProcess, &resolvedName, PsGetProcessWow64Process( pProcess ) != NULL );
@@ -492,6 +492,70 @@ NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
 }
 
 /// <summary>
+/// Create new thread in the target process
+/// Must be running in target process context
+/// </summary>
+/// <param name="pBaseAddress">Thread start address</param>
+/// <param name="pParam">Thread argument</param>
+/// <param name="flags">Thread creation flags</param>
+/// <param name="wait">If set to TRUE - wait for thread completion</param>
+/// <param name="pExitStatus">Thread exit status</param>
+/// <returns>Status code</returns>
+NTSTATUS BBExecuteInNewThread(
+    IN PVOID pBaseAddress,
+    IN PVOID pParam,
+    IN ULONG flags,
+    IN BOOLEAN wait,
+    OUT PNTSTATUS pExitStatus
+    )
+{
+    HANDLE hThread = NULL;
+    OBJECT_ATTRIBUTES ob = { 0 };
+
+    InitializeObjectAttributes( &ob, NULL, OBJ_KERNEL_HANDLE, NULL, NULL );
+
+    NTSTATUS status = ZwCreateThreadEx(
+        &hThread, THREAD_QUERY_LIMITED_INFORMATION, &ob,
+        ZwCurrentProcess(), pBaseAddress, pParam, flags,
+        0, 0x1000, 0x100000, NULL
+        );
+
+    // Wait for completion
+    if (NT_SUCCESS( status ) && wait != FALSE)
+    {
+        // Force 60 sec timeout
+        LARGE_INTEGER timeout = { 0 };
+        timeout.QuadPart = -(60ll * 10 * 1000 * 1000);
+
+        status = ZwWaitForSingleObject( hThread, TRUE, &timeout );
+        if (NT_SUCCESS( status ))
+        {
+            THREAD_BASIC_INFORMATION info = { 0 };
+            ULONG bytes = 0;
+
+            status = ZwQueryInformationThread( hThread, ThreadBasicInformation, &info, sizeof( info ), &bytes );
+            if (NT_SUCCESS( status ) && pExitStatus)
+            {
+                *pExitStatus = info.ExitStatus;
+            }
+            else if (!NT_SUCCESS( status ))
+            {
+                DPRINT( "BlackBone: %s: ZwQueryInformationThread failed with status 0x%X\n", __FUNCTION__, status );
+            }
+        }
+        else
+            DPRINT( "BlackBone: %s: ZwWaitForSingleObject failed with status 0x%X\n", __FUNCTION__, status );
+    }
+    else
+        DPRINT( "BlackBone: %s: ZwCreateThreadEx failed with status 0x%X\n", __FUNCTION__, status );
+
+    if (hThread)
+        ZwClose( hThread );
+
+    return status;
+}
+
+/// <summary>
 /// Queue user-mode APC to the target thread
 /// </summary>
 /// <param name="pThread">Target thread</param>
@@ -544,7 +608,7 @@ NTSTATUS BBQueueUserApc(
     // Insert APC
     if (KeInsertQueueApc( pInjectApc, Arg2, Arg3, 0 ))
     {
-        if (pPrepareApc)
+        if (bForce && pPrepareApc)
             KeInsertQueueApc( pPrepareApc, NULL, NULL, 0 );
 
         return STATUS_SUCCESS;
@@ -578,7 +642,7 @@ VOID KernelApcPrepareCallback(
     UNREFERENCED_PARAMETER( SystemArgument1 );
     UNREFERENCED_PARAMETER( SystemArgument2 );
 
-    DPRINT( "BlackBone: %s: Called\n", __FUNCTION__ );
+    //DPRINT( "BlackBone: %s: Called\n", __FUNCTION__ );
 
     // Alert current thread
     KeTestAlertThread( UserMode );
@@ -596,7 +660,7 @@ VOID KernelApcInjectCallback(
     UNREFERENCED_PARAMETER( SystemArgument1 );
     UNREFERENCED_PARAMETER( SystemArgument2 );
 
-    //DPRINT( "BlackBone: %s: Called\n", __FUNCTION__ );
+    //DPRINT( "BlackBone: %s: Called. NormalRoutine = 0x%p\n", __FUNCTION__, *NormalRoutine );
 
     // Skip execution
     if (PsIsThreadTerminating( PsGetCurrentThread() ))
@@ -631,8 +695,12 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
     InitializeObjectAttributes( &obAttr, pPath, OBJ_KERNEL_HANDLE, NULL, NULL );
 
     // Open driver file
-    status = ZwCreateFile( &hFile, FILE_READ_DATA | SYNCHRONIZE, &obAttr, &statusBlock, NULL, FILE_ATTRIBUTE_NORMAL,
-                           FILE_SHARE_READ, FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0 );
+    status = ZwCreateFile( 
+        &hFile, FILE_READ_DATA | SYNCHRONIZE, &obAttr, 
+        &statusBlock, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, 
+        FILE_OPEN, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0
+        );
+
     if (!NT_SUCCESS( status ))
     {
         DPRINT( "BlackBone: %s: Failed to open '%wZ'. Status: 0x%X\n", __FUNCTION__, pPath, status );
@@ -685,9 +753,11 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
                       pSection < (PIMAGE_SECTION_HEADER)(pNTHeader + 1) + pNTHeader->FileHeader.NumberOfSections;
                       pSection++)
                 {
-                    RtlCopyMemory( (PUCHAR)imageSection + pSection->VirtualAddress,
-                                   (PUCHAR)fileData + pSection->PointerToRawData,
-                                   pSection->SizeOfRawData );
+                    RtlCopyMemory( 
+                        (PUCHAR)imageSection + pSection->VirtualAddress,
+                        (PUCHAR)fileData + pSection->PointerToRawData,
+                        pSection->SizeOfRawData
+                        );
                 }
 
                 // Relocate image

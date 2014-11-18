@@ -96,23 +96,6 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData );
 NTSTATUS BBUnlinkHandleTable( IN PUNLINK_HTABLE pUnlink );
 
 /// <summary>
-/// Create new thread in the target process
-/// </summary>
-/// <param name="pBaseAddress">Thread start address</param>
-/// <param name="pParam">Thread argument</param>
-/// <param name="flags">Thread creation flags</param>
-/// <param name="wait">If set to TRUE - wait for thread completion</param>
-/// <param name="pExitStatus">Thread exit status</param>
-/// <returns>Status code</returns>
-NTSTATUS BBExecuteInNewThread(
-    IN PVOID pBaseAddress, 
-    IN PVOID pParam, 
-    IN ULONG flags, 
-    IN BOOLEAN wait, 
-    OUT PNTSTATUS pExitStatus 
-    );
-
-/// <summary>
 /// Process termination handler
 /// </summary>
 /// <param name="ParentId">Parent PID</param>

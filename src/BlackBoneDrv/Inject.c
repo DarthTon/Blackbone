@@ -72,6 +72,25 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         RtlInitUnicodeString( &ustrPath, pData->FullDllPath );
         RtlInitUnicodeString( &ustrNtdll, L"Ntdll.dll" );
 
+        // Handle manual map separately
+        if (pData->type == IT_MMap)
+        {
+            MODULE_DATA mod = { 0 };
+
+            status = BBMapUserImage(
+                pProcess, &ustrPath, (PVOID)pData->imageBase,
+                pData->imageSize, pData->asImage, pData->flags,
+                pData->initRVA, pData->initArg, &mod
+                );
+
+            KeUnstackDetachProcess( &apc );
+
+            if (pProcess)
+                ObDereferenceObject( pProcess );
+
+            return status;
+        }
+
         // Get ntdll base
         pNtdll = BBGetUserModule( pProcess, &ustrNtdll, isWow64 );
 
@@ -132,11 +151,6 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
             else if (pData->type == IT_Apc)
             {
                 status = BBApcInject( pUserBuf, (HANDLE)pData->pid, pData->initRVA, pData->initArg );
-            }
-            else if (pData->type == IT_MMap)
-            {
-                MODULE_DATA mod = { 0 };
-                status = BBMapUserImage( pProcess, &ustrPath, NULL, 0, FALSE, KRebaseProcess | KManualImports, &mod );
             }
             else
             {
@@ -199,72 +213,6 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
 
     if (pProcess)
         ObDereferenceObject( pProcess );
-
-    return status;
-}
-
-/// <summary>
-/// Create new thread in the target process
-/// Must be running in target process context
-/// </summary>
-/// <param name="pBaseAddress">Thread start address</param>
-/// <param name="pParam">Thread argument</param>
-/// <param name="flags">Thread creation flags</param>
-/// <param name="wait">If set to TRUE - wait for thread completion</param>
-/// <param name="pExitStatus">Thread exit status</param>
-/// <returns>Status code</returns>
-NTSTATUS BBExecuteInNewThread(
-    IN PVOID pBaseAddress,
-    IN PVOID pParam,
-    IN ULONG flags,
-    IN BOOLEAN wait,
-    OUT PNTSTATUS pExitStatus 
-    )
-{
-    HANDLE hThread = NULL;
-    OBJECT_ATTRIBUTES ob = { 0 };
-    
-    InitializeObjectAttributes( &ob, NULL, OBJ_KERNEL_HANDLE, NULL, NULL );
-
-    // If PreviousMode == KernelMode, handle granted access is ignored.
-    // So it's safe to create handle without any DesiredAccess
-    NTSTATUS status = ZwCreateThreadEx(
-        &hThread, THREAD_QUERY_LIMITED_INFORMATION, &ob,
-        ZwCurrentProcess(), pBaseAddress, pParam, flags,
-        0, 0x1000, 0x100000, NULL
-        );
-
-    // Wait for completion
-    if (NT_SUCCESS( status ) && wait != FALSE)
-    {
-        // Force 60 sec timeout
-        LARGE_INTEGER timeout = { 0 };
-        timeout.QuadPart = -(60ll * 10 * 1000 * 1000);
-
-        status = ZwWaitForSingleObject( hThread, TRUE, &timeout );
-        if (NT_SUCCESS(status))
-        {
-            THREAD_BASIC_INFORMATION info = { 0 };
-            ULONG bytes = 0;
-
-            status = ZwQueryInformationThread( hThread, ThreadBasicInformation, &info, sizeof( info ), &bytes );
-            if (NT_SUCCESS( status ) && pExitStatus)
-            {
-                *pExitStatus = info.ExitStatus;
-            }
-            else if (!NT_SUCCESS( status ))
-            {
-                DPRINT( "BlackBone: %s: ZwQueryInformationThread failed with status 0x%X\n", __FUNCTION__, status );
-            }
-        }
-        else
-            DPRINT( "BlackBone: %s: ZwWaitForSingleObject failed with status 0x%X\n", __FUNCTION__, status ); 
-    }
-    else
-        DPRINT( "BlackBone: %s: ZwCreateThreadEx failed with status 0x%X\n", __FUNCTION__, status );
-
-    if (hThread)
-        ZwClose( hThread );
 
     return status;
 }

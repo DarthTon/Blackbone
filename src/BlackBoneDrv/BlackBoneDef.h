@@ -414,22 +414,18 @@ typedef enum _InjectType
     IT_MMap,        // Manual map
 } InjectType;
 
-typedef enum _MMmapFlags
+typedef enum _MmapFlags
 {
-    KNoFlags         = 0x00,     // No flags
-    KManualImports   = 0x01,     // Manually map import libraries
-    //KCreateLdrRef    = 0x02,     // Create module references for native loader
-    KWipeHeader      = 0x04,     // Wipe image PE headers
-    //KHideVAD         = 0x10,     // Make image appear as PAGE_NOACESS region
-    //KMapInHighMem    = 0x20,     // Try to map image in address space beyond 4GB limit
-    KRebaseProcess   = 0x40,     // If target image is an .exe file, process base address will be replaced with mapped module value
+    KNoFlags         = 0x00,    // No flags
+    KManualImports   = 0x01,    // Manually map import libraries
+    KWipeHeader      = 0x04,    // Wipe image PE headers
+    KHideVAD         = 0x10,    // Make image appear as PAGE_NOACESS region
+    KRebaseProcess   = 0x40,    // If target image is an .exe file, process base address will be replaced with mapped module value
 
-    KNoExceptions    = 0x01000,   // Do not create custom exception handler
-    KPartialExcept   = 0x02000,   // Only create Inverted function table, without VEH
-    //KNoDelayLoad     = 0x04000,   // Do not resolve delay import
-    KNoSxS           = 0x08000,   // Do not apply SxS activation context
-    KNoTLS           = 0x10000,   // Skip TLS initialization and don't execute TLS callbacks
-} MMmapFlags;
+    KNoExceptions    = 0x01000, // Do not create custom exception handler
+    KNoSxS           = 0x08000, // Do not apply SxS activation context
+    KNoTLS           = 0x10000, // Skip TLS initialization and don't execute TLS callbacks
+} KMmapFlags;
 
 /// <summary>
 /// Input for IOCTL_BLACKBONE_INJECT_DLL
@@ -444,6 +440,10 @@ typedef struct _INJECT_DLL
     BOOLEAN    wait;                // Wait on injection thread
     BOOLEAN    unlink;              // Unlink module after injection
     BOOLEAN    erasePE;             // Erase PE headers after injection   
+    KMmapFlags flags;               // Manual map flags
+    ULONGLONG  imageBase;           // Image address in memory to manually map
+    ULONG      imageSize;           // Size of memory image
+    BOOLEAN    asImage;             // Memory chunk has image layout
 } INJECT_DLL, *PINJECT_DLL;
 
 /// <summary>
