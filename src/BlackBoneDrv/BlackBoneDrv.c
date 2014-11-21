@@ -187,7 +187,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->PrevMode         = 0x232;
                 pData->ExitStatus       = 0x450;
                 //pData->MiAllocPage    = 0x3AF374;
-                pData->ExRemoveTable    = 0x0;
+                pData->ExRemoveTable    = 0x487518;
                 break;
 
                 // Windows 8.1
@@ -196,7 +196,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->Protection       = 0x67A;
                 pData->ObjTable         = 0x408;
                 pData->VadRoot          = 0x5D8;
-                pData->NtCreateThdIndex = 0x0B0;
+                pData->NtCreateThdIndex = 0xB0;
                 pData->NtTermThdIndex   = 0x52;
                 pData->PrevMode         = 0x232;
                 pData->ExitStatus       = 0x6D8;
@@ -210,12 +210,12 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->Protection       = 0x692;
                 pData->ObjTable         = 0x410;
                 pData->VadRoot          = 0x5F0;
-                pData->NtCreateThdIndex = 0x0B0;
-                pData->NtTermThdIndex   = 0x0;
+                pData->NtCreateThdIndex = 0xB0;
+                pData->NtTermThdIndex   = 0x53;
                 pData->PrevMode         = 0x232;
                 pData->ExitStatus       = 0x6D8;
                 //pData->MiAllocPage    = 0x5191BC;
-                pData->ExRemoveTable    = 0;
+                pData->ExRemoveTable    = 0x419C2C;
                 break;
 
             default:

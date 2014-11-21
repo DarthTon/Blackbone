@@ -41,9 +41,11 @@ ProcessModules::~ProcessModules()
 /// <param name="type">Module type. 32 bit or 64 bit</param>
 /// <param name="search">Saerch type.</param>
 /// <returns>Module data. nullptr if not found</returns>
-const ModuleData* ProcessModules::GetModule( const std::wstring& name, 
-                                             eModSeachType search /*= LdrList*/,
-                                             eModType type /*= mt_default*/ )
+const ModuleData* ProcessModules::GetModule(
+    const std::wstring& name,
+    eModSeachType search /*= LdrList*/,
+    eModType type /*= mt_default*/
+    )
 {
     std::wstring namecopy( Utils::StripPath( name ) );
     return GetModule( namecopy, search, type );
@@ -56,10 +58,12 @@ const ModuleData* ProcessModules::GetModule( const std::wstring& name,
 /// <param name="type">Module type. 32 bit or 64 bit</param>
 /// <param name="baseModule">Import module name. Used only to resolve ApiSchema during manual map</param>
 /// <returns>Module data. nullptr if not found</returns>
-const ModuleData* ProcessModules::GetModule( std::wstring& name, 
-                                             eModSeachType search /*= LdrList*/,
-                                             eModType type /*= mt_default*/, 
-                                             const wchar_t* baseModule /*= L""*/ )
+const ModuleData* ProcessModules::GetModule(
+    std::wstring& name,
+    eModSeachType search /*= LdrList*/,
+    eModType type /*= mt_default*/,
+    const wchar_t* baseModule /*= L""*/
+    )
 {
     NameResolve::Instance().ResolvePath( name, Utils::StripPath( baseModule ), L"", NameResolve::ApiSchemaOnly, _core.pid() );
 
@@ -96,9 +100,11 @@ const ModuleData* ProcessModules::GetModule( std::wstring& name,
 /// <param name="type">Module type. 32 bit or 64 bit</param>
 /// <param name="search">Saerch type.</param>
 /// <returns>Module data. nullptr if not found</returns>
-const ModuleData* ProcessModules::GetModule( module_t modBase, 
-                                             eModSeachType search /*= LdrList*/, 
-                                             eModType type /*= mt_default */ )
+const ModuleData* ProcessModules::GetModule(
+    module_t modBase,
+    eModSeachType search /*= LdrList*/,
+    eModType type /*= mt_default */
+    )
 {
     // Detect module type
     if (type == mt_default)
@@ -255,7 +261,7 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
 
         _memory.Read( hMod->baseAddress + expBase, expSize, pExpData );
 
-        WORD  *pAddressOfOrds  = reinterpret_cast<WORD*> (
+        WORD *pAddressOfOrds = reinterpret_cast<WORD*> (
             pExpData->AddressOfNameOrdinals + reinterpret_cast<size_t>(pExpData) - expBase);
 
         DWORD *pAddressOfNames = reinterpret_cast<DWORD*>(
@@ -367,7 +373,6 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
 
     // Image and process have same processor architecture
     bool sameArch = (img.mType() == mt_mod64 && _core.isWow64() == false) || (img.mType() == mt_mod32 && _core.isWow64() == true);
-
     auto pLoadLibrary = GetExport( GetModule( L"kernel32.dll", LdrList, img.mType() ), "LoadLibraryW" ).procAddress;
 
     // Try to use LoadLibrary if possible
@@ -543,11 +548,13 @@ using namespace asmjit::host;
 /// <param name="netAssemblyArgs">Arguments passed into method</param>
 /// <param name="returnCode">Return code</param>
 /// <returns>true on success</returns>
-bool ProcessModules::InjectPureIL( const std::wstring& netVersion, 
-                                   const std::wstring& netAssemblyPath,
-                                   const std::wstring& netAssemblyMethod, 
-                                   const std::wstring& netAssemblyArgs, 
-                                   DWORD& returnCode )
+bool ProcessModules::InjectPureIL(
+    const std::wstring& netVersion,
+    const std::wstring& netAssemblyPath,
+    const std::wstring& netAssemblyMethod,
+    const std::wstring& netAssemblyArgs,
+    DWORD& returnCode
+    )
 {
     // split netAssemblyMethod string into class and method names
     size_t idx = netAssemblyMethod.find_last_of( '.' );

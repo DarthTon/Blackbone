@@ -199,6 +199,44 @@ public:
         );
 
     /// <summary>
+    /// Manually map PE image
+    /// </summary>
+    /// <param name="pid">Target PID</param>
+    /// <param name="path">Full qualified image path</param>
+    /// <param name="flags">Mapping flags</param>
+    /// <param name="initRVA">Init routine RVA</param>
+    /// <param name="initArg">Init routine argument</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS MmapDll(
+        DWORD pid,
+        const std::wstring& path,
+        KMmapFlags flags,
+        uint32_t initRVA = 0,
+        const std::wstring& initArg = L""     
+        );
+
+    /// <summary>
+    /// Manually map PE image
+    /// </summary>
+    /// <param name="pid">Target PID</param>
+    /// <param name="address">Memory location of the image to map</param>
+    /// <param name="size">Image size</param>
+    /// <param name="asImage">Memory chunk has image layout</param>
+    /// <param name="flags">Mapping flags</param>
+    /// <param name="initRVA">Init routine RVA</param>
+    /// <param name="initArg">Init routine argument</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS MmapDll(
+        DWORD pid,
+        void* address,
+        uint32_t size,
+        bool asImage,
+        KMmapFlags flags,
+        uint32_t initRVA = 0,
+        const std::wstring& initArg = L""
+        );
+
+    /// <summary>
     /// Manually map another system driver into system space
     /// </summary>
     /// <param name="path">Fully quialified path to the drver</param>

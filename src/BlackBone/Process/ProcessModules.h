@@ -15,7 +15,6 @@ namespace std
     template <>
     struct hash < struct pair<wstring, blackbone::eModType> >
     {
-    public:
         size_t operator()( const pair<wstring, blackbone::eModType>& value ) const
         {
             hash<wstring> sh;
@@ -56,9 +55,11 @@ public:
     /// <param name="type">Module type. 32 bit or 64 bit</param>
     /// <param name="search">Saerch type.</param>
     /// <returns>Module data. nullptr if not found</returns>
-    BLACKBONE_API const ModuleData* GetModule( const std::wstring& name,
-                                               eModSeachType search = LdrList,
-                                               eModType type = mt_default );
+    BLACKBONE_API const ModuleData* GetModule(
+        const std::wstring& name,
+        eModSeachType search = LdrList,
+        eModType type = mt_default
+        );
 
     /// <summary>
     /// Get module by name
@@ -67,10 +68,12 @@ public:
     /// <param name="type">Module type. 32 bit or 64 bit</param>
     /// <param name="baseModule">Import module name. Used only to resolve ApiSchema during manual map</param>
     /// <returns>Module data. nullptr if not found</returns>
-    BLACKBONE_API const ModuleData* GetModule( std::wstring& name,
-                                               eModSeachType search = LdrList,
-                                               eModType type = mt_default,
-                                               const wchar_t* baseModule = L"" );
+    BLACKBONE_API const ModuleData* GetModule(
+        std::wstring& name,
+        eModSeachType search = LdrList,
+        eModType type = mt_default,
+        const wchar_t* baseModule = L""
+        );
 
     /// <summary>
     /// Get module by base address
@@ -79,9 +82,11 @@ public:
     /// <param name="type">Module type. 32 bit or 64 bit</param>
     /// <param name="search">Saerch type.</param>
     /// <returns>Module data. nullptr if not found</returns>
-    BLACKBONE_API const ModuleData* GetModule( module_t modBase,
-                                               eModSeachType search = LdrList,
-                                               eModType type = mt_default );
+    BLACKBONE_API const ModuleData* GetModule(
+        module_t modBase,
+        eModSeachType search = LdrList,
+        eModType type = mt_default
+        );
 
     /// <summary>
     /// Get process main module
@@ -128,11 +133,13 @@ public:
     /// <param name="netAssemblyArgs">Arguments passed into method</param>
     /// <param name="returnCode">Return code</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool InjectPureIL( const std::wstring& netVersion,
-                                     const std::wstring& netAssemblyPath,
-                                     const std::wstring& netAssemblyMethod,
-                                     const std::wstring& netAssemblyArgs,
-                                     DWORD& returnCode );
+    BLACKBONE_API bool InjectPureIL(
+        const std::wstring& netVersion,
+        const std::wstring& netAssemblyPath,
+        const std::wstring& netAssemblyMethod,
+        const std::wstring& netAssemblyArgs,
+        DWORD& returnCode
+        );
 #endif
 
     /// <summary>
@@ -157,7 +164,12 @@ public:
     /// <param name="size">Module size</param>
     /// <param name="mt">Module type. 32 bit or 64 bit</param>
     /// <returns>Module info</returns>
-    BLACKBONE_API const ModuleData* AddManualModule( const std::wstring& FilePath, module_t base, size_t size, eModType mt );
+    BLACKBONE_API const ModuleData* AddManualModule( 
+        const std::wstring& FilePath,
+        module_t base,
+        size_t size, 
+        eModType mt
+        );
 
     /// <summary>
     /// Remove module from module list

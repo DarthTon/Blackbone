@@ -54,6 +54,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         SET_PROC_PROTECTION prot = { 0 };
         PVOID pNtdll = NULL;
         PVOID LdrLoadDll = NULL;
+        PVOID systemBuffer = NULL;
         BOOLEAN isWow64 = (PsGetProcessWow64Process( pProcess ) != NULL) ? TRUE : FALSE;
         LARGE_INTEGER procTimeout = { 0 };
 
@@ -64,7 +65,30 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
 
             if (pProcess)
                 ObDereferenceObject( pProcess );
+
             return STATUS_PROCESS_IS_TERMINATING;
+        }
+
+        // Copy mmap image buffer to system space.
+        // Buffer will be released in mapping routine automatically
+        if (pData->type == IT_MMap && pData->imageBase)
+        {
+            __try
+            {
+                ProbeForRead( (PVOID)pData->imageBase, pData->imageSize, 1 );
+                systemBuffer = ExAllocatePoolWithTag( PagedPool, pData->imageSize, BB_POOL_TAG );
+                RtlCopyMemory( systemBuffer, (PVOID)pData->imageBase, pData->imageSize );
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER)
+            {
+                DPRINT( "BlackBone: %s: AV in user buffer: 0x%p - 0x%p\n", __FUNCTION__, 
+                        pData->imageBase, pData->imageBase + pData->imageSize );
+
+                if (pProcess)
+                    ObDereferenceObject( pProcess );
+
+                return STATUS_INVALID_USER_BUFFER;
+            }
         }
 
         KeStackAttachProcess( pProcess, &apc );
@@ -78,7 +102,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
             MODULE_DATA mod = { 0 };
 
             status = BBMapUserImage(
-                pProcess, &ustrPath, (PVOID)pData->imageBase,
+                pProcess, &ustrPath, systemBuffer,
                 pData->imageSize, pData->asImage, pData->flags,
                 pData->initRVA, pData->initArg, &mod
                 );

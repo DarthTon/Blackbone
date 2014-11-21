@@ -4,6 +4,7 @@
 #pragma alloc_text(PAGE, BBSafeAllocateString)
 #pragma alloc_text(PAGE, BBSafeInitString)
 #pragma alloc_text(PAGE, BBStripPath)
+#pragma alloc_text(PAGE, BBStripFilename)
 #pragma alloc_text(PAGE, BBFileExists)
 
 /// <summary>
@@ -44,7 +45,11 @@ NTSTATUS BBSafeInitString( OUT PUNICODE_STRING result, IN PUNICODE_STRING source
 
     // No data to copy
     if (source->Length == 0)
+    {
+        result->Length = result->MaximumLength = 0;
+        result->Buffer = NULL;
         return STATUS_SUCCESS;
+    }
 
     result->Buffer = ExAllocatePoolWithTag( PagedPool, source->MaximumLength, 'enoB' );
     result->Length = source->Length;
@@ -59,13 +64,20 @@ NTSTATUS BBSafeInitString( OUT PUNICODE_STRING result, IN PUNICODE_STRING source
 /// Get file name from full path
 /// </summary>
 /// <param name="path">Path.</param>
-/// <param name="name">Resultingf name</param>
+/// <param name="name">Resulting name</param>
 /// <returns>Status code</returns>
 NTSTATUS BBStripPath( IN PUNICODE_STRING path, OUT PUNICODE_STRING name )
 {
     ASSERT( path != NULL && name );
     if (path == NULL || name == NULL)
         return STATUS_INVALID_PARAMETER;
+
+    // Empty string
+    if (path->Length < 2)
+    {
+        *name = *path;
+        return STATUS_NOT_FOUND;
+    }
 
     for (USHORT i = (path->Length / sizeof( WCHAR )) - 1; i != 0; i--)
     {
@@ -78,6 +90,39 @@ NTSTATUS BBStripPath( IN PUNICODE_STRING path, OUT PUNICODE_STRING name )
     }
 
     *name = *path;
+    return STATUS_NOT_FOUND;
+}
+
+/// <summary>
+/// Get directory path name from full path
+/// </summary>
+/// <param name="path">Path</param>
+/// <param name="name">Resulting directory path</param>
+/// <returns>Status code</returns>
+NTSTATUS BBStripFilename( IN PUNICODE_STRING path, OUT PUNICODE_STRING dir )
+{
+    ASSERT( path != NULL && dir );
+    if (path == NULL || dir == NULL)
+        return STATUS_INVALID_PARAMETER;
+
+    // Empty string
+    if (path->Length < 2)
+    {
+        *dir = *path;
+        return STATUS_NOT_FOUND;
+    }
+
+    for (USHORT i = (path->Length / sizeof( WCHAR )) - 1; i != 0; i--)
+    {
+        if (path->Buffer[i] == L'\\' || path->Buffer[i] == L'/')
+        {
+            dir->Buffer = path->Buffer;
+            dir->Length = dir->MaximumLength = i*sizeof( WCHAR );
+            return STATUS_SUCCESS;
+        }
+    }
+
+    *dir = *path;
     return STATUS_NOT_FOUND;
 }
 

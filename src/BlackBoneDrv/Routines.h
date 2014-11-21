@@ -110,6 +110,16 @@ VOID BBProcessNotify( IN HANDLE ParentId, IN HANDLE ProcessId, IN BOOLEAN Create
 /// <returns>Found entry, NULL if not found</returns>
 PMEM_PHYS_PROCESS_ENTRY BBLookupPhysProcessEntry( IN HANDLE pid );
 
+/// <summary>
+/// Allocate kernel memory and map into User space. Or free previously allocated memory
+/// </summary>
+/// <param name="pProcess">Target process object</param>
+/// <param name="pAllocFree">Request params.</param>
+/// <param name="pResult">Allocated region info.</param>
+/// <returns>Status code</returns>
+NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY pAllocFree, OUT PALLOCATE_FREE_MEMORY_RESULT pResult );
+
+
 //
 // Memory allocation cleanup routines
 //

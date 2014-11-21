@@ -180,6 +180,9 @@ PVOID GetSSDTBase()
     pFn   = MmGetSystemRoutineAddress( &fnName );
     pZwFn = MmGetSystemRoutineAddress( &fnZwName );
 
+    //DPRINT( "BlackBone: %s: NtRollbackTransaction = 0x%p\n", __FUNCTION__, pFn );
+    //DPRINT( "BlackBone: %s: ZwRollbackTransaction = 0x%p\n", __FUNCTION__, pZwFn );
+
     if (ntosBase && pFn && pZwFn)
     {
         PIMAGE_NT_HEADERS pHdr = RtlImageNtHeader( ntosBase );
@@ -203,10 +206,15 @@ PVOID GetSSDTBase()
                     // Found NtRollbackTransaction address
                     if (*pPtr == (ULONG_PTR)pFn)
                     {
-                        // Get NtSetSecurityObject index from ZwRollbackTransaction code
+                        //DPRINT( "BlackBone: %s: NtRollbackTransaction PE section: %c%c%c%c%c\n", __FUNCTION__, 
+                                //pSec->Name[0], pSec->Name[1], pSec->Name[2], pSec->Name[3], pSec->Name[4] );
+
+                        // Get SSDT index from ZwRollbackTransaction code
                         ULONG idx = *(PULONG)(pZwFn + 0x15);
+                        //DPRINT( "BlackBone: %s: NtRollbackTransaction index = 0x%X\n", __FUNCTION__, idx );
 
                         // Get SSDT base
+                        //DPRINT( "BlackBone: %s: SSDT base = 0xp\n", __FUNCTION__, g_SSDT );
                         return g_SSDT = (PUCHAR)pPtr - idx * sizeof( PVOID );
                     }
                 }
@@ -315,10 +323,13 @@ ZwCreateThreadEx(
         UCHAR prevMode = *pPrevMode;
         *pPrevMode = KernelMode;
 
-        status = NtCreateThreadEx( hThread, DesiredAccess, ObjectAttributes,
-                                   ProcessHandle, lpStartAddress, lpParameter,
-                                   Flags, StackZeroBits, SizeOfStackCommit,
-                                   SizeOfStackReserve, AttributeList );
+        status = NtCreateThreadEx(
+            hThread, DesiredAccess, ObjectAttributes,
+            ProcessHandle, lpStartAddress, lpParameter,
+            Flags, StackZeroBits, SizeOfStackCommit,
+            SizeOfStackReserve, AttributeList
+            );
+
         *pPrevMode = prevMode;
     }
     else

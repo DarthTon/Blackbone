@@ -173,14 +173,14 @@ NTSTATUS NativeWow64::SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuff
 /// <param name="arg">Thread argument</param>
 /// <param name="flags">Creation flags</param>
 /// <returns>Status code</returns>*/
-NTSTATUS NativeWow64::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags )
+NTSTATUS NativeWow64::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access )
 {
     // Try to use default routine if possible
-    if(_wowBarrier.targetWow64 == true)
+    /*if(_wowBarrier.targetWow64 == true)
     {
-        return Native::CreateRemoteThreadT( hThread, entry, arg, flags );
+        return Native::CreateRemoteThreadT( hThread, entry, arg, flags, access );
     }
-    else
+    else*/
     {
         LastNtStatus( STATUS_SUCCESS );
 
@@ -192,9 +192,11 @@ NTSTATUS NativeWow64::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t a
         // hThread can't be used directly because x64Call will zero stack space near variable
         DWORD64 hThd2 = NULL;
 
-        NTSTATUS status = static_cast<NTSTATUS>(
-            _local.X64Call( NtCreateThreadEx, &hThd2, THREAD_ALL_ACCESS, NULL,
-                            _hProcess, entry, arg, flags, 0, 0x1000, 0x100000, NULL ));
+        NTSTATUS status = static_cast<NTSTATUS>(_local.X64Call(
+            NtCreateThreadEx, &hThd2, access, NULL,
+            _hProcess, entry, arg, flags,
+            0, 0x1000, 0x100000, NULL
+            ));
 
         hThread = reinterpret_cast<HANDLE>(hThd2);
         return status;

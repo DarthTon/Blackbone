@@ -475,8 +475,8 @@ NTSTATUS DriverControl::ProtectMem( DWORD pid, ptr_t base, ptr_t size, DWORD pro
 /// <summary>
 /// Inject DLL into arbitrary process
 /// </summary>
-/// <param name="pid">Target PID.</param>
-/// <param name="path">Full qualified dll path.</param>
+/// <param name="pid">Target PID</param>
+/// <param name="path">Full qualified dll path</param>
 /// <param name="itype">Injection type</param>
 /// <param name="initRVA">Init routine RVA</param>
 /// <param name="initArg">Init routine argument</param>
@@ -502,18 +502,7 @@ NTSTATUS DriverControl::InjectDll(
     if (_hDriver == INVALID_HANDLE_VALUE)
         return STATUS_DEVICE_DOES_NOT_EXIST;
 
-    if (itype == IT_MMap)
-    {
-        UNICODE_STRING ustr = { 0 };
-
-        // Convert path to native format
-        GET_IMPORT( RtlDosPathNameToNtPathName_U )(path.c_str(), &ustr, NULL, NULL);
-        wcscpy_s( data.FullDllPath, ustr.Buffer );
-        GET_IMPORT( RtlFreeUnicodeString )(&ustr);
-    }
-    else
-        wcscpy_s( data.FullDllPath, path.c_str() );
-
+    wcscpy_s( data.FullDllPath, path.c_str() );
     wcscpy_s( data.initArg, initArg.c_str() );
     data.type = itype;
     data.pid = pid;
@@ -527,6 +516,94 @@ NTSTATUS DriverControl::InjectDll(
 
     return STATUS_SUCCESS;
 }
+
+/// <summary>
+/// Manually map PE image
+/// </summary>
+/// <param name="pid">Target PID</param>
+/// <param name="path">Full qualified image path</param>
+/// <param name="flags">Mapping flags</param>
+/// <param name="initRVA">Init routine RVA</param>
+/// <param name="initArg">Init routine argument</param>
+/// <returns>Status code</returns>
+NTSTATUS DriverControl::MmapDll( 
+    DWORD pid, 
+    const std::wstring& path, 
+    KMmapFlags flags,
+    uint32_t initRVA /*= 0*/, 
+    const std::wstring& initArg /*= L"" */ 
+    )
+{
+    DWORD bytes = 0;
+    INJECT_DLL data = { IT_MMap };
+    UNICODE_STRING ustr = { 0 };
+
+    // Convert path to native format
+    GET_IMPORT( RtlDosPathNameToNtPathName_U )(path.c_str(), &ustr, NULL, NULL);
+    wcscpy_s( data.FullDllPath, ustr.Buffer );
+    GET_IMPORT( RtlFreeUnicodeString )(&ustr);
+
+    wcscpy_s( data.initArg, initArg.c_str() );
+
+    data.pid = pid;
+    data.initRVA = initRVA;
+    data.wait = true;
+    data.unlink = false;
+    data.erasePE = false;
+    data.flags = flags;
+    data.imageBase = 0;
+    data.imageSize = 0;
+    data.asImage = false;
+
+    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_INJECT_DLL, &data, sizeof( data ), nullptr, 0, &bytes, NULL ))
+        return LastNtStatus();
+
+    return STATUS_SUCCESS;
+}
+
+/// <summary>
+/// Manually map PE image
+/// </summary>
+/// <param name="pid">Target PID</param>
+/// <param name="address">Memory location of the image to map</param>
+/// <param name="size">Image size</param>
+/// <param name="asImage">Memory chunk has image layout</param>
+/// <param name="flags">Mapping flags</param>
+/// <param name="initRVA">Init routine RVA</param>
+/// <param name="initArg">Init routine argument</param>
+/// <returns>Status code</returns>
+NTSTATUS DriverControl::MmapDll( 
+    DWORD pid, 
+    void* address, 
+    uint32_t size, 
+    bool asImage,
+    KMmapFlags flags,
+    uint32_t initRVA /*= 0*/, 
+    const std::wstring& initArg /*= L"" */ 
+    )
+{
+    DWORD bytes = 0;
+    INJECT_DLL data = { IT_MMap };
+
+    memset( data.FullDllPath, 0, sizeof( data.FullDllPath ) );
+    wcscpy_s( data.initArg, initArg.c_str() );
+
+    data.pid = pid;
+    data.initRVA = initRVA;
+    data.wait = true;
+    data.unlink = false;
+    data.erasePE = false;
+    data.flags = flags;
+    data.imageBase = (ULONGLONG)address;
+    data.imageSize = size;
+    data.asImage = asImage;
+
+    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_INJECT_DLL, &data, sizeof( data ), nullptr, 0, &bytes, NULL ))
+        return LastNtStatus();
+
+    return STATUS_SUCCESS;
+}
+
 
 /// <summary>
 /// Manually map another system driver into system space
@@ -689,7 +766,6 @@ LSTATUS DriverControl::PrepareDriverRegEntry( const std::wstring& svcName, const
 
     return status;
 }
-
 
 
 }

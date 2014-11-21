@@ -47,6 +47,10 @@
 
 #define EX_ADDITIONAL_INFO_SIGNATURE (ULONG_PTR)(-2)
 
+#define KI_USER_SHARED_DATA 0xFFFFF78000000000UI64
+
+#define SharedUserData ((KUSER_SHARED_DATA * const)KI_USER_SHARED_DATA)
+
 #define PTE_SHIFT 3
 #define ObpDecodeGrantedAccess( Access ) \
     ((Access)& ~ObpAccessProtectCloseBit)

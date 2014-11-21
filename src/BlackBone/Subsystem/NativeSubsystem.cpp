@@ -213,8 +213,9 @@ NTSTATUS Native::SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, u
 /// <param name="entry">Thread entry point</param>
 /// <param name="arg">Thread argument</param>
 /// <param name="flags">Creation flags</param>
+/// <param name="access">Access override</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags )
+NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access /*= THREAD_ALL_ACCESS*/ )
 {
     LastNtStatus( STATUS_SUCCESS );
     NTSTATUS status = 0; 
@@ -222,13 +223,15 @@ NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, C
 
     if (pCreateThread)
     {
-        OBJECT_ATTRIBUTES ob = { 0 };
-        ob.Length = sizeof(ob);
+        status = pCreateThread(
+            &hThread, access, NULL,
+            _hProcess, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
+            reinterpret_cast<LPVOID>(arg), static_cast<DWORD>(flags),
+            0, 0x1000, 0x100000, NULL
+            );
 
-        status = pCreateThread( &hThread, THREAD_ALL_ACCESS, &ob,
-                                _hProcess, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
-                                reinterpret_cast<LPVOID>(arg), static_cast<DWORD>(flags),
-                                0, 0x1000, 0x100000, NULL );
+        if (!NT_SUCCESS( status ))
+            hThread = NULL;
     }
     else
     {
@@ -237,10 +240,15 @@ NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, C
         if (flags & CreateSuspended)
             win32Flags = CREATE_SUSPENDED;
 
-        hThread = CreateRemoteThread( _hProcess, NULL, 0, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
-                                      reinterpret_cast<LPVOID>(arg), flags, NULL );
+        hThread = CreateRemoteThread( 
+            _hProcess, NULL, 0, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
+            reinterpret_cast<LPVOID>(arg), flags, NULL
+            );
+
         status = LastNtStatus();
     }
+
+
 
     return status;
 }

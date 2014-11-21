@@ -105,12 +105,14 @@ bool blackbone::NameResolve::InitializeP()
 /// <param name="procID">Process ID. Used to search process executable directory</param>
 /// <param name="actx">Activation context</param>
 /// <returns>Status</returns>
-NTSTATUS NameResolve::ResolvePath( std::wstring& path, 
-                                   const std::wstring& baseName,
-                                   const std::wstring& searchDir,
-                                   eResolveFlag flags, 
-                                   DWORD procID, 
-                                   HANDLE actx /*= INVALID_HANDLE_VALUE*/ )
+NTSTATUS NameResolve::ResolvePath( 
+    std::wstring& path, 
+    const std::wstring& baseName,
+    const std::wstring& searchDir,
+    eResolveFlag flags, 
+    DWORD procID, 
+    HANDLE actx /*= INVALID_HANDLE_VALUE*/ 
+    )
 {
     wchar_t tmpPath[4096] = { 0 };
     std::wstring completePath;
@@ -132,15 +134,19 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
     if (iter != _apiSchema.end())
     {
         // Select appropriate api host
-        if (iter->second.front() != baseName)
-            path.assign( iter->second.front().begin(), iter->second.front().end() );
-        else
-            path.assign( iter->second.back().begin(), iter->second.back().end() );
+        path = iter->second.front() != baseName ? iter->second.front() : iter->second.back();
 
         if (ProbeSxSRedirect( path, actx ) == STATUS_SUCCESS)
+        {
             return STATUS_SUCCESS;
+        }
         else if (flags & EnsureFullPath)
-            path = L"C:\\windows\\system32\\" + path;
+        {
+            wchar_t sys_path[255] = { 0 };
+            GetSystemDirectoryW( sys_path, 255 );
+
+            path = sys_path + path;
+        }
         
         return LastNtStatus( STATUS_SUCCESS );
     }
@@ -202,7 +208,7 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
 
 
     //
-    // 2. Prent directory of image being resolved
+    // 2. Parent directory of the image being resolved
     //
     if (!searchDir.empty())
     {
@@ -293,10 +299,9 @@ NTSTATUS NameResolve::ResolvePath( std::wstring& path,
 /// <returns></returns>
 NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVALID_HANDLE_VALUE*/ )
 {
-    UNICODE_STRING OriginalName;
-    UNICODE_STRING Extension;
-    UNICODE_STRING DllName1;
-    UNICODE_STRING DllName2;
+    UNICODE_STRING OriginalName = { 0 };
+    UNICODE_STRING DllName1 = { 0 };
+    UNICODE_STRING DllName2 = { 0 };
     PUNICODE_STRING pPath = nullptr;
     ULONG_PTR cookie = 0;
     wchar_t wBuf[255];
@@ -305,12 +310,7 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
     if (GET_IMPORT( RtlDosApplyFileIsolationRedirection_Ustr ) == nullptr)
         return STATUS_ORDINAL_NOT_FOUND;
 
-    if (path.rfind( L".dll" ) != std::wstring::npos)
-        path.erase( path.rfind( L".dll" ) );
-
-    GET_IMPORT( RtlInitUnicodeString )( &Extension, L".dll" );
     GET_IMPORT( RtlInitUnicodeString )( &OriginalName, path.c_str()) ;
-    GET_IMPORT( RtlInitUnicodeString )( &DllName2, L"" );
 
     DllName1.Buffer = wBuf;
     DllName1.Length = NULL;
@@ -321,7 +321,7 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
         ActivateActCtx( actx, &cookie );
 
     // SxS resolve
-    NTSTATUS status = GET_IMPORT( RtlDosApplyFileIsolationRedirection_Ustr )( 1, &OriginalName, &Extension,
+    NTSTATUS status = GET_IMPORT( RtlDosApplyFileIsolationRedirection_Ustr )( TRUE, &OriginalName, NULL,
                                                                               &DllName1, &DllName2, &pPath,
                                                                               NULL, NULL, NULL );
 
@@ -334,8 +334,8 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
     }
     else
     {
-        GET_IMPORT( RtlFreeUnicodeString )( &DllName2 );
-        path.append( L".dll" );
+        if (DllName2.Buffer)
+            GET_IMPORT( RtlFreeUnicodeString )( &DllName2 );
     }
 
     return LastNtStatus( status );

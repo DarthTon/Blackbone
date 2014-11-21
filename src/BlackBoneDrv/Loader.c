@@ -135,10 +135,17 @@ PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN 
             }
 
             // Wait for loader a bit
-            for (INT i = 10; !pPeb32->Ldr && i > 0; i++)
+            for (INT i = 0; !pPeb32->Ldr && i < 10; i++)
             {
                 DPRINT( "BlackBone: %s: Loader not intialiezd, waiting\n", __FUNCTION__ );
                 KeDelayExecutionThread( KernelMode, TRUE, &time );
+            }
+
+            // Still no loader
+            if (!pPeb32->Ldr)
+            {
+                DPRINT( "BlackBone: %s: Loader was not intialiezd in time. Aborting\n", __FUNCTION__ );
+                return NULL;
             }
 
             // Search in InLoadOrderModuleList
@@ -166,10 +173,17 @@ PVOID BBGetUserModule( IN PEPROCESS pProcess, IN PUNICODE_STRING ModuleName, IN 
             }
 
             // Wait for loader a bit
-            for (INT i = 10; !pPeb->Ldr && i > 0; i++)
+            for (INT i = 0; !pPeb->Ldr && i < 10; i++)
             {
                 DPRINT( "BlackBone: %s: Loader not intialiezd, waiting\n", __FUNCTION__ );
                 KeDelayExecutionThread( KernelMode, TRUE, &time );
+            }
+
+            // Still no loader
+            if (!pPeb->Ldr)
+            {
+                DPRINT( "BlackBone: %s: Loader was not intialiezd in time. Aborting\n", __FUNCTION__ );
+                return NULL;
             }
 
             // Search in InLoadOrderModuleList

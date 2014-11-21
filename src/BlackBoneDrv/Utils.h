@@ -23,9 +23,17 @@ NTSTATUS BBSafeInitString( OUT PUNICODE_STRING result, IN PUNICODE_STRING source
 /// Get file name from full path
 /// </summary>
 /// <param name="path">Path.</param>
-/// <param name="name">Resultingf name</param>
+/// <param name="name">Resulting name</param>
 /// <returns>Status code</returns>
 NTSTATUS BBStripPath( IN PUNICODE_STRING path, OUT PUNICODE_STRING name );
+
+/// <summary>
+/// Get directory path name from full path
+/// </summary>
+/// <param name="path">Path</param>
+/// <param name="name">Resulting directory path</param>
+/// <returns>Status code</returns>
+NTSTATUS BBStripFilename( IN PUNICODE_STRING path, OUT PUNICODE_STRING dir );
 
 /// <summary>
 /// Check if file exists

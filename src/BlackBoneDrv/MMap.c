@@ -1,5 +1,6 @@
 #include "Loader.h"
 #include "Private.h"
+#include "Routines.h"
 #include "BlackBoneDef.h"
 #include "Utils.h"
 #include <ntstrsafe.h>
@@ -85,11 +86,12 @@ void BBCallTlsInitializers( IN PMMAP_CONTEXT pContext, IN PVOID imageBase );
 /// <summary>
 /// Create activation context
 /// </summary>
-/// <param name="pPath">Image path</param>
+/// <param name="pPath">Manifest path</param>
+/// <param name="asImage">Target file is a PE image</param>
 /// <param name="manifestID">Manifest ID</param>
 /// <param name="pContext">Loader context</param>
 /// <returns>Status code</returns>
-NTSTATUS BBPrepareACTX( IN PUNICODE_STRING pPath, IN LONG manifestID, IN PMMAP_CONTEXT pContext );
+NTSTATUS BBPrepareACTX( IN PUNICODE_STRING pPath, IN BOOLEAN asImage, IN LONG manifestID, IN PMMAP_CONTEXT pContext );
 
 /// <summary>
 /// Create exception table for x64 image
@@ -210,7 +212,6 @@ NTSTATUS BBMapUserImage(
     )
 {
     NTSTATUS status = STATUS_SUCCESS;
-    PVOID systemBuffer = NULL;
     MMAP_CONTEXT context = { 0 };
 
     ASSERT( pProcess != NULL );
@@ -222,21 +223,6 @@ NTSTATUS BBMapUserImage(
 
     context.pProcess = pProcess;
     InitializeListHead( &context.modules );
-
-    // Copy buffer to system space
-    if (buffer)
-    {
-        __try
-        {
-            ProbeForRead( buffer, size, 0 );
-            systemBuffer = ExAllocatePoolWithTag( PagedPool, size, BB_POOL_TAG );
-            RtlCopyMemory( systemBuffer, buffer, size );
-        }
-        __except (EXCEPTION_EXECUTE_HANDLER)
-        {
-            DPRINT( "BlackBone: %s: AV in user buffer: 0x%p - 0x%p\n", __FUNCTION__, buffer, (PUCHAR)buffer + size );
-        }
-    }
 
     DPRINT( "BlackBone: %s: Mapping image '%wZ' with flags 0x%X\n", __FUNCTION__, path, flags );
 
@@ -271,7 +257,7 @@ NTSTATUS BBMapUserImage(
 
     // Map module
     if (NT_SUCCESS( status ))
-        status = BBFindOrMapModule( pProcess, path, systemBuffer, size, asImage, flags, &context, pImage );
+        status = BBFindOrMapModule( pProcess, path, buffer, size, asImage, flags, &context, pImage );
 
     // Enable exceptions for WOW64 process
     if (NT_SUCCESS( status ) && !(flags & KNoExceptions))
@@ -301,10 +287,18 @@ NTSTATUS BBMapUserImage(
 
     // Run module initializers
     if (NT_SUCCESS( status ))
-        BBCallInitializers( &context, (flags & KNoTLS) != 0 );
+    {
+        __try{
+            BBCallInitializers( &context, (flags & KNoTLS) != 0 );
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER){
+            DPRINT( "BlackBone: %s: Exception during initialization phase.Exception code 0x%X\n", __FUNCTION__, GetExceptionCode() );
+            status = STATUS_UNHANDLED_EXCEPTION;
+        }
+    }
 
     // Run user initializer
-    if (initRVA != 0)
+    if (NT_SUCCESS( status ) && initRVA != 0)
     {
         PVOID pInitRoutine = (PUCHAR)pImage->baseAddress + initRVA;
         memcpy( context.userMem->buffer, initArg, 512 * sizeof( WCHAR ) );
@@ -347,9 +341,6 @@ NTSTATUS BBMapUserImage(
         SIZE_T size = 0;
         ZwFreeVirtualMemory( ZwCurrentProcess(), &context.userMem, &size, MEM_RELEASE );
     }
-
-    if (systemBuffer)
-        ExFreePoolWithTag( systemBuffer, BB_POOL_TAG );
 
     // Cleanup module list
     while (!IsListEmpty( &context.modules ))
@@ -415,6 +406,8 @@ NTSTATUS BBFindOrMapModule(
         return STATUS_SUCCESS;
     }
 
+    DPRINT( "BlackBone: %s: Loading image %wZ\n", __FUNCTION__, &pLocalImage->fullPath );
+
     // Load image info 
     if (buffer == NULL)
     {
@@ -439,23 +432,85 @@ NTSTATUS BBFindOrMapModule(
         ULONG_PTR manifestSize = 0;
         PVOID pManifest = BBImageManifest( pLocalImage->localBase, &manifestSize, &manifestID );
         if (pManifest && manifestID != 0)
-            BBPrepareACTX( path, manifestID, pContext );
+        {
+            // Save manifest into tmp file
+            if (buffer != NULL)
+            {
+                UNICODE_STRING manifestPathNt = { 0 };
+                UNICODE_STRING manifestPath = { 0 };
+                NTSTATUS status2 = STATUS_SUCCESS;
+                HANDLE hFile = NULL;
+                OBJECT_ATTRIBUTES obAttr = { 0 };
+                IO_STATUS_BLOCK statusBlock = { 0 };
+
+                BBSafeAllocateString( &manifestPath, 512 );
+                RtlInitUnicodeString( &manifestPathNt, L"\\SystemRoot\\Temp\\BBImage.manifest" );
+                InitializeObjectAttributes( &obAttr, &manifestPathNt, OBJ_KERNEL_HANDLE, NULL, NULL );
+                
+                status2 = ZwCreateFile(
+                    &hFile, FILE_WRITE_DATA | DELETE | SYNCHRONIZE, &obAttr,
+                    &statusBlock, NULL, FILE_ATTRIBUTE_NORMAL,
+                    FILE_SHARE_READ, FILE_SUPERSEDE, FILE_SYNCHRONOUS_IO_NONALERT, NULL, 0
+                    );
+
+                if (NT_SUCCESS( status2 ))
+                {
+                    status2 = ZwWriteFile( hFile, NULL, NULL, NULL, &statusBlock, pManifest, (ULONG)manifestSize, NULL, NULL );
+                    ZwClose( hFile );
+                }                   
+
+                if (NT_SUCCESS( status2 ))
+                {
+                    // Cast path
+                    RtlUnicodeStringPrintf( &manifestPath, L"%ls\\%ls", SharedUserData->NtSystemRoot, L"\\Temp\\BBImage.manifest" );
+                    BBPrepareACTX( &manifestPath, FALSE, manifestID, pContext );
+                }
+                else
+                    DPRINT( "BlackBone: %s: Failed to create temporary manifest. Status code: 0x%X\n", __FUNCTION__, status2 );
+
+                ZwDeleteFile( &obAttr );
+                RtlFreeUnicodeString( &manifestPath );
+            }
+            else
+                BBPrepareACTX( path, TRUE, manifestID, pContext );
+        }
     }
 
 
     // Allocate memory in target process
     if (NT_SUCCESS( status ))
     {
-        pLocalImage->baseAddress = (PUCHAR)HEADER_VAL_T( pHeaders, ImageBase );
-        pLocalImage->size = HEADER_VAL_T( pHeaders, SizeOfImage );
-        status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, 0, &pLocalImage->size, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
-
-        // Retry with arbitrary base
-        if (!NT_SUCCESS( status ))
+        // Allocate physical memory
+        if (flags & KHideVAD)
         {
-            pLocalImage->baseAddress = NULL;
+            ALLOCATE_FREE_MEMORY request = { 0 };
+            ALLOCATE_FREE_MEMORY_RESULT mapResult = { 0 };
+
+            request.allocate = TRUE;
+            request.physical = TRUE;
+            request.protection = PAGE_EXECUTE_READWRITE;
+            request.size = HEADER_VAL_T( pHeaders, SizeOfImage );
+
+            status = BBAllocateFreePhysical( pProcess, &request, &mapResult );
+            if (NT_SUCCESS( status ))
+            {
+                pLocalImage->baseAddress = (PUCHAR)mapResult.address;
+                pLocalImage->size = mapResult.size;
+            }
+        }
+        else
+        {
+            pLocalImage->baseAddress = (PUCHAR)HEADER_VAL_T( pHeaders, ImageBase );
             pLocalImage->size = HEADER_VAL_T( pHeaders, SizeOfImage );
             status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, 0, &pLocalImage->size, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+
+            // Retry with arbitrary base
+            if (!NT_SUCCESS( status ))
+            {
+                pLocalImage->baseAddress = NULL;
+                pLocalImage->size = HEADER_VAL_T( pHeaders, SizeOfImage );
+                status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, 0, &pLocalImage->size, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+            }
         }
     }
 
@@ -499,6 +554,8 @@ NTSTATUS BBFindOrMapModule(
             DPRINT( "BlackBone: %s: Failed to relocate image '%wZ'. Status: 0x%X\n", __FUNCTION__, path, status );
     }
 
+    InsertHeadList( &pContext->modules, &pLocalImage->link );
+
     // Resolve imports
     if (NT_SUCCESS( status ))
         status = BBResolveImageRefs( pLocalImage->baseAddress, FALSE, pProcess, IMAGE32( pHeaders ), pContext, flags );
@@ -506,32 +563,39 @@ NTSTATUS BBFindOrMapModule(
     // Set image memory protection
     if (NT_SUCCESS( status ))
     {
-        SIZE_T tmpSize = 0;
-
-        // Protect header
-        tmpSize = HEADER_VAL_T( pHeaders, SizeOfHeaders );
-        status = ZwProtectVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, &tmpSize, PAGE_READONLY, NULL );
-
-        //
-        // Protect sections
-        //
-        PIMAGE_SECTION_HEADER pFirstSection = (PIMAGE_SECTION_HEADER)(pHeaders + 1);
-        if (IMAGE32( pHeaders ))
-            pFirstSection = (PIMAGE_SECTION_HEADER)((PIMAGE_NT_HEADERS32)pHeaders + 1);
-
-        for (PIMAGE_SECTION_HEADER pSection = pFirstSection;
-              pSection < pFirstSection + pHeaders->FileHeader.NumberOfSections;
-              pSection++)
+        if (flags & KHideVAD)
         {
-            ULONG prot = BBCastSectionProtection( pSection->Characteristics, FALSE /*!(flags & KNoExceptions) && wow64*/ );
-            PUCHAR pAddr = pLocalImage->baseAddress + pSection->VirtualAddress;
-            tmpSize = pSection->Misc.VirtualSize;
+            status = BBProtectVAD( pProcess, (ULONG_PTR)pLocalImage->baseAddress, MM_ZERO_ACCESS );
+        }
+        else
+        {
+            SIZE_T tmpSize = 0;
 
-            // Decommit pages with NO_ACCESS protection
-            if (prot != PAGE_NOACCESS)
-                status |= ZwProtectVirtualMemory( ZwCurrentProcess(), &pAddr, &tmpSize, prot, NULL );
-            else
-                ZwFreeVirtualMemory( ZwCurrentProcess(), &pAddr, &tmpSize, MEM_DECOMMIT );
+            // Protect header
+            tmpSize = HEADER_VAL_T( pHeaders, SizeOfHeaders );
+            status = ZwProtectVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, &tmpSize, PAGE_READONLY, NULL );
+
+            //
+            // Protect sections
+            //
+            PIMAGE_SECTION_HEADER pFirstSection = (PIMAGE_SECTION_HEADER)(pHeaders + 1);
+            if (IMAGE32( pHeaders ))
+                pFirstSection = (PIMAGE_SECTION_HEADER)((PIMAGE_NT_HEADERS32)pHeaders + 1);
+
+            for (PIMAGE_SECTION_HEADER pSection = pFirstSection;
+                  pSection < pFirstSection + pHeaders->FileHeader.NumberOfSections;
+                  pSection++)
+            {
+                ULONG prot = BBCastSectionProtection( pSection->Characteristics, FALSE /*!(flags & KNoExceptions) && wow64*/ );
+                PUCHAR pAddr = pLocalImage->baseAddress + pSection->VirtualAddress;
+                tmpSize = pSection->Misc.VirtualSize;
+
+                // Decommit pages with NO_ACCESS protection
+                if (prot != PAGE_NOACCESS)
+                    status |= ZwProtectVirtualMemory( ZwCurrentProcess(), &pAddr, &tmpSize, prot, NULL );
+                else
+                    ZwFreeVirtualMemory( ZwCurrentProcess(), &pAddr, &tmpSize, MEM_DECOMMIT );
+            }
         }
     }
 
@@ -560,11 +624,12 @@ NTSTATUS BBFindOrMapModule(
         // Copy image info
         if (pImage)
             *pImage = *pLocalImage;
-
-        InsertTailList( &pContext->modules, &pLocalImage->link );
     }
     else if (pLocalImage)
     {
+        // Remove entry from list
+        RemoveEntryList( &pLocalImage->link );
+
         // Delete remote image
         if (pLocalImage->baseAddress)
         {
@@ -653,6 +718,8 @@ NTSTATUS BBResolveImageRefs(
             }
             else
             {
+                DPRINT( "BlackBone: %s: Loading missing import %wZ\n", __FUNCTION__, &resolved );
+
                 if (IMAGE64( pHeader ))
                 {
                     RtlInitEmptyUnicodeString( &pContext->userMem->ustr, pContext->userMem->buffer, sizeof( pContext->userMem->buffer ) );
@@ -682,7 +749,7 @@ NTSTATUS BBResolveImageRefs(
         // Failed to load
         if (!pModule.address)
         {
-            DPRINT( "BlackBone: %s: Failed to resolve import module: '%wZ'. Status code: 0x%X\n", __FUNCTION__, ustrImpDll, status );
+            DPRINT( "BlackBone: %s: Failed to load import '%wZ'. Status code: 0x%X\n", __FUNCTION__, ustrImpDll, status );
             RtlFreeUnicodeString( &ustrImpDll );
             RtlFreeUnicodeString( &resolved );
 
@@ -1001,7 +1068,6 @@ NTSTATUS BBResolveImagePath(
     if (NT_SUCCESS( BBResolveApiSet( pProcess, &filename, baseImage, resolved ) ))
     {
         UNICODE_STRING fullResolved = { 0 };
-        DPRINT( "BlackBone: %s: Resolved via API SET %wZ -> %wZ\n", __FUNCTION__, path, resolved );
 
         BBSafeAllocateString( &fullResolved, 512 );
         
@@ -1031,7 +1097,6 @@ NTSTATUS BBResolveImagePath(
     if (pContext && NT_SUCCESS( status ))
     {
         UNICODE_STRING fullResolved = { 0 };
-        DPRINT( "BlackBone: %s: Resolved via SxS %wZ -> %wZ\n", __FUNCTION__, path, resolved );
 
         BBSafeAllocateString( &fullResolved, 1024 );
         RtlUnicodeStringCatString( &fullResolved, L"\\??\\" );
@@ -1052,32 +1117,55 @@ NTSTATUS BBResolveImagePath(
         status = STATUS_SUCCESS;
        
 SkipSxS:
+    BBSafeAllocateString( &fullResolved, 0x400 );
+
+    //
+    // Executable directory
+    //
+    ULONG bytes = 0;
+    if (NT_SUCCESS( ZwQueryInformationProcess( ZwCurrentProcess(), ProcessImageFileName, fullResolved.Buffer + 0x100, 0x200, &bytes ) ))
+    {
+        PUNICODE_STRING pPath = (PUNICODE_STRING)(fullResolved.Buffer + 0x100);
+        UNICODE_STRING parentDir = { 0 };
+        BBStripFilename( pPath, &parentDir );
+
+        RtlCopyUnicodeString( &fullResolved, &parentDir );
+        RtlUnicodeStringCatString( &fullResolved, L"\\" );
+        RtlUnicodeStringCat( &fullResolved, &filename );
+
+        if (NT_SUCCESS( BBFileExists( &fullResolved ) ))
+        {
+            RtlFreeUnicodeString( resolved );
+            RtlFreeUnicodeString( &pathLow );
+
+            *resolved = fullResolved;
+            return STATUS_SUCCESS;
+        }
+    }
+    
+    fullResolved.Length = 0;
+    RtlZeroMemory( fullResolved.Buffer, 0x400 );
+
     //
     // System directory
     //
-    BBSafeAllocateString( &fullResolved, 512 );
-
     if (PsGetProcessWow64Process( pProcess ) != NULL)
-        RtlUnicodeStringCatString( &fullResolved, L"\\SystemRoot\\syswow64\\" );
+        RtlUnicodeStringCatString( &fullResolved, L"\\SystemRoot\\SysWOW64\\" );
     else
         RtlUnicodeStringCatString( &fullResolved, L"\\SystemRoot\\System32\\" );
 
     RtlUnicodeStringCat( &fullResolved, &filename );
     if (NT_SUCCESS( BBFileExists( &fullResolved ) ))
     {
-        DPRINT( "BlackBone: %s: Resolved %wZ -> %wZ\n", __FUNCTION__, path, fullResolved );
         RtlFreeUnicodeString( resolved );
         RtlFreeUnicodeString( &pathLow );
 
         *resolved = fullResolved;
         return STATUS_SUCCESS;
     }
-
-    //
-    // Executable directory
-    //
-
-
+    
+    RtlFreeUnicodeString( &fullResolved );
+    
     // Nothing found
 skip:
     *resolved = pathLow;
@@ -1096,6 +1184,8 @@ void BBCallInitializers( IN PMMAP_CONTEXT pContext, IN BOOLEAN noTLS )
         PMODULE_DATA pEntry = (PMODULE_DATA)CONTAINING_RECORD( pListEntry, MODULE_DATA, link );
         if (pEntry->initialized)
             continue;
+
+        DPRINT( "BlackBone: %s: Calling '%wZ' initializer\n", __FUNCTION__, pEntry->name );
 
         PIMAGE_NT_HEADERS pHeaders = RtlImageNtHeader( pEntry->baseAddress );
 
@@ -1125,26 +1215,40 @@ void BBCallInitializers( IN PMMAP_CONTEXT pContext, IN BOOLEAN noTLS )
             PVOID pBase = (PUCHAR)pEntry->baseAddress + pSection->VirtualAddress;
             SIZE_T secSize = pSection->Misc.VirtualSize;
 
-            if (NT_SUCCESS( ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &secSize, PAGE_READWRITE, NULL ) ))
+            if (pEntry->flags & KWipeHeader)
+            {
                 RtlZeroMemory( pBase, secSize );
+            }
+            else
+            {
+                if (NT_SUCCESS( ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &secSize, PAGE_READWRITE, NULL ) ))
+                    RtlZeroMemory( pBase, secSize );
 
-            ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &secSize, PAGE_NOACCESS, NULL );
-            ZwFreeVirtualMemory( ZwCurrentProcess(), &pBase, &secSize, MEM_DECOMMIT );
+                ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &secSize, PAGE_NOACCESS, NULL );
+                ZwFreeVirtualMemory( ZwCurrentProcess(), &pBase, &secSize, MEM_DECOMMIT );
+            }
         }
 
         // Wipe header
         if (pEntry->flags & KWipeHeader)
         {
             SIZE_T hdrSize = HEADER_VAL_T( pHeaders, SizeOfHeaders );
-            PVOID pBase = pEntry->baseAddress;
 
-            if (NT_SUCCESS( ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &hdrSize, PAGE_READWRITE, NULL ) ))
-            {
+            if (pEntry->flags & KHideVAD)
+            {             
                 RtlZeroMemory( pEntry->baseAddress, hdrSize );
-                ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &hdrSize, PAGE_READONLY, NULL );
             }
             else
-                DPRINT( "BlackBone: %s: Failed to wipe image header\n", __FUNCTION__ );
+            {
+                PVOID pBase = pEntry->baseAddress;
+                if (NT_SUCCESS( ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &hdrSize, PAGE_READWRITE, NULL ) ))
+                {
+                    RtlZeroMemory( pEntry->baseAddress, hdrSize );
+                    ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &hdrSize, PAGE_READONLY, NULL );
+                }
+                else
+                    DPRINT( "BlackBone: %s: Failed to wipe image header\n", __FUNCTION__ );
+            }
         }
 
         pEntry->initialized = TRUE;
@@ -1179,11 +1283,12 @@ void BBCallTlsInitializers( IN PMMAP_CONTEXT pContext, IN PVOID imageBase )
 /// <summary>
 /// Create activation context
 /// </summary>
-/// <param name="pPath">Image path</param>
+/// <param name="pPath">Manifest path</param>
+/// <param name="asImage">Target file is a PE image</param>
 /// <param name="manifestID">Manifest ID</param>
 /// <param name="pContext">Loader context</param>
 /// <returns>Status code</returns>
-NTSTATUS BBPrepareACTX( IN PUNICODE_STRING pPath, IN LONG manifestID, IN PMMAP_CONTEXT pContext )
+NTSTATUS BBPrepareACTX( IN PUNICODE_STRING pPath, IN BOOLEAN asImage, IN LONG manifestID, IN PMMAP_CONTEXT pContext )
 {
     NTSTATUS status = STATUS_SUCCESS;
     UNICODE_STRING ustrKernel = { 0 }, ustrNtdll = { 0 };
@@ -1225,9 +1330,13 @@ NTSTATUS BBPrepareACTX( IN PUNICODE_STRING pPath, IN LONG manifestID, IN PMMAP_C
             RtlZeroMemory( &pContext->userMem->actx32, sizeof( pContext->userMem->actx32 ) );
 
             pContext->userMem->actx32.cbSize = sizeof( ACTCTXW32 );
-            pContext->userMem->actx32.lpSource = (ULONG)pContext->userMem->buffer + 4 * sizeof( wchar_t );
-            pContext->userMem->actx32.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
-            pContext->userMem->actx32.lpResourceName = (ULONG)MAKEINTRESOURCEW( manifestID );
+            pContext->userMem->actx32.lpSource = (ULONG)pContext->userMem->buffer;
+            if (asImage)
+            {
+                pContext->userMem->actx32.lpSource += 4 * sizeof( wchar_t );
+                pContext->userMem->actx32.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
+                pContext->userMem->actx32.lpResourceName = (ULONG)MAKEINTRESOURCEW( manifestID );
+            }
 
             BBCallRoutine( FALSE, pContext, pCreateActCtxW, 1, &pContext->userMem->actx32 );
         }
@@ -1236,9 +1345,13 @@ NTSTATUS BBPrepareACTX( IN PUNICODE_STRING pPath, IN LONG manifestID, IN PMMAP_C
             RtlZeroMemory( &pContext->userMem->actx, sizeof( pContext->userMem->actx ) );
 
             pContext->userMem->actx.cbSize = sizeof( ACTCTXW );
-            pContext->userMem->actx.lpSource = pContext->userMem->buffer + 4;
-            pContext->userMem->actx.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
-            pContext->userMem->actx.lpResourceName = MAKEINTRESOURCEW( manifestID );
+            pContext->userMem->actx.lpSource = pContext->userMem->buffer;
+            if (asImage)
+            {
+                pContext->userMem->actx.lpSource += 4;
+                pContext->userMem->actx.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
+                pContext->userMem->actx.lpResourceName = MAKEINTRESOURCEW( manifestID );
+            }
 
             BBCallRoutine( FALSE, pContext, pCreateActCtxW, 1, &pContext->userMem->actx );
         }
@@ -1540,12 +1653,12 @@ NTSTATUS BBCallRoutine( IN BOOLEAN newThread, IN PMMAP_CONTEXT pContext, IN PVOI
         if (NT_SUCCESS( status ))
         {
             LARGE_INTEGER timeout = { 0 };
-            timeout.QuadPart = -(10ll * 10 * 1000 * 1000);   // 10s
+            timeout.QuadPart = -(10ll * 10 * 1000 * 1000);  // 10s
 
-            status = KeWaitForSingleObject( pContext->pSync, Executive, UserMode, FALSE, &timeout );
+            status = KeWaitForSingleObject( pContext->pSync, Executive, UserMode, TRUE, &timeout );
 
             timeout.QuadPart = -(1ll * 10 * 1000);          // 1ms
-            KeDelayExecutionThread( UserMode, FALSE, &timeout );
+            KeDelayExecutionThread( KernelMode, TRUE, &timeout );
         }
     }
 

@@ -111,7 +111,7 @@ private:
     HANDLE    _hProcess = NULL; // Process handle
     DWORD     _pid = 0;         // Process ID
     ptrNative _native;          // Api wrapper
-    bool      _dep = false;     // DEP state for process
+    bool      _dep = true;      // DEP state for process
 };
 
 }

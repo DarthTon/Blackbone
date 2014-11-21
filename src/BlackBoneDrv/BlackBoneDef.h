@@ -427,6 +427,12 @@ typedef enum _MmapFlags
     KNoTLS           = 0x10000, // Skip TLS initialization and don't execute TLS callbacks
 } KMmapFlags;
 
+#ifdef __cplusplus
+#include "../Include/Macro.h"
+ENUM_OPS(KMmapFlags);
+#endif // __cplusplus
+
+
 /// <summary>
 /// Input for IOCTL_BLACKBONE_INJECT_DLL
 /// </summary>

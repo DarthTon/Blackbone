@@ -1,5 +1,6 @@
 #include "Threads.h"
 #include "../ProcessCore.h"
+#include "../../DriverControl/DriverControl.h"
 
 #include <memory>
 #include <random>
@@ -26,7 +27,15 @@ ProcessThreads::~ProcessThreads()
 Thread ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg, CreateThreadFlags flags /*= 0*/ )
 {
     HANDLE hThd = NULL;
-    _core.native()->CreateRemoteThreadT( hThd, threadProc, arg, flags );
+    if (!NT_SUCCESS( _core.native()->CreateRemoteThreadT( hThd, threadProc, arg, flags, THREAD_ALL_ACCESS ) ))
+    {
+        // Ensure full thread access
+        if (NT_SUCCESS( _core.native()->CreateRemoteThreadT( hThd, threadProc, arg, flags, THREAD_QUERY_LIMITED_INFORMATION ) ))
+        {
+            if (Driver().loaded())
+                Driver().PromoteHandle( GetCurrentProcessId(), hThd, THREAD_ALL_ACCESS );
+        }
+    }
 
     return Thread( hThd, &_core );
 }

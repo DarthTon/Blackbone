@@ -103,7 +103,7 @@ public:
     /// <param name="arg">Thread argument</param>
     /// <param name="flags">Creation flags</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags );
+    virtual NTSTATUS CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access = THREAD_ALL_ACCESS );
 
     /// <summary>
     /// Get native thread context

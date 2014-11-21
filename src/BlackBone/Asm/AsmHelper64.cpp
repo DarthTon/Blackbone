@@ -117,8 +117,8 @@ void AsmHelper64::ExitThreadWithStatus( uint64_t pExitThread, size_t resultPtr )
 
     _assembler.mov( asmjit::host::rdx, asmjit::host::rax );
     _assembler.mov( asmjit::host::rcx, 0 );
-    _assembler.mov( asmjit::host::r13, pExitThread );
-    _assembler.call( asmjit::host::r13 );
+    _assembler.mov( asmjit::host::rax, pExitThread );
+    _assembler.call( asmjit::host::rax );
 }
 
 /// <summary>
@@ -152,8 +152,8 @@ void AsmHelper64::SaveRetValAndSignalEvent( size_t pSetEvent,
     _assembler.mov( asmjit::host::rax, EventPtr );
     _assembler.mov( asmjit::host::rcx, asmjit::host::dword_ptr( asmjit::host::rax ) );
     _assembler.mov( asmjit::host::rdx, 0 );
-    _assembler.mov( asmjit::host::r13, pSetEvent );
-    _assembler.call( asmjit::host::r13 );
+    _assembler.mov( asmjit::host::rax, pSetEvent );
+    _assembler.call( asmjit::host::rax );
 }
 
 

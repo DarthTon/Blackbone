@@ -45,12 +45,14 @@ public:
     /// <param name="procID">Process ID. Used to search process executable directory</param>
     /// <param name="actx">Activation context</param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS ResolvePath( std::wstring& path,
-                                        const std::wstring& baseName, 
-                                        const std::wstring& searchDir,
-                                        eResolveFlag flags,
-                                        DWORD procID, 
-                                        HANDLE actx = INVALID_HANDLE_VALUE );
+    BLACKBONE_API NTSTATUS ResolvePath( 
+        std::wstring& path,
+        const std::wstring& baseName,
+        const std::wstring& searchDir,
+        eResolveFlag flags,
+        DWORD procID,
+        HANDLE actx = INVALID_HANDLE_VALUE
+        );
 
     /// <summary>
     /// Try SxS redirection
