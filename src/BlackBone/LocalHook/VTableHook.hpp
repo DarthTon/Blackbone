@@ -106,7 +106,7 @@ public:
     /// <param name="ppVtable">Pointer to vtable pointer</param>
     /// <param name="index">Function index</param>
     /// <param name="hkPtr">Hook class member address</param>
-    /// <param name="pClass">THook class address</param>
+    /// <param name="pClass">Hook class address</param>
     /// <param name="copyVtable">if true, vtable will be copied and edited, otherwise existing vtable will be edited</param>
     /// <param name="vtableLen">Optional. Valid only when copyVtable is true. Number of function in vtable. 
     /// Used to determine number of function to copy</param>

@@ -53,15 +53,15 @@ struct HookHandler<R( __stdcall* )(Args...), C> : public DetourBase
 
     inline ReturnType CallOriginal( Args&&... args )
     {
-        return (reinterpret_cast<type>(_callOriginal))(args...);
+        return (reinterpret_cast<typeR>(_callOriginal))(args...);
     }
 
     inline ReturnType CallCallback( Args&&... args )
     {
         if (_callbackClass != nullptr)
-            return ((C*)_callbackClass->*brutal_cast<hktypeC>(_callback))(args...);
+            return ((C*)_callbackClass->*brutal_cast<hktypeCR>(_callback))(args...);
         else
-            return (reinterpret_cast<hktype>(_callback))(args...);
+            return (reinterpret_cast<hktypeR>(_callback))(args...);
     }
 };
 
