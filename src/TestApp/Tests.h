@@ -10,6 +10,7 @@
 
 using namespace blackbone;
 
+void TestPatterns();
 void TestLocalHook();
 void TestRemoteHook();
 void TestMMap();

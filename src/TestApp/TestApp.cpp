@@ -16,6 +16,8 @@ void TestPEB( Process& proc )
     auto ppeb64 = proc.core().peb( &peb64 );
     std::wcout << L"PEB64 address 0x" << std::hex << ppeb64 
                << L". Ldr address 0x" << peb64.Ldr << std::endl << std::endl;
+
+    std::wcout << std::dec;
 }
 
 /*
@@ -34,15 +36,19 @@ void TestTEB( Process& proc )
     auto pteb64 = proc.threads().getMain()->teb( &teb64 );
     std::wcout << L"TEB64 address 0x" << std::hex << pteb64 << L". Thread ID 0x" 
                << teb64.ClientId.UniqueThread << std::endl << std::endl;
+
+    std::wcout << std::dec;
 }
 
+
 int main( int /*argc*/, char* /*argv*/[] )
-{ 
+{
     Process proc;
     proc.Attach( GetCurrentProcessId() );
 
     TestPEB( proc );
     TestTEB( proc );
+    TestPatterns();
     TestLocalHook();
     TestRemoteCall();
     TestRemoteHook();

@@ -382,6 +382,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|Win32'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="RemoteMemTest.cpp" />
+    <ClCompile Include="PatternTest.cpp" />
     <ClCompile Include="TestApp.cpp" />
   </ItemGroup>
   <ItemGroup>
