@@ -186,7 +186,11 @@ size_t PatternSearch::SearchRemoteWhole( Process& remote, bool useWildcard, uint
 
     for (ptr_t memptr = native->minAddr(); memptr < native->maxAddr(); memptr = mbi.BaseAddress + mbi.RegionSize)
     {
-        if (remote.core().native()->VirtualQueryExT( memptr, &mbi ) != STATUS_SUCCESS)
+        auto status = remote.core().native()->VirtualQueryExT( memptr, &mbi );
+
+        if (status == STATUS_INVALID_PARAMETER || status == STATUS_ACCESS_DENIED)
+            break;
+        else if (status != STATUS_SUCCESS)
             continue;
 
         // Filter regions
