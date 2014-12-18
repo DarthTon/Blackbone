@@ -12,10 +12,11 @@ namespace blackbone
 class PatternSearch
 {
 public:
-    BLACKBONE_API PatternSearch(const std::vector<uint8_t>& pattern);
-    BLACKBONE_API PatternSearch(const std::string& pattern);
-    BLACKBONE_API PatternSearch(const char* pattern, size_t len = 0);
-    BLACKBONE_API PatternSearch(const uint8_t* pattern, size_t len = 0);
+    BLACKBONE_API PatternSearch( const std::vector<uint8_t>& pattern );
+    BLACKBONE_API PatternSearch( const std::initializer_list<uint8_t>&& pattern );
+    BLACKBONE_API PatternSearch( const std::string& pattern );
+    BLACKBONE_API PatternSearch( const char* pattern, size_t len = 0 );
+    BLACKBONE_API PatternSearch( const uint8_t* pattern, size_t len = 0 );
 
     BLACKBONE_API ~PatternSearch();
 

@@ -14,6 +14,11 @@ PatternSearch::PatternSearch( const std::vector<uint8_t>& pattern )
 {
 }
 
+PatternSearch::PatternSearch( const std::initializer_list<uint8_t>&& pattern )
+    : _pattern( pattern )
+{
+}
+
 PatternSearch::PatternSearch( const std::string& pattern )
     : _pattern( pattern.begin(), pattern.end() )
 {
@@ -132,7 +137,7 @@ size_t PatternSearch::SearchRemote( Process& remote, uint8_t wildcard, ptr_t sca
     uint8_t *pBuffer = reinterpret_cast<uint8_t*>(VirtualAlloc( NULL, scanSize, MEM_COMMIT, PAGE_READWRITE ));
 
     if (pBuffer && remote.memory().Read( scanStart, scanSize, pBuffer ) == STATUS_SUCCESS)
-        Search( wildcard, pBuffer, scanSize, out );
+        Search( wildcard, pBuffer, scanSize, out, scanStart );
 
     if (pBuffer)
         VirtualFree( pBuffer, 0, MEM_RELEASE );
