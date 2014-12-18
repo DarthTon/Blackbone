@@ -5,11 +5,12 @@
 // Zlib - See LICENSE.md file in the package.
 
 // [Guard]
-#ifndef _ASMJIT_BASE_PODVECTOR_H
-#define _ASMJIT_BASE_PODVECTOR_H
+#ifndef _ASMJIT_BASE_CONTAINERS_H
+#define _ASMJIT_BASE_CONTAINERS_H
 
 // [Dependencies - AsmJit]
 #include "../base/error.h"
+#include "../base/globals.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -25,10 +26,18 @@ namespace asmjit {
 
 //! \internal
 struct PodVectorData {
+  // --------------------------------------------------------------------------
+  // [Accessors]
+  // --------------------------------------------------------------------------
+
   //! Get data.
   ASMJIT_INLINE void* getData() const {
     return (void*)(this + 1);
   }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
 
   //! Capacity of the vector.
   size_t capacity;
@@ -54,9 +63,18 @@ struct PodVectorBase {
 
   //! Destroy the `PodVectorBase` and data.
   ASMJIT_INLINE ~PodVectorBase() {
-    if (_d != &_nullData)
-      ASMJIT_FREE(_d);
+    reset(true);
   }
+
+  // --------------------------------------------------------------------------
+  // [Reset]
+  // --------------------------------------------------------------------------
+
+  //! Reset the vector data and set its `length` to zero.
+  //!
+  //! If `releaseMemory` is true the vector buffer will be released to the
+  //! system.
+  ASMJIT_API void reset(bool releaseMemory = false);
 
   // --------------------------------------------------------------------------
   // [Grow / Reserve]
@@ -125,24 +143,6 @@ struct PodVector : PodVectorBase {
   //! \overload
   ASMJIT_INLINE const T* getData() const {
     return static_cast<const T*>(_d->getData());
-  }
-
-  // --------------------------------------------------------------------------
-  // [Clear / Reset]
-  // --------------------------------------------------------------------------
-
-  //! Clear vector data, but don't free an internal buffer.
-  ASMJIT_INLINE void clear() {
-    if (_d != &_nullData)
-      _d->length = 0;
-  }
-
-  //! Clear vector data and free internal buffer.
-  ASMJIT_INLINE void reset() {
-    if (_d != &_nullData) {
-      ASMJIT_FREE(_d);
-      _d = const_cast<PodVectorData*>(&_nullData);
-    }
   }
 
   // --------------------------------------------------------------------------
@@ -254,19 +254,89 @@ struct PodVector : PodVectorBase {
     ASMJIT_ASSERT(i < getLength());
     return getData()[i];
   }
+};
 
-  //! Allocate and append a new item and return its address.
-  T* newElement() {
-    PodVectorData* d = _d;
+// ============================================================================
+// [asmjit::PodList<T>]
+// ============================================================================
 
-    if (d->length == d->capacity) {
-      if (!_grow(1))
-        return NULL;
-      d = _d;
-    }
+//! \internal
+template <typename T>
+struct PodList {
+  ASMJIT_NO_COPY(PodList<T>)
 
-    return static_cast<T*>(d->getData()) + (d->length++);
+  // --------------------------------------------------------------------------
+  // [Link]
+  // --------------------------------------------------------------------------
+
+  struct Link {
+    // --------------------------------------------------------------------------
+    // [Accessors]
+    // --------------------------------------------------------------------------
+
+    //! Get next node.
+    ASMJIT_INLINE Link* getNext() const { return _next; }
+
+    //! Get value.
+    ASMJIT_INLINE T getValue() const { return _value; }
+    //! Set value to `value`.
+    ASMJIT_INLINE void setValue(const T& value) { _value = value; }
+
+    // --------------------------------------------------------------------------
+    // [Members]
+    // --------------------------------------------------------------------------
+
+    Link* _next;
+    T _value;
+  };
+
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE PodList() : _first(NULL), _last(NULL) {}
+  ASMJIT_INLINE ~PodList() {}
+
+  // --------------------------------------------------------------------------
+  // [Data]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE bool isEmpty() const { return _first != NULL; }
+
+  ASMJIT_INLINE Link* getFirst() const { return _first; }
+  ASMJIT_INLINE Link* getLast() const { return _last; }
+
+  // --------------------------------------------------------------------------
+  // [Ops]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE void reset() {
+    _first = NULL;
+    _last = NULL;
   }
+
+  ASMJIT_INLINE void prepend(Link* link) {
+    link->_next = _first;
+    if (_first == NULL)
+      _last = link;
+    _first = link;
+  }
+
+  ASMJIT_INLINE void append(Link* link) {
+    link->_next = NULL;
+    if (_first == NULL)
+      _first = link;
+    else
+      _last->_next = link;
+    _last = link;
+  }
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  Link* _first;
+  Link* _last;
 };
 
 //! \}
@@ -277,4 +347,4 @@ struct PodVector : PodVectorBase {
 #include "../apiend.h"
 
 // [Guard]
-#endif // _ASMJIT_BASE_PODVECTOR_H
+#endif // _ASMJIT_BASE_CONTAINERS_H

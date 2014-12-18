@@ -147,11 +147,13 @@ void AsmHelper32::ExitThreadWithStatus( size_t pExitThread, size_t resultPtr = 0
 /// <param name="EventPtr">Event memory location</param>
 /// <param name="errPtr">Error code memory location</param>
 /// <param name="rtype">Return type</param>
-void AsmHelper32::SaveRetValAndSignalEvent( size_t pSetEvent,
-                                            size_t ResultPtr, 
-                                            size_t EventPtr, 
-                                            size_t errPtr, 
-                                            eReturnType rtype /*= rt_int32*/ )
+void AsmHelper32::SaveRetValAndSignalEvent( 
+    size_t pSetEvent,
+    size_t ResultPtr, 
+    size_t EventPtr, 
+    size_t errPtr, 
+    eReturnType rtype /*= rt_int32*/ 
+    )
 {
     _assembler.mov( asmjit::host::ecx, ResultPtr );
 
@@ -263,7 +265,7 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
 template<typename _Type>
 void AsmHelper32::PushArgp( _Type arg, eArgType index )
 {
-    static const asmjit::host::GpReg regs[] = { asmjit::host::ecx, asmjit::host::edx };
+    static const asmjit::GpReg regs[] = { asmjit::host::ecx, asmjit::host::edx };
 
     // for __fastcall and __thiscall
     if (index < at_stack)

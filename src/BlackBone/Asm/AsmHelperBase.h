@@ -86,7 +86,8 @@ namespace blackbone
             _assembler.db( 0xCB );    // retf
         }
 
-        BLACKBONE_API inline asmjit::host::Assembler* operator ->() { return &_assembler; }
+        BLACKBONE_API inline asmjit::X86Assembler* assembler() { return &_assembler; }
+        BLACKBONE_API inline asmjit::X86Assembler* operator ->() { return &_assembler; }
 
     private:
         AsmHelperBase( const AsmHelperBase& ) = delete;
@@ -94,6 +95,6 @@ namespace blackbone
 
     protected:
         asmjit::JitRuntime _runtime;
-        asmjit::host::Assembler _assembler;
+        asmjit::X86Assembler _assembler;
     };
 }

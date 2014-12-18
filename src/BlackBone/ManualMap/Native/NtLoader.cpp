@@ -352,7 +352,7 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
     {
         if (_LdrHeapBase)
         {
-            a->clear();
+            a->reset();
 
             //
             // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DDAG_NODE));

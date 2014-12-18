@@ -22,10 +22,12 @@
 #include "../apibegin.h"
 
 namespace asmjit {
-namespace x86x64 {
+
+//! \addtogroup asmjit_x86_compiler
+//! \{
 
 // ============================================================================
-// [asmjit::Context]
+// [asmjit::X86Context]
 // ============================================================================
 
 #if defined(ASMJIT_DEBUG)
@@ -34,50 +36,51 @@ namespace x86x64 {
 # define ASMJIT_X86_CHECK_STATE
 #endif // ASMJIT_DEBUG
 
-//! \addtogroup asmjit_x86x64_tree
-//! \{
-
 //! \internal
 //!
-//! Compiler context is used by `X86X64Compiler`.
+//! Compiler context is used by `X86Compiler`.
 //!
 //! Compiler context is used during compilation and normally developer doesn't
 //! need access to it. The context is user per function (it's reset after each
 //! function is generated).
-struct X86X64Context : public BaseContext {
-  ASMJIT_NO_COPY(X86X64Context)
+struct X86Context : public Context {
+  ASMJIT_NO_COPY(X86Context)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `X86X64Context` instance.
-  X86X64Context(X86X64Compiler* compiler);
-  //! Destroy the `X86X64Context` instance.
-  virtual ~X86X64Context();
+  //! Create a new `X86Context` instance.
+  X86Context(X86Compiler* compiler);
+  //! Destroy the `X86Context` instance.
+  virtual ~X86Context();
 
   // --------------------------------------------------------------------------
   // [Reset]
   // --------------------------------------------------------------------------
 
-  virtual void reset();
+  virtual void reset(bool releaseMemory = false);
+
+  // --------------------------------------------------------------------------
+  // [Arch]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_INLINE bool isX64() const {
+    return _zsp.getSize() == 16;
+  }
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  //! Get compiler as `X86X64Compiler`.
-  ASMJIT_INLINE X86X64Compiler* getCompiler() const {
-    return static_cast<X86X64Compiler*>(_compiler);
+  //! Get compiler as `X86Compiler`.
+  ASMJIT_INLINE X86Compiler* getCompiler() const {
+    return static_cast<X86Compiler*>(_compiler);
   }
 
-  //! Get function as `X86X64FuncNode`.
-  ASMJIT_INLINE X86X64FuncNode* getFunc() const {
-    return reinterpret_cast<X86X64FuncNode*>(_func);
-  }
-
-  ASMJIT_INLINE bool isX64() const {
-    return _baseRegsCount == 16;
+  //! Get function as `X86FuncNode`.
+  ASMJIT_INLINE X86FuncNode* getFunc() const {
+    return reinterpret_cast<X86FuncNode*>(_func);
   }
 
   //! Get clobbered registers (global).
@@ -89,9 +92,9 @@ struct X86X64Context : public BaseContext {
   // [Helpers]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE VarInst* newVarInst(uint32_t vaCount) {
-    return static_cast<VarInst*>(
-      _baseZone.alloc(sizeof(VarInst) + vaCount * sizeof(VarAttr)));
+  ASMJIT_INLINE X86VarMap* newVarMap(uint32_t vaCount) {
+    return static_cast<X86VarMap*>(
+      _baseZone.alloc(sizeof(X86VarMap) + vaCount * sizeof(VarAttr)));
   }
 
   // --------------------------------------------------------------------------
@@ -107,8 +110,8 @@ struct X86X64Context : public BaseContext {
   void emitPopSequence(uint32_t regs);
 
   void emitConvertVarToVar(uint32_t dstType, uint32_t dstIndex, uint32_t srcType, uint32_t srcIndex);
-  void emitMoveVarOnStack(uint32_t dstType, const Mem* dst, uint32_t srcType, uint32_t srcIndex);
-  void emitMoveImmOnStack(uint32_t dstType, const Mem* dst, const Imm* src);
+  void emitMoveVarOnStack(uint32_t dstType, const X86Mem* dst, uint32_t srcType, uint32_t srcIndex);
+  void emitMoveImmOnStack(uint32_t dstType, const X86Mem* dst, const Imm* src);
 
   void emitMoveImmToReg(uint32_t dstType, uint32_t dstIndex, const Imm* src);
 
@@ -117,13 +120,6 @@ struct X86X64Context : public BaseContext {
   // --------------------------------------------------------------------------
 
   void _checkState();
-
-  ASMJIT_INLINE uint32_t getRegsCount(uint32_t c) const {
-    if (c == kRegClassGp || c == kRegClassXyz)
-      return _baseRegsCount;
-    else
-      return 8;
-  }
 
   ASMJIT_INLINE uint32_t getRegSize() const {
     return _zsp.getSize();
@@ -137,24 +133,25 @@ struct X86X64Context : public BaseContext {
   //!
   //! Attach a register to the 'VarData', changing 'VarData' members to show
   //! that the variable is currently alive and linking variable with the
-  //! current 'VarState'.
+  //! current 'X86VarState'.
   template<int C>
   ASMJIT_INLINE void attach(VarData* vd, uint32_t regIndex, bool modified) {
     ASMJIT_ASSERT(vd->getClass() == C);
     ASMJIT_ASSERT(regIndex != kInvalidReg);
 
     // Prevent Esp allocation if C==Gp.
-    ASMJIT_ASSERT(C != kRegClassGp || regIndex != kRegIndexSp);
+    ASMJIT_ASSERT(C != kX86RegClassGp || regIndex != kX86RegIndexSp);
 
     uint32_t regMask = IntUtil::mask(regIndex);
 
     vd->setState(kVarStateReg);
     vd->setRegIndex(regIndex);
+    vd->addHomeIndex(regIndex);
     vd->setModified(modified);
 
     _x86State.getListByClass(C)[regIndex] = vd;
-    _x86State._occupied.add(C, regMask);
-    _x86State._modified.add(C, static_cast<uint32_t>(modified) << regIndex);
+    _x86State._occupied.or_(C, regMask);
+    _x86State._modified.or_(C, static_cast<uint32_t>(modified) << regIndex);
 
     ASMJIT_X86_CHECK_STATE
   }
@@ -163,7 +160,7 @@ struct X86X64Context : public BaseContext {
   //!
   //! The opposite of 'Attach'. Detach resets the members in 'VarData'
   //! (regIndex, state and changed flags) and unlinks the variable with the
-  //! current 'VarState'.
+  //! current 'X86VarState'.
   template<int C>
   ASMJIT_INLINE void detach(VarData* vd, uint32_t regIndex, uint32_t vState) {
     ASMJIT_ASSERT(vd->getClass() == C);
@@ -177,8 +174,8 @@ struct X86X64Context : public BaseContext {
     vd->setModified(false);
 
     _x86State.getListByClass(C)[regIndex] = NULL;
-    _x86State._occupied.del(C, regMask);
-    _x86State._modified.del(C, regMask);
+    _x86State._occupied.andNot(C, regMask);
+    _x86State._modified.andNot(C, regMask);
 
     ASMJIT_X86_CHECK_STATE
   }
@@ -189,7 +186,7 @@ struct X86X64Context : public BaseContext {
 
   //! Rebase.
   //!
-  //! Change the register of the 'VarData' changing also the current 'VarState'.
+  //! Change the register of the 'VarData' changing also the current 'X86VarState'.
   //! Rebase is nearly identical to 'Detach' and 'Attach' sequence, but doesn't
   // change the 'VarData' modified flag.
   template<int C>
@@ -247,7 +244,7 @@ struct X86X64Context : public BaseContext {
     emitSave(vd, regIndex, "Save");
 
     vd->setModified(false);
-    _x86State._modified.del(C, regMask);
+    _x86State._modified.andNot(C, regMask);
 
     ASMJIT_X86_CHECK_STATE
   }
@@ -281,11 +278,11 @@ struct X86X64Context : public BaseContext {
   ASMJIT_INLINE void swapGp(VarData* aVd, VarData* bVd) {
     ASMJIT_ASSERT(aVd != bVd);
 
-    ASMJIT_ASSERT(aVd->getClass() == kRegClassGp);
+    ASMJIT_ASSERT(aVd->getClass() == kX86RegClassGp);
     ASMJIT_ASSERT(aVd->getState() == kVarStateReg);
     ASMJIT_ASSERT(aVd->getRegIndex() != kInvalidReg);
 
-    ASMJIT_ASSERT(bVd->getClass() == kRegClassGp);
+    ASMJIT_ASSERT(bVd->getClass() == kX86RegClassGp);
     ASMJIT_ASSERT(bVd->getState() == kVarStateReg);
     ASMJIT_ASSERT(bVd->getRegIndex() != kInvalidReg);
 
@@ -297,11 +294,11 @@ struct X86X64Context : public BaseContext {
     aVd->setRegIndex(bIndex);
     bVd->setRegIndex(aIndex);
 
-    _x86State.getListByClass(kRegClassGp)[aIndex] = bVd;
-    _x86State.getListByClass(kRegClassGp)[bIndex] = aVd;
+    _x86State.getListByClass(kX86RegClassGp)[aIndex] = bVd;
+    _x86State.getListByClass(kX86RegClassGp)[bIndex] = aVd;
 
     uint32_t m = aVd->isModified() ^ bVd->isModified();
-    _x86State._modified.xor_(kRegClassGp, (m << aIndex) | (m << bIndex));
+    _x86State._modified.xor_(kX86RegClassGp, (m << aIndex) | (m << bIndex));
 
     ASMJIT_X86_CHECK_STATE
   }
@@ -310,7 +307,7 @@ struct X86X64Context : public BaseContext {
   // [Alloc / Spill]
   // --------------------------------------------------------------------------
 
-  //! Alloc
+  //! Alloc.
   template<int C>
   ASMJIT_INLINE void alloc(VarData* vd, uint32_t regIndex) {
     ASMJIT_ASSERT(vd->getClass() == C);
@@ -384,7 +381,7 @@ struct X86X64Context : public BaseContext {
     uint32_t regMask = IntUtil::mask(regIndex);
 
     vd->setModified(true);
-    _x86State._modified.add(C, regMask);
+    _x86State._modified.or_(C, regMask);
 
     ASMJIT_X86_CHECK_STATE
   }
@@ -415,35 +412,34 @@ struct X86X64Context : public BaseContext {
   // [State]
   // --------------------------------------------------------------------------
 
-  //! Get state as `VarState`.
-  ASMJIT_INLINE VarState* getState() const {
-    return const_cast<VarState*>(&_x86State);
+  //! Get state as `X86VarState`.
+  ASMJIT_INLINE X86VarState* getState() const {
+    return const_cast<X86VarState*>(&_x86State);
   }
 
-  virtual void loadState(BaseVarState* src);
-  virtual BaseVarState* saveState();
+  virtual void loadState(VarState* src);
+  virtual VarState* saveState();
 
-  virtual void switchState(BaseVarState* src);
-  virtual void intersectStates(BaseVarState* a, BaseVarState* b);
+  virtual void switchState(VarState* src);
+  virtual void intersectStates(VarState* a, VarState* b);
 
   // --------------------------------------------------------------------------
   // [Memory]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE Mem getVarMem(VarData* vd) {
+  ASMJIT_INLINE X86Mem getVarMem(VarData* vd) {
     (void)getVarCell(vd);
 
-    Mem mem(_memSlot);
+    X86Mem mem(_memSlot);
     mem.setBase(vd->getId());
     return mem;
   }
 
   // --------------------------------------------------------------------------
-  // [Prepare]
+  // [Fetch]
   // --------------------------------------------------------------------------
 
   virtual Error fetch();
-  virtual Error analyze();
 
   // --------------------------------------------------------------------------
   // [Annotate]
@@ -458,36 +454,42 @@ struct X86X64Context : public BaseContext {
   virtual Error translate();
 
   // --------------------------------------------------------------------------
+  // [Schedule]
+  // --------------------------------------------------------------------------
+
+  virtual Error schedule();
+
+  // --------------------------------------------------------------------------
   // [Serialize]
   // --------------------------------------------------------------------------
 
-  virtual Error serialize(BaseAssembler* assembler, Node* start, Node* stop);
+  virtual Error serialize(Assembler* assembler, Node* start, Node* stop);
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
+  //! Count of X86/X64 registers.
+  X86RegCount _regCount;
   //! X86/X64 stack-pointer (esp or rsp).
-  GpReg _zsp;
+  X86GpReg _zsp;
   //! X86/X64 frame-pointer (ebp or rbp).
-  GpReg _zbp;
+  X86GpReg _zbp;
   //! Temporary memory operand.
-  Mem _memSlot;
+  X86Mem _memSlot;
 
   //! X86/X64 specific compiler state, linked to `_state`.
-  VarState _x86State;
+  X86VarState _x86State;
   //! Clobbered registers (for the whole function).
-  RegMask _clobberedRegs;
+  X86RegMask _clobberedRegs;
 
   //! Memory cell where is stored address used to restore manually
   //! aligned stack.
   MemCell* _stackFrameCell;
 
   //! Global allocable registers mask.
-  uint32_t _gaRegs[kRegClassCount];
+  uint32_t _gaRegs[kX86RegClassCount];
 
-  //! X86/X64 number of Gp/Xmm registers.
-  uint8_t _baseRegsCount;
   //! Function arguments base pointer (register).
   uint8_t _argBaseReg;
   //! Function variables base pointer (register).
@@ -511,7 +513,6 @@ struct X86X64Context : public BaseContext {
 
 //! \}
 
-} // x86x64 namespace
 } // asmjit namespace
 
 // [Api-End]

@@ -70,7 +70,7 @@ ASMJIT_ENUM(kLoggerStyle) {
 //!
 //! This class also contain `_enabled` member that can be used to enable
 //! or disable logging.
-struct Logger {
+struct ASMJIT_VCLASS Logger {
   ASMJIT_NO_COPY(Logger)
 
   // --------------------------------------------------------------------------
@@ -117,11 +117,17 @@ struct Logger {
   // --------------------------------------------------------------------------
 
   //! Get indentation.
-  ASMJIT_INLINE const char* getIndentation() const { return _indentation; }
+  ASMJIT_INLINE const char* getIndentation() const {
+    return _indentation;
+  }
+
   //! Set indentation.
   ASMJIT_API void setIndentation(const char* indentation);
+
   //! Reset indentation.
-  ASMJIT_INLINE void resetIndentation() { setIndentation(NULL); }
+  ASMJIT_INLINE void resetIndentation() {
+    setIndentation(NULL);
+  }
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -139,7 +145,7 @@ struct Logger {
 // ============================================================================
 
 //! Logger that can log to standard C `FILE*` stream.
-struct FileLogger : public Logger {
+struct ASMJIT_VCLASS FileLogger : public Logger {
   ASMJIT_NO_COPY(FileLogger)
 
   // --------------------------------------------------------------------------
@@ -159,11 +165,15 @@ struct FileLogger : public Logger {
   //! Get `FILE*` stream.
   //!
   //! \note Return value can be `NULL`.
-  ASMJIT_INLINE FILE* getStream() const { return _stream; }
+  ASMJIT_INLINE FILE* getStream() const {
+    return _stream;
+  }
 
   //! Set `FILE*` stream, can be set to `NULL` to disable logging, although
   //! the `CodeGen` will still call `logString` even if there is no stream.
-  ASMJIT_API void setStream(FILE* stream);
+  ASMJIT_INLINE void setStream(FILE* stream) {
+    _stream = stream;
+  }
 
   // --------------------------------------------------------------------------
   // [Logging]
@@ -184,7 +194,7 @@ struct FileLogger : public Logger {
 // ============================================================================
 
 //! String logger.
-struct StringLogger : public Logger {
+struct ASMJIT_VCLASS StringLogger : public Logger {
   ASMJIT_NO_COPY(StringLogger)
 
   // --------------------------------------------------------------------------
@@ -201,14 +211,17 @@ struct StringLogger : public Logger {
   // [Accessors]
   // --------------------------------------------------------------------------
 
-  //! Get <code>char*</code> pointer which represents the resulting
-  //! string.
+  //! Get `char*` pointer which represents the resulting string.
   //!
   //! The pointer is owned by `StringLogger`, it can't be modified or freed.
-  ASMJIT_INLINE const char* getString() const { return _stringBuilder.getData(); }
+  ASMJIT_INLINE const char* getString() const {
+    return _stringBuilder.getData();
+  }
 
   //! Clear the resulting string.
-  ASMJIT_INLINE void clearString() { _stringBuilder.clear(); }
+  ASMJIT_INLINE void clearString() {
+    _stringBuilder.clear();
+  }
 
   // --------------------------------------------------------------------------
   // [Logging]

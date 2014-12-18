@@ -20,8 +20,8 @@ namespace asmjit {
 // [Forward Declarations]
 // ============================================================================
 
-struct BaseAssembler;
-struct BaseCompiler;
+struct Assembler;
+struct Compiler;
 
 //! \addtogroup asmjit_base_general
 //! \{
@@ -52,7 +52,7 @@ ASMJIT_ENUM(kOperandType) {
 
 //! Operand id masks used to determine the operand type.
 ASMJIT_ENUM(kOperandId) {
-  //! Operand id refers to `BaseVar`.
+  //! Operand id refers to `Var`.
   kOperandIdVar = 0x80000000U,
   //! Operand id to real index mask.
   kOperandIdNum = 0x7FFFFFFFU
@@ -64,11 +64,8 @@ ASMJIT_ENUM(kOperandId) {
 
 //! Register class.
 ASMJIT_ENUM(kRegClass) {
-  //! Gp register class (any architecture).
-  kRegClassGp = 0,
-
-  //! Invalid register class.
-  kRegClassInvalid = 0xFF
+  //! Gp register class, compatible with all architectures.
+  kRegClassGp = 0
 };
 
 // ============================================================================
@@ -102,7 +99,7 @@ ASMJIT_ENUM(kMemType) {
   //! Memory operand is a combination of base register and optional index register
   //! and displacement.
   //!
-  //! The `BaseAssembler` interprets `kMemTypeBaseIndex` and `kMemTypeStackIndex`
+  //! The `Assembler` interprets `kMemTypeBaseIndex` and `kMemTypeStackIndex`
   //! types the same way, but `Compiler` interprets  `kMemTypeBaseIndex` as
   //! `[base + index]` and `kMemTypeStackIndex` as `[stack(base) + index]`.
   kMemTypeBaseIndex = 0,
@@ -110,8 +107,8 @@ ASMJIT_ENUM(kMemType) {
   //! Memory operand is a combination of variable's memory location,
   //! optional index register and displacement.
   //!
-  //! The `BaseAssembler` interprets `kMemTypeBaseIndex` and  `kMemTypeStackIndex`
-  //! types in the same way, but `BaseCompiler` interprets `kMemTypeBaseIndex` as
+  //! The `Assembler` interprets `kMemTypeBaseIndex` and  `kMemTypeStackIndex`
+  //! types in the same way, but `Compiler` interprets `kMemTypeBaseIndex` as
   //! `[base + index]` and `kMemTypeStackIndex` as `[stack(base) + index]`.
   kMemTypeStackIndex = 1,
 
@@ -125,52 +122,6 @@ ASMJIT_ENUM(kMemType) {
 };
 
 // ============================================================================
-// [asmjit::kVarType]
-// ============================================================================
-
-ASMJIT_ENUM(kVarType) {
-  //! Variable is 8-bit signed integer.
-  kVarTypeInt8 = 0,
-  //! Variable is 8-bit unsigned integer.
-  kVarTypeUInt8 = 1,
-  //! Variable is 16-bit signed integer.
-  kVarTypeInt16 = 2,
-  //! Variable is 16-bit unsigned integer.
-  kVarTypeUInt16 = 3,
-  //! Variable is 32-bit signed integer.
-  kVarTypeInt32 = 4,
-  //! Variable is 32-bit unsigned integer.
-  kVarTypeUInt32 = 5,
-  //! Variable is 64-bit signed integer.
-  kVarTypeInt64 = 6,
-  //! Variable is 64-bit unsigned integer.
-  kVarTypeUInt64 = 7,
-
-  //! Variable is target `intptr_t`, not compatible with host `intptr_t`.
-  kVarTypeIntPtr = 8,
-  //! Variable is target `uintptr_t`, not compatible with host `uintptr_t`.
-  kVarTypeUIntPtr = 9,
-
-  //! Variable is 32-bit floating point (single precision).
-  kVarTypeFp32 = 10,
-  //! Variable is 64-bit floating point (double precision).
-  kVarTypeFp64 = 11,
-
-  //! Invalid variable type.
-  kVarTypeInvalid = 0xFF,
-
-  //! \internal
-  _kVarTypeIntStart = kVarTypeInt8,
-  //! \internal
-  _kVarTypeIntEnd = kVarTypeUIntPtr,
-
-  //! \internal
-  _kVarTypeFpStart = kVarTypeFp32,
-  //! \internal
-  _kVarTypeFpEnd = kVarTypeFp64
-};
-
-// ============================================================================
 // [asmjit::Operand]
 // ============================================================================
 
@@ -180,19 +131,6 @@ struct Operand {
   // [Structs]
   // --------------------------------------------------------------------------
 
-  // \internal
-  //
-  // Register operand structure, allows to do register initialization at
-  // compile time instead of doing it "non-deterministically" at runtime.
-  struct InitRegOp {
-    uint8_t op;
-    uint8_t size;
-    uint16_t code;
-    uint32_t id;
-    uint32_t vType;
-    uint32_t vUnused;
-  };
-
   //! \internal
   //!
   //! Base operand data.
@@ -201,15 +139,20 @@ struct Operand {
     uint8_t op;
     //! Size of operand (register, address, immediate, or variable).
     uint8_t size;
-    //! Flags, each operand uses this byte for something else.
-    uint8_t reserved0;
-    //! Reserved (not used).
-    uint8_t reserved1;
+    //! \internal
+    uint8_t reserved_2_1;
+    //! \internal
+    uint8_t reserved_3_1;
 
-    //! Operand id, identifier used by `BaseAssembler` and `BaseCompiler`.
+    //! Operand id, identifier used by `Assembler` and `Compiler`.
     //!
     //! \note Uninitialized operand has always set id to `kInvalidValue`.
     uint32_t id;
+
+    //! \internal
+    uint32_t reserved_8_4;
+    //! \internal
+    uint32_t reserved_12_4;
   };
 
   //! \internal
@@ -241,15 +184,24 @@ struct Operand {
       };
     };
 
-    //! Variable id, used by `BaseCompiler` to identify variables.
+    //! Variable id, used by `Compiler` to identify variables.
     uint32_t id;
 
-    //! Variable type.
-    uint32_t vType;
-    //! \internal
-    //!
-    //! Unused.
-    uint32_t vUnused;
+    union {
+      struct {
+        //! Variable type.
+        uint32_t vType;
+        //! \internal
+        uint32_t reserved_12_4;
+      };
+
+      //! \internal
+      //!
+      //! This is not needed or used, it's just to force compiler to always
+      //! align this struct to 8-bytes (so the struct is compatible to others
+      //! when it comes to alignment). It should fix VS linker warning as well.
+      uint64_t reserved8_8;
+    };
   };
 
   //! \internal
@@ -263,7 +215,7 @@ struct Operand {
     //! Type of the memory operand, see `kMemType`.
     uint8_t type;
     //! X86/X64 layout:
-    //!   - segment  [3 bits], see `x86x64::kSeg`.
+    //!   - segment  [3 bits], see `kX86Seg`.
     //!   - shift    [2 bits], index register shift (0 to 3).
     uint8_t flags;
 
@@ -283,12 +235,12 @@ struct Operand {
     uint8_t op;
     //! Size of immediate (or 0 to autodetect).
     uint8_t size;
-    //! Reserved (not used).
-    uint8_t reserved0;
-    //! Reserved (not used).
-    uint8_t reserved1;
+    //! \internal
+    uint8_t reserved_2_1;
+    //! \internal
+    uint8_t reserved_3_1;
 
-    //! Operand id, always set to `kInvalidValue`.
+    //! Operand id, always set to `kInvalidValue` (immediates don't have IDs).
     uint32_t id;
 
     union {
@@ -325,15 +277,21 @@ struct Operand {
   struct LabelOp {
     //! Type of operand, `kOperandTypeLabel`.
     uint8_t op;
-    //! Reserved (not used).
+    //! Always zero, labels don't have size.
     uint8_t size;
-    //! Reserved (not used).
-    uint8_t reserved0;
-    //! Reserved (not used).
-    uint8_t reserved1;
+    //! \internal
+    uint8_t reserved_2_1;
+    //! \internal
+    uint8_t reserved_3_1;
 
-    //! Operand id.
+    //! Operand id (`kInvalidValue` if the label is not initialized by code
+    //! generator).
     uint32_t id;
+
+    //! \internal
+    uint32_t reserved_8_4;
+    //! \internal
+    uint32_t reserved_12_4;
   };
 
   // --------------------------------------------------------------------------
@@ -407,10 +365,14 @@ struct Operand {
   // --------------------------------------------------------------------------
 
   template<typename T>
-  ASMJIT_INLINE T& getData() { return reinterpret_cast<T&>(_base); }
+  ASMJIT_INLINE T& getData() {
+    return reinterpret_cast<T&>(_base);
+  }
 
   template<typename T>
-  ASMJIT_INLINE const T& getData() const { return reinterpret_cast<const T&>(_base); }
+  ASMJIT_INLINE const T& getData() const {
+    return reinterpret_cast<const T&>(_base);
+  }
 
   // --------------------------------------------------------------------------
   // [Type]
@@ -435,6 +397,16 @@ struct Operand {
   // --------------------------------------------------------------------------
   // [Type - Combined]
   // --------------------------------------------------------------------------
+
+  //! Get register type.
+  ASMJIT_INLINE uint32_t getRegType() const {
+    return _vreg.type;
+  }
+
+  //! Get register index.
+  ASMJIT_INLINE uint32_t getRegIndex() const {
+    return _vreg.index;
+  }
 
   //! Get whether the operand is register of `type`.
   ASMJIT_INLINE bool isRegType(uint32_t type) const {
@@ -465,7 +437,9 @@ struct Operand {
   // --------------------------------------------------------------------------
 
   //! Get size of the operand in bytes.
-  ASMJIT_INLINE uint32_t getSize() const { return _base.size; }
+  ASMJIT_INLINE uint32_t getSize() const {
+    return _base.size;
+  }
 
   // --------------------------------------------------------------------------
   // [Id]
@@ -473,11 +447,13 @@ struct Operand {
 
   //! Get operand id.
   //!
-  //! Operand id's are used internally by `BaseAssembler` and `BaseCompiler`.
+  //! Operand id's are used internally by `Assembler` and `Compiler`.
   //!
   //! There is no way to change or remove operand id. Unneeded operands can be
   //! simply reassigned by `operator=`.
-  ASMJIT_INLINE uint32_t getId() const { return _base.id; }
+  ASMJIT_INLINE uint32_t getId() const {
+    return _base.id;
+  }
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -521,7 +497,7 @@ struct OperandUtil {
     return id & 0x7FFFFFFFU;
   }
 
-  //! Get whether the id refers to `BaseVar`.
+  //! Get whether the id refers to `Var`.
   //!
   //! \note The function will never return `true` if the id is `kInvalidValue`.
   //! The trick is to compare a given id to -1 (kInvalidValue) so we check both
@@ -539,39 +515,44 @@ struct OperandUtil {
 };
 
 // ============================================================================
-// [asmjit::BaseReg]
+// [asmjit::Reg]
 // ============================================================================
 
 //! Base class for all register operands.
-struct BaseReg : public Operand {
+struct Reg : public Operand {
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
   //! Create a dummy base register.
-  ASMJIT_INLINE BaseReg() : Operand(NoInit) {
+  ASMJIT_INLINE Reg() : Operand(NoInit) {
     _init_packed_op_sz_w0_id(kOperandTypeReg, 0, (kInvalidReg << 8) + kInvalidReg, kInvalidValue);
-    _init_packed_d2_d3(kVarTypeInvalid, 0);
+    _init_packed_d2_d3(kInvalidVar, 0);
   }
 
   //! Create a new base register.
-  ASMJIT_INLINE BaseReg(uint32_t type, uint32_t index, uint32_t size) : Operand(NoInit) {
+  ASMJIT_INLINE Reg(uint32_t type, uint32_t index, uint32_t size) : Operand(NoInit) {
     _init_packed_op_sz_w0_id(kOperandTypeReg, size, (type << 8) + index, kInvalidValue);
-    _init_packed_d2_d3(kVarTypeInvalid, 0);
+    _init_packed_d2_d3(kInvalidVar, 0);
   }
 
   //! Create a new reference to `other`.
-  ASMJIT_INLINE BaseReg(const BaseReg& other) : Operand(other) {}
+  ASMJIT_INLINE Reg(const Reg& other) : Operand(other) {}
 
-  explicit ASMJIT_INLINE BaseReg(const _NoInit&) : Operand(NoInit) {}
+  //! Create a new reference to `other` and change the index to `index`.
+  ASMJIT_INLINE Reg(const Reg& other, uint32_t index) : Operand(other) {
+    _vreg.index = static_cast<uint8_t>(index);
+  }
+
+  explicit ASMJIT_INLINE Reg(const _NoInit&) : Operand(NoInit) {}
 
   // --------------------------------------------------------------------------
-  // [BaseReg Specific]
+  // [Reg Specific]
   // --------------------------------------------------------------------------
 
-  //! Clone `BaseReg` operand.
-  ASMJIT_INLINE BaseReg clone() const {
-    return BaseReg(*this);
+  //! Clone `Reg` operand.
+  ASMJIT_INLINE Reg clone() const {
+    return Reg(*this);
   }
 
   //! Get whether register code is equal to `type`.
@@ -679,15 +660,25 @@ struct BaseMem : public Operand {
   }
 
   //! Get the type of the memory operand, see `kMemType`.
-  ASMJIT_INLINE uint32_t getMemType() const { return _vmem.type; }
+  ASMJIT_INLINE uint32_t getMemType() const {
+    return _vmem.type;
+  }
+
   //! Get whether the type of the memory operand is either `kMemTypeBaseIndex`
   //! or `kMemTypeStackIndex`.
-  ASMJIT_INLINE bool isBaseIndexType() const { return _vmem.type <= kMemTypeStackIndex; }
+  ASMJIT_INLINE bool isBaseIndexType() const {
+    return _vmem.type <= kMemTypeStackIndex;
+  }
 
   //! Get whether the memory operand has base register.
-  ASMJIT_INLINE bool hasBase() const { return _vmem.base != kInvalidValue; }
+  ASMJIT_INLINE bool hasBase() const {
+    return _vmem.base != kInvalidValue;
+  }
+
   //! Get memory operand base id, or `kInvalidValue`.
-  ASMJIT_INLINE uint32_t getBase() const { return _vmem.base; }
+  ASMJIT_INLINE uint32_t getBase() const {
+    return _vmem.base;
+  }
 
   //! Set memory operand size.
   ASMJIT_INLINE BaseMem& setSize(uint32_t size) {
@@ -719,52 +710,10 @@ struct BaseMem : public Operand {
     return (_packed[0] == other._packed[0]) & (_packed[1] == other._packed[1]);
   }
 
-  ASMJIT_INLINE bool operator!=(const BaseMem& other) const { return !(*this == other); }
+  ASMJIT_INLINE bool operator!=(const BaseMem& other) const {
+    return !(*this == other);
+  }
 };
-
-// ============================================================================
-// [asmjit::BaseVar]
-// ============================================================================
-
-#if !defined(ASMJIT_DISABLE_COMPILER)
-//! Base class for all variables.
-struct BaseVar : public Operand {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE BaseVar() : Operand(NoInit) {
-    _init_packed_op_sz_b0_b1_id(kOperandTypeVar, 0, 0, 0, kInvalidValue);
-    _init_packed_d2_d3(kInvalidValue, kInvalidValue);
-  }
-
-  ASMJIT_INLINE BaseVar(const BaseVar& other) : Operand(other) {}
-
-  explicit ASMJIT_INLINE BaseVar(const _NoInit&) : Operand(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [BaseVar Specific]
-  // --------------------------------------------------------------------------
-
-  //! Clone `BaseVar` operand.
-  ASMJIT_INLINE BaseVar clone() const {
-    return BaseVar(*this);
-  }
-
-  ASMJIT_INLINE uint32_t getVarType() const {
-    return _vreg.vType;
-  }
-
-  // --------------------------------------------------------------------------
-  // [Operator Overload]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE BaseVar& operator=(const BaseVar& other) { _copy(other); return *this; }
-
-  ASMJIT_INLINE bool operator==(const BaseVar& other) const { return _packed[0] == other._packed[0]; }
-  ASMJIT_INLINE bool operator!=(const BaseVar& other) const { return !operator==(other); }
-};
-#endif // !ASMJIT_DISABLE_COMPILER
 
 // ============================================================================
 // [asmjit::Imm]
@@ -1033,7 +982,7 @@ struct Imm : public Operand {
 //! Label represents a location in code typically used as jump targets, but may
 //! be also reference data or static variables. Label has to be explicitly
 //! created by a code-generator by calling `CodeGen::newLabel()` where `CodeGen`
-//! is your code generator, which derives from `BaseAssembler` or `BaseCompiler`.
+//! is your code generator, which derives from `Assembler` or `Compiler`.
 //!
 //! Example of using labels:
 //!
@@ -1047,12 +996,12 @@ struct Imm : public Operand {
 //! // ... your code ...
 //!
 //! // Using label.
-//! a->jump(L_1);
+//! a.jump(L_1);
 //!
 //! // ... your code ...
 //!
 //! // Bind label to the current position, see `CodeGen::bind()`.
-//! a->bind(L_1);
+//! a.bind(L_1);
 //! ~~~
 struct Label : public Operand {
   // --------------------------------------------------------------------------
@@ -1070,9 +1019,9 @@ struct Label : public Operand {
   }
 
   //! Create new initialized label.
-  explicit ASMJIT_INLINE Label(BaseAssembler& a);
+  explicit ASMJIT_INLINE Label(Assembler& a);
   //! Create new initialized label.
-  explicit ASMJIT_INLINE Label(BaseCompiler& c);
+  explicit ASMJIT_INLINE Label(Compiler& c);
 
   //! Create reference to another label.
   ASMJIT_INLINE Label(const Label& other) : Operand(other) {}
@@ -1086,6 +1035,15 @@ struct Label : public Operand {
   ASMJIT_INLINE void reset() {
     _init_packed_op_sz_b0_b1_id(kOperandTypeLabel, 0, 0, 0, kInvalidValue);
     _init_packed_d2_d3(0, 0);
+  }
+
+  // --------------------------------------------------------------------------
+  // [Label Specific]
+  // --------------------------------------------------------------------------
+
+  //! Get whether the label has been initialized by `Assembler` or `Compiler`.
+  ASMJIT_INLINE bool isInitialized() const {
+    return _label.id != kInvalidValue;
   }
 
   // --------------------------------------------------------------------------

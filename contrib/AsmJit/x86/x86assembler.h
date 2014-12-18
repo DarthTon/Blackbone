@@ -12,18 +12,529 @@
 #include "../base/assembler.h"
 #include "../x86/x86inst.h"
 #include "../x86/x86operand.h"
-#include "../x86/x86regs.h"
-#include "../x86/x86util.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
 
 namespace asmjit {
-namespace x86x64 {
+
+//! \addtogroup asmjit_x86_general
+//! \{
 
 // ============================================================================
-// [CodeGen-Begin]
+// [asmjit::X86Assembler]
 // ============================================================================
+
+// \internal
+#define ASMJIT_X86_EMIT_OPTIONS(_Class_) \
+  /*! Force short form of jmp/jcc instruction. */ \
+  ASMJIT_INLINE _Class_& short_() { \
+    _instOptions |= kInstOptionShortForm; \
+    return *this; \
+  } \
+  \
+  /*! Force long form of jmp/jcc instruction. */ \
+  ASMJIT_INLINE _Class_& long_() { \
+    _instOptions |= kInstOptionLongForm; \
+    return *this; \
+  } \
+  \
+  /*! Condition is likely to be taken (has only benefit on P4). */ \
+  ASMJIT_INLINE _Class_& taken() { \
+    _instOptions |= kInstOptionTaken; \
+    return *this; \
+  } \
+  \
+  /*! Condition is unlikely to be taken (has only benefit on P4). */ \
+  ASMJIT_INLINE _Class_& notTaken() { \
+    _instOptions |= kInstOptionNotTaken; \
+    return *this; \
+  } \
+  \
+  /*! Use LOCK prefix. */ \
+  ASMJIT_INLINE _Class_& lock() { \
+    _instOptions |= kX86InstOptionLock; \
+    return *this; \
+  } \
+  \
+  /*! Force REX prefix (X64). */ \
+  ASMJIT_INLINE _Class_& rex() { \
+    _instOptions |= kX86InstOptionRex; \
+    return *this; \
+  } \
+  \
+  /*! Force 3-byte VEX prefix (AVX+). */ \
+  ASMJIT_INLINE _Class_& vex3() { \
+    _instOptions |= kX86InstOptionVex3; \
+    return *this; \
+  } \
+  \
+  /*! Force 4-byte EVEX prefix (AVX512+). */ \
+  ASMJIT_INLINE _Class_& evex() { \
+    _instOptions |= kX86InstOptionEvex; \
+    return *this; \
+  } \
+  \
+  /*! Use zeroing instead of merging (AVX512+). */ \
+  ASMJIT_INLINE _Class_& z() { \
+    _instOptions |= kX86InstOptionEvexZero; \
+    return *this; \
+  } \
+  \
+  /*! Broadcast one element to all other elements (AVX512+). */ \
+  ASMJIT_INLINE _Class_& _1ToN() { \
+    _instOptions |= kX86InstOptionEvexOneN; \
+    return *this; \
+  } \
+  \
+  /*! Suppress all exceptions (AVX512+). */ \
+  ASMJIT_INLINE _Class_& sae() { \
+    _instOptions |= kX86InstOptionEvexSae; \
+    return *this; \
+  } \
+  \
+  /*! Static rounding mode `round-to-nearest` (even) and `SAE` (AVX512+). */ \
+  ASMJIT_INLINE _Class_& rn_sae() { \
+    _instOptions |= kX86InstOptionEvexRnSae; \
+    return *this; \
+  } \
+  \
+  /*! Static rounding mode `round-down` (toward -inf) and `SAE` (AVX512+). */ \
+  ASMJIT_INLINE _Class_& rd_sae() { \
+    _instOptions |= kX86InstOptionEvexRdSae; \
+    return *this; \
+  } \
+  \
+  /*! Static rounding mode `round-up` (toward +inf) and `SAE` (AVX512+). */ \
+  ASMJIT_INLINE _Class_& ru_sae() { \
+    _instOptions |= kX86InstOptionEvexRuSae; \
+    return *this; \
+  } \
+  \
+  /*! Static rounding mode `round-toward-zero` (truncate) and `SAE` (AVX512+). */ \
+  ASMJIT_INLINE _Class_& rz_sae() { \
+    _instOptions |= kX86InstOptionEvexRzSae; \
+    return *this; \
+  }
+
+//! X86/X64 assembler.
+//!
+//! Assembler is the main class in AsmJit that can encode instructions and their
+//! operands to a binary stream runnable by CPU. It creates internal buffer
+//! where the encodes instructions are stored and it contains intrinsics that
+//! can be used to emit the code in a convenent way. Code generation is in
+//! general safe, because the intrinsics uses method overloading so even the
+//! code is emitted it can be checked by a C++ compiler. It's nearly impossible
+//! to create invalid instruction, for example `mov [eax], [eax]`, because such
+//! overload doesn't exist.
+//!
+//! Each call to an assembler intrinsic function emits instruction directly
+//! to the binary stream. There are also runtime checks that prevent invalid
+//! code to be emitted. It will assert in debug mode and put the `Assembler`
+//! instance to an  error state in production mode.
+//!
+//! Code Generation
+//! ---------------
+//!
+//! To generate code is only needed to create instance of `Assembler`
+//! and to use intrinsics. See example how to do that:
+//!
+//! ~~~
+//! // Use asmjit namespace.
+//! using namespace asmjit;
+//! using namespace asmjit::x86;
+//!
+//! // Create X86Assembler instance.
+//! X86Assembler a;
+//!
+//! // Prolog.
+//! a.push(ebp);
+//! a.mov(ebp, esp);
+//!
+//! // Mov 1024 to EAX, EAX is also return value.
+//! a.mov(eax, 1024);
+//!
+//! // Epilog.
+//! a.mov(esp, ebp);
+//! a.pop(ebp);
+//!
+//! // Return.
+//! a.ret();
+//! ~~~
+//!
+//! You can see that syntax is very close to Intel one. Only difference is that
+//! you are calling functions that emit binary code for you. All registers are
+//! in `asmjit::x86` namespace, so it's very comfortable to use it (look at the
+//! `use namespace` section). Without importing `asmjit::x86` registers would
+//! have to be written as `x86::eax`, `x86::esp`, and so on.
+//!
+//! There is also possibility to use memory addresses and immediates. Use
+//! `ptr()`, `byte_ptr()`, `word_ptr()`, `dword_ptr()` and similar functions to
+//! build a memory address operand. In most cases `ptr()` is enough, because an
+//! information related to the operand size is needed only in rare cases, that
+//! is an instruction without having any register operands, such as `inc [mem]`.
+//!
+//! for example, `a` is an `X86Assembler` instance:
+//!
+//! ~~~
+//! a.mov(ptr(eax), 0);             // mov ptr [eax], 0
+//! a.mov(ptr(eax), edx);           // mov ptr [eax], edx
+//! ~~~
+//!
+//! But it's also possible to create complex addresses offered by x86 architecture:
+//!
+//! ~~~
+//! // eax + ecx*x addresses
+//! a.mov(ptr(eax, ecx, 0), 0);     // mov ptr [eax + ecx], 0
+//! a.mov(ptr(eax, ecx, 1), 0);     // mov ptr [eax + ecx * 2], 0
+//! a.mov(ptr(eax, ecx, 2), 0);     // mov ptr [eax + ecx * 4], 0
+//! a.mov(ptr(eax, ecx, 3), 0);     // mov ptr [eax + ecx * 8], 0
+//! // eax + ecx*x + disp addresses
+//! a.mov(ptr(eax, ecx, 0,  4), 0); // mov ptr [eax + ecx     +  4], 0
+//! a.mov(ptr(eax, ecx, 1,  8), 0); // mov ptr [eax + ecx * 2 +  8], 0
+//! a.mov(ptr(eax, ecx, 2, 12), 0); // mov ptr [eax + ecx * 4 + 12], 0
+//! a.mov(ptr(eax, ecx, 3, 16), 0); // mov ptr [eax + ecx * 8 + 16], 0
+//! ~~~
+//!
+//! All addresses shown are using `x86::ptr()` to make memory operand. Some
+//! assembler instructions using a single operand need to know the size of
+//! the operand to avoid ambiguity. For example `a.inc(ptr(eax))` is ambiguous
+//! and would cause a runtime error. This problem can be fixed by using memory
+//! operand with size specified - `byte_ptr`, `word_ptr`, `dword_ptr`, see the
+//! code below:
+//!
+//! ~~~
+//! // [byte] address.
+//! a.inc(byte_ptr(eax));           // Inc byte ptr [eax].
+//! a.dec(byte_ptr(eax));           // Dec byte ptr [eax].
+//! // [word] address.
+//! a.inc(word_ptr(eax));           // Inc word ptr [eax].
+//! a.dec(word_ptr(eax));           // Dec word ptr [eax].
+//! // [dword] address.
+//! a.inc(dword_ptr(eax));          // Inc dword ptr [eax].
+//! a.dec(dword_ptr(eax));          // Dec dword ptr [eax].
+//! // [dword] address.
+//! a.inc(dword_ptr(rax));          // Inc qword ptr [rax].
+//! a.dec(dword_ptr(rax));          // Dec qword ptr [rax].
+//! ~~~
+//!
+//! Calling JIT Code
+//! ----------------
+//!
+//! After you are finished with emitting instructions, you can make your function
+//! callable by using `Assembler::make()` method. This method will use memory
+//! manager to allocate virtual memory and relocates generated code to it. The
+//! memory is allocated through `Runtime` instance provided to `X86Assembler`
+//! constructor.
+//!
+//! The size of the code generated can be retrieved by `getCodeSize()` and
+//! `getOffset()` methods. The `getOffset()` method returns the current offset
+//! (that is mostly equal to the final code size, if called after the code
+//! generation) and `getCodeSize()` returns the final code size with possible
+//! trampolines. The `takeCode()` method can be used to take the internal buffer
+//! and reset the code generator, but the buffer returned has to be freed manually
+//! in such case.
+//!
+//! Machine code can be executed only in memory that is marked executable. This
+//! mark is usually not set for memory returned by a C/C++ `malloc()` function.
+//! The `VMemUtil::alloc()` function can be used allocate a memory where the code
+//! can be executed. Please note that `VMemUtil` is a low-level class that works
+//! at memory page level. High level interface that is similar to malloc/free is
+//! provided by `VMemMgr` class.
+//!
+//! The next example shows how to allocate memory where the code can be executed:
+//!
+//! ~~~
+//! using namespace asmjit;
+//!
+//! JitRuntime runtime;
+//! X86Assembler a(&runtime);
+//!
+//! ... Code generation ...
+//!
+//! // The function prototype.
+//! typedef void (*MyFunc)();
+//!
+//! // Make the function.
+//! MyFunc func = asmjit_cast<MyFunc>(a.make());
+//!
+//! // Call the function.
+//! func();
+//!
+//! // Release the function if not needed anymore.
+//! runtime.release(func);
+//! ~~~
+//!
+//! This was a very primitive example showing how the generated code can be.
+//! executed by using the foundation of classes AsmJit offers. In production
+//! nobody is likely to generate a function that is only called once and freed
+//! immediately after it's been called, however, the concept of releasing code
+//! that is not needed anymore should be clear.
+//!
+//! Labels
+//! ------
+//!
+//! While generating assembler code, you will usually need to create complex
+//! code with labels. Labels are fully supported and you can call `jmp` or
+//! `je` (and similar) instructions to initialized or yet uninitialized label.
+//! Each label expects to be bound into offset. To bind label to specific
+//! offset, use `CodeGen::bind()` method.
+//!
+//! See next example that contains complete code that creates simple memory
+//! copy function (in DWord entities).
+//!
+//! ~~~
+//! // Example: Usage of Label (32-bit code).
+//! //
+//! // Create simple DWord memory copy function:
+//! // ASMJIT_STDCALL void copy32(uint32_t* dst, const uint32_t* src, size_t count);
+//! using namespace asmjit;
+//!
+//! // Assembler instance.
+//! JitRuntime runtime;
+//! Assembler a(&runtime);
+//!
+//! // Constants.
+//! const int arg_offset = 8; // Arguments offset (STDCALL EBP).
+//! const int arg_size = 12;  // Arguments size.
+//!
+//! // Labels.
+//! Label L_Loop(a);
+//!
+//! // Prolog.
+//! a.push(ebp);
+//! a.mov(ebp, esp);
+//! a.push(esi);
+//! a.push(edi);
+//!
+//! // Fetch arguments
+//! a.mov(esi, dword_ptr(ebp, arg_offset + 0)); // Get dst.
+//! a.mov(edi, dword_ptr(ebp, arg_offset + 4)); // Get src.
+//! a.mov(ecx, dword_ptr(ebp, arg_offset + 8)); // Get count.
+//!
+//! // Bind L_Loop label to here.
+//! a.bind(L_Loop);
+//!
+//! Copy 4 bytes.
+//! a.mov(eax, dword_ptr(esi));
+//! a.mov(dword_ptr(edi), eax);
+//!
+//! // Increment pointers.
+//! a.add(esi, 4);
+//! a.add(edi, 4);
+//!
+//! // Repeat loop until (--ecx != 0).
+//! a.dec(ecx);
+//! a.jz(L_Loop);
+//!
+//! // Epilog.
+//! a.pop(edi);
+//! a.pop(esi);
+//! a.mov(esp, ebp);
+//! a.pop(ebp);
+//!
+//! // Return: Pop the stack by `arg_size` as defined by `STDCALL` convention.
+//! a.ret(arg_size);
+//! ~~~
+//!
+//! If you need more abstraction for generating assembler code and you want
+//! to hide calling conventions between 32-bit and 64-bit operating systems,
+//! look at `Compiler` class that is designed for higher level code
+//! generation.
+//!
+//! Advanced Code Generation
+//! ------------------------
+//!
+//! This section describes some advanced generation features of `Assembler`
+//! class which can be simply overlooked. The first thing that is very likely
+//! needed is generic register support. In previous example the named registers
+//! were used. AsmJit contains functions which can convert register index into
+//! operand and back.
+//!
+//! Let's define function which can be used to generate some abstract code:
+//!
+//! ~~~
+//! // Simple function that generates dword copy.
+//! void genCopyDWord(Assembler& a, const X86GpReg& dst, const X86GpReg& src, const X86GpReg& tmp) {
+//!   a.mov(tmp, dword_ptr(src));
+//!   a.mov(dword_ptr(dst), tmp);
+//! }
+//! ~~~
+//!
+//! This function can be called like `genCopyDWord(a, edi, esi, ebx)` or by
+//! using existing `X86GpReg` instances. This abstraction allows to join more
+//! code sections together without rewriting each to use specific registers.
+//! You need to take care only about implicit registers which may be used by
+//! several instructions (like mul, imul, div, idiv, shifting, etc...).
+//!
+//! Next, more advanced, but often needed technique is that you can build your
+//! own registers allocator. X86 architecture contains 8 general purpose
+//! registers, 8 Mm registers and 8 Xmm/Ymm/Zmm registers. X64 architecture
+//! extends the count of Gp registers and Xmm/Ymm/Zmm registers to 16. AVX-512
+//! architecture extends Xmm/Ymm/Zmm SIMD registers to 32.
+//!
+//! To create a general purpose register operand from register index use
+//! `gpb_lo()`, `gpb_hi()`, `gpw()`, `gpd()`, `gpq()`. To create registers of
+//! other types there `fp()`, `mm()`, `k()`, `xmm()`, `ymm()` and `zmm()`
+//! functions available that return a new register operand.
+//!
+//! \sa X86Compiler.
+struct ASMJIT_VCLASS X86Assembler : public Assembler {
+  // --------------------------------------------------------------------------
+  // [Construction / Destruction]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_API X86Assembler(Runtime* runtime, uint32_t arch
+#if defined(ASMJIT_HOST_X86) || defined(ASMJIT_HOST_X64)
+    = kArchHost
+#endif // ASMJIT_HOST_X86 || ASMJIT_HOST_X64
+  );
+  ASMJIT_API virtual ~X86Assembler();
+
+  // --------------------------------------------------------------------------
+  // [Arch]
+  // --------------------------------------------------------------------------
+
+  //! Get count of registers of the current architecture and mode.
+  ASMJIT_INLINE const X86RegCount& getRegCount() const {
+    return _regCount;
+  }
+
+  //! Get Gpd or Gpq register depending on the current architecture.
+  ASMJIT_INLINE X86GpReg gpz(uint32_t index) const {
+    return X86GpReg(zax, index);
+  }
+
+  //! Create an architecture dependent intptr_t memory operand.
+  ASMJIT_INLINE X86Mem intptr_ptr(const X86GpReg& base, int32_t disp = 0) const {
+    return x86::ptr(base, disp, _regSize);
+  }
+  //! \overload
+  ASMJIT_INLINE X86Mem intptr_ptr(const X86GpReg& base, const X86GpReg& index, uint32_t shift = 0, int32_t disp = 0) const {
+    return x86::ptr(base, index, shift, disp, _regSize);
+  }
+  //! \overload
+  ASMJIT_INLINE X86Mem intptr_ptr(const Label& label, int32_t disp = 0) const {
+    return x86::ptr(label, disp, _regSize);
+  }
+  //! \overload
+  ASMJIT_INLINE X86Mem intptr_ptr(const Label& label, const X86GpReg& index, uint32_t shift, int32_t disp = 0) const {
+    return x86::ptr(label, index, shift, disp, _regSize);
+  }
+  //! \overload
+  ASMJIT_INLINE X86Mem intptr_ptr_abs(Ptr pAbs, int32_t disp = 0) const {
+    return x86::ptr_abs(pAbs, disp, _regSize);
+  }
+  //! \overload
+  ASMJIT_INLINE X86Mem intptr_ptr_abs(Ptr pAbs, const X86GpReg& index, uint32_t shift, int32_t disp = 0) const {
+    return x86::ptr_abs(pAbs, index, shift, disp, _regSize);
+  }
+
+  ASMJIT_API Error setArch(uint32_t arch);
+
+  // --------------------------------------------------------------------------
+  // [Embed]
+  // --------------------------------------------------------------------------
+
+  //! Add 8-bit integer data to the instruction stream.
+  ASMJIT_INLINE void db(uint8_t x) { embed(&x, 1); }
+  //! Add 16-bit integer data to the instruction stream.
+  ASMJIT_INLINE void dw(uint16_t x) { embed(&x, 2); }
+  //! Add 32-bit integer data to the instruction stream.
+  ASMJIT_INLINE void dd(uint32_t x) { embed(&x, 4); }
+  //! Add 64-bit integer data to the instruction stream.
+  ASMJIT_INLINE void dq(uint64_t x) { embed(&x, 8); }
+
+  //! Add 8-bit integer data to the instruction stream.
+  ASMJIT_INLINE void dint8(int8_t x) { embed(&x, sizeof(int8_t)); }
+  //! Add 8-bit integer data to the instruction stream.
+  ASMJIT_INLINE void duint8(uint8_t x) { embed(&x, sizeof(uint8_t)); }
+
+  //! Add 16-bit integer data to the instruction stream.
+  ASMJIT_INLINE void dint16(int16_t x) { embed(&x, sizeof(int16_t)); }
+  //! Add 16-bit integer data to the instruction stream.
+  ASMJIT_INLINE void duint16(uint16_t x) { embed(&x, sizeof(uint16_t)); }
+
+  //! Add 32-bit integer data to the instruction stream.
+  ASMJIT_INLINE void dint32(int32_t x) { embed(&x, sizeof(int32_t)); }
+  //! Add 32-bit integer data to the instruction stream.
+  ASMJIT_INLINE void duint32(uint32_t x) { embed(&x, sizeof(uint32_t)); }
+
+  //! Add 64-bit integer data to the instruction stream.
+  ASMJIT_INLINE void dint64(int64_t x) { embed(&x, sizeof(int64_t)); }
+  //! Add 64-bit integer data to the instruction stream.
+  ASMJIT_INLINE void duint64(uint64_t x) { embed(&x, sizeof(uint64_t)); }
+
+  //! Add float data to the instruction stream.
+  ASMJIT_INLINE void dfloat(float x) { embed(&x, sizeof(float)); }
+  //! Add double data to the instruction stream.
+  ASMJIT_INLINE void ddouble(double x) { embed(&x, sizeof(double)); }
+
+  //! Add Mm data to the instruction stream.
+  ASMJIT_INLINE void dmm(const Vec64& x) { embed(&x, sizeof(Vec64)); }
+  //! Add Xmm data to the instruction stream.
+  ASMJIT_INLINE void dxmm(const Vec128& x) { embed(&x, sizeof(Vec128)); }
+  //! Add Ymm data to the instruction stream.
+  ASMJIT_INLINE void dymm(const Vec256& x) { embed(&x, sizeof(Vec256)); }
+
+  //! Add data in a given structure instance to the instruction stream.
+  template<typename T>
+  ASMJIT_INLINE void dstruct(const T& x) { embed(&x, static_cast<uint32_t>(sizeof(T))); }
+
+  //! Embed absolute label pointer (4 or 8 bytes).
+  ASMJIT_API Error embedLabel(const Label& op);
+
+  // --------------------------------------------------------------------------
+  // [Align]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_API virtual Error align(uint32_t mode, uint32_t offset);
+
+  // --------------------------------------------------------------------------
+  // [Reloc]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_API virtual size_t _relocCode(void* dst, Ptr baseAddress) const;
+
+  // --------------------------------------------------------------------------
+  // [Emit]
+  // --------------------------------------------------------------------------
+
+  ASMJIT_API virtual Error _emit(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2, const Operand& o3);
+
+  // -------------------------------------------------------------------------
+  // [Options]
+  // -------------------------------------------------------------------------
+
+  ASMJIT_X86_EMIT_OPTIONS(X86Assembler)
+
+  // --------------------------------------------------------------------------
+  // [Members]
+  // --------------------------------------------------------------------------
+
+  //! Count of registers depending on the current architecture.
+  X86RegCount _regCount;
+
+  //! EAX or RAX register depending on the current architecture.
+  X86GpReg zax;
+  //! ECX or RCX register depending on the current architecture.
+  X86GpReg zcx;
+  //! EDX or RDX register depending on the current architecture.
+  X86GpReg zdx;
+  //! EBX or RBX register depending on the current architecture.
+  X86GpReg zbx;
+  //! ESP or RSP register depending on the current architecture.
+  X86GpReg zsp;
+  //! EBP or RBP register depending on the current architecture.
+  X86GpReg zbp;
+  //! ESI or RSI register depending on the current architecture.
+  X86GpReg zsi;
+  //! EDI or RDI register depending on the current architecture.
+  X86GpReg zdi;
+
+  // --------------------------------------------------------------------------
+  // [Emit]
+  // --------------------------------------------------------------------------
 
 #define INST_0x(_Inst_, _Code_) \
   ASMJIT_INLINE Error _Inst_() { \
@@ -198,6 +709,30 @@ namespace x86x64 {
     return emit(_Code_, o0, o1, o2); \
   }
 
+#define INST_3ii(_Inst_, _Code_, _Op0_, _Op1_, _Op2_) \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, const _Op1_& o1, const _Op2_& o2) { \
+    return emit(_Code_, o0, o1, o2); \
+  } \
+  /*! \overload */ \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, int o1, int o2) { \
+    Imm o1Imm(o1); \
+    return emit(_Code_, o0, o1Imm, o2); \
+  } \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, unsigned int o1, unsigned int o2) { \
+    Imm o1Imm(o1); \
+    return emit(_Code_, o0, o1Imm, static_cast<uint64_t>(o2)); \
+  } \
+  /*! \overload */ \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, int64_t o1, int64_t o2) { \
+    Imm o1Imm(o1); \
+    return emit(_Code_, o0, o1Imm, static_cast<uint64_t>(o2)); \
+  } \
+  /*! \overload */ \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, uint64_t o1, uint64_t o2) { \
+    Imm o1Imm(o1); \
+    return emit(_Code_, o0, o1Imm, o2); \
+  }
+
 #define INST_4x(_Inst_, _Code_, _Op0_, _Op1_, _Op2_, _Op3_) \
   ASMJIT_INLINE Error _Inst_(const _Op0_& o0, const _Op1_& o1, const _Op2_& o2, const _Op3_& o3) { \
     return emit(_Code_, o0, o1, o2, o3); \
@@ -230,6366 +765,5886 @@ namespace x86x64 {
     return emit(_Code_, o0, o1, o2, o3); \
   }
 
-#define ASMJIT_X86X64_EMIT_OPTIONS(_Class_) \
-  /*! Force short form of jmp/jcc instruction. */ \
-  ASMJIT_INLINE _Class_& short_() { \
-    _options |= kInstOptionShortForm; \
-    return *this; \
+#define INST_4ii(_Inst_, _Code_, _Op0_, _Op1_, _Op2_, _Op3_) \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, const _Op1_& o1, const _Op2_& o2, const _Op3_& o3) { \
+    return emit(_Code_, o0, o1, o2, o3); \
   } \
-  \
-  /*! Force long form of jmp/jcc instruction. */ \
-  ASMJIT_INLINE _Class_& long_() { \
-    _options |= kInstOptionLongForm; \
-    return *this; \
+  /*! \overload */ \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, const _Op1_& o1, int o2, int o3) { \
+    Imm o2Imm(o2); \
+    return emit(_Code_, o0, o1, o2Imm, o3); \
   } \
-  \
-  /*! Condition is likely to be taken (has only benefit on P4). */ \
-  ASMJIT_INLINE _Class_& taken() { \
-    _options |= kInstOptionTaken; \
-    return *this; \
+  /*! \overload */ \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, const _Op1_& o1, unsigned int o2, unsigned int o3) { \
+    Imm o2Imm(o2); \
+    return emit(_Code_, o0, o1, o2Imm, static_cast<uint64_t>(o3)); \
   } \
-  \
-  /*! Condition is unlikely to be taken (has only benefit on P4). */ \
-  ASMJIT_INLINE _Class_& notTaken() { \
-    _options |= kInstOptionNotTaken; \
-    return *this; \
+  /*! \overload */ \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, const _Op1_& o1, int64_t o2, int64_t o3) { \
+    Imm o2Imm(o2); \
+    return emit(_Code_, o0, o1, o2Imm, static_cast<uint64_t>(o3)); \
   } \
-  \
-  /*! Use LOCK prefix. */ \
-  ASMJIT_INLINE _Class_& lock() { \
-    _options |= kInstOptionLock; \
-    return *this; \
-  } \
-  \
-  /*! Force REX prefix. */ \
-  ASMJIT_INLINE _Class_& rex() { \
-    _options |= kInstOptionRex; \
-    return *this; \
-  } \
-  \
-  /*! Force 3-byte VEX prefix. */ \
-  ASMJIT_INLINE _Class_& vex3() { \
-    _options |= kInstOptionVex3; \
-    return *this; \
+  /*! \overload */ \
+  ASMJIT_INLINE Error _Inst_(const _Op0_& o0, const _Op1_& o1, uint64_t o2, uint64_t o3) { \
+    Imm o2Imm(o2); \
+    return emit(_Code_, o0, o1, o2Imm, o3); \
   }
 
-//! \addtogroup asmjit_x86x64_general
-//! \{
-
-// ============================================================================
-// [asmjit::x86x64::X86X64Assembler]
-// ============================================================================
-
-//! X86/X64 assembler.
-//!
-//! Assembler is the main class in AsmJit that can encode instructions and their
-//! operands to a binary stream runnable by CPU. It creates internal buffer
-//! where the encodes instructions are stored and it contains intrinsics that
-//! can be used to emit the code in a convenent way. Code generation is in
-//! general safe, because the intrinsics uses method overloading so even the
-//! code is emitted it can be checked by a C++ compiler. It's nearly impossible
-//! to create invalid instruction, for example `mov [eax], [eax]`, because such
-//! overload doesn't exist.
-//!
-//! Each call to an assembler intrinsic function emits instruction directly
-//! to the binary stream. There are also runtime checks that prevent invalid
-//! code to be emitted. It will assert in debug mode and put the `BaseAssembler`
-//! instance to an  error state in production mode.
-//!
-//! Code Generation
-//! ---------------
-//!
-//! To generate code is only needed to create instance of `BaseAssembler`
-//! and to use intrinsics. See example how to do that:
-//!
-//! ~~~
-//! // Use asmjit namespace.
-//! using namespace asmjit;
-//! using namespace asmjit::host;
-//!
-//! // Create Assembler instance.
-//! Assembler a;
-//!
-//! // Prolog.
-//! a->push(ebp);
-//! a->mov(ebp, esp);
-//!
-//! // Mov 1024 to EAX, EAX is also return value.
-//! a->mov(eax, 1024);
-//!
-//! // Epilog.
-//! a->mov(esp, ebp);
-//! a->pop(ebp);
-//!
-//! // Return.
-//! a->ret();
-//! ~~~
-//!
-//! You can see that syntax is very close to Intel one. Only difference is that
-//! you are calling functions that emits the binary code for you. All registers
-//! are in `asmjit` namespace, so it's very comfortable to use it (look at
-//! first line). There is also used method `imm()` to create an immediate value.
-//! Use `imm_u()` to create unsigned immediate value.
-//!
-//! There is also possibility to use memory addresses and immediates. Use
-//! `ptr()`, `byte_ptr()`, `word_ptr()`, `dword_ptr()` and similar functions to
-//! build a memory address operand. In most cases `ptr()` is enough, because an
-//! information related to the operand size is needed only in rare cases, that
-//! is an instruction without having any register operands, such as `inc [mem]`.
-//!
-//! for example, `a` is `x86::BaseAssembler` instance:
-//!
-//! ~~~
-//! a->mov(ptr(eax), 0);             // mov ptr [eax], 0
-//! a->mov(ptr(eax), edx);           // mov ptr [eax], edx
-//! ~~~
-//!
-//! But it's also possible to create complex addresses:
-//!
-//! ~~~
-//! // eax + ecx*x addresses
-//! a->mov(ptr(eax, ecx, 0), 0);     // mov ptr [eax + ecx], 0
-//! a->mov(ptr(eax, ecx, 1), 0);     // mov ptr [eax + ecx * 2], 0
-//! a->mov(ptr(eax, ecx, 2), 0);     // mov ptr [eax + ecx * 4], 0
-//! a->mov(ptr(eax, ecx, 3), 0);     // mov ptr [eax + ecx * 8], 0
-//! // eax + ecx*x + disp addresses
-//! a->mov(ptr(eax, ecx, 0,  4), 0); // mov ptr [eax + ecx     +  4], 0
-//! a->mov(ptr(eax, ecx, 1,  8), 0); // mov ptr [eax + ecx * 2 +  8], 0
-//! a->mov(ptr(eax, ecx, 2, 12), 0); // mov ptr [eax + ecx * 4 + 12], 0
-//! a->mov(ptr(eax, ecx, 3, 16), 0); // mov ptr [eax + ecx * 8 + 16], 0
-//! ~~~
-//!
-//! All addresses shown are using `ptr()` to make memory operand. Some assembler
-//! instructions (single operand ones) needs to have specified memory operand
-//! size. For example `a->inc(ptr(eax))` can't be called, because the meaning is
-//! ambiguous, see the code below.
-//!
-//! ~~~
-//! // [byte] address.
-//! a->inc(byte_ptr(eax));           // Inc byte ptr [eax].
-//! a->dec(byte_ptr(eax));           // Dec byte ptr [eax].
-//! // [word] address.
-//! a->inc(word_ptr(eax));           // Inc word ptr [eax].
-//! a->dec(word_ptr(eax));           // Dec word ptr [eax].
-//! // [dword] address.
-//! a->inc(dword_ptr(eax));          // Inc dword ptr [eax].
-//! a->dec(dword_ptr(eax));          // Dec dword ptr [eax].
-//! ~~~
-//!
-//! Calling JIT Code
-//! ----------------
-//!
-//! While you are over from emitting instructions, you can make your function
-//! by using `BaseAssembler::make()` method. This method will use memory
-//! manager to allocate virtual memory and relocates generated code to it. For
-//! memory allocation is used global memory manager by default and memory is
-//! freeable, but of course this default behavior can be overridden specifying
-//! your memory manager and allocation type. If you want to do with code
-//! something else you can always override make() method and do what you want.
-//!
-//! You can get size of generated code by `getCodeSize()` or `getOffset()`
-//! methods. These methods returns you code size or more precisely the current
-//! code offset in bytes. The `takeCode()` function can be used to take the
-//! internal buffer and clear the code generator, but the buffer taken has to
-//! be freed manually.
-//!
-//! Machine code can be executed only in memory that is marked executable. This
-//! mark is usually not set for memory returned by a C/C++ `malloc` function.
-//! The `VMem::alloc()` function can be used allocate a memory where the code can
-//! be executed or more preferably `VMemMgr` which has interface
-//! similar to `malloc/free` and can allocate chunks of various sizes.
-//!
-//! The next example shows how to allocate memory where the code can be executed:
-//!
-//! ~~~
-//! using namespace asmjit;
-//!
-//! JitRuntime runtime;
-//! Assembler a(&runtime);
-//!
-//! // ... Your code generation ...
-//!
-//! // The function prototype
-//! typedef void (*MyFunc)();
-//!
-//! // make your function
-//! MyFunc func = asmjit_cast<MyFunc>(a->make());
-//!
-//! // call your function
-//! func();
-//!
-//! // If you don't need your function again, free it.
-//! runtime.release(func);
-//! ~~~
-//!
-//! This was a very primitive showing how the generated code can be executed.
-//! In production noone will probably generate a function that is only called
-//! once and nobody will probably free the function right after it was executed.
-//! The code just shows the proper way of code generation and cleanup.
-//!
-//! Labels
-//! ------
-//!
-//! While generating assembler code, you will usually need to create complex
-//! code with labels. Labels are fully supported and you can call `jmp` or
-//! `je` (and similar) instructions to initialized or yet uninitialized label.
-//! Each label expects to be bound into offset. To bind label to specific
-//! offset, use `CodeGen::bind()` method.
-//!
-//! See next example that contains complete code that creates simple memory
-//! copy function (in DWord entities).
-//!
-//! ~~~
-//! // Example: Usage of Label (32-bit code).
-//! //
-//! // Create simple DWord memory copy function:
-//! // ASMJIT_STDCALL void copy32(uint32_t* dst, const uint32_t* src, size_t count);
-//! using namespace asmjit;
-//!
-//! // Assembler instance.
-//! JitRuntime runtime;
-//! Assembler a(&runtime);
-//!
-//! // Constants.
-//! const int arg_offset = 8; // Arguments offset (STDCALL EBP).
-//! const int arg_size = 12;  // Arguments size.
-//!
-//! // Labels.
-//! Label L_Loop(a);
-//!
-//! // Prolog.
-//! a->push(ebp);
-//! a->mov(ebp, esp);
-//! a->push(esi);
-//! a->push(edi);
-//!
-//! // Fetch arguments
-//! a->mov(esi, dword_ptr(ebp, arg_offset + 0)); // Get dst.
-//! a->mov(edi, dword_ptr(ebp, arg_offset + 4)); // Get src.
-//! a->mov(ecx, dword_ptr(ebp, arg_offset + 8)); // Get count.
-//!
-//! // Bind L_Loop label to here.
-//! a->bind(L_Loop);
-//!
-//! Copy 4 bytes.
-//! a->mov(eax, dword_ptr(esi));
-//! a->mov(dword_ptr(edi), eax);
-//!
-//! // Increment pointers.
-//! a->add(esi, 4);
-//! a->add(edi, 4);
-//!
-//! // Repeat loop until (--ecx != 0).
-//! a->dec(ecx);
-//! a->jz(L_Loop);
-//!
-//! // Epilog.
-//! a->pop(edi);
-//! a->pop(esi);
-//! a->mov(esp, ebp);
-//! a->pop(ebp);
-//!
-//! // Return: STDCALL convention is to pop stack in called function.
-//! a->ret(arg_size);
-//! ~~~
-//!
-//! If you need more abstraction for generating assembler code and you want
-//! to hide calling conventions between 32-bit and 64-bit operating systems,
-//! look at @c Compiler class that is designed for higher level code
-//! generation.
-//!
-//! Advanced Code Generation
-//! ------------------------
-//!
-//! This section describes some advanced generation features of @c Assembler
-//! class which can be simply overlooked. The first thing that is very likely
-//! needed is generic register support. In previous example the named registers
-//! were used. AsmJit contains functions which can convert register index into
-//! operand and back.
-//!
-//! Let's define function which can be used to generate some abstract code:
-//!
-//! ~~~
-//! // Simple function that generates dword copy.
-//! void genCopyDWord(BaseAssembler& a, const GpReg& dst, const GpReg& src, const GpReg& tmp) {
-//!   a->mov(tmp, dword_ptr(src));
-//!   a->mov(dword_ptr(dst), tmp);
-//! }
-//! ~~~
-//!
-//! This function can be called like <code>genCopyDWord(a, edi, esi, ebx)</code>
-//! or by using existing `GpReg` instances. This abstraction allows to join
-//! more code sections together without rewriting each to use specific registers.
-//! You need to take care only about implicit registers which may be used by
-//! several instructions (like mul, imul, div, idiv, shifting, etc...).
-//!
-//! Next, more advanced, but often needed technique is that you can build your
-//! own registers allocator. X86 architecture contains 8 general purpose registers,
-//! 8 Mm registers and 8 Xmm registers. The X64 (AMD64) architecture extends count
-//! of Gp registers and Xmm registers to 16. Use the \ref kRegCountBase constant to
-//! get count of Gp or Xmm registers or \ref kRegCountGp, \ref kRegCountMm and \ref
-//! kRegCountXmm constants individually.
-//!
-//! To build register from index (value from 0 inclusive to `kRegNum...` exclusive)
-//! use `gpd()`, `gpq()` or `gpz()` functions. To create a 8 or 16-bit register use
-//! `gpw()`, `gpb_lo()` or `gpb_hi()`. To create other registers there are similar
-//! methods like `mm()`, `xmm()`, `ymm()` and `fp()`.
-//!
-//! So our function call to `genCopyDWord` can be also used like this:
-//!
-//! ~~~
-//! genCopyDWord(a, gpd(kRegIndexDi), gpd(kRegIndexSi), gpd(kRegIndexBx));
-//! ~~~
-//!
-//! `kRegIndex...` are constants defined by `kRegIndex` enum. You can use your
-//! own register allocator (or register slot manager) to alloc / free registers
-//! so `kRegIndex...` values can be replaced by your variables (`0` to
-//! `kRegNum...-1`).
-//!
-//! @sa `X86X64Compiler`.
-struct X86X64Assembler : public BaseAssembler {
   // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_API X86X64Assembler(Runtime* runtime);
-  ASMJIT_API virtual ~X86X64Assembler();
-
-  // --------------------------------------------------------------------------
-  // [Label]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_API virtual void _bind(const Label& label);
-
-  // --------------------------------------------------------------------------
-  // [Embed]
-  // --------------------------------------------------------------------------
-
-  //! Add 8-bit integer data to the instuction stream.
-  ASMJIT_INLINE void db(uint8_t x) { embed(&x, 1); }
-  //! Add 16-bit integer data to the instuction stream.
-  ASMJIT_INLINE void dw(uint16_t x) { embed(&x, 2); }
-  //! Add 32-bit integer data to the instuction stream.
-  ASMJIT_INLINE void dd(uint32_t x) { embed(&x, 4); }
-  //! Add 64-bit integer data to the instuction stream.
-  ASMJIT_INLINE void dq(uint64_t x) { embed(&x, 8); }
-
-  //! Add 8-bit integer data to the instuction stream.
-  ASMJIT_INLINE void dint8(int8_t x) { embed(&x, sizeof(int8_t)); }
-  //! Add 8-bit integer data to the instuction stream.
-  ASMJIT_INLINE void duint8(uint8_t x) { embed(&x, sizeof(uint8_t)); }
-
-  //! Add 16-bit integer data to the instuction stream.
-  ASMJIT_INLINE void dint16(int16_t x) { embed(&x, sizeof(int16_t)); }
-  //! Add 16-bit integer data to the instuction stream.
-  ASMJIT_INLINE void duint16(uint16_t x) { embed(&x, sizeof(uint16_t)); }
-
-  //! Add 32-bit integer data to the instuction stream.
-  ASMJIT_INLINE void dint32(int32_t x) { embed(&x, sizeof(int32_t)); }
-  //! Add 32-bit integer data to the instuction stream.
-  ASMJIT_INLINE void duint32(uint32_t x) { embed(&x, sizeof(uint32_t)); }
-
-  //! Add 64-bit integer data to the instuction stream.
-  ASMJIT_INLINE void dint64(int64_t x) { embed(&x, sizeof(int64_t)); }
-  //! Add 64-bit integer data to the instuction stream.
-  ASMJIT_INLINE void duint64(uint64_t x) { embed(&x, sizeof(uint64_t)); }
-
-  //! Add float data to the instuction stream.
-  ASMJIT_INLINE void dfloat(float x) { embed(&x, sizeof(float)); }
-  //! Add double data to the instuction stream.
-  ASMJIT_INLINE void ddouble(double x) { embed(&x, sizeof(double)); }
-
-  //! Add pointer data to the instuction stream.
-  ASMJIT_INLINE void dptr(void* x) { embed(&x, sizeof(void*)); }
-
-  //! Add Mm data to the instuction stream.
-  ASMJIT_INLINE void dmm(const MmData& x) { embed(&x, sizeof(MmData)); }
-  //! Add Xmm data to the instuction stream.
-  ASMJIT_INLINE void dxmm(const XmmData& x) { embed(&x, sizeof(XmmData)); }
-  //! Add Ymm data to the instuction stream.
-  ASMJIT_INLINE void dymm(const YmmData& x) { embed(&x, sizeof(YmmData)); }
-
-  //! Add data in a given structure instance to the instuction stream.
-  template<typename T>
-  ASMJIT_INLINE void dstruct(const T& x) { embed(&x, static_cast<uint32_t>(sizeof(T))); }
-
-  //! Embed absolute label pointer (4 or 8 bytes).
-  ASMJIT_API Error embedLabel(const Label& op);
-
-  // --------------------------------------------------------------------------
-  // [Align]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_API virtual Error _align(uint32_t mode, uint32_t offset);
-
-  // -------------------------------------------------------------------------
-  // [Options]
-  // -------------------------------------------------------------------------
-
-  ASMJIT_X86X64_EMIT_OPTIONS(X86X64Assembler)
-
-  // --------------------------------------------------------------------------
-  // [Base Instructions]
+  // [X86/X64]
   // --------------------------------------------------------------------------
 
   //! Add with Carry.
-  INST_2x(adc, kInstAdc, GpReg, GpReg)
+  INST_2x(adc, kX86InstIdAdc, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(adc, kInstAdc, GpReg, Mem)
+  INST_2x(adc, kX86InstIdAdc, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(adc, kInstAdc, GpReg, Imm)
+  INST_2i(adc, kX86InstIdAdc, X86GpReg, Imm)
   //! \overload
-  INST_2x(adc, kInstAdc, Mem, GpReg)
+  INST_2x(adc, kX86InstIdAdc, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(adc, kInstAdc, Mem, Imm)
+  INST_2i(adc, kX86InstIdAdc, X86Mem, Imm)
 
   //! Add.
-  INST_2x(add, kInstAdd, GpReg, GpReg)
+  INST_2x(add, kX86InstIdAdd, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(add, kInstAdd, GpReg, Mem)
+  INST_2x(add, kX86InstIdAdd, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(add, kInstAdd, GpReg, Imm)
+  INST_2i(add, kX86InstIdAdd, X86GpReg, Imm)
   //! \overload
-  INST_2x(add, kInstAdd, Mem, GpReg)
+  INST_2x(add, kX86InstIdAdd, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(add, kInstAdd, Mem, Imm)
+  INST_2i(add, kX86InstIdAdd, X86Mem, Imm)
 
   //! And.
-  INST_2x(and_, kInstAnd, GpReg, GpReg)
+  INST_2x(and_, kX86InstIdAnd, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(and_, kInstAnd, GpReg, Mem)
+  INST_2x(and_, kX86InstIdAnd, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(and_, kInstAnd, GpReg, Imm)
+  INST_2i(and_, kX86InstIdAnd, X86GpReg, Imm)
   //! \overload
-  INST_2x(and_, kInstAnd, Mem, GpReg)
+  INST_2x(and_, kX86InstIdAnd, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(and_, kInstAnd, Mem, Imm)
+  INST_2i(and_, kX86InstIdAnd, X86Mem, Imm)
 
   //! Bit scan forward.
-  INST_2x_(bsf, kInstBsf, GpReg, GpReg, !o0.isGpb())
+  INST_2x_(bsf, kX86InstIdBsf, X86GpReg, X86GpReg, !o0.isGpb())
   //! \overload
-  INST_2x_(bsf, kInstBsf, GpReg, Mem, !o0.isGpb())
+  INST_2x_(bsf, kX86InstIdBsf, X86GpReg, X86Mem, !o0.isGpb())
 
   //! Bit scan reverse.
-  INST_2x_(bsr, kInstBsr, GpReg, GpReg, !o0.isGpb())
+  INST_2x_(bsr, kX86InstIdBsr, X86GpReg, X86GpReg, !o0.isGpb())
   //! \overload
-  INST_2x_(bsr, kInstBsr, GpReg, Mem, !o0.isGpb())
+  INST_2x_(bsr, kX86InstIdBsr, X86GpReg, X86Mem, !o0.isGpb())
 
   //! Byte swap (32-bit or 64-bit registers only) (i486).
-  INST_1x_(bswap, kInstBswap, GpReg, o0.getSize() >= 4)
+  INST_1x_(bswap, kX86InstIdBswap, X86GpReg, o0.getSize() >= 4)
 
   //! Bit test.
-  INST_2x(bt, kInstBt, GpReg, GpReg)
+  INST_2x(bt, kX86InstIdBt, X86GpReg, X86GpReg)
   //! \overload
-  INST_2i(bt, kInstBt, GpReg, Imm)
+  INST_2i(bt, kX86InstIdBt, X86GpReg, Imm)
   //! \overload
-  INST_2x(bt, kInstBt, Mem, GpReg)
+  INST_2x(bt, kX86InstIdBt, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(bt, kInstBt, Mem, Imm)
+  INST_2i(bt, kX86InstIdBt, X86Mem, Imm)
 
   //! Bit test and complement.
-  INST_2x(btc, kInstBtc, GpReg, GpReg)
+  INST_2x(btc, kX86InstIdBtc, X86GpReg, X86GpReg)
   //! \overload
-  INST_2i(btc, kInstBtc, GpReg, Imm)
+  INST_2i(btc, kX86InstIdBtc, X86GpReg, Imm)
   //! \overload
-  INST_2x(btc, kInstBtc, Mem, GpReg)
+  INST_2x(btc, kX86InstIdBtc, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(btc, kInstBtc, Mem, Imm)
+  INST_2i(btc, kX86InstIdBtc, X86Mem, Imm)
 
   //! Bit test and reset.
-  INST_2x(btr, kInstBtr, GpReg, GpReg)
+  INST_2x(btr, kX86InstIdBtr, X86GpReg, X86GpReg)
   //! \overload
-  INST_2i(btr, kInstBtr, GpReg, Imm)
+  INST_2i(btr, kX86InstIdBtr, X86GpReg, Imm)
   //! \overload
-  INST_2x(btr, kInstBtr, Mem, GpReg)
+  INST_2x(btr, kX86InstIdBtr, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(btr, kInstBtr, Mem, Imm)
+  INST_2i(btr, kX86InstIdBtr, X86Mem, Imm)
 
   //! Bit test and set.
-  INST_2x(bts, kInstBts, GpReg, GpReg)
+  INST_2x(bts, kX86InstIdBts, X86GpReg, X86GpReg)
   //! \overload
-  INST_2i(bts, kInstBts, GpReg, Imm)
+  INST_2i(bts, kX86InstIdBts, X86GpReg, Imm)
   //! \overload
-  INST_2x(bts, kInstBts, Mem, GpReg)
+  INST_2x(bts, kX86InstIdBts, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(bts, kInstBts, Mem, Imm)
+  INST_2i(bts, kX86InstIdBts, X86Mem, Imm)
 
   //! Call.
-  INST_1x(call, kInstCall, GpReg)
+  INST_1x(call, kX86InstIdCall, X86GpReg)
   //! \overload
-  INST_1x(call, kInstCall, Mem)
+  INST_1x(call, kX86InstIdCall, X86Mem)
   //! \overload
-  INST_1x(call, kInstCall, Label)
+  INST_1x(call, kX86InstIdCall, Label)
   //! \overload
-  INST_1x(call, kInstCall, Imm)
+  INST_1x(call, kX86InstIdCall, Imm)
   //! \overload
-  ASMJIT_INLINE Error call(void* dst) { return call(Imm((intptr_t)dst)); }
+  ASMJIT_INLINE Error call(Ptr o0) { return call(Imm(o0)); }
 
   //! Clear carry flag.
-  INST_0x(clc, kInstClc)
+  INST_0x(clc, kX86InstIdClc)
   //! Clear direction flag.
-  INST_0x(cld, kInstCld)
+  INST_0x(cld, kX86InstIdCld)
   //! Complement carry flag.
-  INST_0x(cmc, kInstCmc)
+  INST_0x(cmc, kX86InstIdCmc)
 
   //! Convert BYTE to WORD (AX <- Sign Extend AL).
-  INST_0x(cbw, kInstCbw)
-  //! Convert WORD to DWORD (DX:AX <- Sign Extend AX).
-  INST_0x(cwd, kInstCwd)
-  //! Convert WORD to DWORD (EAX <- Sign Extend AX).
-  INST_0x(cwde, kInstCwde)
+  INST_0x(cbw, kX86InstIdCbw)
   //! Convert DWORD to QWORD (EDX:EAX <- Sign Extend EAX).
-  INST_0x(cdq, kInstCdq)
+  INST_0x(cdq, kX86InstIdCdq)
+  //! Convert DWORD to QWORD (RAX <- Sign Extend EAX) (X64 Only).
+  INST_0x(cdqe, kX86InstIdCdqe)
+  //! Convert QWORD to OWORD (RDX:RAX <- Sign Extend RAX) (X64 Only).
+  INST_0x(cqo, kX86InstIdCqo)
+  //! Convert WORD to DWORD (DX:AX <- Sign Extend AX).
+  INST_0x(cwd, kX86InstIdCwd)
+  //! Convert WORD to DWORD (EAX <- Sign Extend AX).
+  INST_0x(cwde, kX86InstIdCwde)
 
   //! Conditional move.
-  INST_2cc(cmov, kInstCmov, X86Util::condToCmovcc, GpReg, GpReg)
+  INST_2cc(cmov, kX86InstIdCmov, X86Util::condToCmovcc, X86GpReg, X86GpReg)
   //! Conditional move.
-  INST_2cc(cmov, kInstCmov, X86Util::condToCmovcc, GpReg, Mem)
+  INST_2cc(cmov, kX86InstIdCmov, X86Util::condToCmovcc, X86GpReg, X86Mem)
 
   //! Compare two operands.
-  INST_2x(cmp, kInstCmp, GpReg, GpReg)
+  INST_2x(cmp, kX86InstIdCmp, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(cmp, kInstCmp, GpReg, Mem)
+  INST_2x(cmp, kX86InstIdCmp, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(cmp, kInstCmp, GpReg, Imm)
+  INST_2i(cmp, kX86InstIdCmp, X86GpReg, Imm)
   //! \overload
-  INST_2x(cmp, kInstCmp, Mem, GpReg)
+  INST_2x(cmp, kX86InstIdCmp, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(cmp, kInstCmp, Mem, Imm)
+  INST_2i(cmp, kX86InstIdCmp, X86Mem, Imm)
+
+  //! Compare BYTE in ES:[EDI/RDI] and DS:[ESI/RSI].
+  INST_0x(cmpsb, kX86InstIdCmpsB)
+  //! Compare DWORD in ES:[EDI/RDI] and DS:[ESI/RSI].
+  INST_0x(cmpsd, kX86InstIdCmpsD)
+  //! Compare QWORD in ES:[RDI] and DS:[RDI] (X64 Only).
+  INST_0x(cmpsq, kX86InstIdCmpsQ)
+  //! Compare WORD in ES:[EDI/RDI] and DS:[ESI/RSI].
+  INST_0x(cmpsw, kX86InstIdCmpsW)
 
   //! Compare and exchange (i486).
-  INST_2x(cmpxchg, kInstCmpxchg, GpReg, GpReg)
+  INST_2x(cmpxchg, kX86InstIdCmpxchg, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(cmpxchg, kInstCmpxchg, Mem, GpReg)
+  INST_2x(cmpxchg, kX86InstIdCmpxchg, X86Mem, X86GpReg)
 
-  //! Compares the 64-bit value in EDX:EAX with the memory operand (Pentium).
-  INST_1x(cmpxchg8b, kInstCmpxchg8b, Mem)
+  //! Compare and exchange 128-bit value in RDX:RAX with the memory operand (X64 Only).
+  INST_1x(cmpxchg16b, kX86InstIdCmpxchg16b, X86Mem)
+  //! Compare and exchange 64-bit value in EDX:EAX with the memory operand (Pentium).
+  INST_1x(cmpxchg8b, kX86InstIdCmpxchg8b, X86Mem)
 
   //! CPU identification (i486).
-  INST_0x(cpuid, kInstCpuid)
+  INST_0x(cpuid, kX86InstIdCpuid)
 
-  //! Accumulate crc32 value (polynomial 0x11EDC6F41) (SSE4.2).
-  INST_2x_(crc32, kInstCrc32, GpReg, GpReg, o0.isRegType(kRegTypeGpd) || o0.isRegType(kRegTypeGpq))
-  //! \overload
-  INST_2x_(crc32, kInstCrc32, GpReg, Mem, o0.isRegType(kRegTypeGpd) || o0.isRegType(kRegTypeGpq))
+  //! Decimal adjust AL after addition (X86 Only).
+  INST_0x(daa, kX86InstIdDaa)
+  //! Decimal adjust AL after subtraction (X86 Only).
+  INST_0x(das, kX86InstIdDas)
 
   //! Decrement by 1.
-  INST_1x(dec, kInstDec, GpReg)
+  INST_1x(dec, kX86InstIdDec, X86GpReg)
   //! \overload
-  INST_1x(dec, kInstDec, Mem)
+  INST_1x(dec, kX86InstIdDec, X86Mem)
 
   //! Unsigned divide (xDX:xAX <- xDX:xAX / o0).
-  INST_1x(div, kInstDiv, GpReg)
+  INST_1x(div, kX86InstIdDiv, X86GpReg)
   //! \overload
-  INST_1x(div, kInstDiv, Mem)
+  INST_1x(div, kX86InstIdDiv, X86Mem)
 
   //! Make stack frame for procedure parameters.
-  INST_2x(enter, kInstEnter, Imm, Imm)
+  INST_2x(enter, kX86InstIdEnter, Imm, Imm)
 
   //! Signed divide (xDX:xAX <- xDX:xAX / op).
-  INST_1x(idiv, kInstIdiv, GpReg)
+  INST_1x(idiv, kX86InstIdIdiv, X86GpReg)
   //! \overload
-  INST_1x(idiv, kInstIdiv, Mem)
+  INST_1x(idiv, kX86InstIdIdiv, X86Mem)
 
   //! Signed multiply (xDX:xAX <- xAX * o0).
-  INST_1x(imul, kInstImul, GpReg)
+  INST_1x(imul, kX86InstIdImul, X86GpReg)
   //! \overload
-  INST_1x(imul, kInstImul, Mem)
+  INST_1x(imul, kX86InstIdImul, X86Mem)
 
   //! Signed multiply.
-  INST_2x(imul, kInstImul, GpReg, GpReg)
+  INST_2x(imul, kX86InstIdImul, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(imul, kInstImul, GpReg, Mem)
+  INST_2x(imul, kX86InstIdImul, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(imul, kInstImul, GpReg, Imm)
+  INST_2i(imul, kX86InstIdImul, X86GpReg, Imm)
 
   //! Signed multiply.
-  INST_3i(imul, kInstImul, GpReg, GpReg, Imm)
+  INST_3i(imul, kX86InstIdImul, X86GpReg, X86GpReg, Imm)
   //! \overload
-  INST_3i(imul, kInstImul, GpReg, Mem, Imm)
+  INST_3i(imul, kX86InstIdImul, X86GpReg, X86Mem, Imm)
 
   //! Increment by 1.
-  INST_1x(inc, kInstInc, GpReg)
+  INST_1x(inc, kX86InstIdInc, X86GpReg)
   //! \overload
-  INST_1x(inc, kInstInc, Mem)
+  INST_1x(inc, kX86InstIdInc, X86Mem)
 
   //! Interrupt.
-  INST_1i(int_, kInstInt, Imm)
+  INST_1i(int_, kX86InstIdInt, Imm)
   //! Interrupt 3 - trap to debugger.
   ASMJIT_INLINE Error int3() { return int_(3); }
 
   //! Jump to `label` if condition `cc` is met.
-  INST_1cc(j, kInstJ, X86Util::condToJcc, Label)
+  INST_1cc(j, kX86InstIdJ, X86Util::condToJcc, Label)
 
   //! Short jump if CX/ECX/RCX is zero.
-  INST_2x_(jecxz, kInstJecxz, GpReg, Label, o0.getRegIndex() == kRegIndexCx)
+  INST_2x_(jecxz, kX86InstIdJecxz, X86GpReg, Label, o0.getRegIndex() == kX86RegIndexCx)
 
   //! Jump.
-  INST_1x(jmp, kInstJmp, GpReg)
+  INST_1x(jmp, kX86InstIdJmp, X86GpReg)
   //! \overload
-  INST_1x(jmp, kInstJmp, Mem)
+  INST_1x(jmp, kX86InstIdJmp, X86Mem)
   //! \overload
-  INST_1x(jmp, kInstJmp, Label)
+  INST_1x(jmp, kX86InstIdJmp, Label)
   //! \overload
-  INST_1x(jmp, kInstJmp, Imm)
+  INST_1x(jmp, kX86InstIdJmp, Imm)
   //! \overload
-  ASMJIT_INLINE Error jmp(void* dst) { return jmp(Imm((intptr_t)dst)); }
+  ASMJIT_INLINE Error jmp(Ptr dst) { return jmp(Imm(dst)); }
 
   //! Load AH from flags.
-  INST_0x(lahf, kInstLahf)
+  INST_0x(lahf, kX86InstIdLahf)
 
   //! Load effective address
-  INST_2x(lea, kInstLea, GpReg, Mem)
+  INST_2x(lea, kX86InstIdLea, X86GpReg, X86Mem)
 
   //! High level procedure exit.
-  INST_0x(leave, kInstLeave)
+  INST_0x(leave, kX86InstIdLeave)
+
+  //! Load BYTE from DS:[ESI/RSI] to AL.
+  INST_0x(lodsb, kX86InstIdLodsB)
+  //! Load DWORD from DS:[ESI/RSI] to EAX.
+  INST_0x(lodsd, kX86InstIdLodsD)
+  //! Load QWORD from DS:[RDI] to RAX (X64 Only).
+  INST_0x(lodsq, kX86InstIdLodsQ)
+  //! Load WORD from DS:[ESI/RSI] to AX.
+  INST_0x(lodsw, kX86InstIdLodsW)
 
   //! Move.
-  INST_2x(mov, kInstMov, GpReg, GpReg)
+  INST_2x(mov, kX86InstIdMov, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(mov, kInstMov, GpReg, Mem)
+  INST_2x(mov, kX86InstIdMov, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(mov, kInstMov, GpReg, Imm)
+  INST_2i(mov, kX86InstIdMov, X86GpReg, Imm)
   //! \overload
-  INST_2x(mov, kInstMov, Mem, GpReg)
+  INST_2x(mov, kX86InstIdMov, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(mov, kInstMov, Mem, Imm)
+  INST_2i(mov, kX86InstIdMov, X86Mem, Imm)
 
   //! Move from segment register.
-  INST_2x(mov, kInstMov, GpReg, SegReg)
+  INST_2x(mov, kX86InstIdMov, X86GpReg, X86SegReg)
   //! \overload
-  INST_2x(mov, kInstMov, Mem, SegReg)
+  INST_2x(mov, kX86InstIdMov, X86Mem, X86SegReg)
   //! Move to segment register.
-  INST_2x(mov, kInstMov, SegReg, GpReg)
+  INST_2x(mov, kX86InstIdMov, X86SegReg, X86GpReg)
   //! \overload
-  INST_2x(mov, kInstMov, SegReg, Mem)
+  INST_2x(mov, kX86InstIdMov, X86SegReg, X86Mem)
 
   //! Move (AL|AX|EAX|RAX <- absolute address in immediate).
-  ASMJIT_INLINE Error mov_ptr(const GpReg& dst, void* src) {
-    ASMJIT_ASSERT(dst.getRegIndex() == 0);
-
-    Imm imm(static_cast<int64_t>((intptr_t)src));
-    return emit(kInstMovPtr, dst, imm);
+  INST_2x_(mov_ptr, kX86InstIdMovPtr, X86GpReg, Imm, o0.getRegIndex() == 0);
+  //! \overload
+  ASMJIT_INLINE Error mov_ptr(const X86GpReg& o0, Ptr o1) {
+    ASMJIT_ASSERT(o0.getRegIndex() == 0);
+    return emit(kX86InstIdMovPtr, o0, Imm(o1));
   }
 
   //! Move (absolute address in immediate <- AL|AX|EAX|RAX).
-  ASMJIT_INLINE Error mov_ptr(void* dst, const GpReg& src) {
-    ASMJIT_ASSERT(src.getRegIndex() == 0);
-
-    Imm imm(static_cast<int64_t>((intptr_t)dst));
-    return emit(kInstMovPtr, imm, src);
+  INST_2x_(mov_ptr, kX86InstIdMovPtr, Imm, X86GpReg, o1.getRegIndex() == 0);
+  //! \overload
+  ASMJIT_INLINE Error mov_ptr(Ptr o0, const X86GpReg& o1) {
+    ASMJIT_ASSERT(o1.getRegIndex() == 0);
+    return emit(kX86InstIdMovPtr, Imm(o0), o1);
   }
 
   //! Move data after dwapping bytes (SSE3 - Atom).
-  INST_2x_(movbe, kInstMovbe, GpReg, Mem, !o0.isGpb());
+  INST_2x_(movbe, kX86InstIdMovbe, X86GpReg, X86Mem, !o0.isGpb());
   //! \overload
-  INST_2x_(movbe, kInstMovbe, Mem, GpReg, !o1.isGpb());
+  INST_2x_(movbe, kX86InstIdMovbe, X86Mem, X86GpReg, !o1.isGpb());
+
+  //! Move BYTE from DS:[ESI/RSI] to ES:[EDI/RDI].
+  INST_0x(movsb, kX86InstIdMovsB)
+  //! Move DWORD from DS:[ESI/RSI] to ES:[EDI/RDI].
+  INST_0x(movsd, kX86InstIdMovsD)
+  //! Move QWORD from DS:[RSI] to ES:[RDI] (X64 Only).
+  INST_0x(movsq, kX86InstIdMovsQ)
+  //! Move WORD from DS:[ESI/RSI] to ES:[EDI/RDI].
+  INST_0x(movsw, kX86InstIdMovsW)
 
   //! Move with sign-extension.
-  INST_2x(movsx, kInstMovsx, GpReg, GpReg)
+  INST_2x(movsx, kX86InstIdMovsx, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(movsx, kInstMovsx, GpReg, Mem)
+  INST_2x(movsx, kX86InstIdMovsx, X86GpReg, X86Mem)
+
+  //! Move DWORD to QWORD with sign-extension (X64 Only).
+  INST_2x(movsxd, kX86InstIdMovsxd, X86GpReg, X86GpReg)
+  //! \overload
+  INST_2x(movsxd, kX86InstIdMovsxd, X86GpReg, X86Mem)
 
   //! Move with zero-extension.
-  INST_2x(movzx, kInstMovzx, GpReg, GpReg)
+  INST_2x(movzx, kX86InstIdMovzx, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(movzx, kInstMovzx, GpReg, Mem)
+  INST_2x(movzx, kX86InstIdMovzx, X86GpReg, X86Mem)
 
   //! Unsigned multiply (xDX:xAX <- xAX * o0).
-  INST_1x(mul, kInstMul, GpReg)
+  INST_1x(mul, kX86InstIdMul, X86GpReg)
   //! \overload
-  INST_1x(mul, kInstMul, Mem)
+  INST_1x(mul, kX86InstIdMul, X86Mem)
 
   //! Two's complement negation.
-  INST_1x(neg, kInstNeg, GpReg)
+  INST_1x(neg, kX86InstIdNeg, X86GpReg)
   //! \overload
-  INST_1x(neg, kInstNeg, Mem)
+  INST_1x(neg, kX86InstIdNeg, X86Mem)
 
   //! No operation.
-  INST_0x(nop, kInstNop)
+  INST_0x(nop, kX86InstIdNop)
 
   //! One's complement negation.
-  INST_1x(not_, kInstNot, GpReg)
+  INST_1x(not_, kX86InstIdNot, X86GpReg)
   //! \overload
-  INST_1x(not_, kInstNot, Mem)
+  INST_1x(not_, kX86InstIdNot, X86Mem)
 
   //! Or.
-  INST_2x(or_, kInstOr, GpReg, GpReg)
+  INST_2x(or_, kX86InstIdOr, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(or_, kInstOr, GpReg, Mem)
+  INST_2x(or_, kX86InstIdOr, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(or_, kInstOr, GpReg, Imm)
+  INST_2i(or_, kX86InstIdOr, X86GpReg, Imm)
   //! \overload
-  INST_2x(or_, kInstOr, Mem, GpReg)
+  INST_2x(or_, kX86InstIdOr, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(or_, kInstOr, Mem, Imm)
+  INST_2i(or_, kX86InstIdOr, X86Mem, Imm)
 
   //! Pop a value from the stack.
-  INST_1x_(pop, kInstPop, GpReg, o0.getSize() == 2 || o0.getSize() == _regSize)
+  INST_1x_(pop, kX86InstIdPop, X86GpReg, o0.getSize() == 2 || o0.getSize() == _regSize)
   //! \overload
-  INST_1x_(pop, kInstPop, Mem, o0.getSize() == 2 || o0.getSize() == _regSize)
+  INST_1x_(pop, kX86InstIdPop, X86Mem, o0.getSize() == 2 || o0.getSize() == _regSize)
 
   //! Pop a segment register from the stack.
   //!
   //! \note There is no instruction to pop a cs segment register.
-  INST_1x_(pop, kInstPop, SegReg, o0.getRegIndex() != kSegCs);
+  INST_1x_(pop, kX86InstIdPop, X86SegReg, o0.getRegIndex() != kX86SegCs);
+
+  //! Pop all Gp registers - EDI|ESI|EBP|Ign|EBX|EDX|ECX|EAX (X86 Only).
+  INST_0x(popa, kX86InstIdPopa)
 
   //! Pop stack into EFLAGS register (32-bit or 64-bit).
-  INST_0x(popf, kInstPopf)
-
-  //! Return the count of number of bits set to 1 (SSE4.2).
-  INST_2x_(popcnt, kInstPopcnt, GpReg, GpReg, !o0.isGpb() && o0.getRegType() == o1.getRegType())
-  //! \overload
-  INST_2x_(popcnt, kInstPopcnt, GpReg, Mem, !o0.isGpb())
+  INST_0x(popf, kX86InstIdPopf)
 
   //! Push WORD or DWORD/QWORD on the stack.
-  INST_1x_(push, kInstPush, GpReg, o0.getSize() == 2 || o0.getSize() == _regSize)
+  INST_1x_(push, kX86InstIdPush, X86GpReg, o0.getSize() == 2 || o0.getSize() == _regSize)
   //! Push WORD or DWORD/QWORD on the stack.
-  INST_1x_(push, kInstPush, Mem, o0.getSize() == 2 || o0.getSize() == _regSize)
+  INST_1x_(push, kX86InstIdPush, X86Mem, o0.getSize() == 2 || o0.getSize() == _regSize)
   //! Push segment register on the stack.
-  INST_1x(push, kInstPush, SegReg)
+  INST_1x(push, kX86InstIdPush, X86SegReg)
   //! Push WORD or DWORD/QWORD on the stack.
-  INST_1i(push, kInstPush, Imm)
+  INST_1i(push, kX86InstIdPush, Imm)
+
+  //! Push all Gp registers - EAX|ECX|EDX|EBX|ESP|EBP|ESI|EDI (X86 Only).
+  INST_0x(pusha, kX86InstIdPusha)
 
   //! Push EFLAGS register (32-bit or 64-bit) on the stack.
-  INST_0x(pushf, kInstPushf)
+  INST_0x(pushf, kX86InstIdPushf)
 
   //! Rotate bits left.
   //!
   //! \note `o1` register can be only `cl`.
-  INST_2x(rcl, kInstRcl, GpReg, GpReg)
+  INST_2x(rcl, kX86InstIdRcl, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(rcl, kInstRcl, Mem, GpReg)
+  INST_2x(rcl, kX86InstIdRcl, X86Mem, X86GpReg)
   //! Rotate bits left.
-  INST_2i(rcl, kInstRcl, GpReg, Imm)
+  INST_2i(rcl, kX86InstIdRcl, X86GpReg, Imm)
   //! \overload
-  INST_2i(rcl, kInstRcl, Mem, Imm)
+  INST_2i(rcl, kX86InstIdRcl, X86Mem, Imm)
 
   //! Rotate bits right.
   //!
   //! \note `o1` register can be only `cl`.
-  INST_2x(rcr, kInstRcr, GpReg, GpReg)
+  INST_2x(rcr, kX86InstIdRcr, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(rcr, kInstRcr, Mem, GpReg)
+  INST_2x(rcr, kX86InstIdRcr, X86Mem, X86GpReg)
   //! Rotate bits right.
-  INST_2i(rcr, kInstRcr, GpReg, Imm)
+  INST_2i(rcr, kX86InstIdRcr, X86GpReg, Imm)
   //! \overload
-  INST_2i(rcr, kInstRcr, Mem, Imm)
+  INST_2i(rcr, kX86InstIdRcr, X86Mem, Imm)
 
   //! Read time-stamp counter (Pentium).
-  INST_0x(rdtsc, kInstRdtsc)
+  INST_0x(rdtsc, kX86InstIdRdtsc)
   //! Read time-stamp counter and processor id (Pentium).
-  INST_0x(rdtscp, kInstRdtscp)
+  INST_0x(rdtscp, kX86InstIdRdtscp)
 
-  //! Load ECX/RCX bytes from DS:[ESI/RSI] to AL.
-  INST_0x(rep_lodsb, kInstRepLodsb)
-  //! Load ECX/RCX dwords from DS:[ESI/RSI] to EAX.
-  INST_0x(rep_lodsd, kInstRepLodsd)
-  //! Load ECX/RCX Words from DS:[ESI/RSI] to AX.
-  INST_0x(rep_lodsw, kInstRepLodsw)
+  //! Repeated load ECX/RCX BYTEs from DS:[ESI/RSI] to AL.
+  INST_0x(rep_lodsb, kX86InstIdRepLodsB)
+  //! Repeated load ECX/RCX DWORDs from DS:[ESI/RSI] to EAX.
+  INST_0x(rep_lodsd, kX86InstIdRepLodsD)
+  //! Repeated load ECX/RCX QWORDs from DS:[RDI] to RAX (X64 Only).
+  INST_0x(rep_lodsq, kX86InstIdRepLodsQ)
+  //! Repeated load ECX/RCX WORDs from DS:[ESI/RSI] to AX.
+  INST_0x(rep_lodsw, kX86InstIdRepLodsW)
 
-  //! Move ECX/RCX bytes from DS:[ESI/RSI] to ES:[EDI/RDI].
-  INST_0x(rep_movsb, kInstRepMovsb)
-  //! Move ECX/RCX dwords from DS:[ESI/RSI] to ES:[EDI/RDI].
-  INST_0x(rep_movsd, kInstRepMovsd)
-  //! Move ECX/RCX words from DS:[ESI/RSI] to ES:[EDI/RDI].
-  INST_0x(rep_movsw, kInstRepMovsw)
+  //! Repeated move ECX/RCX BYTEs from DS:[ESI/RSI] to ES:[EDI/RDI].
+  INST_0x(rep_movsb, kX86InstIdRepMovsB)
+  //! Repeated move ECX/RCX DWORDs from DS:[ESI/RSI] to ES:[EDI/RDI].
+  INST_0x(rep_movsd, kX86InstIdRepMovsD)
+  //! Repeated move ECX/RCX QWORDs from DS:[RSI] to ES:[RDI] (X64 Only).
+  INST_0x(rep_movsq, kX86InstIdRepMovsQ)
+  //! Repeated move ECX/RCX WORDs from DS:[ESI/RSI] to ES:[EDI/RDI].
+  INST_0x(rep_movsw, kX86InstIdRepMovsW)
 
-  //! Fill ECX/RCX bytes at ES:[EDI/RDI] with AL.
-  INST_0x(rep_stosb, kInstRepStosb)
-  //! Fill ECX/RCX dwords at ES:[EDI/RDI] with EAX.
-  INST_0x(rep_stosd, kInstRepStosd)
-  //! Fill ECX/RCX words at ES:[EDI/RDI] with AX.
-  INST_0x(rep_stosw, kInstRepStosw)
+  //! Repeated fill ECX/RCX BYTEs at ES:[EDI/RDI] with AL.
+  INST_0x(rep_stosb, kX86InstIdRepStosB)
+  //! Repeated fill ECX/RCX DWORDs at ES:[EDI/RDI] with EAX.
+  INST_0x(rep_stosd, kX86InstIdRepStosD)
+  //! Repeated fill ECX/RCX QWORDs at ES:[RDI] with RAX (X64 Only).
+  INST_0x(rep_stosq, kX86InstIdRepStosQ)
+  //! Repeated fill ECX/RCX WORDs at ES:[EDI/RDI] with AX.
+  INST_0x(rep_stosw, kX86InstIdRepStosW)
 
-  //! Repeated find nonmatching bytes in ES:[EDI/RDI] and DS:[ESI/RDI].
-  INST_0x(repe_cmpsb, kInstRepeCmpsb)
-  //! Repeated find nonmatching dwords in ES:[EDI/RDI] and DS:[ESI/RDI].
-  INST_0x(repe_cmpsd, kInstRepeCmpsd)
-  //! Repeated find nonmatching words in ES:[EDI/RDI] and DS:[ESI/RDI].
-  INST_0x(repe_cmpsw, kInstRepeCmpsw)
+  //! Repeated find non-AL BYTEs in ES:[EDI/RDI] and DS:[ESI/RSI].
+  INST_0x(repe_cmpsb, kX86InstIdRepeCmpsB)
+  //! Repeated find non-EAX DWORDs in ES:[EDI/RDI] and DS:[ESI/RSI].
+  INST_0x(repe_cmpsd, kX86InstIdRepeCmpsD)
+  //! Repeated find non-RAX QWORDs in ES:[RDI] and DS:[RDI] (X64 Only).
+  INST_0x(repe_cmpsq, kX86InstIdRepeCmpsQ)
+  //! Repeated find non-AX WORDs in ES:[EDI/RDI] and DS:[ESI/RSI].
+  INST_0x(repe_cmpsw, kX86InstIdRepeCmpsW)
 
-  //! Find non-AL byte starting at ES:[EDI/RDI].
-  INST_0x(repe_scasb, kInstRepeScasb)
-  //! Find non-EAX dword starting at ES:[EDI/RDI].
-  INST_0x(repe_scasd, kInstRepeScasd)
-  //! Find non-AX word starting at ES:[EDI/RDI].
-  INST_0x(repe_scasw, kInstRepeScasw)
+  //! Repeated find non-AL BYTE starting at ES:[EDI/RDI].
+  INST_0x(repe_scasb, kX86InstIdRepeScasB)
+  //! Repeated find non-EAX DWORD starting at ES:[EDI/RDI].
+  INST_0x(repe_scasd, kX86InstIdRepeScasD)
+  //! Repeated find non-RAX QWORD starting at ES:[RDI] (X64 Only).
+  INST_0x(repe_scasq, kX86InstIdRepeScasQ)
+  //! Repeated find non-AX WORD starting at ES:[EDI/RDI].
+  INST_0x(repe_scasw, kX86InstIdRepeScasW)
 
-  //! Repeated find nonmatching bytes in ES:[EDI/RDI] and DS:[ESI/RDI].
-  INST_0x(repne_cmpsb, kInstRepneCmpsb)
-  //! Repeated find nonmatching dwords in ES:[EDI/RDI] and DS:[ESI/RDI].
-  INST_0x(repne_cmpsd, kInstRepneCmpsd)
-  //! Repeated find nonmatching words in ES:[EDI/RDI] and DS:[ESI/RDI].
-  INST_0x(repne_cmpsw, kInstRepneCmpsw)
+  //! Repeated find AL BYTEs in ES:[EDI/RDI] and DS:[ESI/RSI].
+  INST_0x(repne_cmpsb, kX86InstIdRepneCmpsB)
+  //! Repeated find EAX DWORDs in ES:[EDI/RDI] and DS:[ESI/RSI].
+  INST_0x(repne_cmpsd, kX86InstIdRepneCmpsD)
+  //! Repeated find RAX QWORDs in ES:[RDI] and DS:[RDI] (X64 Only).
+  INST_0x(repne_cmpsq, kX86InstIdRepneCmpsQ)
+  //! Repeated find AX WORDs in ES:[EDI/RDI] and DS:[ESI/RSI].
+  INST_0x(repne_cmpsw, kX86InstIdRepneCmpsW)
 
-  //! Find AL, starting at ES:[EDI/RDI].
-  INST_0x(repne_scasb, kInstRepneScasb)
-  //! Find EAX, starting at ES:[EDI/RDI].
-  INST_0x(repne_scasd, kInstRepneScasd)
-  //! Find AX, starting at ES:[EDI/RDI].
-  INST_0x(repne_scasw, kInstRepneScasw)
+  //! Repeated find AL BYTEs starting at ES:[EDI/RDI].
+  INST_0x(repne_scasb, kX86InstIdRepneScasB)
+  //! Repeated find EAX DWORDs starting at ES:[EDI/RDI].
+  INST_0x(repne_scasd, kX86InstIdRepneScasD)
+  //! Repeated find RAX QWORDs starting at ES:[RDI] (X64 Only).
+  INST_0x(repne_scasq, kX86InstIdRepneScasQ)
+  //! Repeated find AX WORDs starting at ES:[EDI/RDI].
+  INST_0x(repne_scasw, kX86InstIdRepneScasW)
 
   //! Return.
-  INST_0x(ret, kInstRet)
+  INST_0x(ret, kX86InstIdRet)
   //! \overload
-  INST_1i(ret, kInstRet, Imm)
+  INST_1i(ret, kX86InstIdRet, Imm)
 
   //! Rotate bits left.
   //!
   //! \note `o1` register can be only `cl`.
-  INST_2x(rol, kInstRol, GpReg, GpReg)
+  INST_2x(rol, kX86InstIdRol, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(rol, kInstRol, Mem, GpReg)
+  INST_2x(rol, kX86InstIdRol, X86Mem, X86GpReg)
   //! Rotate bits left.
-  INST_2i(rol, kInstRol, GpReg, Imm)
+  INST_2i(rol, kX86InstIdRol, X86GpReg, Imm)
   //! \overload
-  INST_2i(rol, kInstRol, Mem, Imm)
+  INST_2i(rol, kX86InstIdRol, X86Mem, Imm)
 
   //! Rotate bits right.
   //!
   //! \note `o1` register can be only `cl`.
-  INST_2x(ror, kInstRor, GpReg, GpReg)
+  INST_2x(ror, kX86InstIdRor, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(ror, kInstRor, Mem, GpReg)
+  INST_2x(ror, kX86InstIdRor, X86Mem, X86GpReg)
   //! Rotate bits right.
-  INST_2i(ror, kInstRor, GpReg, Imm)
+  INST_2i(ror, kX86InstIdRor, X86GpReg, Imm)
   //! \overload
-  INST_2i(ror, kInstRor, Mem, Imm)
+  INST_2i(ror, kX86InstIdRor, X86Mem, Imm)
 
   //! Store AH into flags.
-  INST_0x(sahf, kInstSahf)
+  INST_0x(sahf, kX86InstIdSahf)
 
   //! Integer subtraction with borrow.
-  INST_2x(sbb, kInstSbb, GpReg, GpReg)
+  INST_2x(sbb, kX86InstIdSbb, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(sbb, kInstSbb, GpReg, Mem)
+  INST_2x(sbb, kX86InstIdSbb, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(sbb, kInstSbb, GpReg, Imm)
+  INST_2i(sbb, kX86InstIdSbb, X86GpReg, Imm)
   //! \overload
-  INST_2x(sbb, kInstSbb, Mem, GpReg)
+  INST_2x(sbb, kX86InstIdSbb, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(sbb, kInstSbb, Mem, Imm)
+  INST_2i(sbb, kX86InstIdSbb, X86Mem, Imm)
 
   //! Shift bits left.
   //!
   //! \note `o1` register can be only `cl`.
-  INST_2x(sal, kInstSal, GpReg, GpReg)
+  INST_2x(sal, kX86InstIdSal, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(sal, kInstSal, Mem, GpReg)
+  INST_2x(sal, kX86InstIdSal, X86Mem, X86GpReg)
   //! Shift bits left.
-  INST_2i(sal, kInstSal, GpReg, Imm)
+  INST_2i(sal, kX86InstIdSal, X86GpReg, Imm)
   //! \overload
-  INST_2i(sal, kInstSal, Mem, Imm)
+  INST_2i(sal, kX86InstIdSal, X86Mem, Imm)
 
   //! Shift bits right.
   //!
   //! \note `o1` register can be only `cl`.
-  INST_2x(sar, kInstSar, GpReg, GpReg)
+  INST_2x(sar, kX86InstIdSar, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(sar, kInstSar, Mem, GpReg)
+  INST_2x(sar, kX86InstIdSar, X86Mem, X86GpReg)
   //! Shift bits right.
-  INST_2i(sar, kInstSar, GpReg, Imm)
+  INST_2i(sar, kX86InstIdSar, X86GpReg, Imm)
   //! \overload
-  INST_2i(sar, kInstSar, Mem, Imm)
+  INST_2i(sar, kX86InstIdSar, X86Mem, Imm)
+
+  //! Find non-AL BYTE starting at ES:[EDI/RDI].
+  INST_0x(scasb, kX86InstIdScasB)
+  //! Find non-EAX DWORD starting at ES:[EDI/RDI].
+  INST_0x(scasd, kX86InstIdScasD)
+  //! Find non-rax QWORD starting at ES:[RDI] (X64 Only).
+  INST_0x(scasq, kX86InstIdScasQ)
+  //! Find non-AX WORD starting at ES:[EDI/RDI].
+  INST_0x(scasw, kX86InstIdScasW)
 
   //! Set byte on condition.
-  INST_1cc(set, kInstSet, X86Util::condToSetcc, GpReg)
+  INST_1cc(set, kX86InstIdSet, X86Util::condToSetcc, X86GpReg)
   //! Set byte on condition.
-  INST_1cc(set, kInstSet, X86Util::condToSetcc, Mem)
+  INST_1cc(set, kX86InstIdSet, X86Util::condToSetcc, X86Mem)
 
   //! Shift bits left.
   //!
   //! \note `o1` register can be only `cl`.
-  INST_2x(shl, kInstShl, GpReg, GpReg)
+  INST_2x(shl, kX86InstIdShl, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(shl, kInstShl, Mem, GpReg)
+  INST_2x(shl, kX86InstIdShl, X86Mem, X86GpReg)
   //! Shift bits left.
-  INST_2i(shl, kInstShl, GpReg, Imm)
+  INST_2i(shl, kX86InstIdShl, X86GpReg, Imm)
   //! \overload
-  INST_2i(shl, kInstShl, Mem, Imm)
+  INST_2i(shl, kX86InstIdShl, X86Mem, Imm)
 
   //! Shift bits right.
   //!
   //! \note `o1` register can be only `cl`.
-  INST_2x(shr, kInstShr, GpReg, GpReg)
+  INST_2x(shr, kX86InstIdShr, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(shr, kInstShr, Mem, GpReg)
+  INST_2x(shr, kX86InstIdShr, X86Mem, X86GpReg)
   //! Shift bits right.
-  INST_2i(shr, kInstShr, GpReg, Imm)
+  INST_2i(shr, kX86InstIdShr, X86GpReg, Imm)
   //! \overload
-  INST_2i(shr, kInstShr, Mem, Imm)
+  INST_2i(shr, kX86InstIdShr, X86Mem, Imm)
 
   //! Double precision shift left.
   //!
   //! \note `o2` register can be only `cl` register.
-  INST_3x(shld, kInstShld, GpReg, GpReg, GpReg)
+  INST_3x(shld, kX86InstIdShld, X86GpReg, X86GpReg, X86GpReg)
   //! \overload
-  INST_3x(shld, kInstShld, Mem, GpReg, GpReg)
+  INST_3x(shld, kX86InstIdShld, X86Mem, X86GpReg, X86GpReg)
   //! Double precision shift left.
-  INST_3i(shld, kInstShld, GpReg, GpReg, Imm)
+  INST_3i(shld, kX86InstIdShld, X86GpReg, X86GpReg, Imm)
   //! \overload
-  INST_3i(shld, kInstShld, Mem, GpReg, Imm)
+  INST_3i(shld, kX86InstIdShld, X86Mem, X86GpReg, Imm)
 
   //! Double precision shift right.
   //!
   //! \note `o2` register can be only `cl` register.
-  INST_3x(shrd, kInstShrd, GpReg, GpReg, GpReg)
+  INST_3x(shrd, kX86InstIdShrd, X86GpReg, X86GpReg, X86GpReg)
   //! \overload
-  INST_3x(shrd, kInstShrd, Mem, GpReg, GpReg)
+  INST_3x(shrd, kX86InstIdShrd, X86Mem, X86GpReg, X86GpReg)
   //! Double precision shift right.
-  INST_3i(shrd, kInstShrd, GpReg, GpReg, Imm)
+  INST_3i(shrd, kX86InstIdShrd, X86GpReg, X86GpReg, Imm)
   //! \overload
-  INST_3i(shrd, kInstShrd, Mem, GpReg, Imm)
+  INST_3i(shrd, kX86InstIdShrd, X86Mem, X86GpReg, Imm)
 
   //! Set carry flag to 1.
-  INST_0x(stc, kInstStc)
+  INST_0x(stc, kX86InstIdStc)
   //! Set direction flag to 1.
-  INST_0x(std, kInstStd)
+  INST_0x(std, kX86InstIdStd)
+
+  //! Fill BYTE at ES:[EDI/RDI] with AL.
+  INST_0x(stosb, kX86InstIdStosB)
+  //! Fill DWORD at ES:[EDI/RDI] with EAX.
+  INST_0x(stosd, kX86InstIdStosD)
+  //! Fill QWORD at ES:[RDI] with RAX (X64 Only).
+  INST_0x(stosq, kX86InstIdStosQ)
+  //! Fill WORD at ES:[EDI/RDI] with AX.
+  INST_0x(stosw, kX86InstIdStosW)
 
   //! Subtract.
-  INST_2x(sub, kInstSub, GpReg, GpReg)
+  INST_2x(sub, kX86InstIdSub, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(sub, kInstSub, GpReg, Mem)
+  INST_2x(sub, kX86InstIdSub, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(sub, kInstSub, GpReg, Imm)
+  INST_2i(sub, kX86InstIdSub, X86GpReg, Imm)
   //! \overload
-  INST_2x(sub, kInstSub, Mem, GpReg)
+  INST_2x(sub, kX86InstIdSub, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(sub, kInstSub, Mem, Imm)
+  INST_2i(sub, kX86InstIdSub, X86Mem, Imm)
 
   //! Logical compare.
-  INST_2x(test, kInstTest, GpReg, GpReg)
+  INST_2x(test, kX86InstIdTest, X86GpReg, X86GpReg)
   //! \overload
-  INST_2i(test, kInstTest, GpReg, Imm)
+  INST_2i(test, kX86InstIdTest, X86GpReg, Imm)
   //! \overload
-  INST_2x(test, kInstTest, Mem, GpReg)
+  INST_2x(test, kX86InstIdTest, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(test, kInstTest, Mem, Imm)
+  INST_2i(test, kX86InstIdTest, X86Mem, Imm)
 
   //! Undefined instruction - Raise #UD exception.
-  INST_0x(ud2, kInstUd2)
+  INST_0x(ud2, kX86InstIdUd2)
 
   //! Exchange and Add.
-  INST_2x(xadd, kInstXadd, GpReg, GpReg)
+  INST_2x(xadd, kX86InstIdXadd, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(xadd, kInstXadd, Mem, GpReg)
+  INST_2x(xadd, kX86InstIdXadd, X86Mem, X86GpReg)
 
   //! Exchange register/memory with register.
-  INST_2x(xchg, kInstXchg, GpReg, GpReg)
+  INST_2x(xchg, kX86InstIdXchg, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(xchg, kInstXchg, Mem, GpReg)
+  INST_2x(xchg, kX86InstIdXchg, X86Mem, X86GpReg)
   //! \overload
-  INST_2x(xchg, kInstXchg, GpReg, Mem)
+  INST_2x(xchg, kX86InstIdXchg, X86GpReg, X86Mem)
 
   //! Xor.
-  INST_2x(xor_, kInstXor, GpReg, GpReg)
+  INST_2x(xor_, kX86InstIdXor, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(xor_, kInstXor, GpReg, Mem)
+  INST_2x(xor_, kX86InstIdXor, X86GpReg, X86Mem)
   //! \overload
-  INST_2i(xor_, kInstXor, GpReg, Imm)
+  INST_2i(xor_, kX86InstIdXor, X86GpReg, Imm)
   //! \overload
-  INST_2x(xor_, kInstXor, Mem, GpReg)
+  INST_2x(xor_, kX86InstIdXor, X86Mem, X86GpReg)
   //! \overload
-  INST_2i(xor_, kInstXor, Mem, Imm)
+  INST_2i(xor_, kX86InstIdXor, X86Mem, Imm)
 
   // --------------------------------------------------------------------------
-  // [Fpu]
+  // [FPU]
   // --------------------------------------------------------------------------
 
-  //! Compute 2^x - 1 (FPU).
-  INST_0x(f2xm1, kInstF2xm1)
+  //! Compute `2^x - 1` - `fp0 = POW(2, fp0) - 1` (FPU).
+  INST_0x(f2xm1, kX86InstIdF2xm1)
+  //! Abs `fp0 = ABS(fp0)` (FPU).
+  INST_0x(fabs, kX86InstIdFabs)
 
-  //! Absolute value of fp0 (FPU).
-  INST_0x(fabs, kInstFabs)
+  //! Add `o0 = o0 + o1` (one operand has to be `fp0`) (FPU).
+  INST_2x_(fadd, kX86InstIdFadd, X86FpReg, X86FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
+  //! Add `fp0 = fp0 + float_or_double[o0]` (FPU).
+  INST_1x(fadd, kX86InstIdFadd, X86Mem)
+  //! Add `o0 = o0 + fp0` and POP (FPU).
+  INST_1x(faddp, kX86InstIdFaddp, X86FpReg)
+  //! Add `fp1 = fp1 + fp0` and POP (FPU).
+  INST_0x(faddp, kX86InstIdFaddp)
 
-  //! Add `o1` to `o0` and store result in `o0` (FPU).
-  //!
-  //! \note One of dst or src must be fp0.
-  INST_2x_(fadd, kInstFadd, FpReg, FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
-  //! Add 4-byte or 8-byte FP `o0` to fp0 and store result in fp0 (FPU).
-  INST_1x(fadd, kInstFadd, Mem)
-  //! Add fp0 to `o0` and POP register stack (FPU).
-  INST_1x(faddp, kInstFaddp, FpReg)
-  //! \overload
-  INST_0x(faddp, kInstFaddp)
+  //! Load BCD from `[o0]` and PUSH (FPU).
+  INST_1x(fbld, kX86InstIdFbld, X86Mem)
+  //! Store BCD-Integer to `[o0]` and POP (FPU).
+  INST_1x(fbstp, kX86InstIdFbstp, X86Mem)
 
-  //! Load binary coded decimal (FPU).
-  INST_1x(fbld, kInstFbld, Mem)
-  //! Store BCD integer and Pop (FPU).
-  INST_1x(fbstp, kInstFbstp, Mem)
-  //! Change fp0 sign (FPU).
-  INST_0x(fchs, kInstFchs)
+  //! Complement Sign `fp0 = -fp0` (FPU).
+  INST_0x(fchs, kX86InstIdFchs)
 
   //! Clear exceptions (FPU).
-  INST_0x(fclex, kInstFclex)
+  INST_0x(fclex, kX86InstIdFclex)
 
-  //! FP Conditional move (FPU).
-  INST_1x(fcmovb, kInstFcmovb, FpReg)
-  //! FP Conditional move (FPU).
-  INST_1x(fcmovbe, kInstFcmovbe, FpReg)
-  //! FP Conditional move (FPU).
-  INST_1x(fcmove, kInstFcmove, FpReg)
-  //! FP Conditional move (FPU).
-  INST_1x(fcmovnb, kInstFcmovnb, FpReg)
-  //! FP Conditional move (FPU).
-  INST_1x(fcmovnbe, kInstFcmovnbe, FpReg)
-  //! FP Conditional move (FPU).
-  INST_1x(fcmovne, kInstFcmovne, FpReg)
-  //! FP Conditional move (FPU).
-  INST_1x(fcmovnu, kInstFcmovnu, FpReg)
-  //! FP Conditional move (FPU).
-  INST_1x(fcmovu, kInstFcmovu, FpReg)
+  //! Conditional move `if (CF=1) fp0 = o0` (FPU).
+  INST_1x(fcmovb, kX86InstIdFcmovb, X86FpReg)
+  //! Conditional move `if (CF|ZF=1) fp0 = o0` (FPU).
+  INST_1x(fcmovbe, kX86InstIdFcmovbe, X86FpReg)
+  //! Conditional move `if (ZF=1) fp0 = o0` (FPU).
+  INST_1x(fcmove, kX86InstIdFcmove, X86FpReg)
+  //! Conditional move `if (CF=0) fp0 = o0` (FPU).
+  INST_1x(fcmovnb, kX86InstIdFcmovnb, X86FpReg)
+  //! Conditional move `if (CF|ZF=0) fp0 = o0` (FPU).
+  INST_1x(fcmovnbe, kX86InstIdFcmovnbe, X86FpReg)
+  //! Conditional move `if (ZF=0) fp0 = o0` (FPU).
+  INST_1x(fcmovne, kX86InstIdFcmovne, X86FpReg)
+  //! Conditional move `if (PF=0) fp0 = o0` (FPU).
+  INST_1x(fcmovnu, kX86InstIdFcmovnu, X86FpReg)
+  //! Conditional move `if (PF=1) fp0 = o0` (FPU).
+  INST_1x(fcmovu, kX86InstIdFcmovu, X86FpReg)
 
-  //! Compare fp0 with `o0` (FPU).
-  INST_1x(fcom, kInstFcom, FpReg)
-  //! Compare fp0 with fp1 (FPU).
-  INST_0x(fcom, kInstFcom)
-  //! Compare fp0 with 4-byte or 8-byte FP at `src` (FPU).
-  INST_1x(fcom, kInstFcom, Mem)
-  //! Compare fp0 with `o0` and pop the stack (FPU).
-  INST_1x(fcomp, kInstFcomp, FpReg)
-  //! Compare fp0 with fp1 and pop the stack (FPU).
-  INST_0x(fcomp, kInstFcomp)
-  //! Compare fp0 with 4-byte or 8-byte FP at `adr` and pop the stack (FPU).
-  INST_1x(fcomp, kInstFcomp, Mem)
-    //! Compare fp0 with fp1 and pop register stack twice (FPU).
-  INST_0x(fcompp, kInstFcompp)
-  //! Compare fp0 and `o0` and Set EFLAGS (FPU).
-  INST_1x(fcomi, kInstFcomi, FpReg)
-  //! Compare fp0 and `o0` and Set EFLAGS and pop the stack (FPU).
-  INST_1x(fcomip, kInstFcomip, FpReg)
+  //! Compare `fp0` with `o0` (FPU).
+  INST_1x(fcom, kX86InstIdFcom, X86FpReg)
+  //! Compare `fp0` with `fp1` (FPU).
+  INST_0x(fcom, kX86InstIdFcom)
+  //! Compare `fp0` with `float_or_double[o0]` (FPU).
+  INST_1x(fcom, kX86InstIdFcom, X86Mem)
+  //! Compare `fp0` with `o0` and POP (FPU).
+  INST_1x(fcomp, kX86InstIdFcomp, X86FpReg)
+  //! Compare `fp0` with `fp1` and POP (FPU).
+  INST_0x(fcomp, kX86InstIdFcomp)
+  //! Compare `fp0` with `float_or_double[o0]` and POP (FPU).
+  INST_1x(fcomp, kX86InstIdFcomp, X86Mem)
+  //! Compare `fp0` with `fp1` and POP twice (FPU).
+  INST_0x(fcompp, kX86InstIdFcompp)
+  //! Compare `fp0` with `o0` and set EFLAGS (FPU).
+  INST_1x(fcomi, kX86InstIdFcomi, X86FpReg)
+  //! Compare `fp0` with `o0` and set EFLAGS and POP (FPU).
+  INST_1x(fcomip, kX86InstIdFcomip, X86FpReg)
 
-  //! Calculate cosine of fp0 and store result in fp0 (FPU).
-  INST_0x(fcos, kInstFcos)
+  //! Cos `fp0 = cos(fp0)` (FPU).
+  INST_0x(fcos, kX86InstIdFcos)
 
-  //! Decrement stack-top pointer (FPU).
-  INST_0x(fdecstp, kInstFdecstp)
+  //! Decrement FPU stack pointer (FPU).
+  INST_0x(fdecstp, kX86InstIdFdecstp)
 
-  //! Divide `o0` by `o1` (FPU).
-  //!
-  //! \note One of `o0` or `o1` register must be fp0.
-  INST_2x_(fdiv, kInstFdiv, FpReg, FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
-  //! Divide fp0 by 32-bit or 64-bit FP value (FPU).
-  INST_1x(fdiv, kInstFdiv, Mem)
-  //! Divide `o0` by fp0 (FPU).
-  INST_1x(fdivp, kInstFdivp, FpReg)
-  //! \overload
-  INST_0x(fdivp, kInstFdivp)
+  //! Divide `o0 = o0 / o1` (one has to be `fp0`) (FPU).
+  INST_2x_(fdiv, kX86InstIdFdiv, X86FpReg, X86FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
+  //! Divide `fp0 = fp0 / float_or_double[o0]` (FPU).
+  INST_1x(fdiv, kX86InstIdFdiv, X86Mem)
+  //! Divide `o0 = o0 / fp0` and POP (FPU).
+  INST_1x(fdivp, kX86InstIdFdivp, X86FpReg)
+  //! Divide `fp1 = fp1 / fp0` and POP (FPU).
+  INST_0x(fdivp, kX86InstIdFdivp)
 
-  //! Reverse divide `o0` by `o1` (FPU).
-  //!
-  //! \note One of `o0` or `src` register must be fp0.
-  INST_2x_(fdivr, kInstFdivr, FpReg, FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
-  //! Reverse divide fp0 by 32-bit or 64-bit FP value (FPU).
-  INST_1x(fdivr, kInstFdivr, Mem)
-  //! Reverse divide `o0` by fp0 (FPU).
-  INST_1x(fdivrp, kInstFdivrp, FpReg)
-  //! \overload
-  INST_0x(fdivrp, kInstFdivrp)
+  //! Reverse divide `o0 = o1 / o0` (one has to be `fp0`) (FPU).
+  INST_2x_(fdivr, kX86InstIdFdivr, X86FpReg, X86FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
+  //! Reverse divide `fp0 = float_or_double[o0] / fp0` (FPU).
+  INST_1x(fdivr, kX86InstIdFdivr, X86Mem)
+  //! Reverse divide `o0 = fp0 / o0` and POP (FPU).
+  INST_1x(fdivrp, kX86InstIdFdivrp, X86FpReg)
+  //! Reverse divide `fp1 = fp0 / fp1` and POP (FPU).
+  INST_0x(fdivrp, kX86InstIdFdivrp)
 
   //! Free FP register (FPU).
-  //!
-  //! Sets the tag in the FPU tag register associated with register `o0`
-  //! to empty (11B). The contents of `o0` and the FPU stack-top pointer
-  //! (TOP) are not affected.
-  INST_1x(ffree, kInstFfree, FpReg)
+  INST_1x(ffree, kX86InstIdFfree, X86FpReg)
 
-  //! Add 16-bit or 32-bit integer to fp0 (FPU).
-  INST_1x_(fiadd, kInstFiadd, Mem, o0.getSize() == 2 || o0.getSize() == 4)
+  //! Add `fp0 = fp0 + short_or_int[o0]` (FPU).
+  INST_1x_(fiadd, kX86InstIdFiadd, X86Mem, o0.getSize() == 2 || o0.getSize() == 4)
+  //! Compare `fp0` with `short_or_int[o0]` (FPU).
+  INST_1x_(ficom, kX86InstIdFicom, X86Mem, o0.getSize() == 2 || o0.getSize() == 4)
+  //! Compare `fp0` with `short_or_int[o0]` and POP (FPU).
+  INST_1x_(ficomp, kX86InstIdFicomp, X86Mem, o0.getSize() == 2 || o0.getSize() == 4)
+  //! Divide `fp0 = fp0 / short_or_int[o0]` (FPU).
+  INST_1x_(fidiv, kX86InstIdFidiv, X86Mem, o0.getSize() == 2 || o0.getSize() == 4)
+  //! Reverse divide `fp0 = short_or_int[o0] / fp0` (FPU).
+  INST_1x_(fidivr, kX86InstIdFidivr, X86Mem, o0.getSize() == 2 || o0.getSize() == 4)
 
-  //! Compare fp0 with 16-bit or 32-bit Integer (FPU).
-  INST_1x_(ficom, kInstFicom, Mem, o0.getSize() == 2 || o0.getSize() == 4)
-  //! Compare fp0 with 16-bit or 32-bit Integer and pop the stack (FPU).
-  INST_1x_(ficomp, kInstFicomp, Mem, o0.getSize() == 2 || o0.getSize() == 4)
+  //! Load `short_or_int_or_long[o0]` and PUSH (FPU).
+  INST_1x_(fild, kX86InstIdFild, X86Mem, o0.getSize() == 2 || o0.getSize() == 4 || o0.getSize() == 8)
+  //! Multiply `fp0 *= short_or_int[o0]` (FPU).
+  INST_1x_(fimul, kX86InstIdFimul, X86Mem, o0.getSize() == 2 || o0.getSize() == 4)
 
-  //! Divide fp0 by 32-bit or 16-bit integer (`src`) (FPU).
-  INST_1x_(fidiv, kInstFidiv, Mem, o0.getSize() == 2 || o0.getSize() == 4)
-  //! Reverse divide fp0 by 32-bit or 16-bit integer (`src`) (FPU).
-  INST_1x_(fidivr, kInstFidivr, Mem, o0.getSize() == 2 || o0.getSize() == 4)
-
-  //! Load 16-bit, 32-bit or 64-bit Integer and push it to the stack (FPU).
-  INST_1x_(fild, kInstFild, Mem, o0.getSize() == 2 || o0.getSize() == 4 || o0.getSize() == 8)
-
-  //! Multiply fp0 by 16-bit or 32-bit integer and store it to fp0 (FPU).
-  INST_1x_(fimul, kInstFimul, Mem, o0.getSize() == 2 || o0.getSize() == 4)
-
-  //! Increment stack-top pointer (FPU).
-  INST_0x(fincstp, kInstFincstp)
-
+  //! Increment FPU stack pointer (FPU).
+  INST_0x(fincstp, kX86InstIdFincstp)
   //! Initialize FPU (FPU).
-  INST_0x(finit, kInstFinit)
+  INST_0x(finit, kX86InstIdFinit)
 
-  //! Subtract 16-bit or 32-bit integer from fp0 and store result to fp0 (FPU).
-  INST_1x_(fisub, kInstFisub, Mem, o0.getSize() == 2 || o0.getSize() == 4)
-  //! Reverse subtract 16-bit or 32-bit integer from fp0 and store result to fp0 (FPU).
-  INST_1x_(fisubr, kInstFisubr, Mem, o0.getSize() == 2 || o0.getSize() == 4)
+  //! Subtract `fp0 = fp0 - short_or_int[o0]` (FPU).
+  INST_1x_(fisub, kX86InstIdFisub, X86Mem, o0.getSize() == 2 || o0.getSize() == 4)
+  //! Reverse subtract `fp0 = short_or_int[o0] - fp0` (FPU).
+  INST_1x_(fisubr, kX86InstIdFisubr, X86Mem, o0.getSize() == 2 || o0.getSize() == 4)
 
   //! Initialize FPU without checking for pending unmasked exceptions (FPU).
-  INST_0x(fninit, kInstFninit)
+  INST_0x(fninit, kX86InstIdFninit)
 
-  //! Store fp0 as 16-bit or 32-bit Integer to `o0` (FPU).
-  INST_1x_(fist, kInstFist, Mem, o0.getSize() == 2 || o0.getSize() == 4)
-  //! Store fp0 as 16-bit, 32-bit or 64-bit Integer to `o0` and pop stack (FPU).
-  INST_1x_(fistp, kInstFistp, Mem, o0.getSize() == 2 || o0.getSize() == 4 || o0.getSize() == 8)
+  //! Store `fp0` as `short_or_int[o0]` (FPU).
+  INST_1x_(fist, kX86InstIdFist, X86Mem, o0.getSize() == 2 || o0.getSize() == 4)
+  //! Store `fp0` as `short_or_int_or_long[o0]` and POP (FPU).
+  INST_1x_(fistp, kX86InstIdFistp, X86Mem, o0.getSize() == 2 || o0.getSize() == 4 || o0.getSize() == 8)
 
-  //! Push 32-bit, 64-bit or 80-bit floating point value on the FPU register stack (FPU).
-  INST_1x_(fld, kInstFld, Mem, o0.getSize() == 4 || o0.getSize() == 8 || o0.getSize() == 10)
-  //! Push `o0` on the FPU register stack (FPU).
-  INST_1x(fld, kInstFld, FpReg)
+  //! Load `float_or_double_or_extended[o0]` and PUSH (FPU).
+  INST_1x_(fld, kX86InstIdFld, X86Mem, o0.getSize() == 4 || o0.getSize() == 8 || o0.getSize() == 10)
+  //! PUSH `o0` (FPU).
+  INST_1x(fld, kX86InstIdFld, X86FpReg)
 
-  //! Push +1.0 on the FPU register stack (FPU).
-  INST_0x(fld1, kInstFld1)
-  //! Push log2(10) on the FPU register stack (FPU).
-  INST_0x(fldl2t, kInstFldl2t)
-  //! Push log2(e) on the FPU register stack (FPU).
-  INST_0x(fldl2e, kInstFldl2e)
-  //! Push pi on the FPU register stack (FPU).
-  INST_0x(fldpi, kInstFldpi)
-  //! Push log10(2) on the FPU register stack (FPU).
-  INST_0x(fldlg2, kInstFldlg2)
-  //! Push ln(2) on the FPU register stack (FPU).
-  INST_0x(fldln2, kInstFldln2)
-  //! Push +0.0 on the FPU register stack (FPU).
-  INST_0x(fldz, kInstFldz)
+  //! PUSH `1.0` (FPU).
+  INST_0x(fld1, kX86InstIdFld1)
+  //! PUSH `log2(10)` (FPU).
+  INST_0x(fldl2t, kX86InstIdFldl2t)
+  //! PUSH `log2(e)` (FPU).
+  INST_0x(fldl2e, kX86InstIdFldl2e)
+  //! PUSH `pi` (FPU).
+  INST_0x(fldpi, kX86InstIdFldpi)
+  //! PUSH `log10(2)` (FPU).
+  INST_0x(fldlg2, kX86InstIdFldlg2)
+  //! PUSH `ln(2)` (FPU).
+  INST_0x(fldln2, kX86InstIdFldln2)
+  //! PUSH `+0.0` (FPU).
+  INST_0x(fldz, kX86InstIdFldz)
 
-  //! Load x87 FPU control word (2 bytes) (FPU).
-  INST_1x(fldcw, kInstFldcw, Mem)
-  //! Load x87 FPU environment (14 or 28 bytes) (FPU).
-  INST_1x(fldenv, kInstFldenv, Mem)
+  //! Load x87 FPU control word from `word_ptr[o0]` (FPU).
+  INST_1x(fldcw, kX86InstIdFldcw, X86Mem)
+  //! Load x87 FPU environment (14 or 28 bytes) from `[o0]` (FPU).
+  INST_1x(fldenv, kX86InstIdFldenv, X86Mem)
 
-  //! Multiply `o0` by `o1` and store result in `o0` (FPU).
-  //!
-  //! \note One of dst or src must be fp0.
-  INST_2x_(fmul, kInstFmul, FpReg, FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
-  //! Multiply fp0 by 32-bit or 64-bit `o0` and store result in fp0 (FPU).
-  INST_1x(fmul, kInstFmul, Mem)
-
-  //! Multiply fp0 by `o0` and POP register stack (FPU).
-  INST_1x(fmulp, kInstFmulp, FpReg)
-  //! \overload
-  INST_0x(fmulp, kInstFmulp)
+  //! Multiply `o0 = o0  * o1` (one has to be `fp0`) (FPU).
+  INST_2x_(fmul, kX86InstIdFmul, X86FpReg, X86FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
+  //! Multiply `fp0 = fp0 * float_or_double[o0]` (FPU).
+  INST_1x(fmul, kX86InstIdFmul, X86Mem)
+  //! Multiply `o0 = o0 * fp0` and POP (FPU).
+  INST_1x(fmulp, kX86InstIdFmulp, X86FpReg)
+  //! Multiply `fp1 = fp1 * fp0` and POP (FPU).
+  INST_0x(fmulp, kX86InstIdFmulp)
 
   //! Clear exceptions (FPU).
-  INST_0x(fnclex, kInstFnclex)
-
+  INST_0x(fnclex, kX86InstIdFnclex)
   //! No operation (FPU).
-  INST_0x(fnop, kInstFnop)
-
-  //! Save FPU state (FPU).
-  INST_1x(fnsave, kInstFnsave, Mem)
-
-  //! Store x87 FPU environment (FPU).
-  INST_1x(fnstenv, kInstFnstenv, Mem)
-
-  //! Store x87 FPU control word (FPU).
-  INST_1x(fnstcw, kInstFnstcw, Mem)
+  INST_0x(fnop, kX86InstIdFnop)
+  //! Save FPU state to `[o0]` (FPU).
+  INST_1x(fnsave, kX86InstIdFnsave, X86Mem)
+  //! Store x87 FPU environment to `[o0]` (FPU).
+  INST_1x(fnstenv, kX86InstIdFnstenv, X86Mem)
+  //! Store x87 FPU control word to `[o0]` (FPU).
+  INST_1x(fnstcw, kX86InstIdFnstcw, X86Mem)
 
   //! Store x87 FPU status word to `o0` (AX) (FPU).
-  INST_1x_(fnstsw, kInstFnstsw, GpReg, o0.isRegCode(kRegTypeGpw, kRegIndexAx))
-  //! Store x87 FPU status word to `o0` (2 bytes) (FPU).
-  INST_1x(fnstsw, kInstFnstsw, Mem)
+  INST_1x_(fnstsw, kX86InstIdFnstsw, X86GpReg, o0.isRegCode(kX86RegTypeGpw, kX86RegIndexAx))
+  //! Store x87 FPU status word to `word_ptr[o0]` (FPU).
+  INST_1x(fnstsw, kX86InstIdFnstsw, X86Mem)
 
-  //! Calculate arctan(fp1 / fp0) and pop the register stack (FPU).
-  INST_0x(fpatan, kInstFpatan)
+  //! Partial Arctan `fp1 = atan2(fp1, fp0)` and POP (FPU).
+  INST_0x(fpatan, kX86InstIdFpatan)
+  //! Partial Remainder[Trunc] `fp1 = fp0 % fp1` and POP (FPU).
+  INST_0x(fprem, kX86InstIdFprem)
+  //! Partial Remainder[Round] `fp1 = fp0 % fp1` and POP (FPU).
+  INST_0x(fprem1, kX86InstIdFprem1)
+  //! Partial Tan `fp0 = tan(fp0)` and PUSH `1.0` (FPU).
+  INST_0x(fptan, kX86InstIdFptan)
+  //! Round `fp0 = round(fp0)` (FPU).
+  INST_0x(frndint, kX86InstIdFrndint)
 
-  //! Calculate fprem(fp0, fp1) and pop the register stack (FPU).
-  INST_0x(fprem, kInstFprem)
-  //! Calculate IEEE fprem(fp0, fp1) and pop the register stack (FPU).
-  INST_0x(fprem1, kInstFprem1)
+  //! Restore FPU state from `[o0]` (94 or 108 bytes) (FPU).
+  INST_1x(frstor, kX86InstIdFrstor, X86Mem)
+  //! Save FPU state to `[o0]` (94 or 108 bytes) (FPU).
+  INST_1x(fsave, kX86InstIdFsave, X86Mem)
 
-  //! Calculate arctan(fp0) and pop the register stack (FPU).
-  INST_0x(fptan, kInstFptan)
-  //! Round fp0 to Integer (FPU).
-  INST_0x(frndint, kInstFrndint)
+  //! Scale `fp0 = fp0 * pow(2, RoundTowardsZero(fp1))` (FPU).
+  INST_0x(fscale, kX86InstIdFscale)
+  //! Sin `fp0 = sin(fp0)` (FPU).
+  INST_0x(fsin, kX86InstIdFsin)
+  //! Sincos `fp0 = sin(fp0)` and PUSH `cos(fp0)` (FPU).
+  INST_0x(fsincos, kX86InstIdFsincos)
+  //! Square root `fp0 = sqrt(fp0)` (FPU).
+  INST_0x(fsqrt, kX86InstIdFsqrt)
 
-  //! Restore FPU state from `o0` (94 or 108 bytes) (FPU).
-  INST_1x(frstor, kInstFrstor, Mem)
+  //! Store floating point value to `float_or_double[o0]` (FPU).
+  INST_1x_(fst, kX86InstIdFst, X86Mem, o0.getSize() == 4 || o0.getSize() == 8)
+  //! Copy `o0 = fp0` (FPU).
+  INST_1x(fst, kX86InstIdFst, X86FpReg)
+  //! Store floating point value to `float_or_double_or_extended[o0]` and POP (FPU).
+  INST_1x_(fstp, kX86InstIdFstp, X86Mem, o0.getSize() == 4 || o0.getSize() == 8 || o0.getSize() == 10)
+  //! Copy `o0 = fp0` and POP (FPU).
+  INST_1x(fstp, kX86InstIdFstp, X86FpReg)
 
-  //! Save FPU state to `o0` (FPU).
-  //!
-  //! Store FPU state to 94 or 108-bytes after checking for
-  //! pending unmasked FP exceptions. Then reinitialize
-  //! the FPU.
-  INST_1x(fsave, kInstFsave, Mem)
+  //! Store x87 FPU control word to `word_ptr[o0]` (FPU).
+  INST_1x(fstcw, kX86InstIdFstcw, X86Mem)
+  //! Store x87 FPU environment to `[o0]` (14 or 28 bytes) (FPU).
+  INST_1x(fstenv, kX86InstIdFstenv, X86Mem)
+  //! Store x87 FPU status word to `o0` (AX) (FPU).
+  INST_1x_(fstsw, kX86InstIdFstsw, X86GpReg, o0.getRegIndex() == kX86RegIndexAx)
+  //! Store x87 FPU status word to `word_ptr[o0]` (FPU).
+  INST_1x(fstsw, kX86InstIdFstsw, X86Mem)
 
-  //! Scale (FPU).
-  //!
-  //! Scale fp0 by fp1.
-  INST_0x(fscale, kInstFscale)
+  //! Subtract `o0 = o0 - o1` (one has to be `fp0`) (FPU).
+  INST_2x_(fsub, kX86InstIdFsub, X86FpReg, X86FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
+  //! Subtract `fp0 = fp0 - float_or_double[o0]` (FPU).
+  INST_1x_(fsub, kX86InstIdFsub, X86Mem, o0.getSize() == 4 || o0.getSize() == 8)
+  //! Subtract `o0 = o0 - fp0` and POP (FPU).
+  INST_1x(fsubp, kX86InstIdFsubp, X86FpReg)
+  //! Subtract `fp1 = fp1 - fp0` and POP (FPU).
+  INST_0x(fsubp, kX86InstIdFsubp)
 
-  //! Calculate sine of fp0 and store result in fp0 (FPU).
-  INST_0x(fsin, kInstFsin)
+  //! Reverse subtract `o0 = o1 - o0` (one has to be `fp0`) (FPU).
+  INST_2x_(fsubr, kX86InstIdFsubr, X86FpReg, X86FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
+  //! Reverse subtract `fp0 = fp0 - float_or_double[o0]` (FPU).
+  INST_1x_(fsubr, kX86InstIdFsubr, X86Mem, o0.getSize() == 4 || o0.getSize() == 8)
+  //! Reverse subtract `o0 = o0 - fp0` and POP (FPU).
+  INST_1x(fsubrp, kX86InstIdFsubrp, X86FpReg)
+  //! Reverse subtract `fp1 = fp1 - fp0` and POP (FPU).
+  INST_0x(fsubrp, kX86InstIdFsubrp)
 
-  //! Sine and cosine (FPU).
-  //!
-  //! Compute the sine and cosine of fp0; replace fp0 with the sine
-  //! and push the cosine on the register stack.
-  INST_0x(fsincos, kInstFsincos)
+  //! Compare `fp0` with `0.0` (FPU).
+  INST_0x(ftst, kX86InstIdFtst)
 
-  //! Square root (FPU).
-  //!
-  //! Calculates square root of fp0 and stores the result in fp0.
-  INST_0x(fsqrt, kInstFsqrt)
+  //! Unordered compare `fp0` with `o0` (FPU).
+  INST_1x(fucom, kX86InstIdFucom, X86FpReg)
+  //! Unordered compare `fp0` with `fp1` (FPU).
+  INST_0x(fucom, kX86InstIdFucom)
+  //! Unordered compare `fp0` with `o0`, check for ordered values and set EFLAGS (FPU).
+  INST_1x(fucomi, kX86InstIdFucomi, X86FpReg)
+  //! Unordered compare `fp0` with `o0`, check for ordered values and set EFLAGS and POP (FPU).
+  INST_1x(fucomip, kX86InstIdFucomip, X86FpReg)
+  //! Unordered compare `fp0` with `o0` and POP (FPU).
+  INST_1x(fucomp, kX86InstIdFucomp, X86FpReg)
+  //! Unordered compare `fp0` with `fp1` and POP (FPU).
+  INST_0x(fucomp, kX86InstIdFucomp)
+  //! Unordered compare `fp0` with `fp1` and POP twice (FPU).
+  INST_0x(fucompp, kX86InstIdFucompp)
 
-  //! Store floating point value (FPU).
-  //!
-  //! Store fp0 as 32-bit or 64-bit floating point value to `o0`.
-  INST_1x_(fst, kInstFst, Mem, o0.getSize() == 4 || o0.getSize() == 8)
-
-  //! Store floating point value to `o0` (FPU).
-  INST_1x(fst, kInstFst, FpReg)
-
-  //! Store floating point value and pop register stack (FPU).
-  //!
-  //! Store fp0 as 32-bit or 64-bit floating point value to `o0`
-  //! and pop register stack.
-  INST_1x_(fstp, kInstFstp, Mem, o0.getSize() == 4 || o0.getSize() == 8 || o0.getSize() == 10)
-
-  //! Store floating point value and pop register stack (FPU).
-  //!
-  //! Store fp0 to `o0` and pop register stack.
-  INST_1x(fstp, kInstFstp, FpReg)
-
-  //! Store x87 FPU control word (FPU).
-  //!
-  //! Store FPU control word to `o0` (2 bytes) after checking for pending
-  //! unmasked floating-point exceptions.
-  INST_1x(fstcw, kInstFstcw, Mem)
-
-  //! Store x87 FPU environment (FPU).
-  //!
-  //! Store FPU environment to `o0` (14 or 28 bytes) after checking for
-  //! pending unmasked floating-point exceptions. Then mask all floating
-  //! point exceptions.
-  INST_1x(fstenv, kInstFstenv, Mem)
-
-  //! Store x87 FPU status word (AX) (FPU).
-  INST_1x_(fstsw, kInstFstsw, GpReg, o0.isRegCode(kRegTypeGpw, kRegIndexAx))
-  //! Store x87 FPU status sord (2 bytes) (FPU).
-  INST_1x(fstsw, kInstFstsw, Mem)
-
-  //! Subtract `o0` from `o0` and store result in `o0` (FPU).
-  //!
-  //! \note One of dst or src must be fp0.
-  INST_2x_(fsub, kInstFsub, FpReg, FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
-  //! Subtract 32-bit or 64-bit `o0` from fp0 and store result in fp0 (FPU).
-  INST_1x_(fsub, kInstFsub, Mem, o0.getSize() == 4 || o0.getSize() == 8)
-  //! Subtract fp0 from `o0` and POP register stack (FPU).
-  INST_1x(fsubp, kInstFsubp, FpReg)
-  //! \overload
-  INST_0x(fsubp, kInstFsubp)
-
-  //! Reverse subtract `o1` from `o0` and store result in `o0` (FPU).
-  //!
-  //! \note One of dst or src must be fp0.
-  INST_2x_(fsubr, kInstFsubr, FpReg, FpReg, o0.getRegIndex() == 0 || o1.getRegIndex() == 0)
-  //! Reverse subtract 32-bit or 64-bit `o0` from fp0 and store result in fp0 (FPU).
-  INST_1x_(fsubr, kInstFsubr, Mem, o0.getSize() == 4 || o0.getSize() == 8)
-  //! Reverse subtract fp0 from `o0` and POP register stack (FPU).
-  INST_1x(fsubrp, kInstFsubrp, FpReg)
-  //! \overload
-  INST_0x(fsubrp, kInstFsubrp)
-
-  //! Floating point test - Compare fp0 with 0.0. (FPU).
-  INST_0x(ftst, kInstFtst)
-
-  //! Unordered compare fp0 with `o0` (FPU).
-  INST_1x(fucom, kInstFucom, FpReg)
-  //! Unordered compare fp0 with fp1 (FPU).
-  INST_0x(fucom, kInstFucom)
-  //! Unordered compare fp0 and `o0`, check for ordered values and Set EFLAGS (FPU).
-  INST_1x(fucomi, kInstFucomi, FpReg)
-  //! Unordered compare fp0 and `o0`, Check for ordered values and Set EFLAGS and pop the stack (FPU).
-  INST_1x(fucomip, kInstFucomip, FpReg)
-  //! Unordered compare fp0 with `o0` and pop register stack (FPU).
-  INST_1x(fucomp, kInstFucomp, FpReg)
-  //! Unordered compare fp0 with fp1 and pop register stack (FPU).
-  INST_0x(fucomp, kInstFucomp)
-  //! Unordered compare fp0 with fp1 and pop register stack twice (FPU).
-  INST_0x(fucompp, kInstFucompp)
-
-  INST_0x(fwait, kInstFwait)
+  INST_0x(fwait, kX86InstIdFwait)
 
   //! Examine fp0 (FPU).
-  INST_0x(fxam, kInstFxam)
+  INST_0x(fxam, kX86InstIdFxam)
+  //! Exchange `fp0` with `o0` (FPU).
+  INST_1x(fxch, kX86InstIdFxch, X86FpReg)
 
-  //! Exchange register contents (FPU).
-  //!
-  //! Exchange content of fp0 with `o0`.
-  INST_1x(fxch, kInstFxch, FpReg)
+  //! Restore FP/MMX/SIMD extension states to `o0` (512 bytes) (FPU, MMX, SSE).
+  INST_1x(fxrstor, kX86InstIdFxrstor, X86Mem)
+  //! Store FP/MMX/SIMD extension states to `o0` (512 bytes) (FPU, MMX, SSE).
+  INST_1x(fxsave, kX86InstIdFxsave, X86Mem)
+  //! Extract `fp0 = exponent(fp0)` and PUSH `significant(fp0)` (FPU).
+  INST_0x(fxtract, kX86InstIdFxtract)
 
-  //! Restore FP, MMX and streaming SIMD extension states (FPU, MMX, SSE).
-  //!
-  //! Load FP and MMX technology and Streaming SIMD Extension state from
-  //! src (512 bytes).
-  INST_1x(fxrstor, kInstFxrstor, Mem)
-
-  //! Store FP, MMX and streaming SIMD extension states (FPU, MMX, SSE).
-  //!
-  //! Store FP and MMX technology state and Streaming SIMD Extension state
-  //! to dst (512 bytes).
-  INST_1x(fxsave, kInstFxsave, Mem)
-
-  //! Extract exponent and significand (FPU).
-  //!
-  //! Separate value in fp0 into exponent and significand, store exponent
-  //! in fp0 and push the significand on the register stack.
-  INST_0x(fxtract, kInstFxtract)
-
-  //! Compute y * log2(x).
-  //!
-  //! Replace fp1 with (fp1 * log2(fp0)) and pop the register stack.
-  INST_0x(fyl2x, kInstFyl2x)
-  //! Compute y * log_2(x+1).
-  //!
-  //! Replace fp1 with (fp1 * (log2(fp0)+1)) and pop the register stack.
-  INST_0x(fyl2xp1, kInstFyl2xp1)
+  //! Compute `fp1 = fp1 * log2(fp0)` and POP (FPU).
+  INST_0x(fyl2x, kX86InstIdFyl2x)
+  //! Compute `fp1 = fp1 * log2(fp0 + 1)` and POP (FPU).
+  INST_0x(fyl2xp1, kX86InstIdFyl2xp1)
 
   // --------------------------------------------------------------------------
   // [MMX]
   // --------------------------------------------------------------------------
 
   //! Move DWORD (MMX).
-  INST_2x(movd, kInstMovd, Mem, MmReg)
+  INST_2x(movd, kX86InstIdMovd, X86Mem, X86MmReg)
   //! \overload
-  INST_2x(movd, kInstMovd, GpReg, MmReg)
+  INST_2x(movd, kX86InstIdMovd, X86GpReg, X86MmReg)
   //! \overload
-  INST_2x(movd, kInstMovd, MmReg, Mem)
+  INST_2x(movd, kX86InstIdMovd, X86MmReg, X86Mem)
   //! \overload
-  INST_2x(movd, kInstMovd, MmReg, GpReg)
+  INST_2x(movd, kX86InstIdMovd, X86MmReg, X86GpReg)
 
   //! Move QWORD (MMX).
-  INST_2x(movq, kInstMovq, MmReg, MmReg)
+  INST_2x(movq, kX86InstIdMovq, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(movq, kInstMovq, Mem, MmReg)
+  INST_2x(movq, kX86InstIdMovq, X86Mem, X86MmReg)
   //! \overload
-  INST_2x(movq, kInstMovq, MmReg, Mem)
+  INST_2x(movq, kX86InstIdMovq, X86MmReg, X86Mem)
+
+  //! Move QWORD (X64 Only).
+  INST_2x(movq, kX86InstIdMovq, X86GpReg, X86MmReg)
+  //! \overload
+  INST_2x(movq, kX86InstIdMovq, X86MmReg, X86GpReg)
 
   //! Pack DWORDs to WORDs with signed saturation (MMX).
-  INST_2x(packssdw, kInstPackssdw, MmReg, MmReg)
+  INST_2x(packssdw, kX86InstIdPackssdw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(packssdw, kInstPackssdw, MmReg, Mem)
+  INST_2x(packssdw, kX86InstIdPackssdw, X86MmReg, X86Mem)
 
   //! Pack WORDs to BYTEs with signed saturation (MMX).
-  INST_2x(packsswb, kInstPacksswb, MmReg, MmReg)
+  INST_2x(packsswb, kX86InstIdPacksswb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(packsswb, kInstPacksswb, MmReg, Mem)
+  INST_2x(packsswb, kX86InstIdPacksswb, X86MmReg, X86Mem)
 
   //! Pack WORDs to BYTEs with unsigned saturation (MMX).
-  INST_2x(packuswb, kInstPackuswb, MmReg, MmReg)
+  INST_2x(packuswb, kX86InstIdPackuswb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(packuswb, kInstPackuswb, MmReg, Mem)
+  INST_2x(packuswb, kX86InstIdPackuswb, X86MmReg, X86Mem)
 
   //! Packed BYTE add (MMX).
-  INST_2x(paddb, kInstPaddb, MmReg, MmReg)
+  INST_2x(paddb, kX86InstIdPaddb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(paddb, kInstPaddb, MmReg, Mem)
+  INST_2x(paddb, kX86InstIdPaddb, X86MmReg, X86Mem)
 
   //! Packed DWORD add (MMX).
-  INST_2x(paddd, kInstPaddd, MmReg, MmReg)
+  INST_2x(paddd, kX86InstIdPaddd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(paddd, kInstPaddd, MmReg, Mem)
+  INST_2x(paddd, kX86InstIdPaddd, X86MmReg, X86Mem)
 
   //! Packed BYTE add with saturation (MMX).
-  INST_2x(paddsb, kInstPaddsb, MmReg, MmReg)
+  INST_2x(paddsb, kX86InstIdPaddsb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(paddsb, kInstPaddsb, MmReg, Mem)
+  INST_2x(paddsb, kX86InstIdPaddsb, X86MmReg, X86Mem)
 
   //! Packed WORD add with saturation (MMX).
-  INST_2x(paddsw, kInstPaddsw, MmReg, MmReg)
+  INST_2x(paddsw, kX86InstIdPaddsw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(paddsw, kInstPaddsw, MmReg, Mem)
+  INST_2x(paddsw, kX86InstIdPaddsw, X86MmReg, X86Mem)
 
   //! Packed BYTE add with unsigned saturation (MMX).
-  INST_2x(paddusb, kInstPaddusb, MmReg, MmReg)
+  INST_2x(paddusb, kX86InstIdPaddusb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(paddusb, kInstPaddusb, MmReg, Mem)
+  INST_2x(paddusb, kX86InstIdPaddusb, X86MmReg, X86Mem)
 
   //! Packed WORD add with unsigned saturation (MMX).
-  INST_2x(paddusw, kInstPaddusw, MmReg, MmReg)
+  INST_2x(paddusw, kX86InstIdPaddusw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(paddusw, kInstPaddusw, MmReg, Mem)
+  INST_2x(paddusw, kX86InstIdPaddusw, X86MmReg, X86Mem)
 
   //! Packed WORD add (MMX).
-  INST_2x(paddw, kInstPaddw, MmReg, MmReg)
+  INST_2x(paddw, kX86InstIdPaddw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(paddw, kInstPaddw, MmReg, Mem)
+  INST_2x(paddw, kX86InstIdPaddw, X86MmReg, X86Mem)
 
   //! Packed bitwise and (MMX).
-  INST_2x(pand, kInstPand, MmReg, MmReg)
+  INST_2x(pand, kX86InstIdPand, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pand, kInstPand, MmReg, Mem)
+  INST_2x(pand, kX86InstIdPand, X86MmReg, X86Mem)
 
   //! Packed bitwise and-not (MMX).
-  INST_2x(pandn, kInstPandn, MmReg, MmReg)
+  INST_2x(pandn, kX86InstIdPandn, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pandn, kInstPandn, MmReg, Mem)
+  INST_2x(pandn, kX86InstIdPandn, X86MmReg, X86Mem)
 
   //! Packed BYTEs compare for equality (MMX).
-  INST_2x(pcmpeqb, kInstPcmpeqb, MmReg, MmReg)
+  INST_2x(pcmpeqb, kX86InstIdPcmpeqb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pcmpeqb, kInstPcmpeqb, MmReg, Mem)
+  INST_2x(pcmpeqb, kX86InstIdPcmpeqb, X86MmReg, X86Mem)
 
   //! Packed DWORDs compare for equality (MMX).
-  INST_2x(pcmpeqd, kInstPcmpeqd, MmReg, MmReg)
+  INST_2x(pcmpeqd, kX86InstIdPcmpeqd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pcmpeqd, kInstPcmpeqd, MmReg, Mem)
+  INST_2x(pcmpeqd, kX86InstIdPcmpeqd, X86MmReg, X86Mem)
 
   //! Packed WORDs compare for equality (MMX).
-  INST_2x(pcmpeqw, kInstPcmpeqw, MmReg, MmReg)
+  INST_2x(pcmpeqw, kX86InstIdPcmpeqw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pcmpeqw, kInstPcmpeqw, MmReg, Mem)
+  INST_2x(pcmpeqw, kX86InstIdPcmpeqw, X86MmReg, X86Mem)
 
   //! Packed BYTEs compare if greater than (MMX).
-  INST_2x(pcmpgtb, kInstPcmpgtb, MmReg, MmReg)
+  INST_2x(pcmpgtb, kX86InstIdPcmpgtb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pcmpgtb, kInstPcmpgtb, MmReg, Mem)
+  INST_2x(pcmpgtb, kX86InstIdPcmpgtb, X86MmReg, X86Mem)
 
   //! Packed DWORDs compare if greater than (MMX).
-  INST_2x(pcmpgtd, kInstPcmpgtd, MmReg, MmReg)
+  INST_2x(pcmpgtd, kX86InstIdPcmpgtd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pcmpgtd, kInstPcmpgtd, MmReg, Mem)
+  INST_2x(pcmpgtd, kX86InstIdPcmpgtd, X86MmReg, X86Mem)
 
   //! Packed WORDs compare if greater than (MMX).
-  INST_2x(pcmpgtw, kInstPcmpgtw, MmReg, MmReg)
+  INST_2x(pcmpgtw, kX86InstIdPcmpgtw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pcmpgtw, kInstPcmpgtw, MmReg, Mem)
+  INST_2x(pcmpgtw, kX86InstIdPcmpgtw, X86MmReg, X86Mem)
 
   //! Packed WORDs multiply high (MMX).
-  INST_2x(pmulhw, kInstPmulhw, MmReg, MmReg)
+  INST_2x(pmulhw, kX86InstIdPmulhw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pmulhw, kInstPmulhw, MmReg, Mem)
+  INST_2x(pmulhw, kX86InstIdPmulhw, X86MmReg, X86Mem)
 
   //! Packed WORDs multiply low (MMX).
-  INST_2x(pmullw, kInstPmullw, MmReg, MmReg)
+  INST_2x(pmullw, kX86InstIdPmullw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pmullw, kInstPmullw, MmReg, Mem)
+  INST_2x(pmullw, kX86InstIdPmullw, X86MmReg, X86Mem)
 
   //! Pakced bitwise or (MMX).
-  INST_2x(por, kInstPor, MmReg, MmReg)
+  INST_2x(por, kX86InstIdPor, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(por, kInstPor, MmReg, Mem)
+  INST_2x(por, kX86InstIdPor, X86MmReg, X86Mem)
 
   //! Packed WORD multiply and add to packed DWORD (MMX).
-  INST_2x(pmaddwd, kInstPmaddwd, MmReg, MmReg)
+  INST_2x(pmaddwd, kX86InstIdPmaddwd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pmaddwd, kInstPmaddwd, MmReg, Mem)
+  INST_2x(pmaddwd, kX86InstIdPmaddwd, X86MmReg, X86Mem)
 
   //! Packed DWORD shift left logical (MMX).
-  INST_2x(pslld, kInstPslld, MmReg, MmReg)
+  INST_2x(pslld, kX86InstIdPslld, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pslld, kInstPslld, MmReg, Mem)
+  INST_2x(pslld, kX86InstIdPslld, X86MmReg, X86Mem)
   //! \overload
-  INST_2i(pslld, kInstPslld, MmReg, Imm)
+  INST_2i(pslld, kX86InstIdPslld, X86MmReg, Imm)
 
   //! Packed QWORD shift left logical (MMX).
-  INST_2x(psllq, kInstPsllq, MmReg, MmReg)
+  INST_2x(psllq, kX86InstIdPsllq, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psllq, kInstPsllq, MmReg, Mem)
+  INST_2x(psllq, kX86InstIdPsllq, X86MmReg, X86Mem)
   //! \overload
-  INST_2i(psllq, kInstPsllq, MmReg, Imm)
+  INST_2i(psllq, kX86InstIdPsllq, X86MmReg, Imm)
 
   //! Packed WORD shift left logical (MMX).
-  INST_2x(psllw, kInstPsllw, MmReg, MmReg)
+  INST_2x(psllw, kX86InstIdPsllw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psllw, kInstPsllw, MmReg, Mem)
+  INST_2x(psllw, kX86InstIdPsllw, X86MmReg, X86Mem)
   //! \overload
-  INST_2i(psllw, kInstPsllw, MmReg, Imm)
+  INST_2i(psllw, kX86InstIdPsllw, X86MmReg, Imm)
 
   //! Packed DWORD shift right arithmetic (MMX).
-  INST_2x(psrad, kInstPsrad, MmReg, MmReg)
+  INST_2x(psrad, kX86InstIdPsrad, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psrad, kInstPsrad, MmReg, Mem)
+  INST_2x(psrad, kX86InstIdPsrad, X86MmReg, X86Mem)
   //! \overload
-  INST_2i(psrad, kInstPsrad, MmReg, Imm)
+  INST_2i(psrad, kX86InstIdPsrad, X86MmReg, Imm)
 
   //! Packed WORD shift right arithmetic (MMX).
-  INST_2x(psraw, kInstPsraw, MmReg, MmReg)
+  INST_2x(psraw, kX86InstIdPsraw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psraw, kInstPsraw, MmReg, Mem)
+  INST_2x(psraw, kX86InstIdPsraw, X86MmReg, X86Mem)
   //! \overload
-  INST_2i(psraw, kInstPsraw, MmReg, Imm)
+  INST_2i(psraw, kX86InstIdPsraw, X86MmReg, Imm)
 
   //! Packed DWORD shift right logical (MMX).
-  INST_2x(psrld, kInstPsrld, MmReg, MmReg)
+  INST_2x(psrld, kX86InstIdPsrld, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psrld, kInstPsrld, MmReg, Mem)
+  INST_2x(psrld, kX86InstIdPsrld, X86MmReg, X86Mem)
   //! \overload
-  INST_2i(psrld, kInstPsrld, MmReg, Imm)
+  INST_2i(psrld, kX86InstIdPsrld, X86MmReg, Imm)
 
   //! Packed QWORD shift right logical (MMX).
-  INST_2x(psrlq, kInstPsrlq, MmReg, MmReg)
+  INST_2x(psrlq, kX86InstIdPsrlq, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psrlq, kInstPsrlq, MmReg, Mem)
+  INST_2x(psrlq, kX86InstIdPsrlq, X86MmReg, X86Mem)
   //! \overload
-  INST_2i(psrlq, kInstPsrlq, MmReg, Imm)
+  INST_2i(psrlq, kX86InstIdPsrlq, X86MmReg, Imm)
 
   //! Packed WORD shift right logical (MMX).
-  INST_2x(psrlw, kInstPsrlw, MmReg, MmReg)
+  INST_2x(psrlw, kX86InstIdPsrlw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psrlw, kInstPsrlw, MmReg, Mem)
+  INST_2x(psrlw, kX86InstIdPsrlw, X86MmReg, X86Mem)
   //! \overload
-  INST_2i(psrlw, kInstPsrlw, MmReg, Imm)
+  INST_2i(psrlw, kX86InstIdPsrlw, X86MmReg, Imm)
 
   //! Packed BYTE subtract (MMX).
-  INST_2x(psubb, kInstPsubb, MmReg, MmReg)
+  INST_2x(psubb, kX86InstIdPsubb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psubb, kInstPsubb, MmReg, Mem)
+  INST_2x(psubb, kX86InstIdPsubb, X86MmReg, X86Mem)
 
   //! Packed DWORD subtract (MMX).
-  INST_2x(psubd, kInstPsubd, MmReg, MmReg)
+  INST_2x(psubd, kX86InstIdPsubd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psubd, kInstPsubd, MmReg, Mem)
+  INST_2x(psubd, kX86InstIdPsubd, X86MmReg, X86Mem)
 
   //! Packed BYTE subtract with saturation (MMX).
-  INST_2x(psubsb, kInstPsubsb, MmReg, MmReg)
+  INST_2x(psubsb, kX86InstIdPsubsb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psubsb, kInstPsubsb, MmReg, Mem)
+  INST_2x(psubsb, kX86InstIdPsubsb, X86MmReg, X86Mem)
 
   //! Packed WORD subtract with saturation (MMX).
-  INST_2x(psubsw, kInstPsubsw, MmReg, MmReg)
+  INST_2x(psubsw, kX86InstIdPsubsw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psubsw, kInstPsubsw, MmReg, Mem)
+  INST_2x(psubsw, kX86InstIdPsubsw, X86MmReg, X86Mem)
 
   //! Packed BYTE subtract with unsigned saturation (MMX).
-  INST_2x(psubusb, kInstPsubusb, MmReg, MmReg)
+  INST_2x(psubusb, kX86InstIdPsubusb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psubusb, kInstPsubusb, MmReg, Mem)
+  INST_2x(psubusb, kX86InstIdPsubusb, X86MmReg, X86Mem)
 
   //! Packed WORD subtract with unsigned saturation (MMX).
-  INST_2x(psubusw, kInstPsubusw, MmReg, MmReg)
+  INST_2x(psubusw, kX86InstIdPsubusw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psubusw, kInstPsubusw, MmReg, Mem)
+  INST_2x(psubusw, kX86InstIdPsubusw, X86MmReg, X86Mem)
 
   //! Packed WORD subtract (MMX).
-  INST_2x(psubw, kInstPsubw, MmReg, MmReg)
+  INST_2x(psubw, kX86InstIdPsubw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psubw, kInstPsubw, MmReg, Mem)
+  INST_2x(psubw, kX86InstIdPsubw, X86MmReg, X86Mem)
 
   //! Unpack high packed BYTEs to WORDs (MMX).
-  INST_2x(punpckhbw, kInstPunpckhbw, MmReg, MmReg)
+  INST_2x(punpckhbw, kX86InstIdPunpckhbw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(punpckhbw, kInstPunpckhbw, MmReg, Mem)
+  INST_2x(punpckhbw, kX86InstIdPunpckhbw, X86MmReg, X86Mem)
 
   //! Unpack high packed DWORDs to QWORDs (MMX).
-  INST_2x(punpckhdq, kInstPunpckhdq, MmReg, MmReg)
+  INST_2x(punpckhdq, kX86InstIdPunpckhdq, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(punpckhdq, kInstPunpckhdq, MmReg, Mem)
+  INST_2x(punpckhdq, kX86InstIdPunpckhdq, X86MmReg, X86Mem)
 
   //! Unpack high packed WORDs to DWORDs (MMX).
-  INST_2x(punpckhwd, kInstPunpckhwd, MmReg, MmReg)
+  INST_2x(punpckhwd, kX86InstIdPunpckhwd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(punpckhwd, kInstPunpckhwd, MmReg, Mem)
+  INST_2x(punpckhwd, kX86InstIdPunpckhwd, X86MmReg, X86Mem)
 
   //! Unpack low packed BYTEs to WORDs (MMX).
-  INST_2x(punpcklbw, kInstPunpcklbw, MmReg, MmReg)
+  INST_2x(punpcklbw, kX86InstIdPunpcklbw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(punpcklbw, kInstPunpcklbw, MmReg, Mem)
+  INST_2x(punpcklbw, kX86InstIdPunpcklbw, X86MmReg, X86Mem)
 
   //! Unpack low packed DWORDs to QWORDs (MMX).
-  INST_2x(punpckldq, kInstPunpckldq, MmReg, MmReg)
+  INST_2x(punpckldq, kX86InstIdPunpckldq, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(punpckldq, kInstPunpckldq, MmReg, Mem)
+  INST_2x(punpckldq, kX86InstIdPunpckldq, X86MmReg, X86Mem)
 
   //! Unpack low packed WORDs to DWORDs (MMX).
-  INST_2x(punpcklwd, kInstPunpcklwd, MmReg, MmReg)
+  INST_2x(punpcklwd, kX86InstIdPunpcklwd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(punpcklwd, kInstPunpcklwd, MmReg, Mem)
+  INST_2x(punpcklwd, kX86InstIdPunpcklwd, X86MmReg, X86Mem)
 
   //! Packed bitwise xor (MMX).
-  INST_2x(pxor, kInstPxor, MmReg, MmReg)
+  INST_2x(pxor, kX86InstIdPxor, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pxor, kInstPxor, MmReg, Mem)
+  INST_2x(pxor, kX86InstIdPxor, X86MmReg, X86Mem)
 
   //! Empty MMX state.
-  INST_0x(emms, kInstEmms)
+  INST_0x(emms, kX86InstIdEmms)
 
   // -------------------------------------------------------------------------
   // [3dNow]
   // -------------------------------------------------------------------------
 
   //! Packed SP-FP to DWORD convert (3dNow!).
-  INST_2x(pf2id, kInstPf2id, MmReg, MmReg)
+  INST_2x(pf2id, kX86InstIdPf2id, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pf2id, kInstPf2id, MmReg, Mem)
+  INST_2x(pf2id, kX86InstIdPf2id, X86MmReg, X86Mem)
 
   //!  Packed SP-FP to WORD convert (3dNow!).
-  INST_2x(pf2iw, kInstPf2iw, MmReg, MmReg)
+  INST_2x(pf2iw, kX86InstIdPf2iw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pf2iw, kInstPf2iw, MmReg, Mem)
+  INST_2x(pf2iw, kX86InstIdPf2iw, X86MmReg, X86Mem)
 
   //! Packed SP-FP accumulate (3dNow!).
-  INST_2x(pfacc, kInstPfacc, MmReg, MmReg)
+  INST_2x(pfacc, kX86InstIdPfacc, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfacc, kInstPfacc, MmReg, Mem)
+  INST_2x(pfacc, kX86InstIdPfacc, X86MmReg, X86Mem)
 
   //! Packed SP-FP addition (3dNow!).
-  INST_2x(pfadd, kInstPfadd, MmReg, MmReg)
+  INST_2x(pfadd, kX86InstIdPfadd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfadd, kInstPfadd, MmReg, Mem)
+  INST_2x(pfadd, kX86InstIdPfadd, X86MmReg, X86Mem)
 
   //! Packed SP-FP compare - dst == src (3dNow!).
-  INST_2x(pfcmpeq, kInstPfcmpeq, MmReg, MmReg)
+  INST_2x(pfcmpeq, kX86InstIdPfcmpeq, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfcmpeq, kInstPfcmpeq, MmReg, Mem)
+  INST_2x(pfcmpeq, kX86InstIdPfcmpeq, X86MmReg, X86Mem)
 
   //! Packed SP-FP compare - dst >= src (3dNow!).
-  INST_2x(pfcmpge, kInstPfcmpge, MmReg, MmReg)
+  INST_2x(pfcmpge, kX86InstIdPfcmpge, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfcmpge, kInstPfcmpge, MmReg, Mem)
+  INST_2x(pfcmpge, kX86InstIdPfcmpge, X86MmReg, X86Mem)
 
   //! Packed SP-FP compare - dst > src (3dNow!).
-  INST_2x(pfcmpgt, kInstPfcmpgt, MmReg, MmReg)
+  INST_2x(pfcmpgt, kX86InstIdPfcmpgt, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfcmpgt, kInstPfcmpgt, MmReg, Mem)
+  INST_2x(pfcmpgt, kX86InstIdPfcmpgt, X86MmReg, X86Mem)
 
   //! Packed SP-FP maximum (3dNow!).
-  INST_2x(pfmax, kInstPfmax, MmReg, MmReg)
+  INST_2x(pfmax, kX86InstIdPfmax, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfmax, kInstPfmax, MmReg, Mem)
+  INST_2x(pfmax, kX86InstIdPfmax, X86MmReg, X86Mem)
 
   //! Packed SP-FP minimum (3dNow!).
-  INST_2x(pfmin, kInstPfmin, MmReg, MmReg)
+  INST_2x(pfmin, kX86InstIdPfmin, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfmin, kInstPfmin, MmReg, Mem)
+  INST_2x(pfmin, kX86InstIdPfmin, X86MmReg, X86Mem)
 
   //! Packed SP-FP multiply (3dNow!).
-  INST_2x(pfmul, kInstPfmul, MmReg, MmReg)
+  INST_2x(pfmul, kX86InstIdPfmul, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfmul, kInstPfmul, MmReg, Mem)
+  INST_2x(pfmul, kX86InstIdPfmul, X86MmReg, X86Mem)
 
   //! Packed SP-FP negative accumulate (3dNow!).
-  INST_2x(pfnacc, kInstPfnacc, MmReg, MmReg)
+  INST_2x(pfnacc, kX86InstIdPfnacc, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfnacc, kInstPfnacc, MmReg, Mem)
+  INST_2x(pfnacc, kX86InstIdPfnacc, X86MmReg, X86Mem)
 
   //! Packed SP-FP mixed accumulate (3dNow!).
-  INST_2x(pfpnacc, kInstPfpnacc, MmReg, MmReg)
+  INST_2x(pfpnacc, kX86InstIdPfpnacc, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfpnacc, kInstPfpnacc, MmReg, Mem)
+  INST_2x(pfpnacc, kX86InstIdPfpnacc, X86MmReg, X86Mem)
 
   //! Packed SP-FP reciprocal Approximation (3dNow!).
-  INST_2x(pfrcp, kInstPfrcp, MmReg, MmReg)
+  INST_2x(pfrcp, kX86InstIdPfrcp, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfrcp, kInstPfrcp, MmReg, Mem)
+  INST_2x(pfrcp, kX86InstIdPfrcp, X86MmReg, X86Mem)
 
   //! Packed SP-FP reciprocal, first iteration step (3dNow!).
-  INST_2x(pfrcpit1, kInstPfrcpit1, MmReg, MmReg)
+  INST_2x(pfrcpit1, kX86InstIdPfrcpit1, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfrcpit1, kInstPfrcpit1, MmReg, Mem)
+  INST_2x(pfrcpit1, kX86InstIdPfrcpit1, X86MmReg, X86Mem)
 
   //! Packed SP-FP reciprocal, second iteration step (3dNow!).
-  INST_2x(pfrcpit2, kInstPfrcpit2, MmReg, MmReg)
+  INST_2x(pfrcpit2, kX86InstIdPfrcpit2, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfrcpit2, kInstPfrcpit2, MmReg, Mem)
+  INST_2x(pfrcpit2, kX86InstIdPfrcpit2, X86MmReg, X86Mem)
 
   //! Packed SP-FP reciprocal square root, first iteration step (3dNow!).
-  INST_2x(pfrsqit1, kInstPfrsqit1, MmReg, MmReg)
+  INST_2x(pfrsqit1, kX86InstIdPfrsqit1, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfrsqit1, kInstPfrsqit1, MmReg, Mem)
+  INST_2x(pfrsqit1, kX86InstIdPfrsqit1, X86MmReg, X86Mem)
 
   //! Packed SP-FP reciprocal square root approximation (3dNow!).
-  INST_2x(pfrsqrt, kInstPfrsqrt, MmReg, MmReg)
+  INST_2x(pfrsqrt, kX86InstIdPfrsqrt, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfrsqrt, kInstPfrsqrt, MmReg, Mem)
+  INST_2x(pfrsqrt, kX86InstIdPfrsqrt, X86MmReg, X86Mem)
 
   //! Packed SP-FP subtract (3dNow!).
-  INST_2x(pfsub, kInstPfsub, MmReg, MmReg)
+  INST_2x(pfsub, kX86InstIdPfsub, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfsub, kInstPfsub, MmReg, Mem)
+  INST_2x(pfsub, kX86InstIdPfsub, X86MmReg, X86Mem)
 
   //! Packed SP-FP reverse subtract (3dNow!).
-  INST_2x(pfsubr, kInstPfsubr, MmReg, MmReg)
+  INST_2x(pfsubr, kX86InstIdPfsubr, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pfsubr, kInstPfsubr, MmReg, Mem)
+  INST_2x(pfsubr, kX86InstIdPfsubr, X86MmReg, X86Mem)
 
   //! Packed DWORDs to SP-FP (3dNow!).
-  INST_2x(pi2fd, kInstPi2fd, MmReg, MmReg)
+  INST_2x(pi2fd, kX86InstIdPi2fd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pi2fd, kInstPi2fd, MmReg, Mem)
+  INST_2x(pi2fd, kX86InstIdPi2fd, X86MmReg, X86Mem)
 
   //! Packed WORDs to SP-FP (3dNow!).
-  INST_2x(pi2fw, kInstPi2fw, MmReg, MmReg)
+  INST_2x(pi2fw, kX86InstIdPi2fw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pi2fw, kInstPi2fw, MmReg, Mem)
+  INST_2x(pi2fw, kX86InstIdPi2fw, X86MmReg, X86Mem)
 
   //! Packed swap DWORDs (3dNow!)
-  INST_2x(pswapd, kInstPswapd, MmReg, MmReg)
+  INST_2x(pswapd, kX86InstIdPswapd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pswapd, kInstPswapd, MmReg, Mem)
+  INST_2x(pswapd, kX86InstIdPswapd, X86MmReg, X86Mem)
 
   //! Prefetch (3dNow!).
-  INST_1x(prefetch3dnow, kInstPrefetch3dNow, Mem)
+  INST_1x(prefetch3dnow, kX86InstIdPrefetch3dNow, X86Mem)
 
   //! Prefetch and set cache to modified (3dNow!).
-  INST_1x(prefetchw3dnow, kInstPrefetchw3dNow, Mem)
+  INST_1x(prefetchw3dnow, kX86InstIdPrefetchw3dNow, X86Mem)
 
   //! Faster EMMS (3dNow!).
-  INST_0x(femms, kInstFemms)
+  INST_0x(femms, kX86InstIdFemms)
 
   // --------------------------------------------------------------------------
   // [SSE]
   // --------------------------------------------------------------------------
 
   //! Packed SP-FP add (SSE).
-  INST_2x(addps, kInstAddps, XmmReg, XmmReg)
+  INST_2x(addps, kX86InstIdAddps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(addps, kInstAddps, XmmReg, Mem)
+  INST_2x(addps, kX86InstIdAddps, X86XmmReg, X86Mem)
 
   //! Scalar SP-FP add (SSE).
-  INST_2x(addss, kInstAddss, XmmReg, XmmReg)
+  INST_2x(addss, kX86InstIdAddss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(addss, kInstAddss, XmmReg, Mem)
+  INST_2x(addss, kX86InstIdAddss, X86XmmReg, X86Mem)
 
   //! Packed SP-FP bitwise and-not (SSE).
-  INST_2x(andnps, kInstAndnps, XmmReg, XmmReg)
+  INST_2x(andnps, kX86InstIdAndnps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(andnps, kInstAndnps, XmmReg, Mem)
+  INST_2x(andnps, kX86InstIdAndnps, X86XmmReg, X86Mem)
 
   //! Packed SP-FP bitwise and (SSE).
-  INST_2x(andps, kInstAndps, XmmReg, XmmReg)
+  INST_2x(andps, kX86InstIdAndps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(andps, kInstAndps, XmmReg, Mem)
+  INST_2x(andps, kX86InstIdAndps, X86XmmReg, X86Mem)
 
   //! Packed SP-FP compare (SSE).
-  INST_3i(cmpps, kInstCmpps, XmmReg, XmmReg, Imm)
+  INST_3i(cmpps, kX86InstIdCmpps, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(cmpps, kInstCmpps, XmmReg, Mem, Imm)
+  INST_3i(cmpps, kX86InstIdCmpps, X86XmmReg, X86Mem, Imm)
 
   //! Compare scalar SP-FP (SSE).
-  INST_3i(cmpss, kInstCmpss, XmmReg, XmmReg, Imm)
+  INST_3i(cmpss, kX86InstIdCmpss, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(cmpss, kInstCmpss, XmmReg, Mem, Imm)
+  INST_3i(cmpss, kX86InstIdCmpss, X86XmmReg, X86Mem, Imm)
 
   //! Scalar ordered SP-FP compare and set EFLAGS (SSE).
-  INST_2x(comiss, kInstComiss, XmmReg, XmmReg)
+  INST_2x(comiss, kX86InstIdComiss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(comiss, kInstComiss, XmmReg, Mem)
+  INST_2x(comiss, kX86InstIdComiss, X86XmmReg, X86Mem)
 
   //! Packed signed INT32 to packed SP-FP conversion (SSE).
-  INST_2x(cvtpi2ps, kInstCvtpi2ps, XmmReg, MmReg)
+  INST_2x(cvtpi2ps, kX86InstIdCvtpi2ps, X86XmmReg, X86MmReg)
   //! \overload
-  INST_2x(cvtpi2ps, kInstCvtpi2ps, XmmReg, Mem)
+  INST_2x(cvtpi2ps, kX86InstIdCvtpi2ps, X86XmmReg, X86Mem)
 
   //! Packed SP-FP to packed INT32 conversion (SSE).
-  INST_2x(cvtps2pi, kInstCvtps2pi, MmReg, XmmReg)
+  INST_2x(cvtps2pi, kX86InstIdCvtps2pi, X86MmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtps2pi, kInstCvtps2pi, MmReg, Mem)
+  INST_2x(cvtps2pi, kX86InstIdCvtps2pi, X86MmReg, X86Mem)
 
   //! Convert scalar INT32 to SP-FP (SSE).
-  INST_2x(cvtsi2ss, kInstCvtsi2ss, XmmReg, GpReg)
+  INST_2x(cvtsi2ss, kX86InstIdCvtsi2ss, X86XmmReg, X86GpReg)
   //! \overload
-  INST_2x(cvtsi2ss, kInstCvtsi2ss, XmmReg, Mem)
+  INST_2x(cvtsi2ss, kX86InstIdCvtsi2ss, X86XmmReg, X86Mem)
 
   //! Convert scalar SP-FP to INT32 (SSE).
-  INST_2x(cvtss2si, kInstCvtss2si, GpReg, XmmReg)
+  INST_2x(cvtss2si, kX86InstIdCvtss2si, X86GpReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtss2si, kInstCvtss2si, GpReg, Mem)
+  INST_2x(cvtss2si, kX86InstIdCvtss2si, X86GpReg, X86Mem)
 
   //! Convert with truncation packed SP-FP to packed INT32 (SSE).
-  INST_2x(cvttps2pi, kInstCvttps2pi, MmReg, XmmReg)
+  INST_2x(cvttps2pi, kX86InstIdCvttps2pi, X86MmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvttps2pi, kInstCvttps2pi, MmReg, Mem)
+  INST_2x(cvttps2pi, kX86InstIdCvttps2pi, X86MmReg, X86Mem)
 
   //! Convert with truncation scalar SP-FP to INT32 (SSE).
-  INST_2x(cvttss2si, kInstCvttss2si, GpReg, XmmReg)
+  INST_2x(cvttss2si, kX86InstIdCvttss2si, X86GpReg, X86XmmReg)
   //! \overload
-  INST_2x(cvttss2si, kInstCvttss2si, GpReg, Mem)
+  INST_2x(cvttss2si, kX86InstIdCvttss2si, X86GpReg, X86Mem)
 
   //! Packed SP-FP divide (SSE).
-  INST_2x(divps, kInstDivps, XmmReg, XmmReg)
+  INST_2x(divps, kX86InstIdDivps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(divps, kInstDivps, XmmReg, Mem)
+  INST_2x(divps, kX86InstIdDivps, X86XmmReg, X86Mem)
 
   //! Scalar SP-FP divide (SSE).
-  INST_2x(divss, kInstDivss, XmmReg, XmmReg)
+  INST_2x(divss, kX86InstIdDivss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(divss, kInstDivss, XmmReg, Mem)
+  INST_2x(divss, kX86InstIdDivss, X86XmmReg, X86Mem)
 
   //! Load streaming SIMD extension control/status (SSE).
-  INST_1x(ldmxcsr, kInstLdmxcsr, Mem)
+  INST_1x(ldmxcsr, kX86InstIdLdmxcsr, X86Mem)
 
   //! Byte mask write to DS:EDI/RDI (SSE).
-  INST_2x(maskmovq, kInstMaskmovq, MmReg, MmReg)
+  INST_2x(maskmovq, kX86InstIdMaskmovq, X86MmReg, X86MmReg)
 
   //! Packed SP-FP maximum (SSE).
-  INST_2x(maxps, kInstMaxps, XmmReg, XmmReg)
+  INST_2x(maxps, kX86InstIdMaxps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(maxps, kInstMaxps, XmmReg, Mem)
+  INST_2x(maxps, kX86InstIdMaxps, X86XmmReg, X86Mem)
 
   //! Scalar SP-FP maximum (SSE).
-  INST_2x(maxss, kInstMaxss, XmmReg, XmmReg)
+  INST_2x(maxss, kX86InstIdMaxss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(maxss, kInstMaxss, XmmReg, Mem)
+  INST_2x(maxss, kX86InstIdMaxss, X86XmmReg, X86Mem)
 
   //! Packed SP-FP minimum (SSE).
-  INST_2x(minps, kInstMinps, XmmReg, XmmReg)
+  INST_2x(minps, kX86InstIdMinps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(minps, kInstMinps, XmmReg, Mem)
+  INST_2x(minps, kX86InstIdMinps, X86XmmReg, X86Mem)
 
   //! Scalar SP-FP minimum (SSE).
-  INST_2x(minss, kInstMinss, XmmReg, XmmReg)
+  INST_2x(minss, kX86InstIdMinss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(minss, kInstMinss, XmmReg, Mem)
+  INST_2x(minss, kX86InstIdMinss, X86XmmReg, X86Mem)
 
   //! Move aligned packed SP-FP (SSE).
-  INST_2x(movaps, kInstMovaps, XmmReg, XmmReg)
+  INST_2x(movaps, kX86InstIdMovaps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movaps, kInstMovaps, XmmReg, Mem)
+  INST_2x(movaps, kX86InstIdMovaps, X86XmmReg, X86Mem)
   //! Move aligned packed SP-FP (SSE).
-  INST_2x(movaps, kInstMovaps, Mem, XmmReg)
+  INST_2x(movaps, kX86InstIdMovaps, X86Mem, X86XmmReg)
 
   //! Move DWORD.
-  INST_2x(movd, kInstMovd, Mem, XmmReg)
+  INST_2x(movd, kX86InstIdMovd, X86Mem, X86XmmReg)
   //! \overload
-  INST_2x(movd, kInstMovd, GpReg, XmmReg)
+  INST_2x(movd, kX86InstIdMovd, X86GpReg, X86XmmReg)
   //! \overload
-  INST_2x(movd, kInstMovd, XmmReg, Mem)
+  INST_2x(movd, kX86InstIdMovd, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movd, kInstMovd, XmmReg, GpReg)
+  INST_2x(movd, kX86InstIdMovd, X86XmmReg, X86GpReg)
 
   //! Move QWORD (SSE).
-  INST_2x(movq, kInstMovq, XmmReg, XmmReg)
+  INST_2x(movq, kX86InstIdMovq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movq, kInstMovq, Mem, XmmReg)
+  INST_2x(movq, kX86InstIdMovq, X86Mem, X86XmmReg)
   //! \overload
-  INST_2x(movq, kInstMovq, XmmReg, Mem)
+  INST_2x(movq, kX86InstIdMovq, X86XmmReg, X86Mem)
+
+  //! Move QWORD (X64 Only).
+  INST_2x(movq, kX86InstIdMovq, X86GpReg, X86XmmReg)
+  //! \overload
+  INST_2x(movq, kX86InstIdMovq, X86XmmReg, X86GpReg)
 
   //! Move QWORD using NT hint (SSE).
-  INST_2x(movntq, kInstMovntq, Mem, MmReg)
+  INST_2x(movntq, kX86InstIdMovntq, X86Mem, X86MmReg)
 
   //! Move high to low packed SP-FP (SSE).
-  INST_2x(movhlps, kInstMovhlps, XmmReg, XmmReg)
+  INST_2x(movhlps, kX86InstIdMovhlps, X86XmmReg, X86XmmReg)
 
   //! Move high packed SP-FP (SSE).
-  INST_2x(movhps, kInstMovhps, XmmReg, Mem)
+  INST_2x(movhps, kX86InstIdMovhps, X86XmmReg, X86Mem)
   //! Move high packed SP-FP (SSE).
-  INST_2x(movhps, kInstMovhps, Mem, XmmReg)
+  INST_2x(movhps, kX86InstIdMovhps, X86Mem, X86XmmReg)
 
   //! Move low to high packed SP-FP (SSE).
-  INST_2x(movlhps, kInstMovlhps, XmmReg, XmmReg)
+  INST_2x(movlhps, kX86InstIdMovlhps, X86XmmReg, X86XmmReg)
 
   //! Move low packed SP-FP (SSE).
-  INST_2x(movlps, kInstMovlps, XmmReg, Mem)
+  INST_2x(movlps, kX86InstIdMovlps, X86XmmReg, X86Mem)
   //! Move low packed SP-FP (SSE).
-  INST_2x(movlps, kInstMovlps, Mem, XmmReg)
+  INST_2x(movlps, kX86InstIdMovlps, X86Mem, X86XmmReg)
 
   //! Move aligned packed SP-FP using NT hint (SSE).
-  INST_2x(movntps, kInstMovntps, Mem, XmmReg)
+  INST_2x(movntps, kX86InstIdMovntps, X86Mem, X86XmmReg)
 
   //! Move scalar SP-FP (SSE).
-  INST_2x(movss, kInstMovss, XmmReg, XmmReg)
+  INST_2x(movss, kX86InstIdMovss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movss, kInstMovss, XmmReg, Mem)
+  INST_2x(movss, kX86InstIdMovss, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movss, kInstMovss, Mem, XmmReg)
+  INST_2x(movss, kX86InstIdMovss, X86Mem, X86XmmReg)
 
   //! Move unaligned packed SP-FP (SSE).
-  INST_2x(movups, kInstMovups, XmmReg, XmmReg)
+  INST_2x(movups, kX86InstIdMovups, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movups, kInstMovups, XmmReg, Mem)
+  INST_2x(movups, kX86InstIdMovups, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movups, kInstMovups, Mem, XmmReg)
+  INST_2x(movups, kX86InstIdMovups, X86Mem, X86XmmReg)
 
   //! Packed SP-FP multiply (SSE).
-  INST_2x(mulps, kInstMulps, XmmReg, XmmReg)
+  INST_2x(mulps, kX86InstIdMulps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(mulps, kInstMulps, XmmReg, Mem)
+  INST_2x(mulps, kX86InstIdMulps, X86XmmReg, X86Mem)
 
   //! Scalar SP-FP multiply (SSE).
-  INST_2x(mulss, kInstMulss, XmmReg, XmmReg)
+  INST_2x(mulss, kX86InstIdMulss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(mulss, kInstMulss, XmmReg, Mem)
+  INST_2x(mulss, kX86InstIdMulss, X86XmmReg, X86Mem)
 
   //! Packed SP-FP bitwise or (SSE).
-  INST_2x(orps, kInstOrps, XmmReg, XmmReg)
+  INST_2x(orps, kX86InstIdOrps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(orps, kInstOrps, XmmReg, Mem)
+  INST_2x(orps, kX86InstIdOrps, X86XmmReg, X86Mem)
 
   //! Packed BYTE average (SSE).
-  INST_2x(pavgb, kInstPavgb, MmReg, MmReg)
+  INST_2x(pavgb, kX86InstIdPavgb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pavgb, kInstPavgb, MmReg, Mem)
+  INST_2x(pavgb, kX86InstIdPavgb, X86MmReg, X86Mem)
 
   //! Packed WORD average (SSE).
-  INST_2x(pavgw, kInstPavgw, MmReg, MmReg)
+  INST_2x(pavgw, kX86InstIdPavgw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pavgw, kInstPavgw, MmReg, Mem)
+  INST_2x(pavgw, kX86InstIdPavgw, X86MmReg, X86Mem)
 
   //! Extract WORD based on selector (SSE).
-  INST_3i(pextrw, kInstPextrw, GpReg, MmReg, Imm)
+  INST_3i(pextrw, kX86InstIdPextrw, X86GpReg, X86MmReg, Imm)
 
   //! Insert WORD based on selector (SSE).
-  INST_3i(pinsrw, kInstPinsrw, MmReg, GpReg, Imm)
+  INST_3i(pinsrw, kX86InstIdPinsrw, X86MmReg, X86GpReg, Imm)
   //! \overload
-  INST_3i(pinsrw, kInstPinsrw, MmReg, Mem, Imm)
+  INST_3i(pinsrw, kX86InstIdPinsrw, X86MmReg, X86Mem, Imm)
 
   //! Packed WORD maximum (SSE).
-  INST_2x(pmaxsw, kInstPmaxsw, MmReg, MmReg)
+  INST_2x(pmaxsw, kX86InstIdPmaxsw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pmaxsw, kInstPmaxsw, MmReg, Mem)
+  INST_2x(pmaxsw, kX86InstIdPmaxsw, X86MmReg, X86Mem)
 
   //! Packed BYTE unsigned maximum (SSE).
-  INST_2x(pmaxub, kInstPmaxub, MmReg, MmReg)
+  INST_2x(pmaxub, kX86InstIdPmaxub, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pmaxub, kInstPmaxub, MmReg, Mem)
+  INST_2x(pmaxub, kX86InstIdPmaxub, X86MmReg, X86Mem)
 
   //! Packed WORD minimum (SSE).
-  INST_2x(pminsw, kInstPminsw, MmReg, MmReg)
+  INST_2x(pminsw, kX86InstIdPminsw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pminsw, kInstPminsw, MmReg, Mem)
+  INST_2x(pminsw, kX86InstIdPminsw, X86MmReg, X86Mem)
 
   //! Packed BYTE unsigned minimum (SSE).
-  INST_2x(pminub, kInstPminub, MmReg, MmReg)
+  INST_2x(pminub, kX86InstIdPminub, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pminub, kInstPminub, MmReg, Mem)
+  INST_2x(pminub, kX86InstIdPminub, X86MmReg, X86Mem)
 
   //! Move Byte mask to integer (SSE).
-  INST_2x(pmovmskb, kInstPmovmskb, GpReg, MmReg)
+  INST_2x(pmovmskb, kX86InstIdPmovmskb, X86GpReg, X86MmReg)
 
   //! Packed WORD unsigned multiply high (SSE).
-  INST_2x(pmulhuw, kInstPmulhuw, MmReg, MmReg)
+  INST_2x(pmulhuw, kX86InstIdPmulhuw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pmulhuw, kInstPmulhuw, MmReg, Mem)
+  INST_2x(pmulhuw, kX86InstIdPmulhuw, X86MmReg, X86Mem)
 
   //! Packed WORD sum of absolute differences (SSE).
-  INST_2x(psadbw, kInstPsadbw, MmReg, MmReg)
+  INST_2x(psadbw, kX86InstIdPsadbw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psadbw, kInstPsadbw, MmReg, Mem)
+  INST_2x(psadbw, kX86InstIdPsadbw, X86MmReg, X86Mem)
 
   //! Packed WORD shuffle (SSE).
-  INST_3i(pshufw, kInstPshufw, MmReg, MmReg, Imm)
+  INST_3i(pshufw, kX86InstIdPshufw, X86MmReg, X86MmReg, Imm)
   //! \overload
-  INST_3i(pshufw, kInstPshufw, MmReg, Mem, Imm)
+  INST_3i(pshufw, kX86InstIdPshufw, X86MmReg, X86Mem, Imm)
 
   //! Packed SP-FP reciprocal (SSE).
-  INST_2x(rcpps, kInstRcpps, XmmReg, XmmReg)
+  INST_2x(rcpps, kX86InstIdRcpps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(rcpps, kInstRcpps, XmmReg, Mem)
+  INST_2x(rcpps, kX86InstIdRcpps, X86XmmReg, X86Mem)
 
   //! Scalar SP-FP reciprocal (SSE).
-  INST_2x(rcpss, kInstRcpss, XmmReg, XmmReg)
+  INST_2x(rcpss, kX86InstIdRcpss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(rcpss, kInstRcpss, XmmReg, Mem)
+  INST_2x(rcpss, kX86InstIdRcpss, X86XmmReg, X86Mem)
 
   //! Prefetch (SSE).
-  INST_2i(prefetch, kInstPrefetch, Mem, Imm)
+  INST_2i(prefetch, kX86InstIdPrefetch, X86Mem, Imm)
 
   //! Packed WORD sum of absolute differences (SSE).
-  INST_2x(psadbw, kInstPsadbw, XmmReg, XmmReg)
+  INST_2x(psadbw, kX86InstIdPsadbw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psadbw, kInstPsadbw, XmmReg, Mem)
+  INST_2x(psadbw, kX86InstIdPsadbw, X86XmmReg, X86Mem)
 
   //! Packed SP-FP square root reciprocal (SSE).
-  INST_2x(rsqrtps, kInstRsqrtps, XmmReg, XmmReg)
+  INST_2x(rsqrtps, kX86InstIdRsqrtps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(rsqrtps, kInstRsqrtps, XmmReg, Mem)
+  INST_2x(rsqrtps, kX86InstIdRsqrtps, X86XmmReg, X86Mem)
 
   //! Scalar SP-FP square root reciprocal (SSE).
-  INST_2x(rsqrtss, kInstRsqrtss, XmmReg, XmmReg)
+  INST_2x(rsqrtss, kX86InstIdRsqrtss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(rsqrtss, kInstRsqrtss, XmmReg, Mem)
+  INST_2x(rsqrtss, kX86InstIdRsqrtss, X86XmmReg, X86Mem)
 
   //! Store fence (SSE).
-  INST_0x(sfence, kInstSfence)
+  INST_0x(sfence, kX86InstIdSfence)
 
   //! Shuffle SP-FP (SSE).
-  INST_3i(shufps, kInstShufps, XmmReg, XmmReg, Imm)
+  INST_3i(shufps, kX86InstIdShufps, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(shufps, kInstShufps, XmmReg, Mem, Imm)
+  INST_3i(shufps, kX86InstIdShufps, X86XmmReg, X86Mem, Imm)
 
   //! Packed SP-FP square root (SSE).
-  INST_2x(sqrtps, kInstSqrtps, XmmReg, XmmReg)
+  INST_2x(sqrtps, kX86InstIdSqrtps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(sqrtps, kInstSqrtps, XmmReg, Mem)
+  INST_2x(sqrtps, kX86InstIdSqrtps, X86XmmReg, X86Mem)
 
   //! Scalar SP-FP square root (SSE).
-  INST_2x(sqrtss, kInstSqrtss, XmmReg, XmmReg)
+  INST_2x(sqrtss, kX86InstIdSqrtss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(sqrtss, kInstSqrtss, XmmReg, Mem)
+  INST_2x(sqrtss, kX86InstIdSqrtss, X86XmmReg, X86Mem)
 
   //! Store streaming SIMD extension control/status (SSE).
-  INST_1x(stmxcsr, kInstStmxcsr, Mem)
+  INST_1x(stmxcsr, kX86InstIdStmxcsr, X86Mem)
 
   //! Packed SP-FP subtract (SSE).
-  INST_2x(subps, kInstSubps, XmmReg, XmmReg)
+  INST_2x(subps, kX86InstIdSubps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(subps, kInstSubps, XmmReg, Mem)
+  INST_2x(subps, kX86InstIdSubps, X86XmmReg, X86Mem)
 
   //! Scalar SP-FP subtract (SSE).
-  INST_2x(subss, kInstSubss, XmmReg, XmmReg)
+  INST_2x(subss, kX86InstIdSubss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(subss, kInstSubss, XmmReg, Mem)
+  INST_2x(subss, kX86InstIdSubss, X86XmmReg, X86Mem)
 
   //! Unordered scalar SP-FP compare and set EFLAGS (SSE).
-  INST_2x(ucomiss, kInstUcomiss, XmmReg, XmmReg)
+  INST_2x(ucomiss, kX86InstIdUcomiss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(ucomiss, kInstUcomiss, XmmReg, Mem)
+  INST_2x(ucomiss, kX86InstIdUcomiss, X86XmmReg, X86Mem)
 
   //! Unpack high packed SP-FP data (SSE).
-  INST_2x(unpckhps, kInstUnpckhps, XmmReg, XmmReg)
+  INST_2x(unpckhps, kX86InstIdUnpckhps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(unpckhps, kInstUnpckhps, XmmReg, Mem)
+  INST_2x(unpckhps, kX86InstIdUnpckhps, X86XmmReg, X86Mem)
 
   //! Unpack low packed SP-FP data (SSE).
-  INST_2x(unpcklps, kInstUnpcklps, XmmReg, XmmReg)
+  INST_2x(unpcklps, kX86InstIdUnpcklps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(unpcklps, kInstUnpcklps, XmmReg, Mem)
+  INST_2x(unpcklps, kX86InstIdUnpcklps, X86XmmReg, X86Mem)
 
   //! Packed SP-FP bitwise xor (SSE).
-  INST_2x(xorps, kInstXorps, XmmReg, XmmReg)
+  INST_2x(xorps, kX86InstIdXorps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(xorps, kInstXorps, XmmReg, Mem)
+  INST_2x(xorps, kX86InstIdXorps, X86XmmReg, X86Mem)
 
   // --------------------------------------------------------------------------
   // [SSE2]
   // --------------------------------------------------------------------------
 
   //! Packed DP-FP add (SSE2).
-  INST_2x(addpd, kInstAddpd, XmmReg, XmmReg)
+  INST_2x(addpd, kX86InstIdAddpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(addpd, kInstAddpd, XmmReg, Mem)
+  INST_2x(addpd, kX86InstIdAddpd, X86XmmReg, X86Mem)
 
   //! Scalar DP-FP add (SSE2).
-  INST_2x(addsd, kInstAddsd, XmmReg, XmmReg)
+  INST_2x(addsd, kX86InstIdAddsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(addsd, kInstAddsd, XmmReg, Mem)
+  INST_2x(addsd, kX86InstIdAddsd, X86XmmReg, X86Mem)
 
   //! Packed DP-FP bitwise and-not (SSE2).
-  INST_2x(andnpd, kInstAndnpd, XmmReg, XmmReg)
+  INST_2x(andnpd, kX86InstIdAndnpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(andnpd, kInstAndnpd, XmmReg, Mem)
+  INST_2x(andnpd, kX86InstIdAndnpd, X86XmmReg, X86Mem)
 
   //! Packed DP-FP bitwise and (SSE2).
-  INST_2x(andpd, kInstAndpd, XmmReg, XmmReg)
+  INST_2x(andpd, kX86InstIdAndpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(andpd, kInstAndpd, XmmReg, Mem)
+  INST_2x(andpd, kX86InstIdAndpd, X86XmmReg, X86Mem)
 
   //! Flush cache line (SSE2).
-  INST_1x(clflush, kInstClflush, Mem)
+  INST_1x(clflush, kX86InstIdClflush, X86Mem)
 
   //! Packed DP-FP compare (SSE2).
-  INST_3i(cmppd, kInstCmppd, XmmReg, XmmReg, Imm)
+  INST_3i(cmppd, kX86InstIdCmppd, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(cmppd, kInstCmppd, XmmReg, Mem, Imm)
+  INST_3i(cmppd, kX86InstIdCmppd, X86XmmReg, X86Mem, Imm)
 
   //! Scalar SP-FP compare (SSE2).
-  INST_3i(cmpsd, kInstCmpsd, XmmReg, XmmReg, Imm)
+  INST_3i(cmpsd, kX86InstIdCmpsd, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(cmpsd, kInstCmpsd, XmmReg, Mem, Imm)
+  INST_3i(cmpsd, kX86InstIdCmpsd, X86XmmReg, X86Mem, Imm)
 
   //! Scalar ordered DP-FP compare and set EFLAGS (SSE2).
-  INST_2x(comisd, kInstComisd, XmmReg, XmmReg)
+  INST_2x(comisd, kX86InstIdComisd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(comisd, kInstComisd, XmmReg, Mem)
+  INST_2x(comisd, kX86InstIdComisd, X86XmmReg, X86Mem)
 
   //! Convert packed QWORDs to packed DP-FP (SSE2).
-  INST_2x(cvtdq2pd, kInstCvtdq2pd, XmmReg, XmmReg)
+  INST_2x(cvtdq2pd, kX86InstIdCvtdq2pd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtdq2pd, kInstCvtdq2pd, XmmReg, Mem)
+  INST_2x(cvtdq2pd, kX86InstIdCvtdq2pd, X86XmmReg, X86Mem)
 
   //! Convert packed QWORDs to packed SP-FP (SSE2).
-  INST_2x(cvtdq2ps, kInstCvtdq2ps, XmmReg, XmmReg)
+  INST_2x(cvtdq2ps, kX86InstIdCvtdq2ps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtdq2ps, kInstCvtdq2ps, XmmReg, Mem)
+  INST_2x(cvtdq2ps, kX86InstIdCvtdq2ps, X86XmmReg, X86Mem)
 
-  //! Convert packed DP-FP to packed QWORDs (SSE2).
-  INST_2x(cvtpd2dq, kInstCvtpd2dq, XmmReg, XmmReg)
+  //! Convert packed DP-FP to packed DWORDs (SSE2).
+  INST_2x(cvtpd2dq, kX86InstIdCvtpd2dq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtpd2dq, kInstCvtpd2dq, XmmReg, Mem)
+  INST_2x(cvtpd2dq, kX86InstIdCvtpd2dq, X86XmmReg, X86Mem)
 
-  //! Convert packed DP-FP to packed QRODSs (SSE2).
-  INST_2x(cvtpd2pi, kInstCvtpd2pi, MmReg, XmmReg)
+  //! Convert packed DP-FP to packed DWORDs (SSE2).
+  INST_2x(cvtpd2pi, kX86InstIdCvtpd2pi, X86MmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtpd2pi, kInstCvtpd2pi, MmReg, Mem)
+  INST_2x(cvtpd2pi, kX86InstIdCvtpd2pi, X86MmReg, X86Mem)
 
   //! Convert packed DP-FP to packed SP-FP (SSE2).
-  INST_2x(cvtpd2ps, kInstCvtpd2ps, XmmReg, XmmReg)
+  INST_2x(cvtpd2ps, kX86InstIdCvtpd2ps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtpd2ps, kInstCvtpd2ps, XmmReg, Mem)
+  INST_2x(cvtpd2ps, kX86InstIdCvtpd2ps, X86XmmReg, X86Mem)
 
   //! Convert packed DWORDs integers to packed DP-FP (SSE2).
-  INST_2x(cvtpi2pd, kInstCvtpi2pd, XmmReg, MmReg)
+  INST_2x(cvtpi2pd, kX86InstIdCvtpi2pd, X86XmmReg, X86MmReg)
   //! \overload
-  INST_2x(cvtpi2pd, kInstCvtpi2pd, XmmReg, Mem)
+  INST_2x(cvtpi2pd, kX86InstIdCvtpi2pd, X86XmmReg, X86Mem)
 
-  //! Convert packed SP-FP to packed QWORDs (SSE2).
-  INST_2x(cvtps2dq, kInstCvtps2dq, XmmReg, XmmReg)
+  //! Convert packed SP-FP to packed DWORDs (SSE2).
+  INST_2x(cvtps2dq, kX86InstIdCvtps2dq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtps2dq, kInstCvtps2dq, XmmReg, Mem)
+  INST_2x(cvtps2dq, kX86InstIdCvtps2dq, X86XmmReg, X86Mem)
 
   //! Convert packed SP-FP to packed DP-FP (SSE2).
-  INST_2x(cvtps2pd, kInstCvtps2pd, XmmReg, XmmReg)
+  INST_2x(cvtps2pd, kX86InstIdCvtps2pd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtps2pd, kInstCvtps2pd, XmmReg, Mem)
+  INST_2x(cvtps2pd, kX86InstIdCvtps2pd, X86XmmReg, X86Mem)
 
   //! Convert scalar DP-FP to DWORD integer (SSE2).
-  INST_2x(cvtsd2si, kInstCvtsd2si, GpReg, XmmReg)
+  INST_2x(cvtsd2si, kX86InstIdCvtsd2si, X86GpReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtsd2si, kInstCvtsd2si, GpReg, Mem)
+  INST_2x(cvtsd2si, kX86InstIdCvtsd2si, X86GpReg, X86Mem)
 
   //! Convert scalar DP-FP to scalar SP-FP (SSE2).
-  INST_2x(cvtsd2ss, kInstCvtsd2ss, XmmReg, XmmReg)
+  INST_2x(cvtsd2ss, kX86InstIdCvtsd2ss, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtsd2ss, kInstCvtsd2ss, XmmReg, Mem)
+  INST_2x(cvtsd2ss, kX86InstIdCvtsd2ss, X86XmmReg, X86Mem)
 
   //! Convert DWORD integer to scalar DP-FP (SSE2).
-  INST_2x(cvtsi2sd, kInstCvtsi2sd, XmmReg, GpReg)
+  INST_2x(cvtsi2sd, kX86InstIdCvtsi2sd, X86XmmReg, X86GpReg)
   //! \overload
-  INST_2x(cvtsi2sd, kInstCvtsi2sd, XmmReg, Mem)
+  INST_2x(cvtsi2sd, kX86InstIdCvtsi2sd, X86XmmReg, X86Mem)
 
   //! Convert scalar SP-FP to DP-FP (SSE2).
-  INST_2x(cvtss2sd, kInstCvtss2sd, XmmReg, XmmReg)
+  INST_2x(cvtss2sd, kX86InstIdCvtss2sd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvtss2sd, kInstCvtss2sd, XmmReg, Mem)
+  INST_2x(cvtss2sd, kX86InstIdCvtss2sd, X86XmmReg, X86Mem)
 
   //! Convert with truncation packed DP-FP to packed DWORDs (SSE2).
-  INST_2x(cvttpd2pi, kInstCvttpd2pi, MmReg, XmmReg)
+  INST_2x(cvttpd2pi, kX86InstIdCvttpd2pi, X86MmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvttpd2pi, kInstCvttpd2pi, MmReg, Mem)
+  INST_2x(cvttpd2pi, kX86InstIdCvttpd2pi, X86MmReg, X86Mem)
 
-  //! Convert with truncation packed DP-FP to packed QWORDs (SSE2).
-  INST_2x(cvttpd2dq, kInstCvttpd2dq, XmmReg, XmmReg)
+  //! Convert with truncation packed DP-FP to packed DWORDs (SSE2).
+  INST_2x(cvttpd2dq, kX86InstIdCvttpd2dq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvttpd2dq, kInstCvttpd2dq, XmmReg, Mem)
+  INST_2x(cvttpd2dq, kX86InstIdCvttpd2dq, X86XmmReg, X86Mem)
 
-  //! Convert with truncation packed SP-FP to packed QWORDs (SSE2).
-  INST_2x(cvttps2dq, kInstCvttps2dq, XmmReg, XmmReg)
+  //! Convert with truncation packed SP-FP to packed DWORDs (SSE2).
+  INST_2x(cvttps2dq, kX86InstIdCvttps2dq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(cvttps2dq, kInstCvttps2dq, XmmReg, Mem)
+  INST_2x(cvttps2dq, kX86InstIdCvttps2dq, X86XmmReg, X86Mem)
 
   //! Convert with truncation scalar DP-FP to signed DWORDs (SSE2).
-  INST_2x(cvttsd2si, kInstCvttsd2si, GpReg, XmmReg)
+  INST_2x(cvttsd2si, kX86InstIdCvttsd2si, X86GpReg, X86XmmReg)
   //! \overload
-  INST_2x(cvttsd2si, kInstCvttsd2si, GpReg, Mem)
+  INST_2x(cvttsd2si, kX86InstIdCvttsd2si, X86GpReg, X86Mem)
 
   //! Packed DP-FP divide (SSE2).
-  INST_2x(divpd, kInstDivpd, XmmReg, XmmReg)
+  INST_2x(divpd, kX86InstIdDivpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(divpd, kInstDivpd, XmmReg, Mem)
+  INST_2x(divpd, kX86InstIdDivpd, X86XmmReg, X86Mem)
 
   //! Scalar DP-FP divide (SSE2).
-  INST_2x(divsd, kInstDivsd, XmmReg, XmmReg)
+  INST_2x(divsd, kX86InstIdDivsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(divsd, kInstDivsd, XmmReg, Mem)
+  INST_2x(divsd, kX86InstIdDivsd, X86XmmReg, X86Mem)
 
   //! Load fence (SSE2).
-  INST_0x(lfence, kInstLfence)
+  INST_0x(lfence, kX86InstIdLfence)
 
   //! Store selected bytes of OWORD to DS:EDI/RDI (SSE2).
-  INST_2x(maskmovdqu, kInstMaskmovdqu, XmmReg, XmmReg)
+  INST_2x(maskmovdqu, kX86InstIdMaskmovdqu, X86XmmReg, X86XmmReg)
 
   //! Packed DP-FP maximum (SSE2).
-  INST_2x(maxpd, kInstMaxpd, XmmReg, XmmReg)
+  INST_2x(maxpd, kX86InstIdMaxpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(maxpd, kInstMaxpd, XmmReg, Mem)
+  INST_2x(maxpd, kX86InstIdMaxpd, X86XmmReg, X86Mem)
 
   //! Scalar DP-FP maximum (SSE2).
-  INST_2x(maxsd, kInstMaxsd, XmmReg, XmmReg)
+  INST_2x(maxsd, kX86InstIdMaxsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(maxsd, kInstMaxsd, XmmReg, Mem)
+  INST_2x(maxsd, kX86InstIdMaxsd, X86XmmReg, X86Mem)
 
   //! Memory fence (SSE2).
-  INST_0x(mfence, kInstMfence)
+  INST_0x(mfence, kX86InstIdMfence)
 
   //! Packed DP-FP minimum (SSE2).
-  INST_2x(minpd, kInstMinpd, XmmReg, XmmReg)
+  INST_2x(minpd, kX86InstIdMinpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(minpd, kInstMinpd, XmmReg, Mem)
+  INST_2x(minpd, kX86InstIdMinpd, X86XmmReg, X86Mem)
 
   //! Scalar DP-FP minimum (SSE2).
-  INST_2x(minsd, kInstMinsd, XmmReg, XmmReg)
+  INST_2x(minsd, kX86InstIdMinsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(minsd, kInstMinsd, XmmReg, Mem)
+  INST_2x(minsd, kX86InstIdMinsd, X86XmmReg, X86Mem)
 
   //! Move aligned OWORD (SSE2).
-  INST_2x(movdqa, kInstMovdqa, XmmReg, XmmReg)
+  INST_2x(movdqa, kX86InstIdMovdqa, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movdqa, kInstMovdqa, XmmReg, Mem)
+  INST_2x(movdqa, kX86InstIdMovdqa, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movdqa, kInstMovdqa, Mem, XmmReg)
+  INST_2x(movdqa, kX86InstIdMovdqa, X86Mem, X86XmmReg)
 
   //! Move unaligned OWORD (SSE2).
-  INST_2x(movdqu, kInstMovdqu, XmmReg, XmmReg)
+  INST_2x(movdqu, kX86InstIdMovdqu, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movdqu, kInstMovdqu, XmmReg, Mem)
+  INST_2x(movdqu, kX86InstIdMovdqu, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movdqu, kInstMovdqu, Mem, XmmReg)
+  INST_2x(movdqu, kX86InstIdMovdqu, X86Mem, X86XmmReg)
 
   //! Extract packed SP-FP sign mask (SSE2).
-  INST_2x(movmskps, kInstMovmskps, GpReg, XmmReg)
+  INST_2x(movmskps, kX86InstIdMovmskps, X86GpReg, X86XmmReg)
 
   //! Extract packed DP-FP sign mask (SSE2).
-  INST_2x(movmskpd, kInstMovmskpd, GpReg, XmmReg)
+  INST_2x(movmskpd, kX86InstIdMovmskpd, X86GpReg, X86XmmReg)
 
   //! Move scalar DP-FP (SSE2).
-  INST_2x(movsd, kInstMovsd, XmmReg, XmmReg)
+  INST_2x(movsd, kX86InstIdMovsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movsd, kInstMovsd, XmmReg, Mem)
+  INST_2x(movsd, kX86InstIdMovsd, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movsd, kInstMovsd, Mem, XmmReg)
+  INST_2x(movsd, kX86InstIdMovsd, X86Mem, X86XmmReg)
 
   //! Move aligned packed DP-FP (SSE2).
-  INST_2x(movapd, kInstMovapd, XmmReg, XmmReg)
+  INST_2x(movapd, kX86InstIdMovapd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movapd, kInstMovapd, XmmReg, Mem)
+  INST_2x(movapd, kX86InstIdMovapd, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movapd, kInstMovapd, Mem, XmmReg)
+  INST_2x(movapd, kX86InstIdMovapd, X86Mem, X86XmmReg)
 
   //! Move QWORD from Xmm to Mm register (SSE2).
-  INST_2x(movdq2q, kInstMovdq2q, MmReg, XmmReg)
+  INST_2x(movdq2q, kX86InstIdMovdq2q, X86MmReg, X86XmmReg)
 
   //! Move QWORD from Mm to Xmm register (SSE2).
-  INST_2x(movq2dq, kInstMovq2dq, XmmReg, MmReg)
+  INST_2x(movq2dq, kX86InstIdMovq2dq, X86XmmReg, X86MmReg)
 
   //! Move high packed DP-FP (SSE2).
-  INST_2x(movhpd, kInstMovhpd, XmmReg, Mem)
+  INST_2x(movhpd, kX86InstIdMovhpd, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movhpd, kInstMovhpd, Mem, XmmReg)
+  INST_2x(movhpd, kX86InstIdMovhpd, X86Mem, X86XmmReg)
 
   //! Move low packed DP-FP (SSE2).
-  INST_2x(movlpd, kInstMovlpd, XmmReg, Mem)
+  INST_2x(movlpd, kX86InstIdMovlpd, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movlpd, kInstMovlpd, Mem, XmmReg)
+  INST_2x(movlpd, kX86InstIdMovlpd, X86Mem, X86XmmReg)
 
   //! Store OWORD using NT hint (SSE2).
-  INST_2x(movntdq, kInstMovntdq, Mem, XmmReg)
+  INST_2x(movntdq, kX86InstIdMovntdq, X86Mem, X86XmmReg)
 
   //! Store DWORD using NT hint (SSE2).
-  INST_2x(movnti, kInstMovnti, Mem, GpReg)
+  INST_2x(movnti, kX86InstIdMovnti, X86Mem, X86GpReg)
 
   //! Store packed DP-FP using NT hint (SSE2).
-  INST_2x(movntpd, kInstMovntpd, Mem, XmmReg)
+  INST_2x(movntpd, kX86InstIdMovntpd, X86Mem, X86XmmReg)
 
   //! Move unaligned packed DP-FP (SSE2).
-  INST_2x(movupd, kInstMovupd, XmmReg, XmmReg)
+  INST_2x(movupd, kX86InstIdMovupd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movupd, kInstMovupd, XmmReg, Mem)
+  INST_2x(movupd, kX86InstIdMovupd, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(movupd, kInstMovupd, Mem, XmmReg)
+  INST_2x(movupd, kX86InstIdMovupd, X86Mem, X86XmmReg)
 
   //! Packed DP-FP multiply (SSE2).
-  INST_2x(mulpd, kInstMulpd, XmmReg, XmmReg)
+  INST_2x(mulpd, kX86InstIdMulpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(mulpd, kInstMulpd, XmmReg, Mem)
+  INST_2x(mulpd, kX86InstIdMulpd, X86XmmReg, X86Mem)
 
   //! Scalar DP-FP multiply (SSE2).
-  INST_2x(mulsd, kInstMulsd, XmmReg, XmmReg)
+  INST_2x(mulsd, kX86InstIdMulsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(mulsd, kInstMulsd, XmmReg, Mem)
+  INST_2x(mulsd, kX86InstIdMulsd, X86XmmReg, X86Mem)
 
   //! Packed DP-FP bitwise or (SSE2).
-  INST_2x(orpd, kInstOrpd, XmmReg, XmmReg)
+  INST_2x(orpd, kX86InstIdOrpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(orpd, kInstOrpd, XmmReg, Mem)
+  INST_2x(orpd, kX86InstIdOrpd, X86XmmReg, X86Mem)
 
   //! Pack WORDs to BYTEs with signed saturation (SSE2).
-  INST_2x(packsswb, kInstPacksswb, XmmReg, XmmReg)
+  INST_2x(packsswb, kX86InstIdPacksswb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(packsswb, kInstPacksswb, XmmReg, Mem)
+  INST_2x(packsswb, kX86InstIdPacksswb, X86XmmReg, X86Mem)
 
   //! Pack DWORDs to WORDs with signed saturation (SSE2).
-  INST_2x(packssdw, kInstPackssdw, XmmReg, XmmReg)
+  INST_2x(packssdw, kX86InstIdPackssdw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(packssdw, kInstPackssdw, XmmReg, Mem)
+  INST_2x(packssdw, kX86InstIdPackssdw, X86XmmReg, X86Mem)
 
   //! Pack WORDs to BYTEs with unsigned saturation (SSE2).
-  INST_2x(packuswb, kInstPackuswb, XmmReg, XmmReg)
+  INST_2x(packuswb, kX86InstIdPackuswb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(packuswb, kInstPackuswb, XmmReg, Mem)
+  INST_2x(packuswb, kX86InstIdPackuswb, X86XmmReg, X86Mem)
 
   //! Packed BYTE Add (SSE2).
-  INST_2x(paddb, kInstPaddb, XmmReg, XmmReg)
+  INST_2x(paddb, kX86InstIdPaddb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(paddb, kInstPaddb, XmmReg, Mem)
+  INST_2x(paddb, kX86InstIdPaddb, X86XmmReg, X86Mem)
 
   //! Packed WORD add (SSE2).
-  INST_2x(paddw, kInstPaddw, XmmReg, XmmReg)
+  INST_2x(paddw, kX86InstIdPaddw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(paddw, kInstPaddw, XmmReg, Mem)
+  INST_2x(paddw, kX86InstIdPaddw, X86XmmReg, X86Mem)
 
   //! Packed DWORD add (SSE2).
-  INST_2x(paddd, kInstPaddd, XmmReg, XmmReg)
+  INST_2x(paddd, kX86InstIdPaddd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(paddd, kInstPaddd, XmmReg, Mem)
+  INST_2x(paddd, kX86InstIdPaddd, X86XmmReg, X86Mem)
 
   //! Packed QWORD add (SSE2).
-  INST_2x(paddq, kInstPaddq, MmReg, MmReg)
+  INST_2x(paddq, kX86InstIdPaddq, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(paddq, kInstPaddq, MmReg, Mem)
+  INST_2x(paddq, kX86InstIdPaddq, X86MmReg, X86Mem)
 
   //! Packed QWORD add (SSE2).
-  INST_2x(paddq, kInstPaddq, XmmReg, XmmReg)
+  INST_2x(paddq, kX86InstIdPaddq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(paddq, kInstPaddq, XmmReg, Mem)
+  INST_2x(paddq, kX86InstIdPaddq, X86XmmReg, X86Mem)
 
   //! Packed BYTE add with saturation (SSE2).
-  INST_2x(paddsb, kInstPaddsb, XmmReg, XmmReg)
+  INST_2x(paddsb, kX86InstIdPaddsb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(paddsb, kInstPaddsb, XmmReg, Mem)
+  INST_2x(paddsb, kX86InstIdPaddsb, X86XmmReg, X86Mem)
 
   //! Packed WORD add with saturation (SSE2).
-  INST_2x(paddsw, kInstPaddsw, XmmReg, XmmReg)
+  INST_2x(paddsw, kX86InstIdPaddsw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(paddsw, kInstPaddsw, XmmReg, Mem)
+  INST_2x(paddsw, kX86InstIdPaddsw, X86XmmReg, X86Mem)
 
   //! Packed BYTE add with unsigned saturation (SSE2).
-  INST_2x(paddusb, kInstPaddusb, XmmReg, XmmReg)
+  INST_2x(paddusb, kX86InstIdPaddusb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(paddusb, kInstPaddusb, XmmReg, Mem)
+  INST_2x(paddusb, kX86InstIdPaddusb, X86XmmReg, X86Mem)
 
   //! Packed WORD add with unsigned saturation (SSE2).
-  INST_2x(paddusw, kInstPaddusw, XmmReg, XmmReg)
+  INST_2x(paddusw, kX86InstIdPaddusw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(paddusw, kInstPaddusw, XmmReg, Mem)
+  INST_2x(paddusw, kX86InstIdPaddusw, X86XmmReg, X86Mem)
 
   //! Packed bitwise and (SSE2).
-  INST_2x(pand, kInstPand, XmmReg, XmmReg)
+  INST_2x(pand, kX86InstIdPand, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pand, kInstPand, XmmReg, Mem)
+  INST_2x(pand, kX86InstIdPand, X86XmmReg, X86Mem)
 
   //! Packed bitwise and-not (SSE2).
-  INST_2x(pandn, kInstPandn, XmmReg, XmmReg)
+  INST_2x(pandn, kX86InstIdPandn, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pandn, kInstPandn, XmmReg, Mem)
+  INST_2x(pandn, kX86InstIdPandn, X86XmmReg, X86Mem)
 
   //! Spin loop hint (SSE2).
-  INST_0x(pause, kInstPause)
+  INST_0x(pause, kX86InstIdPause)
 
   //! Packed BYTE average (SSE2).
-  INST_2x(pavgb, kInstPavgb, XmmReg, XmmReg)
+  INST_2x(pavgb, kX86InstIdPavgb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pavgb, kInstPavgb, XmmReg, Mem)
+  INST_2x(pavgb, kX86InstIdPavgb, X86XmmReg, X86Mem)
 
   //! Packed WORD average (SSE2).
-  INST_2x(pavgw, kInstPavgw, XmmReg, XmmReg)
+  INST_2x(pavgw, kX86InstIdPavgw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pavgw, kInstPavgw, XmmReg, Mem)
+  INST_2x(pavgw, kX86InstIdPavgw, X86XmmReg, X86Mem)
 
   //! Packed BYTE compare for equality (SSE2).
-  INST_2x(pcmpeqb, kInstPcmpeqb, XmmReg, XmmReg)
+  INST_2x(pcmpeqb, kX86InstIdPcmpeqb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pcmpeqb, kInstPcmpeqb, XmmReg, Mem)
+  INST_2x(pcmpeqb, kX86InstIdPcmpeqb, X86XmmReg, X86Mem)
 
   //! Packed WORD compare for equality (SSE2).
-  INST_2x(pcmpeqw, kInstPcmpeqw, XmmReg, XmmReg)
+  INST_2x(pcmpeqw, kX86InstIdPcmpeqw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pcmpeqw, kInstPcmpeqw, XmmReg, Mem)
+  INST_2x(pcmpeqw, kX86InstIdPcmpeqw, X86XmmReg, X86Mem)
 
   //! Packed DWORD compare for equality (SSE2).
-  INST_2x(pcmpeqd, kInstPcmpeqd, XmmReg, XmmReg)
+  INST_2x(pcmpeqd, kX86InstIdPcmpeqd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pcmpeqd, kInstPcmpeqd, XmmReg, Mem)
+  INST_2x(pcmpeqd, kX86InstIdPcmpeqd, X86XmmReg, X86Mem)
 
   //! Packed BYTE compare if greater than (SSE2).
-  INST_2x(pcmpgtb, kInstPcmpgtb, XmmReg, XmmReg)
+  INST_2x(pcmpgtb, kX86InstIdPcmpgtb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pcmpgtb, kInstPcmpgtb, XmmReg, Mem)
+  INST_2x(pcmpgtb, kX86InstIdPcmpgtb, X86XmmReg, X86Mem)
 
   //! Packed WORD compare if greater than (SSE2).
-  INST_2x(pcmpgtw, kInstPcmpgtw, XmmReg, XmmReg)
+  INST_2x(pcmpgtw, kX86InstIdPcmpgtw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pcmpgtw, kInstPcmpgtw, XmmReg, Mem)
+  INST_2x(pcmpgtw, kX86InstIdPcmpgtw, X86XmmReg, X86Mem)
 
   //! Packed DWORD compare if greater than (SSE2).
-  INST_2x(pcmpgtd, kInstPcmpgtd, XmmReg, XmmReg)
+  INST_2x(pcmpgtd, kX86InstIdPcmpgtd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pcmpgtd, kInstPcmpgtd, XmmReg, Mem)
+  INST_2x(pcmpgtd, kX86InstIdPcmpgtd, X86XmmReg, X86Mem)
 
   //! Extract WORD based on selector (SSE2).
-  INST_3i(pextrw, kInstPextrw, GpReg, XmmReg, Imm)
+  INST_3i(pextrw, kX86InstIdPextrw, X86GpReg, X86XmmReg, Imm)
 
   //! Insert WORD based on selector (SSE2).
-  INST_3i(pinsrw, kInstPinsrw, XmmReg, GpReg, Imm)
+  INST_3i(pinsrw, kX86InstIdPinsrw, X86XmmReg, X86GpReg, Imm)
   //! \overload
-  INST_3i(pinsrw, kInstPinsrw, XmmReg, Mem, Imm)
+  INST_3i(pinsrw, kX86InstIdPinsrw, X86XmmReg, X86Mem, Imm)
 
   //! Packed WORD maximum (SSE2).
-  INST_2x(pmaxsw, kInstPmaxsw, XmmReg, XmmReg)
+  INST_2x(pmaxsw, kX86InstIdPmaxsw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmaxsw, kInstPmaxsw, XmmReg, Mem)
+  INST_2x(pmaxsw, kX86InstIdPmaxsw, X86XmmReg, X86Mem)
 
   //! Packed BYTE unsigned maximum (SSE2).
-  INST_2x(pmaxub, kInstPmaxub, XmmReg, XmmReg)
+  INST_2x(pmaxub, kX86InstIdPmaxub, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmaxub, kInstPmaxub, XmmReg, Mem)
+  INST_2x(pmaxub, kX86InstIdPmaxub, X86XmmReg, X86Mem)
 
   //! Packed WORD minimum (SSE2).
-  INST_2x(pminsw, kInstPminsw, XmmReg, XmmReg)
+  INST_2x(pminsw, kX86InstIdPminsw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pminsw, kInstPminsw, XmmReg, Mem)
+  INST_2x(pminsw, kX86InstIdPminsw, X86XmmReg, X86Mem)
 
   //! Packed BYTE unsigned minimum (SSE2).
-  INST_2x(pminub, kInstPminub, XmmReg, XmmReg)
+  INST_2x(pminub, kX86InstIdPminub, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pminub, kInstPminub, XmmReg, Mem)
+  INST_2x(pminub, kX86InstIdPminub, X86XmmReg, X86Mem)
 
   //! Move byte mask (SSE2).
-  INST_2x(pmovmskb, kInstPmovmskb, GpReg, XmmReg)
+  INST_2x(pmovmskb, kX86InstIdPmovmskb, X86GpReg, X86XmmReg)
 
   //! Packed WORD multiply high (SSE2).
-  INST_2x(pmulhw, kInstPmulhw, XmmReg, XmmReg)
+  INST_2x(pmulhw, kX86InstIdPmulhw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmulhw, kInstPmulhw, XmmReg, Mem)
+  INST_2x(pmulhw, kX86InstIdPmulhw, X86XmmReg, X86Mem)
 
   //! Packed WORD unsigned multiply high (SSE2).
-  INST_2x(pmulhuw, kInstPmulhuw, XmmReg, XmmReg)
+  INST_2x(pmulhuw, kX86InstIdPmulhuw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmulhuw, kInstPmulhuw, XmmReg, Mem)
+  INST_2x(pmulhuw, kX86InstIdPmulhuw, X86XmmReg, X86Mem)
 
   //! Packed WORD multiply low (SSE2).
-  INST_2x(pmullw, kInstPmullw, XmmReg, XmmReg)
+  INST_2x(pmullw, kX86InstIdPmullw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmullw, kInstPmullw, XmmReg, Mem)
+  INST_2x(pmullw, kX86InstIdPmullw, X86XmmReg, X86Mem)
 
   //! Packed DWORD multiply to QWORD (SSE2).
-  INST_2x(pmuludq, kInstPmuludq, MmReg, MmReg)
+  INST_2x(pmuludq, kX86InstIdPmuludq, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pmuludq, kInstPmuludq, MmReg, Mem)
+  INST_2x(pmuludq, kX86InstIdPmuludq, X86MmReg, X86Mem)
 
   //! Packed DWORD multiply to QWORD (SSE2).
-  INST_2x(pmuludq, kInstPmuludq, XmmReg, XmmReg)
+  INST_2x(pmuludq, kX86InstIdPmuludq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmuludq, kInstPmuludq, XmmReg, Mem)
+  INST_2x(pmuludq, kX86InstIdPmuludq, X86XmmReg, X86Mem)
 
   //! Packed bitwise or (SSE2).
-  INST_2x(por, kInstPor, XmmReg, XmmReg)
+  INST_2x(por, kX86InstIdPor, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(por, kInstPor, XmmReg, Mem)
+  INST_2x(por, kX86InstIdPor, X86XmmReg, X86Mem)
 
   //! Packed DWORD shift left logical (SSE2).
-  INST_2x(pslld, kInstPslld, XmmReg, XmmReg)
+  INST_2x(pslld, kX86InstIdPslld, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pslld, kInstPslld, XmmReg, Mem)
+  INST_2x(pslld, kX86InstIdPslld, X86XmmReg, X86Mem)
   //! \overload
-  INST_2i(pslld, kInstPslld, XmmReg, Imm)
+  INST_2i(pslld, kX86InstIdPslld, X86XmmReg, Imm)
 
   //! Packed QWORD shift left logical (SSE2).
-  INST_2x(psllq, kInstPsllq, XmmReg, XmmReg)
+  INST_2x(psllq, kX86InstIdPsllq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psllq, kInstPsllq, XmmReg, Mem)
+  INST_2x(psllq, kX86InstIdPsllq, X86XmmReg, X86Mem)
   //! \overload
-  INST_2i(psllq, kInstPsllq, XmmReg, Imm)
+  INST_2i(psllq, kX86InstIdPsllq, X86XmmReg, Imm)
 
   //! Packed WORD shift left logical (SSE2).
-  INST_2x(psllw, kInstPsllw, XmmReg, XmmReg)
+  INST_2x(psllw, kX86InstIdPsllw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psllw, kInstPsllw, XmmReg, Mem)
+  INST_2x(psllw, kX86InstIdPsllw, X86XmmReg, X86Mem)
   //! \overload
-  INST_2i(psllw, kInstPsllw, XmmReg, Imm)
+  INST_2i(psllw, kX86InstIdPsllw, X86XmmReg, Imm)
 
   //! Packed OWORD shift left logical (SSE2).
-  INST_2i(pslldq, kInstPslldq, XmmReg, Imm)
+  INST_2i(pslldq, kX86InstIdPslldq, X86XmmReg, Imm)
 
   //! Packed DWORD shift right arithmetic (SSE2).
-  INST_2x(psrad, kInstPsrad, XmmReg, XmmReg)
+  INST_2x(psrad, kX86InstIdPsrad, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psrad, kInstPsrad, XmmReg, Mem)
+  INST_2x(psrad, kX86InstIdPsrad, X86XmmReg, X86Mem)
   //! \overload
-  INST_2i(psrad, kInstPsrad, XmmReg, Imm)
+  INST_2i(psrad, kX86InstIdPsrad, X86XmmReg, Imm)
 
   //! Packed WORD shift right arithmetic (SSE2).
-  INST_2x(psraw, kInstPsraw, XmmReg, XmmReg)
+  INST_2x(psraw, kX86InstIdPsraw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psraw, kInstPsraw, XmmReg, Mem)
+  INST_2x(psraw, kX86InstIdPsraw, X86XmmReg, X86Mem)
   //! \overload
-  INST_2i(psraw, kInstPsraw, XmmReg, Imm)
+  INST_2i(psraw, kX86InstIdPsraw, X86XmmReg, Imm)
 
   //! Packed BYTE subtract (SSE2).
-  INST_2x(psubb, kInstPsubb, XmmReg, XmmReg)
+  INST_2x(psubb, kX86InstIdPsubb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psubb, kInstPsubb, XmmReg, Mem)
+  INST_2x(psubb, kX86InstIdPsubb, X86XmmReg, X86Mem)
 
   //! Packed DWORD subtract (SSE2).
-  INST_2x(psubd, kInstPsubd, XmmReg, XmmReg)
+  INST_2x(psubd, kX86InstIdPsubd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psubd, kInstPsubd, XmmReg, Mem)
+  INST_2x(psubd, kX86InstIdPsubd, X86XmmReg, X86Mem)
 
   //! Packed QWORD subtract (SSE2).
-  INST_2x(psubq, kInstPsubq, MmReg, MmReg)
+  INST_2x(psubq, kX86InstIdPsubq, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psubq, kInstPsubq, MmReg, Mem)
+  INST_2x(psubq, kX86InstIdPsubq, X86MmReg, X86Mem)
 
   //! Packed QWORD subtract (SSE2).
-  INST_2x(psubq, kInstPsubq, XmmReg, XmmReg)
+  INST_2x(psubq, kX86InstIdPsubq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psubq, kInstPsubq, XmmReg, Mem)
+  INST_2x(psubq, kX86InstIdPsubq, X86XmmReg, X86Mem)
 
   //! Packed WORD subtract (SSE2).
-  INST_2x(psubw, kInstPsubw, XmmReg, XmmReg)
+  INST_2x(psubw, kX86InstIdPsubw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psubw, kInstPsubw, XmmReg, Mem)
+  INST_2x(psubw, kX86InstIdPsubw, X86XmmReg, X86Mem)
 
   //! Packed WORD to DWORD multiply and add (SSE2).
-  INST_2x(pmaddwd, kInstPmaddwd, XmmReg, XmmReg)
+  INST_2x(pmaddwd, kX86InstIdPmaddwd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmaddwd, kInstPmaddwd, XmmReg, Mem)
+  INST_2x(pmaddwd, kX86InstIdPmaddwd, X86XmmReg, X86Mem)
 
   //! Packed DWORD shuffle (SSE2).
-  INST_3i(pshufd, kInstPshufd, XmmReg, XmmReg, Imm)
+  INST_3i(pshufd, kX86InstIdPshufd, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pshufd, kInstPshufd, XmmReg, Mem, Imm)
+  INST_3i(pshufd, kX86InstIdPshufd, X86XmmReg, X86Mem, Imm)
 
   //! Packed WORD shuffle high (SSE2).
-  INST_3i(pshufhw, kInstPshufhw, XmmReg, XmmReg, Imm)
+  INST_3i(pshufhw, kX86InstIdPshufhw, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pshufhw, kInstPshufhw, XmmReg, Mem, Imm)
+  INST_3i(pshufhw, kX86InstIdPshufhw, X86XmmReg, X86Mem, Imm)
 
   //! Packed WORD shuffle low (SSE2).
-  INST_3i(pshuflw, kInstPshuflw, XmmReg, XmmReg, Imm)
+  INST_3i(pshuflw, kX86InstIdPshuflw, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pshuflw, kInstPshuflw, XmmReg, Mem, Imm)
+  INST_3i(pshuflw, kX86InstIdPshuflw, X86XmmReg, X86Mem, Imm)
 
   //! Packed DWORD shift right logical (SSE2).
-  INST_2x(psrld, kInstPsrld, XmmReg, XmmReg)
+  INST_2x(psrld, kX86InstIdPsrld, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psrld, kInstPsrld, XmmReg, Mem)
+  INST_2x(psrld, kX86InstIdPsrld, X86XmmReg, X86Mem)
   //! \overload
-  INST_2i(psrld, kInstPsrld, XmmReg, Imm)
+  INST_2i(psrld, kX86InstIdPsrld, X86XmmReg, Imm)
 
   //! Packed QWORD shift right logical (SSE2).
-  INST_2x(psrlq, kInstPsrlq, XmmReg, XmmReg)
+  INST_2x(psrlq, kX86InstIdPsrlq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psrlq, kInstPsrlq, XmmReg, Mem)
+  INST_2x(psrlq, kX86InstIdPsrlq, X86XmmReg, X86Mem)
   //! \overload
-  INST_2i(psrlq, kInstPsrlq, XmmReg, Imm)
+  INST_2i(psrlq, kX86InstIdPsrlq, X86XmmReg, Imm)
 
   //! Scalar OWORD shift right logical (SSE2).
-  INST_2i(psrldq, kInstPsrldq, XmmReg, Imm)
+  INST_2i(psrldq, kX86InstIdPsrldq, X86XmmReg, Imm)
 
   //! Packed WORD shift right logical (SSE2).
-  INST_2x(psrlw, kInstPsrlw, XmmReg, XmmReg)
+  INST_2x(psrlw, kX86InstIdPsrlw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psrlw, kInstPsrlw, XmmReg, Mem)
+  INST_2x(psrlw, kX86InstIdPsrlw, X86XmmReg, X86Mem)
   //! \overload
-  INST_2i(psrlw, kInstPsrlw, XmmReg, Imm)
+  INST_2i(psrlw, kX86InstIdPsrlw, X86XmmReg, Imm)
 
   //! Packed BYTE subtract with saturation (SSE2).
-  INST_2x(psubsb, kInstPsubsb, XmmReg, XmmReg)
+  INST_2x(psubsb, kX86InstIdPsubsb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psubsb, kInstPsubsb, XmmReg, Mem)
+  INST_2x(psubsb, kX86InstIdPsubsb, X86XmmReg, X86Mem)
 
   //! Packed WORD subtract with saturation (SSE2).
-  INST_2x(psubsw, kInstPsubsw, XmmReg, XmmReg)
+  INST_2x(psubsw, kX86InstIdPsubsw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psubsw, kInstPsubsw, XmmReg, Mem)
+  INST_2x(psubsw, kX86InstIdPsubsw, X86XmmReg, X86Mem)
 
   //! Packed BYTE subtract with unsigned saturation (SSE2).
-  INST_2x(psubusb, kInstPsubusb, XmmReg, XmmReg)
+  INST_2x(psubusb, kX86InstIdPsubusb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psubusb, kInstPsubusb, XmmReg, Mem)
+  INST_2x(psubusb, kX86InstIdPsubusb, X86XmmReg, X86Mem)
 
   //! Packed WORD subtract with unsigned saturation (SSE2).
-  INST_2x(psubusw, kInstPsubusw, XmmReg, XmmReg)
+  INST_2x(psubusw, kX86InstIdPsubusw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psubusw, kInstPsubusw, XmmReg, Mem)
+  INST_2x(psubusw, kX86InstIdPsubusw, X86XmmReg, X86Mem)
 
   //! Unpack high packed BYTEs to WORDs (SSE2).
-  INST_2x(punpckhbw, kInstPunpckhbw, XmmReg, XmmReg)
+  INST_2x(punpckhbw, kX86InstIdPunpckhbw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(punpckhbw, kInstPunpckhbw, XmmReg, Mem)
+  INST_2x(punpckhbw, kX86InstIdPunpckhbw, X86XmmReg, X86Mem)
 
   //! Unpack high packed DWORDs to QWORDs (SSE2).
-  INST_2x(punpckhdq, kInstPunpckhdq, XmmReg, XmmReg)
+  INST_2x(punpckhdq, kX86InstIdPunpckhdq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(punpckhdq, kInstPunpckhdq, XmmReg, Mem)
+  INST_2x(punpckhdq, kX86InstIdPunpckhdq, X86XmmReg, X86Mem)
 
   //! Unpack high packed QWORDs to OWORD (SSE2).
-  INST_2x(punpckhqdq, kInstPunpckhqdq, XmmReg, XmmReg)
+  INST_2x(punpckhqdq, kX86InstIdPunpckhqdq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(punpckhqdq, kInstPunpckhqdq, XmmReg, Mem)
+  INST_2x(punpckhqdq, kX86InstIdPunpckhqdq, X86XmmReg, X86Mem)
 
   //! Unpack high packed WORDs to DWORDs (SSE2).
-  INST_2x(punpckhwd, kInstPunpckhwd, XmmReg, XmmReg)
+  INST_2x(punpckhwd, kX86InstIdPunpckhwd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(punpckhwd, kInstPunpckhwd, XmmReg, Mem)
+  INST_2x(punpckhwd, kX86InstIdPunpckhwd, X86XmmReg, X86Mem)
 
   //! Unpack low packed BYTEs to WORDs (SSE2).
-  INST_2x(punpcklbw, kInstPunpcklbw, XmmReg, XmmReg)
+  INST_2x(punpcklbw, kX86InstIdPunpcklbw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(punpcklbw, kInstPunpcklbw, XmmReg, Mem)
+  INST_2x(punpcklbw, kX86InstIdPunpcklbw, X86XmmReg, X86Mem)
 
   //! Unpack low packed DWORDs to QWORDs (SSE2).
-  INST_2x(punpckldq, kInstPunpckldq, XmmReg, XmmReg)
+  INST_2x(punpckldq, kX86InstIdPunpckldq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(punpckldq, kInstPunpckldq, XmmReg, Mem)
+  INST_2x(punpckldq, kX86InstIdPunpckldq, X86XmmReg, X86Mem)
 
   //! Unpack low packed QWORDs to OWORD (SSE2).
-  INST_2x(punpcklqdq, kInstPunpcklqdq, XmmReg, XmmReg)
+  INST_2x(punpcklqdq, kX86InstIdPunpcklqdq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(punpcklqdq, kInstPunpcklqdq, XmmReg, Mem)
+  INST_2x(punpcklqdq, kX86InstIdPunpcklqdq, X86XmmReg, X86Mem)
 
   //! Unpack low packed WORDs to DWORDs (SSE2).
-  INST_2x(punpcklwd, kInstPunpcklwd, XmmReg, XmmReg)
+  INST_2x(punpcklwd, kX86InstIdPunpcklwd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(punpcklwd, kInstPunpcklwd, XmmReg, Mem)
+  INST_2x(punpcklwd, kX86InstIdPunpcklwd, X86XmmReg, X86Mem)
 
   //! Packed bitwise xor (SSE2).
-  INST_2x(pxor, kInstPxor, XmmReg, XmmReg)
+  INST_2x(pxor, kX86InstIdPxor, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pxor, kInstPxor, XmmReg, Mem)
+  INST_2x(pxor, kX86InstIdPxor, X86XmmReg, X86Mem)
 
   //! Shuffle DP-FP (SSE2).
-  INST_3i(shufpd, kInstShufpd, XmmReg, XmmReg, Imm)
+  INST_3i(shufpd, kX86InstIdShufpd, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(shufpd, kInstShufpd, XmmReg, Mem, Imm)
+  INST_3i(shufpd, kX86InstIdShufpd, X86XmmReg, X86Mem, Imm)
 
   //! Packed DP-FP square root (SSE2).
-  INST_2x(sqrtpd, kInstSqrtpd, XmmReg, XmmReg)
+  INST_2x(sqrtpd, kX86InstIdSqrtpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(sqrtpd, kInstSqrtpd, XmmReg, Mem)
+  INST_2x(sqrtpd, kX86InstIdSqrtpd, X86XmmReg, X86Mem)
 
   //! Scalar DP-FP square root (SSE2).
-  INST_2x(sqrtsd, kInstSqrtsd, XmmReg, XmmReg)
+  INST_2x(sqrtsd, kX86InstIdSqrtsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(sqrtsd, kInstSqrtsd, XmmReg, Mem)
+  INST_2x(sqrtsd, kX86InstIdSqrtsd, X86XmmReg, X86Mem)
 
   //! Packed DP-FP subtract (SSE2).
-  INST_2x(subpd, kInstSubpd, XmmReg, XmmReg)
+  INST_2x(subpd, kX86InstIdSubpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(subpd, kInstSubpd, XmmReg, Mem)
+  INST_2x(subpd, kX86InstIdSubpd, X86XmmReg, X86Mem)
 
   //! Scalar DP-FP subtract (SSE2).
-  INST_2x(subsd, kInstSubsd, XmmReg, XmmReg)
+  INST_2x(subsd, kX86InstIdSubsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(subsd, kInstSubsd, XmmReg, Mem)
+  INST_2x(subsd, kX86InstIdSubsd, X86XmmReg, X86Mem)
 
   //! Scalar DP-FP unordered compare and set EFLAGS (SSE2).
-  INST_2x(ucomisd, kInstUcomisd, XmmReg, XmmReg)
+  INST_2x(ucomisd, kX86InstIdUcomisd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(ucomisd, kInstUcomisd, XmmReg, Mem)
+  INST_2x(ucomisd, kX86InstIdUcomisd, X86XmmReg, X86Mem)
 
   //! Unpack and interleave high packed DP-FP (SSE2).
-  INST_2x(unpckhpd, kInstUnpckhpd, XmmReg, XmmReg)
+  INST_2x(unpckhpd, kX86InstIdUnpckhpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(unpckhpd, kInstUnpckhpd, XmmReg, Mem)
+  INST_2x(unpckhpd, kX86InstIdUnpckhpd, X86XmmReg, X86Mem)
 
   //! Unpack and interleave low packed DP-FP (SSE2).
-  INST_2x(unpcklpd, kInstUnpcklpd, XmmReg, XmmReg)
+  INST_2x(unpcklpd, kX86InstIdUnpcklpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(unpcklpd, kInstUnpcklpd, XmmReg, Mem)
+  INST_2x(unpcklpd, kX86InstIdUnpcklpd, X86XmmReg, X86Mem)
 
   //! Packed DP-FP bitwise xor (SSE2).
-  INST_2x(xorpd, kInstXorpd, XmmReg, XmmReg)
+  INST_2x(xorpd, kX86InstIdXorpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(xorpd, kInstXorpd, XmmReg, Mem)
+  INST_2x(xorpd, kX86InstIdXorpd, X86XmmReg, X86Mem)
 
   // --------------------------------------------------------------------------
   // [SSE3]
   // --------------------------------------------------------------------------
 
   //! Packed DP-FP add/subtract (SSE3).
-  INST_2x(addsubpd, kInstAddsubpd, XmmReg, XmmReg)
+  INST_2x(addsubpd, kX86InstIdAddsubpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(addsubpd, kInstAddsubpd, XmmReg, Mem)
+  INST_2x(addsubpd, kX86InstIdAddsubpd, X86XmmReg, X86Mem)
 
   //! Packed SP-FP add/subtract (SSE3).
-  INST_2x(addsubps, kInstAddsubps, XmmReg, XmmReg)
+  INST_2x(addsubps, kX86InstIdAddsubps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(addsubps, kInstAddsubps, XmmReg, Mem)
+  INST_2x(addsubps, kX86InstIdAddsubps, X86XmmReg, X86Mem)
 
-  //! Store integer with truncation (SSE3).
-  INST_1x(fisttp, kInstFisttp, Mem)
+  //! Store truncated `fp0` to `short_or_int_or_long[o0]` and POP (FPU & SSE3).
+  INST_1x(fisttp, kX86InstIdFisttp, X86Mem)
 
   //! Packed DP-FP horizontal add (SSE3).
-  INST_2x(haddpd, kInstHaddpd, XmmReg, XmmReg)
+  INST_2x(haddpd, kX86InstIdHaddpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(haddpd, kInstHaddpd, XmmReg, Mem)
+  INST_2x(haddpd, kX86InstIdHaddpd, X86XmmReg, X86Mem)
 
   //! Packed SP-FP horizontal add (SSE3).
-  INST_2x(haddps, kInstHaddps, XmmReg, XmmReg)
+  INST_2x(haddps, kX86InstIdHaddps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(haddps, kInstHaddps, XmmReg, Mem)
+  INST_2x(haddps, kX86InstIdHaddps, X86XmmReg, X86Mem)
 
   //! Packed DP-FP horizontal subtract (SSE3).
-  INST_2x(hsubpd, kInstHsubpd, XmmReg, XmmReg)
+  INST_2x(hsubpd, kX86InstIdHsubpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(hsubpd, kInstHsubpd, XmmReg, Mem)
+  INST_2x(hsubpd, kX86InstIdHsubpd, X86XmmReg, X86Mem)
 
   //! Packed SP-FP horizontal subtract (SSE3).
-  INST_2x(hsubps, kInstHsubps, XmmReg, XmmReg)
+  INST_2x(hsubps, kX86InstIdHsubps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(hsubps, kInstHsubps, XmmReg, Mem)
+  INST_2x(hsubps, kX86InstIdHsubps, X86XmmReg, X86Mem)
 
   //! Load 128-bits unaligned (SSE3).
-  INST_2x(lddqu, kInstLddqu, XmmReg, Mem)
+  INST_2x(lddqu, kX86InstIdLddqu, X86XmmReg, X86Mem)
 
   //! Setup monitor address (SSE3).
-  INST_0x(monitor, kInstMonitor)
+  INST_0x(monitor, kX86InstIdMonitor)
 
   //! Move one DP-FP and duplicate (SSE3).
-  INST_2x(movddup, kInstMovddup, XmmReg, XmmReg)
+  INST_2x(movddup, kX86InstIdMovddup, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movddup, kInstMovddup, XmmReg, Mem)
+  INST_2x(movddup, kX86InstIdMovddup, X86XmmReg, X86Mem)
 
   //! Move packed SP-FP high and duplicate (SSE3).
-  INST_2x(movshdup, kInstMovshdup, XmmReg, XmmReg)
+  INST_2x(movshdup, kX86InstIdMovshdup, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movshdup, kInstMovshdup, XmmReg, Mem)
+  INST_2x(movshdup, kX86InstIdMovshdup, X86XmmReg, X86Mem)
 
   //! Move packed SP-FP low and duplicate (SSE3).
-  INST_2x(movsldup, kInstMovsldup, XmmReg, XmmReg)
+  INST_2x(movsldup, kX86InstIdMovsldup, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(movsldup, kInstMovsldup, XmmReg, Mem)
+  INST_2x(movsldup, kX86InstIdMovsldup, X86XmmReg, X86Mem)
 
   //! Monitor wait (SSE3).
-  INST_0x(mwait, kInstMwait)
+  INST_0x(mwait, kX86InstIdMwait)
 
   // --------------------------------------------------------------------------
   // [SSSE3]
   // --------------------------------------------------------------------------
 
   //! Packed BYTE sign (SSSE3).
-  INST_2x(psignb, kInstPsignb, MmReg, MmReg)
+  INST_2x(psignb, kX86InstIdPsignb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psignb, kInstPsignb, MmReg, Mem)
+  INST_2x(psignb, kX86InstIdPsignb, X86MmReg, X86Mem)
 
   //! Packed BYTE sign (SSSE3).
-  INST_2x(psignb, kInstPsignb, XmmReg, XmmReg)
+  INST_2x(psignb, kX86InstIdPsignb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psignb, kInstPsignb, XmmReg, Mem)
+  INST_2x(psignb, kX86InstIdPsignb, X86XmmReg, X86Mem)
 
   //! Packed DWORD sign (SSSE3).
-  INST_2x(psignd, kInstPsignd, MmReg, MmReg)
+  INST_2x(psignd, kX86InstIdPsignd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psignd, kInstPsignd, MmReg, Mem)
+  INST_2x(psignd, kX86InstIdPsignd, X86MmReg, X86Mem)
 
   //! Packed DWORD sign (SSSE3).
-  INST_2x(psignd, kInstPsignd, XmmReg, XmmReg)
+  INST_2x(psignd, kX86InstIdPsignd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psignd, kInstPsignd, XmmReg, Mem)
+  INST_2x(psignd, kX86InstIdPsignd, X86XmmReg, X86Mem)
 
   //! Packed WORD sign (SSSE3).
-  INST_2x(psignw, kInstPsignw, MmReg, MmReg)
+  INST_2x(psignw, kX86InstIdPsignw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(psignw, kInstPsignw, MmReg, Mem)
+  INST_2x(psignw, kX86InstIdPsignw, X86MmReg, X86Mem)
 
   //! Packed WORD sign (SSSE3).
-  INST_2x(psignw, kInstPsignw, XmmReg, XmmReg)
+  INST_2x(psignw, kX86InstIdPsignw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(psignw, kInstPsignw, XmmReg, Mem)
+  INST_2x(psignw, kX86InstIdPsignw, X86XmmReg, X86Mem)
 
   //! Packed DWORD horizontal add (SSSE3).
-  INST_2x(phaddd, kInstPhaddd, MmReg, MmReg)
+  INST_2x(phaddd, kX86InstIdPhaddd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(phaddd, kInstPhaddd, MmReg, Mem)
+  INST_2x(phaddd, kX86InstIdPhaddd, X86MmReg, X86Mem)
 
   //! Packed DWORD horizontal add (SSSE3).
-  INST_2x(phaddd, kInstPhaddd, XmmReg, XmmReg)
+  INST_2x(phaddd, kX86InstIdPhaddd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(phaddd, kInstPhaddd, XmmReg, Mem)
+  INST_2x(phaddd, kX86InstIdPhaddd, X86XmmReg, X86Mem)
 
   //! Packed WORD horizontal add with saturation (SSSE3).
-  INST_2x(phaddsw, kInstPhaddsw, MmReg, MmReg)
+  INST_2x(phaddsw, kX86InstIdPhaddsw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(phaddsw, kInstPhaddsw, MmReg, Mem)
+  INST_2x(phaddsw, kX86InstIdPhaddsw, X86MmReg, X86Mem)
 
   //! Packed WORD horizontal add with saturation (SSSE3).
-  INST_2x(phaddsw, kInstPhaddsw, XmmReg, XmmReg)
+  INST_2x(phaddsw, kX86InstIdPhaddsw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(phaddsw, kInstPhaddsw, XmmReg, Mem)
+  INST_2x(phaddsw, kX86InstIdPhaddsw, X86XmmReg, X86Mem)
 
   //! Packed WORD horizontal add (SSSE3).
-  INST_2x(phaddw, kInstPhaddw, MmReg, MmReg)
+  INST_2x(phaddw, kX86InstIdPhaddw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(phaddw, kInstPhaddw, MmReg, Mem)
+  INST_2x(phaddw, kX86InstIdPhaddw, X86MmReg, X86Mem)
 
   //! Packed WORD horizontal add (SSSE3).
-  INST_2x(phaddw, kInstPhaddw, XmmReg, XmmReg)
+  INST_2x(phaddw, kX86InstIdPhaddw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(phaddw, kInstPhaddw, XmmReg, Mem)
+  INST_2x(phaddw, kX86InstIdPhaddw, X86XmmReg, X86Mem)
 
   //! Packed DWORD horizontal subtract (SSSE3).
-  INST_2x(phsubd, kInstPhsubd, MmReg, MmReg)
+  INST_2x(phsubd, kX86InstIdPhsubd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(phsubd, kInstPhsubd, MmReg, Mem)
+  INST_2x(phsubd, kX86InstIdPhsubd, X86MmReg, X86Mem)
 
   //! Packed DWORD horizontal subtract (SSSE3).
-  INST_2x(phsubd, kInstPhsubd, XmmReg, XmmReg)
+  INST_2x(phsubd, kX86InstIdPhsubd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(phsubd, kInstPhsubd, XmmReg, Mem)
+  INST_2x(phsubd, kX86InstIdPhsubd, X86XmmReg, X86Mem)
 
   //! Packed WORD horizontal subtract with saturation (SSSE3).
-  INST_2x(phsubsw, kInstPhsubsw, MmReg, MmReg)
+  INST_2x(phsubsw, kX86InstIdPhsubsw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(phsubsw, kInstPhsubsw, MmReg, Mem)
+  INST_2x(phsubsw, kX86InstIdPhsubsw, X86MmReg, X86Mem)
 
   //! Packed WORD horizontal subtract with saturation (SSSE3).
-  INST_2x(phsubsw, kInstPhsubsw, XmmReg, XmmReg)
+  INST_2x(phsubsw, kX86InstIdPhsubsw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(phsubsw, kInstPhsubsw, XmmReg, Mem)
+  INST_2x(phsubsw, kX86InstIdPhsubsw, X86XmmReg, X86Mem)
 
   //! Packed WORD horizontal subtract (SSSE3).
-  INST_2x(phsubw, kInstPhsubw, MmReg, MmReg)
+  INST_2x(phsubw, kX86InstIdPhsubw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(phsubw, kInstPhsubw, MmReg, Mem)
+  INST_2x(phsubw, kX86InstIdPhsubw, X86MmReg, X86Mem)
 
   //! Packed WORD horizontal subtract (SSSE3).
-  INST_2x(phsubw, kInstPhsubw, XmmReg, XmmReg)
+  INST_2x(phsubw, kX86InstIdPhsubw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(phsubw, kInstPhsubw, XmmReg, Mem)
+  INST_2x(phsubw, kX86InstIdPhsubw, X86XmmReg, X86Mem)
 
   //! Packed multiply and add signed and unsigned bytes (SSSE3).
-  INST_2x(pmaddubsw, kInstPmaddubsw, MmReg, MmReg)
+  INST_2x(pmaddubsw, kX86InstIdPmaddubsw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pmaddubsw, kInstPmaddubsw, MmReg, Mem)
+  INST_2x(pmaddubsw, kX86InstIdPmaddubsw, X86MmReg, X86Mem)
 
   //! Packed multiply and add signed and unsigned bytes (SSSE3).
-  INST_2x(pmaddubsw, kInstPmaddubsw, XmmReg, XmmReg)
+  INST_2x(pmaddubsw, kX86InstIdPmaddubsw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmaddubsw, kInstPmaddubsw, XmmReg, Mem)
+  INST_2x(pmaddubsw, kX86InstIdPmaddubsw, X86XmmReg, X86Mem)
 
   //! Packed BYTE absolute value (SSSE3).
-  INST_2x(pabsb, kInstPabsb, MmReg, MmReg)
+  INST_2x(pabsb, kX86InstIdPabsb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pabsb, kInstPabsb, MmReg, Mem)
+  INST_2x(pabsb, kX86InstIdPabsb, X86MmReg, X86Mem)
 
   //! Packed BYTE absolute value (SSSE3).
-  INST_2x(pabsb, kInstPabsb, XmmReg, XmmReg)
+  INST_2x(pabsb, kX86InstIdPabsb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pabsb, kInstPabsb, XmmReg, Mem)
+  INST_2x(pabsb, kX86InstIdPabsb, X86XmmReg, X86Mem)
 
   //! Packed DWORD absolute value (SSSE3).
-  INST_2x(pabsd, kInstPabsd, MmReg, MmReg)
+  INST_2x(pabsd, kX86InstIdPabsd, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pabsd, kInstPabsd, MmReg, Mem)
+  INST_2x(pabsd, kX86InstIdPabsd, X86MmReg, X86Mem)
 
   //! Packed DWORD absolute value (SSSE3).
-  INST_2x(pabsd, kInstPabsd, XmmReg, XmmReg)
+  INST_2x(pabsd, kX86InstIdPabsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pabsd, kInstPabsd, XmmReg, Mem)
+  INST_2x(pabsd, kX86InstIdPabsd, X86XmmReg, X86Mem)
 
   //! Packed WORD absolute value (SSSE3).
-  INST_2x(pabsw, kInstPabsw, MmReg, MmReg)
+  INST_2x(pabsw, kX86InstIdPabsw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pabsw, kInstPabsw, MmReg, Mem)
+  INST_2x(pabsw, kX86InstIdPabsw, X86MmReg, X86Mem)
 
   //! Packed WORD absolute value (SSSE3).
-  INST_2x(pabsw, kInstPabsw, XmmReg, XmmReg)
+  INST_2x(pabsw, kX86InstIdPabsw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pabsw, kInstPabsw, XmmReg, Mem)
+  INST_2x(pabsw, kX86InstIdPabsw, X86XmmReg, X86Mem)
 
   //! Packed WORD multiply high, round and scale (SSSE3).
-  INST_2x(pmulhrsw, kInstPmulhrsw, MmReg, MmReg)
+  INST_2x(pmulhrsw, kX86InstIdPmulhrsw, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pmulhrsw, kInstPmulhrsw, MmReg, Mem)
+  INST_2x(pmulhrsw, kX86InstIdPmulhrsw, X86MmReg, X86Mem)
 
   //! Packed WORD multiply high, round and scale (SSSE3).
-  INST_2x(pmulhrsw, kInstPmulhrsw, XmmReg, XmmReg)
+  INST_2x(pmulhrsw, kX86InstIdPmulhrsw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmulhrsw, kInstPmulhrsw, XmmReg, Mem)
+  INST_2x(pmulhrsw, kX86InstIdPmulhrsw, X86XmmReg, X86Mem)
 
   //! Packed BYTE shuffle (SSSE3).
-  INST_2x(pshufb, kInstPshufb, MmReg, MmReg)
+  INST_2x(pshufb, kX86InstIdPshufb, X86MmReg, X86MmReg)
   //! \overload
-  INST_2x(pshufb, kInstPshufb, MmReg, Mem)
+  INST_2x(pshufb, kX86InstIdPshufb, X86MmReg, X86Mem)
 
   //! Packed BYTE shuffle (SSSE3).
-  INST_2x(pshufb, kInstPshufb, XmmReg, XmmReg)
+  INST_2x(pshufb, kX86InstIdPshufb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pshufb, kInstPshufb, XmmReg, Mem)
+  INST_2x(pshufb, kX86InstIdPshufb, X86XmmReg, X86Mem)
 
   //! Packed align right (SSSE3).
-  INST_3i(palignr, kInstPalignr, MmReg, MmReg, Imm)
+  INST_3i(palignr, kX86InstIdPalignr, X86MmReg, X86MmReg, Imm)
   //! \overload
-  INST_3i(palignr, kInstPalignr, MmReg, Mem, Imm)
+  INST_3i(palignr, kX86InstIdPalignr, X86MmReg, X86Mem, Imm)
 
   //! Packed align right (SSSE3).
-  INST_3i(palignr, kInstPalignr, XmmReg, XmmReg, Imm)
+  INST_3i(palignr, kX86InstIdPalignr, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(palignr, kInstPalignr, XmmReg, Mem, Imm)
+  INST_3i(palignr, kX86InstIdPalignr, X86XmmReg, X86Mem, Imm)
 
   // --------------------------------------------------------------------------
   // [SSE4.1]
   // --------------------------------------------------------------------------
 
   //! Packed DP-FP blend (SSE4.1).
-  INST_3i(blendpd, kInstBlendpd, XmmReg, XmmReg, Imm)
+  INST_3i(blendpd, kX86InstIdBlendpd, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(blendpd, kInstBlendpd, XmmReg, Mem, Imm)
+  INST_3i(blendpd, kX86InstIdBlendpd, X86XmmReg, X86Mem, Imm)
 
   //! Packed SP-FP blend (SSE4.1).
-  INST_3i(blendps, kInstBlendps, XmmReg, XmmReg, Imm)
+  INST_3i(blendps, kX86InstIdBlendps, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(blendps, kInstBlendps, XmmReg, Mem, Imm)
+  INST_3i(blendps, kX86InstIdBlendps, X86XmmReg, X86Mem, Imm)
 
   //! Packed DP-FP variable blend (SSE4.1).
-  INST_2x(blendvpd, kInstBlendvpd, XmmReg, XmmReg)
+  INST_2x(blendvpd, kX86InstIdBlendvpd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(blendvpd, kInstBlendvpd, XmmReg, Mem)
+  INST_2x(blendvpd, kX86InstIdBlendvpd, X86XmmReg, X86Mem)
 
   //! Packed SP-FP variable blend (SSE4.1).
-  INST_2x(blendvps, kInstBlendvps, XmmReg, XmmReg)
+  INST_2x(blendvps, kX86InstIdBlendvps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(blendvps, kInstBlendvps, XmmReg, Mem)
+  INST_2x(blendvps, kX86InstIdBlendvps, X86XmmReg, X86Mem)
 
   //! Packed DP-FP dot product (SSE4.1).
-  INST_3i(dppd, kInstDppd, XmmReg, XmmReg, Imm)
+  INST_3i(dppd, kX86InstIdDppd, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(dppd, kInstDppd, XmmReg, Mem, Imm)
+  INST_3i(dppd, kX86InstIdDppd, X86XmmReg, X86Mem, Imm)
 
   //! Packed SP-FP dot product (SSE4.1).
-  INST_3i(dpps, kInstDpps, XmmReg, XmmReg, Imm)
+  INST_3i(dpps, kX86InstIdDpps, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(dpps, kInstDpps, XmmReg, Mem, Imm)
+  INST_3i(dpps, kX86InstIdDpps, X86XmmReg, X86Mem, Imm)
 
   //! Extract SP-FP based on selector (SSE4.1).
-  INST_3i(extractps, kInstExtractps, GpReg, XmmReg, Imm)
+  INST_3i(extractps, kX86InstIdExtractps, X86GpReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(extractps, kInstExtractps, Mem, XmmReg, Imm)
+  INST_3i(extractps, kX86InstIdExtractps, X86Mem, X86XmmReg, Imm)
 
   //! Insert SP-FP based on selector (SSE4.1).
-  INST_3i(insertps, kInstInsertps, XmmReg, XmmReg, Imm)
+  INST_3i(insertps, kX86InstIdInsertps, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(insertps, kInstInsertps, XmmReg, Mem, Imm)
+  INST_3i(insertps, kX86InstIdInsertps, X86XmmReg, X86Mem, Imm)
 
   //! Load OWORD aligned using NT hint (SSE4.1).
-  INST_2x(movntdqa, kInstMovntdqa, XmmReg, Mem)
+  INST_2x(movntdqa, kX86InstIdMovntdqa, X86XmmReg, X86Mem)
 
   //! Packed WORD sums of absolute difference (SSE4.1).
-  INST_3i(mpsadbw, kInstMpsadbw, XmmReg, XmmReg, Imm)
+  INST_3i(mpsadbw, kX86InstIdMpsadbw, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(mpsadbw, kInstMpsadbw, XmmReg, Mem, Imm)
+  INST_3i(mpsadbw, kX86InstIdMpsadbw, X86XmmReg, X86Mem, Imm)
 
   //! Pack DWORDs to WORDs with unsigned saturation (SSE4.1).
-  INST_2x(packusdw, kInstPackusdw, XmmReg, XmmReg)
+  INST_2x(packusdw, kX86InstIdPackusdw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(packusdw, kInstPackusdw, XmmReg, Mem)
+  INST_2x(packusdw, kX86InstIdPackusdw, X86XmmReg, X86Mem)
 
   //! Packed BYTE variable blend (SSE4.1).
-  INST_2x(pblendvb, kInstPblendvb, XmmReg, XmmReg)
+  INST_2x(pblendvb, kX86InstIdPblendvb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pblendvb, kInstPblendvb, XmmReg, Mem)
+  INST_2x(pblendvb, kX86InstIdPblendvb, X86XmmReg, X86Mem)
 
   //! Packed WORD blend (SSE4.1).
-  INST_3i(pblendw, kInstPblendw, XmmReg, XmmReg, Imm)
+  INST_3i(pblendw, kX86InstIdPblendw, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pblendw, kInstPblendw, XmmReg, Mem, Imm)
+  INST_3i(pblendw, kX86InstIdPblendw, X86XmmReg, X86Mem, Imm)
 
   //! Packed QWORD compare for equality (SSE4.1).
-  INST_2x(pcmpeqq, kInstPcmpeqq, XmmReg, XmmReg)
+  INST_2x(pcmpeqq, kX86InstIdPcmpeqq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pcmpeqq, kInstPcmpeqq, XmmReg, Mem)
+  INST_2x(pcmpeqq, kX86InstIdPcmpeqq, X86XmmReg, X86Mem)
 
   //! Extract BYTE based on selector (SSE4.1).
-  INST_3i(pextrb, kInstPextrb, GpReg, XmmReg, Imm)
+  INST_3i(pextrb, kX86InstIdPextrb, X86GpReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pextrb, kInstPextrb, Mem, XmmReg, Imm)
+  INST_3i(pextrb, kX86InstIdPextrb, X86Mem, X86XmmReg, Imm)
 
   //! Extract DWORD based on selector (SSE4.1).
-  INST_3i(pextrd, kInstPextrd, GpReg, XmmReg, Imm)
+  INST_3i(pextrd, kX86InstIdPextrd, X86GpReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pextrd, kInstPextrd, Mem, XmmReg, Imm)
+  INST_3i(pextrd, kX86InstIdPextrd, X86Mem, X86XmmReg, Imm)
 
   //! Extract QWORD based on selector (SSE4.1).
-  INST_3i(pextrq, kInstPextrq, GpReg, XmmReg, Imm)
+  INST_3i(pextrq, kX86InstIdPextrq, X86GpReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pextrq, kInstPextrq, Mem, XmmReg, Imm)
+  INST_3i(pextrq, kX86InstIdPextrq, X86Mem, X86XmmReg, Imm)
 
   //! Extract WORD based on selector (SSE4.1).
-  INST_3i(pextrw, kInstPextrw, Mem, XmmReg, Imm)
+  INST_3i(pextrw, kX86InstIdPextrw, X86Mem, X86XmmReg, Imm)
 
   //! Packed WORD horizontal minimum (SSE4.1).
-  INST_2x(phminposuw, kInstPhminposuw, XmmReg, XmmReg)
+  INST_2x(phminposuw, kX86InstIdPhminposuw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(phminposuw, kInstPhminposuw, XmmReg, Mem)
+  INST_2x(phminposuw, kX86InstIdPhminposuw, X86XmmReg, X86Mem)
 
   //! Insert BYTE based on selector (SSE4.1).
-  INST_3i(pinsrb, kInstPinsrb, XmmReg, GpReg, Imm)
+  INST_3i(pinsrb, kX86InstIdPinsrb, X86XmmReg, X86GpReg, Imm)
   //! \overload
-  INST_3i(pinsrb, kInstPinsrb, XmmReg, Mem, Imm)
+  INST_3i(pinsrb, kX86InstIdPinsrb, X86XmmReg, X86Mem, Imm)
 
   //! Insert DWORD based on selector (SSE4.1).
-  INST_3i(pinsrd, kInstPinsrd, XmmReg, GpReg, Imm)
+  INST_3i(pinsrd, kX86InstIdPinsrd, X86XmmReg, X86GpReg, Imm)
   //! \overload
-  INST_3i(pinsrd, kInstPinsrd, XmmReg, Mem, Imm)
+  INST_3i(pinsrd, kX86InstIdPinsrd, X86XmmReg, X86Mem, Imm)
 
   //! Insert QWORD based on selector (SSE4.1).
-  INST_3i(pinsrq, kInstPinsrq, XmmReg, GpReg, Imm)
+  INST_3i(pinsrq, kX86InstIdPinsrq, X86XmmReg, X86GpReg, Imm)
   //! \overload
-  INST_3i(pinsrq, kInstPinsrq, XmmReg, Mem, Imm)
+  INST_3i(pinsrq, kX86InstIdPinsrq, X86XmmReg, X86Mem, Imm)
 
   //! Packed BYTE maximum (SSE4.1).
-  INST_2x(pmaxsb, kInstPmaxsb, XmmReg, XmmReg)
+  INST_2x(pmaxsb, kX86InstIdPmaxsb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmaxsb, kInstPmaxsb, XmmReg, Mem)
+  INST_2x(pmaxsb, kX86InstIdPmaxsb, X86XmmReg, X86Mem)
 
   //! Packed DWORD maximum (SSE4.1).
-  INST_2x(pmaxsd, kInstPmaxsd, XmmReg, XmmReg)
+  INST_2x(pmaxsd, kX86InstIdPmaxsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmaxsd, kInstPmaxsd, XmmReg, Mem)
+  INST_2x(pmaxsd, kX86InstIdPmaxsd, X86XmmReg, X86Mem)
 
   //! Packed DWORD unsigned maximum (SSE4.1).
-  INST_2x(pmaxud, kInstPmaxud, XmmReg, XmmReg)
+  INST_2x(pmaxud, kX86InstIdPmaxud, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmaxud,kInstPmaxud , XmmReg, Mem)
+  INST_2x(pmaxud,kX86InstIdPmaxud , X86XmmReg, X86Mem)
 
   //! Packed WORD unsigned maximum (SSE4.1).
-  INST_2x(pmaxuw, kInstPmaxuw, XmmReg, XmmReg)
+  INST_2x(pmaxuw, kX86InstIdPmaxuw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmaxuw, kInstPmaxuw, XmmReg, Mem)
+  INST_2x(pmaxuw, kX86InstIdPmaxuw, X86XmmReg, X86Mem)
 
   //! Packed BYTE minimum (SSE4.1).
-  INST_2x(pminsb, kInstPminsb, XmmReg, XmmReg)
+  INST_2x(pminsb, kX86InstIdPminsb, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pminsb, kInstPminsb, XmmReg, Mem)
+  INST_2x(pminsb, kX86InstIdPminsb, X86XmmReg, X86Mem)
 
   //! Packed DWORD minimum (SSE4.1).
-  INST_2x(pminsd, kInstPminsd, XmmReg, XmmReg)
+  INST_2x(pminsd, kX86InstIdPminsd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pminsd, kInstPminsd, XmmReg, Mem)
+  INST_2x(pminsd, kX86InstIdPminsd, X86XmmReg, X86Mem)
 
   //! Packed WORD unsigned minimum (SSE4.1).
-  INST_2x(pminuw, kInstPminuw, XmmReg, XmmReg)
+  INST_2x(pminuw, kX86InstIdPminuw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pminuw, kInstPminuw, XmmReg, Mem)
+  INST_2x(pminuw, kX86InstIdPminuw, X86XmmReg, X86Mem)
 
   //! Packed DWORD unsigned minimum (SSE4.1).
-  INST_2x(pminud, kInstPminud, XmmReg, XmmReg)
+  INST_2x(pminud, kX86InstIdPminud, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pminud, kInstPminud, XmmReg, Mem)
+  INST_2x(pminud, kX86InstIdPminud, X86XmmReg, X86Mem)
 
   //! BYTE to DWORD with sign extend (SSE4.1).
-  INST_2x(pmovsxbd, kInstPmovsxbd, XmmReg, XmmReg)
+  INST_2x(pmovsxbd, kX86InstIdPmovsxbd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovsxbd, kInstPmovsxbd, XmmReg, Mem)
+  INST_2x(pmovsxbd, kX86InstIdPmovsxbd, X86XmmReg, X86Mem)
 
   //! Packed BYTE to QWORD with sign extend (SSE4.1).
-  INST_2x(pmovsxbq, kInstPmovsxbq, XmmReg, XmmReg)
+  INST_2x(pmovsxbq, kX86InstIdPmovsxbq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovsxbq, kInstPmovsxbq, XmmReg, Mem)
+  INST_2x(pmovsxbq, kX86InstIdPmovsxbq, X86XmmReg, X86Mem)
 
   //! Packed BYTE to WORD with sign extend (SSE4.1).
-  INST_2x(pmovsxbw, kInstPmovsxbw, XmmReg, XmmReg)
+  INST_2x(pmovsxbw, kX86InstIdPmovsxbw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovsxbw, kInstPmovsxbw, XmmReg, Mem)
+  INST_2x(pmovsxbw, kX86InstIdPmovsxbw, X86XmmReg, X86Mem)
 
   //! Packed DWORD to QWORD with sign extend (SSE4.1).
-  INST_2x(pmovsxdq, kInstPmovsxdq, XmmReg, XmmReg)
+  INST_2x(pmovsxdq, kX86InstIdPmovsxdq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovsxdq, kInstPmovsxdq, XmmReg, Mem)
+  INST_2x(pmovsxdq, kX86InstIdPmovsxdq, X86XmmReg, X86Mem)
 
   //! Packed WORD to DWORD with sign extend (SSE4.1).
-  INST_2x(pmovsxwd, kInstPmovsxwd, XmmReg, XmmReg)
+  INST_2x(pmovsxwd, kX86InstIdPmovsxwd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovsxwd, kInstPmovsxwd, XmmReg, Mem)
+  INST_2x(pmovsxwd, kX86InstIdPmovsxwd, X86XmmReg, X86Mem)
 
   //! Packed WORD to QWORD with sign extend (SSE4.1).
-  INST_2x(pmovsxwq, kInstPmovsxwq, XmmReg, XmmReg)
+  INST_2x(pmovsxwq, kX86InstIdPmovsxwq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovsxwq, kInstPmovsxwq, XmmReg, Mem)
+  INST_2x(pmovsxwq, kX86InstIdPmovsxwq, X86XmmReg, X86Mem)
 
   //! BYTE to DWORD with zero extend (SSE4.1).
-  INST_2x(pmovzxbd, kInstPmovzxbd, XmmReg, XmmReg)
+  INST_2x(pmovzxbd, kX86InstIdPmovzxbd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovzxbd, kInstPmovzxbd, XmmReg, Mem)
+  INST_2x(pmovzxbd, kX86InstIdPmovzxbd, X86XmmReg, X86Mem)
 
   //! Packed BYTE to QWORD with zero extend (SSE4.1).
-  INST_2x(pmovzxbq, kInstPmovzxbq, XmmReg, XmmReg)
+  INST_2x(pmovzxbq, kX86InstIdPmovzxbq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovzxbq, kInstPmovzxbq, XmmReg, Mem)
+  INST_2x(pmovzxbq, kX86InstIdPmovzxbq, X86XmmReg, X86Mem)
 
   //! BYTE to WORD with zero extend (SSE4.1).
-  INST_2x(pmovzxbw, kInstPmovzxbw, XmmReg, XmmReg)
+  INST_2x(pmovzxbw, kX86InstIdPmovzxbw, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovzxbw, kInstPmovzxbw, XmmReg, Mem)
+  INST_2x(pmovzxbw, kX86InstIdPmovzxbw, X86XmmReg, X86Mem)
 
   //! Packed DWORD to QWORD with zero extend (SSE4.1).
-  INST_2x(pmovzxdq, kInstPmovzxdq, XmmReg, XmmReg)
+  INST_2x(pmovzxdq, kX86InstIdPmovzxdq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovzxdq, kInstPmovzxdq, XmmReg, Mem)
+  INST_2x(pmovzxdq, kX86InstIdPmovzxdq, X86XmmReg, X86Mem)
 
   //! Packed WORD to DWORD with zero extend (SSE4.1).
-  INST_2x(pmovzxwd, kInstPmovzxwd, XmmReg, XmmReg)
+  INST_2x(pmovzxwd, kX86InstIdPmovzxwd, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovzxwd, kInstPmovzxwd, XmmReg, Mem)
+  INST_2x(pmovzxwd, kX86InstIdPmovzxwd, X86XmmReg, X86Mem)
 
   //! Packed WORD to QWORD with zero extend (SSE4.1).
-  INST_2x(pmovzxwq, kInstPmovzxwq, XmmReg, XmmReg)
+  INST_2x(pmovzxwq, kX86InstIdPmovzxwq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmovzxwq, kInstPmovzxwq, XmmReg, Mem)
+  INST_2x(pmovzxwq, kX86InstIdPmovzxwq, X86XmmReg, X86Mem)
 
   //! Packed DWORD to QWORD multiply (SSE4.1).
-  INST_2x(pmuldq, kInstPmuldq, XmmReg, XmmReg)
+  INST_2x(pmuldq, kX86InstIdPmuldq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmuldq, kInstPmuldq, XmmReg, Mem)
+  INST_2x(pmuldq, kX86InstIdPmuldq, X86XmmReg, X86Mem)
 
   //! Packed DWORD multiply low (SSE4.1).
-  INST_2x(pmulld, kInstPmulld, XmmReg, XmmReg)
+  INST_2x(pmulld, kX86InstIdPmulld, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pmulld, kInstPmulld, XmmReg, Mem)
+  INST_2x(pmulld, kX86InstIdPmulld, X86XmmReg, X86Mem)
 
   //! Logical compare (SSE4.1).
-  INST_2x(ptest, kInstPtest, XmmReg, XmmReg)
+  INST_2x(ptest, kX86InstIdPtest, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(ptest, kInstPtest, XmmReg, Mem)
+  INST_2x(ptest, kX86InstIdPtest, X86XmmReg, X86Mem)
 
   //! Packed DP-FP round (SSE4.1).
-  INST_3i(roundpd, kInstRoundpd, XmmReg, XmmReg, Imm)
+  INST_3i(roundpd, kX86InstIdRoundpd, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(roundpd, kInstRoundpd, XmmReg, Mem, Imm)
+  INST_3i(roundpd, kX86InstIdRoundpd, X86XmmReg, X86Mem, Imm)
 
   //! Packed SP-FP round (SSE4.1).
-  INST_3i(roundps, kInstRoundps, XmmReg, XmmReg, Imm)
+  INST_3i(roundps, kX86InstIdRoundps, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(roundps, kInstRoundps, XmmReg, Mem, Imm)
+  INST_3i(roundps, kX86InstIdRoundps, X86XmmReg, X86Mem, Imm)
 
   //! Scalar DP-FP round (SSE4.1).
-  INST_3i(roundsd, kInstRoundsd, XmmReg, XmmReg, Imm)
+  INST_3i(roundsd, kX86InstIdRoundsd, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(roundsd, kInstRoundsd, XmmReg, Mem, Imm)
+  INST_3i(roundsd, kX86InstIdRoundsd, X86XmmReg, X86Mem, Imm)
 
   //! Scalar SP-FP round (SSE4.1).
-  INST_3i(roundss, kInstRoundss, XmmReg, XmmReg, Imm)
+  INST_3i(roundss, kX86InstIdRoundss, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(roundss, kInstRoundss, XmmReg, Mem, Imm)
+  INST_3i(roundss, kX86InstIdRoundss, X86XmmReg, X86Mem, Imm)
 
   // --------------------------------------------------------------------------
   // [SSE4.2]
   // --------------------------------------------------------------------------
 
-  //! Packed compare explicit length strings, return index (SSE4.2).
-  INST_3i(pcmpestri, kInstPcmpestri, XmmReg, XmmReg, Imm)
+  //! Accumulate crc32 value (polynomial 0x11EDC6F41) (SSE4.2).
+  INST_2x_(crc32, kX86InstIdCrc32, X86GpReg, X86GpReg, o0.isRegType(kX86RegTypeGpd) || o0.isRegType(kX86RegTypeGpq))
   //! \overload
-  INST_3i(pcmpestri, kInstPcmpestri, XmmReg, Mem, Imm)
+  INST_2x_(crc32, kX86InstIdCrc32, X86GpReg, X86Mem, o0.isRegType(kX86RegTypeGpd) || o0.isRegType(kX86RegTypeGpq))
+
+  //! Packed compare explicit length strings, return index (SSE4.2).
+  INST_3i(pcmpestri, kX86InstIdPcmpestri, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(pcmpestri, kX86InstIdPcmpestri, X86XmmReg, X86Mem, Imm)
 
   //! Packed compare explicit length strings, return mask (SSE4.2).
-  INST_3i(pcmpestrm, kInstPcmpestrm, XmmReg, XmmReg, Imm)
+  INST_3i(pcmpestrm, kX86InstIdPcmpestrm, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pcmpestrm, kInstPcmpestrm, XmmReg, Mem, Imm)
+  INST_3i(pcmpestrm, kX86InstIdPcmpestrm, X86XmmReg, X86Mem, Imm)
 
   //! Packed compare implicit length strings, return index (SSE4.2).
-  INST_3i(pcmpistri, kInstPcmpistri, XmmReg, XmmReg, Imm)
+  INST_3i(pcmpistri, kX86InstIdPcmpistri, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pcmpistri, kInstPcmpistri, XmmReg, Mem, Imm)
+  INST_3i(pcmpistri, kX86InstIdPcmpistri, X86XmmReg, X86Mem, Imm)
 
   //! Packed compare implicit length strings, return mask (SSE4.2).
-  INST_3i(pcmpistrm, kInstPcmpistrm, XmmReg, XmmReg, Imm)
+  INST_3i(pcmpistrm, kX86InstIdPcmpistrm, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(pcmpistrm, kInstPcmpistrm, XmmReg, Mem, Imm)
+  INST_3i(pcmpistrm, kX86InstIdPcmpistrm, X86XmmReg, X86Mem, Imm)
 
   //! Packed QWORD compare if greater than (SSE4.2).
-  INST_2x(pcmpgtq, kInstPcmpgtq, XmmReg, XmmReg)
+  INST_2x(pcmpgtq, kX86InstIdPcmpgtq, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(pcmpgtq, kInstPcmpgtq, XmmReg, Mem)
+  INST_2x(pcmpgtq, kX86InstIdPcmpgtq, X86XmmReg, X86Mem)
 
   // --------------------------------------------------------------------------
-  // [AESNI]
+  // [SSE4a]
   // --------------------------------------------------------------------------
 
-  //! Perform a single round of the AES decryption flow (AESNI).
-  INST_2x(aesdec, kInstAesdec, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(aesdec, kInstAesdec, XmmReg, Mem)
+  //! Extract Field (SSE4a).
+  INST_2x(extrq, kX86InstIdExtrq, X86XmmReg, X86XmmReg)
+  //! Extract Field (SSE4a).
+  INST_3ii(extrq, kX86InstIdExtrq, X86XmmReg, Imm, Imm)
 
-  //! Perform the last round of the AES decryption flow (AESNI).
-  INST_2x(aesdeclast, kInstAesdeclast, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(aesdeclast, kInstAesdeclast, XmmReg, Mem)
+  //! Insert Field (SSE4a).
+  INST_2x(insertq, kX86InstIdInsertq, X86XmmReg, X86XmmReg)
+  //! Insert Field (SSE4a).
+  INST_4ii(insertq, kX86InstIdInsertq, X86XmmReg, X86XmmReg, Imm, Imm)
 
-  //! Perform a single round of the AES encryption flow (AESNI).
-  INST_2x(aesenc, kInstAesenc, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(aesenc, kInstAesenc, XmmReg, Mem)
-
-  //! Perform the last round of the AES encryption flow (AESNI).
-  INST_2x(aesenclast, kInstAesenclast, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(aesenclast, kInstAesenclast, XmmReg, Mem)
-
-  //! Perform the InvMixColumns transformation (AESNI).
-  INST_2x(aesimc, kInstAesimc, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(aesimc, kInstAesimc, XmmReg, Mem)
-
-  //! Assist in expanding the AES cipher key (AESNI).
-  INST_3i(aeskeygenassist, kInstAeskeygenassist, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(aeskeygenassist, kInstAeskeygenassist, XmmReg, Mem, Imm)
+  //! Move Non-Temporal Scalar DP-FP (SSE4a).
+  INST_2x(movntsd, kX86InstIdMovntsd, X86Mem, X86XmmReg)
+  //! Move Non-Temporal Scalar SP-FP (SSE4a).
+  INST_2x(movntss, kX86InstIdMovntss, X86Mem, X86XmmReg)
 
   // --------------------------------------------------------------------------
-  // [PCLMULQDQ]
+  // [POPCNT]
   // --------------------------------------------------------------------------
 
-  //! Packed QWORD to OWORD carry-less multiply (PCLMULQDQ).
-  INST_3i(pclmulqdq, kInstPclmulqdq, XmmReg, XmmReg, Imm)
+  //! Return the count of number of bits set to 1 (POPCNT).
+  INST_2x_(popcnt, kX86InstIdPopcnt, X86GpReg, X86GpReg, !o0.isGpb() && o0.getRegType() == o1.getRegType())
   //! \overload
-  INST_3i(pclmulqdq, kInstPclmulqdq, XmmReg, Mem, Imm)
-
-  // --------------------------------------------------------------------------
-  // [AVX]
-  // --------------------------------------------------------------------------
-
-  //! Packed DP-FP add (AVX).
-  INST_3x(vaddpd, kInstVaddpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaddpd, kInstVaddpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vaddpd, kInstVaddpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vaddpd, kInstVaddpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP add (AVX).
-  INST_3x(vaddps, kInstVaddps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaddps, kInstVaddps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vaddps, kInstVaddps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vaddps, kInstVaddps, YmmReg, YmmReg, Mem)
-
-  //! Scalar DP-FP add (AVX)
-  INST_3x(vaddsd, kInstVaddsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaddsd, kInstVaddsd, XmmReg, XmmReg, Mem)
-
-  //! Scalar SP-FP add (AVX)
-  INST_3x(vaddss, kInstVaddss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaddss, kInstVaddss, XmmReg, XmmReg, Mem)
-
-  //! Packed DP-FP add/subtract (AVX).
-  INST_3x(vaddsubpd, kInstVaddsubpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaddsubpd, kInstVaddsubpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vaddsubpd, kInstVaddsubpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vaddsubpd, kInstVaddsubpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP add/subtract (AVX).
-  INST_3x(vaddsubps, kInstVaddsubps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaddsubps, kInstVaddsubps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vaddsubps, kInstVaddsubps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vaddsubps, kInstVaddsubps, YmmReg, YmmReg, Mem)
-
-  //! Packed DP-FP bitwise and (AVX).
-  INST_3x(vandpd, kInstVandpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vandpd, kInstVandpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vandpd, kInstVandpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vandpd, kInstVandpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP bitwise and (AVX).
-  INST_3x(vandps, kInstVandps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vandps, kInstVandps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vandps, kInstVandps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vandps, kInstVandps, YmmReg, YmmReg, Mem)
-
-  //! Packed DP-FP bitwise and-not (AVX).
-  INST_3x(vandnpd, kInstVandnpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vandnpd, kInstVandnpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vandnpd, kInstVandnpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vandnpd, kInstVandnpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP bitwise and-not (AVX).
-  INST_3x(vandnps, kInstVandnps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vandnps, kInstVandnps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vandnps, kInstVandnps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vandnps, kInstVandnps, YmmReg, YmmReg, Mem)
-
-  //! Packed DP-FP blend (AVX).
-  INST_4i(vblendpd, kInstVblendpd, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vblendpd, kInstVblendpd, XmmReg, XmmReg, Mem, Imm)
-  //! \overload
-  INST_4i(vblendpd, kInstVblendpd, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vblendpd, kInstVblendpd, YmmReg, YmmReg, Mem, Imm)
-
-  //! Packed SP-FP blend (AVX).
-  INST_4i(vblendps, kInstVblendps, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vblendps, kInstVblendps, XmmReg, XmmReg, Mem, Imm)
-  //! \overload
-  INST_4i(vblendps, kInstVblendps, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vblendps, kInstVblendps, YmmReg, YmmReg, Mem, Imm)
-
-  //! Packed DP-FP variable blend (AVX).
-  INST_4x(vblendvpd, kInstVblendvpd, XmmReg, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_4x(vblendvpd, kInstVblendvpd, XmmReg, XmmReg, Mem, XmmReg)
-  //! \overload
-  INST_4x(vblendvpd, kInstVblendvpd, YmmReg, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_4x(vblendvpd, kInstVblendvpd, YmmReg, YmmReg, Mem, YmmReg)
-
-  //! Packed SP-FP variable blend (AVX).
-  INST_4x(vblendvps, kInstVblendvps, XmmReg, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_4x(vblendvps, kInstVblendvps, XmmReg, XmmReg, Mem, XmmReg)
-  //! \overload
-  INST_4x(vblendvps, kInstVblendvps, YmmReg, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_4x(vblendvps, kInstVblendvps, YmmReg, YmmReg, Mem, YmmReg)
-
-  //! Broadcast 128-bits of FP data in `o1` to low and high 128-bits in `o0` (AVX).
-  INST_2x(vbroadcastf128, kInstVbroadcastf128, YmmReg, Mem)
-  //! Broadcast DP-FP element in `o1` to four locations in `o0` (AVX).
-  INST_2x(vbroadcastsd, kInstVbroadcastsd, YmmReg, Mem)
-  //! Broadcast SP-FP element in `o1` to four locations in `o0` (AVX).
-  INST_2x(vbroadcastss, kInstVbroadcastss, XmmReg, Mem)
-  //! Broadcast SP-FP element in `o1` to eight locations in `o0` (AVX).
-  INST_2x(vbroadcastss, kInstVbroadcastss, YmmReg, Mem)
-
-  //! Packed DP-FP compare (AVX).
-  INST_4i(vcmppd, kInstVcmppd, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vcmppd, kInstVcmppd, XmmReg, XmmReg, Mem, Imm)
-  //! \overload
-  INST_4i(vcmppd, kInstVcmppd, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vcmppd, kInstVcmppd, YmmReg, YmmReg, Mem, Imm)
-
-  //! Packed SP-FP compare (AVX).
-  INST_4i(vcmpps, kInstVcmpps, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vcmpps, kInstVcmpps, XmmReg, XmmReg, Mem, Imm)
-  //! \overload
-  INST_4i(vcmpps, kInstVcmpps, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vcmpps, kInstVcmpps, YmmReg, YmmReg, Mem, Imm)
-
-  //! Scalar DP-FP compare (AVX).
-  INST_4i(vcmpsd, kInstVcmpsd, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vcmpsd, kInstVcmpsd, XmmReg, XmmReg, Mem, Imm)
-
-  //! Scalar SP-FP compare (AVX).
-  INST_4i(vcmpss, kInstVcmpss, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vcmpss, kInstVcmpss, XmmReg, XmmReg, Mem, Imm)
-
-  //! Scalar DP-FP ordered compare and set EFLAGS (AVX).
-  INST_2x(vcomisd, kInstVcomisd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcomisd, kInstVcomisd, XmmReg, Mem)
-
-  //! Scalar SP-FP ordered compare and set EFLAGS (AVX).
-  INST_2x(vcomiss, kInstVcomiss, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcomiss, kInstVcomiss, XmmReg, Mem)
-
-  //! Convert packed QWORDs to packed DP-FP (AVX).
-  INST_2x(vcvtdq2pd, kInstVcvtdq2pd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtdq2pd, kInstVcvtdq2pd, XmmReg, Mem)
-  //! \overload
-  INST_2x(vcvtdq2pd, kInstVcvtdq2pd, YmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtdq2pd, kInstVcvtdq2pd, YmmReg, Mem)
-
-  //! Convert packed QWORDs to packed SP-FP (AVX).
-  INST_2x(vcvtdq2ps, kInstVcvtdq2ps, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtdq2ps, kInstVcvtdq2ps, XmmReg, Mem)
-  //! \overload
-  INST_2x(vcvtdq2ps, kInstVcvtdq2ps, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vcvtdq2ps, kInstVcvtdq2ps, YmmReg, Mem)
-
-  //! Convert packed DP-FP to packed QWORDs (AVX).
-  INST_2x(vcvtpd2dq, kInstVcvtpd2dq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtpd2dq, kInstVcvtpd2dq, XmmReg, YmmReg)
-  //! \overload
-  INST_2x(vcvtpd2dq, kInstVcvtpd2dq, XmmReg, Mem)
-
-  //! Convert packed DP-FP to packed SP-FP (AVX).
-  INST_2x(vcvtpd2ps, kInstVcvtpd2ps, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtpd2ps, kInstVcvtpd2ps, XmmReg, YmmReg)
-  //! \overload
-  INST_2x(vcvtpd2ps, kInstVcvtpd2ps, XmmReg, Mem)
-
-  //! Convert packed SP-FP to packed QWORDs (AVX).
-  INST_2x(vcvtps2dq, kInstVcvtps2dq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtps2dq, kInstVcvtps2dq, XmmReg, Mem)
-  //! \overload
-  INST_2x(vcvtps2dq, kInstVcvtps2dq, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vcvtps2dq, kInstVcvtps2dq, YmmReg, Mem)
-
-  //! Convert packed SP-FP to packed DP-FP (AVX).
-  INST_2x(vcvtps2pd, kInstVcvtps2pd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtps2pd, kInstVcvtps2pd, XmmReg, Mem)
-  //! \overload
-  INST_2x(vcvtps2pd, kInstVcvtps2pd, YmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtps2pd, kInstVcvtps2pd, YmmReg, Mem)
-
-  //! Convert scalar DP-FP to DWORD (AVX).
-  INST_2x(vcvtsd2si, kInstVcvtsd2si, GpReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtsd2si, kInstVcvtsd2si, GpReg, Mem)
-
-  //! Convert scalar DP-FP to scalar SP-FP (AVX).
-  INST_3x(vcvtsd2ss, kInstVcvtsd2ss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vcvtsd2ss, kInstVcvtsd2ss, XmmReg, XmmReg, Mem)
-
-  //! Convert DWORD integer to scalar DP-FP (AVX).
-  INST_3x(vcvtsi2sd, kInstVcvtsi2sd, XmmReg, XmmReg, GpReg)
-  //! \overload
-  INST_3x(vcvtsi2sd, kInstVcvtsi2sd, XmmReg, XmmReg, Mem)
-
-  //! Convert scalar INT32 to SP-FP (AVX).
-  INST_3x(vcvtsi2ss, kInstVcvtsi2ss, XmmReg, XmmReg, GpReg)
-  //! \overload
-  INST_3x(vcvtsi2ss, kInstVcvtsi2ss, XmmReg, XmmReg, Mem)
-
-  //! Convert scalar SP-FP to DP-FP (AVX).
-  INST_3x(vcvtss2sd, kInstVcvtss2sd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vcvtss2sd, kInstVcvtss2sd, XmmReg, XmmReg, Mem)
-
-  //! Convert scalar SP-FP to INT32 (AVX).
-  INST_2x(vcvtss2si, kInstVcvtss2si, GpReg, XmmReg)
-  //! \overload
-  INST_2x(vcvtss2si, kInstVcvtss2si, GpReg, Mem)
-
-  //! Convert with truncation packed DP-FP to packed QWORDs (AVX).
-  INST_2x(vcvttpd2dq, kInstVcvttpd2dq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvttpd2dq, kInstVcvttpd2dq, XmmReg, YmmReg)
-  //! \overload
-  INST_2x(vcvttpd2dq, kInstVcvttpd2dq, XmmReg, Mem)
-
-  //! Convert with truncation packed SP-FP to packed QWORDs (AVX).
-  INST_2x(vcvttps2dq, kInstVcvttps2dq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vcvttps2dq, kInstVcvttps2dq, XmmReg, Mem)
-  //! \overload
-  INST_2x(vcvttps2dq, kInstVcvttps2dq, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vcvttps2dq, kInstVcvttps2dq, YmmReg, Mem)
-
-  //! Convert with truncation scalar DP-FP to DWORD (AVX).
-  INST_2x(vcvttsd2si, kInstVcvttsd2si, GpReg, XmmReg)
-  //! \overload
-  INST_2x(vcvttsd2si, kInstVcvttsd2si, GpReg, Mem)
-
-  //! Convert with truncation scalar SP-FP to INT32 (AVX).
-  INST_2x(vcvttss2si, kInstVcvttss2si, GpReg, XmmReg)
-  //! \overload
-  INST_2x(vcvttss2si, kInstVcvttss2si, GpReg, Mem)
-
-  //! Packed DP-FP divide (AVX).
-  INST_3x(vdivpd, kInstVdivpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vdivpd, kInstVdivpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vdivpd, kInstVdivpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vdivpd, kInstVdivpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP divide (AVX).
-  INST_3x(vdivps, kInstVdivps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vdivps, kInstVdivps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vdivps, kInstVdivps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vdivps, kInstVdivps, YmmReg, YmmReg, Mem)
-
-  //! Scalar DP-FP divide (AVX).
-  INST_3x(vdivsd, kInstVdivsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vdivsd, kInstVdivsd, XmmReg, XmmReg, Mem)
-
-  //! Scalar SP-FP divide (AVX).
-  INST_3x(vdivss, kInstVdivss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vdivss, kInstVdivss, XmmReg, XmmReg, Mem)
-
-  //! Packed DP-FP dot product (AVX).
-  INST_4i(vdppd, kInstVdppd, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vdppd, kInstVdppd, XmmReg, XmmReg, Mem, Imm)
-
-  //! Packed SP-FP dot product (AVX).
-  INST_4i(vdpps, kInstVdpps, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vdpps, kInstVdpps, XmmReg, XmmReg, Mem, Imm)
-  //! \overload
-  INST_4i(vdpps, kInstVdpps, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vdpps, kInstVdpps, YmmReg, YmmReg, Mem, Imm)
-
-  //! Extract 128 bits of packed FP data from `o1` and store results in `o0` (AVX).
-  INST_3i(vextractf128, kInstVextractf128, XmmReg, YmmReg, Imm)
-  //! \overload
-  INST_3i(vextractf128, kInstVextractf128, Mem, YmmReg, Imm)
-
-  //! Extract SP-FP based on selector (AVX).
-  INST_3i(vextractps, kInstVextractps, GpReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vextractps, kInstVextractps, Mem, XmmReg, Imm)
-
-  //! Packed DP-FP horizontal add (AVX).
-  INST_3x(vhaddpd, kInstVhaddpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vhaddpd, kInstVhaddpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vhaddpd, kInstVhaddpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vhaddpd, kInstVhaddpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP horizontal add (AVX).
-  INST_3x(vhaddps, kInstVhaddps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vhaddps, kInstVhaddps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vhaddps, kInstVhaddps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vhaddps, kInstVhaddps, YmmReg, YmmReg, Mem)
-
-  //! Packed DP-FP horizontal subtract (AVX).
-  INST_3x(vhsubpd, kInstVhsubpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vhsubpd, kInstVhsubpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vhsubpd, kInstVhsubpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vhsubpd, kInstVhsubpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP horizontal subtract (AVX).
-  INST_3x(vhsubps, kInstVhsubps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vhsubps, kInstVhsubps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vhsubps, kInstVhsubps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vhsubps, kInstVhsubps, YmmReg, YmmReg, Mem)
-
-  //! Insert 128-bit of packed FP data based on selector (AVX).
-  INST_4i(vinsertf128, kInstVinsertf128, YmmReg, YmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vinsertf128, kInstVinsertf128, YmmReg, YmmReg, Mem, Imm)
-
-  //! Insert SP-FP based on selector (AVX).
-  INST_4i(vinsertps, kInstVinsertps, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vinsertps, kInstVinsertps, XmmReg, XmmReg, Mem, Imm)
-
-  //! Load 128-bits unaligned (AVX).
-  INST_2x(vlddqu, kInstVlddqu, XmmReg, Mem)
-  //! Load 256-bits unaligned (AVX).
-  INST_2x(vlddqu, kInstVlddqu, YmmReg, Mem)
-
-  //! Load streaming SIMD extension control/status (AVX).
-  INST_1x(vldmxcsr, kInstVldmxcsr, Mem)
-
-  //! Store selected bytes of OWORD to DS:EDI/RDI (AVX).
-  INST_2x(vmaskmovdqu, kInstVmaskmovdqu, XmmReg, XmmReg)
-
-  //! Conditionally load packed DP-FP from `o2` using mask in `o1 and store in `o0` (AVX).
-  INST_3x(vmaskmovpd, kInstVmaskmovpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vmaskmovpd, kInstVmaskmovpd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vmaskmovpd, kInstVmaskmovpd, Mem, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmaskmovpd, kInstVmaskmovpd, Mem, YmmReg, YmmReg)
-
-  //! Conditionally load packed SP-FP from `o2` using mask in `o1 and store in `o0` (AVX).
-  INST_3x(vmaskmovps, kInstVmaskmovps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vmaskmovps, kInstVmaskmovps, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vmaskmovps, kInstVmaskmovps, Mem, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmaskmovps, kInstVmaskmovps, Mem, YmmReg, YmmReg)
-
-  //! Packed DP-FP maximum (AVX).
-  INST_3x(vmaxpd, kInstVmaxpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmaxpd, kInstVmaxpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vmaxpd, kInstVmaxpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vmaxpd, kInstVmaxpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP maximum (AVX).
-  INST_3x(vmaxps, kInstVmaxps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmaxps, kInstVmaxps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vmaxps, kInstVmaxps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vmaxps, kInstVmaxps, YmmReg, YmmReg, Mem)
-
-  //! Scalar DP-FP maximum (AVX).
-  INST_3x(vmaxsd, kInstVmaxsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmaxsd, kInstVmaxsd, XmmReg, XmmReg, Mem)
-
-  //! Scalar SP-FP maximum (AVX).
-  INST_3x(vmaxss, kInstVmaxss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmaxss, kInstVmaxss, XmmReg, XmmReg, Mem)
-
-  //! Packed DP-FP minimum (AVX).
-  INST_3x(vminpd, kInstVminpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vminpd, kInstVminpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vminpd, kInstVminpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vminpd, kInstVminpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP minimum (AVX).
-  INST_3x(vminps, kInstVminps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vminps, kInstVminps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vminps, kInstVminps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vminps, kInstVminps, YmmReg, YmmReg, Mem)
-
-  //! Scalar DP-FP minimum (AVX).
-  INST_3x(vminsd, kInstVminsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vminsd, kInstVminsd, XmmReg, XmmReg, Mem)
-
-  //! Scalar SP-FP minimum (AVX).
-  INST_3x(vminss, kInstVminss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vminss, kInstVminss, XmmReg, XmmReg, Mem)
-
-  //! Move 128-bits of aligned packed DP-FP (AVX).
-  INST_2x(vmovapd, kInstVmovapd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovapd, kInstVmovapd, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovapd, kInstVmovapd, Mem, XmmReg)
-  //! Move 256-bits of aligned packed DP-FP (AVX).
-  INST_2x(vmovapd, kInstVmovapd, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vmovapd, kInstVmovapd, YmmReg, Mem)
-  //! \overload
-  INST_2x(vmovapd, kInstVmovapd, Mem, YmmReg)
-
-  //! Move 128-bits of aligned packed SP-FP (AVX).
-  INST_2x(vmovaps, kInstVmovaps, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovaps, kInstVmovaps, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovaps, kInstVmovaps, Mem, XmmReg)
-  //! Move 256-bits of aligned packed SP-FP (AVX).
-  INST_2x(vmovaps, kInstVmovaps, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vmovaps, kInstVmovaps, YmmReg, Mem)
-  //! \overload
-  INST_2x(vmovaps, kInstVmovaps, Mem, YmmReg)
-
-  //! Move DWORD (AVX).
-  INST_2x(vmovd, kInstVmovd, XmmReg, GpReg)
-  //! \overload
-  INST_2x(vmovd, kInstVmovd, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovd, kInstVmovd, GpReg, XmmReg)
-  //! \overload
-  INST_2x(vmovd, kInstVmovd, Mem, XmmReg)
-
-  //! Move QWORD (AVX).
-  INST_2x(vmovq, kInstVmovq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovq, kInstVmovq, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovq, kInstVmovq, Mem, XmmReg)
-
-  //! Move one DP-FP and duplicate (AVX).
-  INST_2x(vmovddup, kInstVmovddup, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovddup, kInstVmovddup, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovddup, kInstVmovddup, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vmovddup, kInstVmovddup, YmmReg, Mem)
-
-  //! Move 128-bits aligned (AVX).
-  INST_2x(vmovdqa, kInstVmovdqa, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovdqa, kInstVmovdqa, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovdqa, kInstVmovdqa, Mem, XmmReg)
-  //! Move 256-bits aligned (AVX).
-  INST_2x(vmovdqa, kInstVmovdqa, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vmovdqa, kInstVmovdqa, YmmReg, Mem)
-  //! \overload
-  INST_2x(vmovdqa, kInstVmovdqa, Mem, YmmReg)
-
-  //! Move 128-bits unaligned (AVX).
-  INST_2x(vmovdqu, kInstVmovdqu, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovdqu, kInstVmovdqu, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovdqu, kInstVmovdqu, Mem, XmmReg)
-  //! Move 256-bits unaligned (AVX).
-  INST_2x(vmovdqu, kInstVmovdqu, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vmovdqu, kInstVmovdqu, YmmReg, Mem)
-  //! \overload
-  INST_2x(vmovdqu, kInstVmovdqu, Mem, YmmReg)
-
-  //! High to low packed SP-FP (AVX).
-  INST_3x(vmovhlps, kInstVmovhlps, XmmReg, XmmReg, XmmReg)
-
-  //! Move high packed DP-FP (AVX).
-  INST_3x(vmovhpd, kInstVmovhpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovhpd, kInstVmovhpd, Mem, XmmReg)
-
-  //! Move high packed SP-FP (AVX).
-  INST_3x(vmovhps, kInstVmovhps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovhps, kInstVmovhps, Mem, XmmReg)
-
-  //! Move low to high packed SP-FP (AVX).
-  INST_3x(vmovlhps, kInstVmovlhps, XmmReg, XmmReg, XmmReg)
-
-  //! Move low packed DP-FP (AVX).
-  INST_3x(vmovlpd, kInstVmovlpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovlpd, kInstVmovlpd, Mem, XmmReg)
-
-  //! Move low packed SP-FP (AVX).
-  INST_3x(vmovlps, kInstVmovlps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovlps, kInstVmovlps, Mem, XmmReg)
-
-  //! Extract packed DP-FP sign mask (AVX).
-  INST_2x(vmovmskpd, kInstVmovmskpd, GpReg, XmmReg)
-  //! \overload
-  INST_2x(vmovmskpd, kInstVmovmskpd, GpReg, YmmReg)
-
-  //! Extract packed SP-FP sign mask (AVX).
-  INST_2x(vmovmskps, kInstVmovmskps, GpReg, XmmReg)
-  //! \overload
-  INST_2x(vmovmskps, kInstVmovmskps, GpReg, YmmReg)
-
-  //! Store 128-bits using NT hint (AVX).
-  INST_2x(vmovntdq, kInstVmovntdq, Mem, XmmReg)
-  //! Store 256-bits using NT hint (AVX).
-  INST_2x(vmovntdq, kInstVmovntdq, Mem, YmmReg)
-
-  //! Store 128-bits aligned using NT hint (AVX).
-  INST_2x(vmovntdqa, kInstVmovntdqa, XmmReg, Mem)
-
-  //! Store packed DP-FP (128-bits) using NT hint (AVX).
-  INST_2x(vmovntpd, kInstVmovntpd, Mem, XmmReg)
-  //! Store packed DP-FP (256-bits) using NT hint (AVX).
-  INST_2x(vmovntpd, kInstVmovntpd, Mem, YmmReg)
-
-  //! Store packed SP-FP (128-bits) using NT hint (AVX).
-  INST_2x(vmovntps, kInstVmovntps, Mem, XmmReg)
-  //! Store packed SP-FP (256-bits) using NT hint (AVX).
-  INST_2x(vmovntps, kInstVmovntps, Mem, YmmReg)
-
-  //! Move scalar DP-FP (AVX).
-  INST_3x(vmovsd, kInstVmovsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovsd, kInstVmovsd, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovsd, kInstVmovsd, Mem, XmmReg)
-
-  //! Move packed SP-FP high and duplicate (AVX).
-  INST_2x(vmovshdup, kInstVmovshdup, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovshdup, kInstVmovshdup, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovshdup, kInstVmovshdup, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vmovshdup, kInstVmovshdup, YmmReg, Mem)
-
-  //! Move packed SP-FP low and duplicate (AVX).
-  INST_2x(vmovsldup, kInstVmovsldup, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovsldup, kInstVmovsldup, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovsldup, kInstVmovsldup, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vmovsldup, kInstVmovsldup, YmmReg, Mem)
-
-  //! Move scalar SP-FP (AVX).
-  INST_3x(vmovss, kInstVmovss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovss, kInstVmovss, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovss, kInstVmovss, Mem, XmmReg)
-
-  //! Move 128-bits of unaligned packed DP-FP (AVX).
-  INST_2x(vmovupd, kInstVmovupd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovupd, kInstVmovupd, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovupd, kInstVmovupd, Mem, XmmReg)
-  //! Move 256-bits of unaligned packed DP-FP (AVX).
-  INST_2x(vmovupd, kInstVmovupd, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vmovupd, kInstVmovupd, YmmReg, Mem)
-  //! \overload
-  INST_2x(vmovupd, kInstVmovupd, Mem, YmmReg)
-
-  //! Move 128-bits of unaligned packed SP-FP (AVX).
-  INST_2x(vmovups, kInstVmovups, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vmovups, kInstVmovups, XmmReg, Mem)
-  //! \overload
-  INST_2x(vmovups, kInstVmovups, Mem, XmmReg)
-  //! Move 256-bits of unaligned packed SP-FP (AVX).
-  INST_2x(vmovups, kInstVmovups, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vmovups, kInstVmovups, YmmReg, Mem)
-  //! \overload
-  INST_2x(vmovups, kInstVmovups, Mem, YmmReg)
-
-  //! Packed WORD sums of absolute difference (AVX).
-  INST_4i(vmpsadbw, kInstVmpsadbw, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vmpsadbw, kInstVmpsadbw, XmmReg, XmmReg, Mem, Imm)
-
-  //! Packed DP-FP multiply (AVX).
-  INST_3x(vmulpd, kInstVmulpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmulpd, kInstVmulpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vmulpd, kInstVmulpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vmulpd, kInstVmulpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP multiply (AVX).
-  INST_3x(vmulps, kInstVmulps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmulps, kInstVmulps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vmulps, kInstVmulps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vmulps, kInstVmulps, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP multiply (AVX).
-  INST_3x(vmulsd, kInstVmulsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmulsd, kInstVmulsd, XmmReg, XmmReg, Mem)
-
-  //! Scalar SP-FP multiply (AVX).
-  INST_3x(vmulss, kInstVmulss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vmulss, kInstVmulss, XmmReg, XmmReg, Mem)
-
-  //! Packed DP-FP bitwise or (AVX).
-  INST_3x(vorpd, kInstVorpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vorpd, kInstVorpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vorpd, kInstVorpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vorpd, kInstVorpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP bitwise or (AVX).
-  INST_3x(vorps, kInstVorps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vorps, kInstVorps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vorps, kInstVorps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vorps, kInstVorps, YmmReg, YmmReg, Mem)
-
-  //! Packed BYTE absolute value (AVX).
-  INST_2x(vpabsb, kInstVpabsb, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpabsb, kInstVpabsb, XmmReg, Mem)
-
-  //! Packed DWORD absolute value (AVX).
-  INST_2x(vpabsd, kInstVpabsd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpabsd, kInstVpabsd, XmmReg, Mem)
-
-  //! Packed WORD absolute value (AVX).
-  INST_2x(vpabsw, kInstVpabsw, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpabsw, kInstVpabsw, XmmReg, Mem)
-
-  //! Pack DWORDs to WORDs with signed saturation (AVX).
-  INST_3x(vpackssdw, kInstVpackssdw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpackssdw, kInstVpackssdw, XmmReg, XmmReg, Mem)
-
-  //! Pack WORDs to BYTEs with signed saturation (AVX).
-  INST_3x(vpacksswb, kInstVpacksswb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpacksswb, kInstVpacksswb, XmmReg, XmmReg, Mem)
-
-  //! Pack DWORDs to WORDs with unsigned saturation (AVX).
-  INST_3x(vpackusdw, kInstVpackusdw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpackusdw, kInstVpackusdw, XmmReg, XmmReg, Mem)
-
-  //! Pack WORDs to BYTEs with unsigned saturation (AVX).
-  INST_3x(vpackuswb, kInstVpackuswb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpackuswb, kInstVpackuswb, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE add (AVX).
-  INST_3x(vpaddb, kInstVpaddb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpaddb, kInstVpaddb, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD add (AVX).
-  INST_3x(vpaddd, kInstVpaddd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpaddd, kInstVpaddd, XmmReg, XmmReg, Mem)
-
-  //! Packed QWORD add (AVX).
-  INST_3x(vpaddq, kInstVpaddq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpaddq, kInstVpaddq, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD add (AVX).
-  INST_3x(vpaddw, kInstVpaddw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpaddw, kInstVpaddw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE add with saturation (AVX).
-  INST_3x(vpaddsb, kInstVpaddsb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpaddsb, kInstVpaddsb, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD add with saturation (AVX).
-  INST_3x(vpaddsw, kInstVpaddsw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpaddsw, kInstVpaddsw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE add with unsigned saturation (AVX).
-  INST_3x(vpaddusb, kInstVpaddusb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpaddusb, kInstVpaddusb, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD add with unsigned saturation (AVX).
-  INST_3x(vpaddusw, kInstVpaddusw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpaddusw, kInstVpaddusw, XmmReg, XmmReg, Mem)
-
-  //! Packed align right (AVX).
-  INST_4i(vpalignr, kInstVpalignr, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vpalignr, kInstVpalignr, XmmReg, XmmReg, Mem, Imm)
-
-  //! Packed bitwise and (AVX).
-  INST_3x(vpand, kInstVpand, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpand, kInstVpand, XmmReg, XmmReg, Mem)
-
-  //! Packed bitwise and-not (AVX).
-  INST_3x(vpandn, kInstVpandn, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpandn, kInstVpandn, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE average (AVX).
-  INST_3x(vpavgb, kInstVpavgb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpavgb, kInstVpavgb, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD average (AVX).
-  INST_3x(vpavgw, kInstVpavgw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpavgw, kInstVpavgw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE variable blend (AVX).
-  INST_4x(vpblendvb, kInstVpblendvb, XmmReg, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_4x(vpblendvb, kInstVpblendvb, XmmReg, XmmReg, Mem, XmmReg)
-
-  //! Packed WORD blend (AVX).
-  INST_4i(vpblendw, kInstVpblendw, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vpblendw, kInstVpblendw, XmmReg, XmmReg, Mem, Imm)
-
-  //! Packed BYTEs compare for equality (AVX).
-  INST_3x(vpcmpeqb, kInstVpcmpeqb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpcmpeqb, kInstVpcmpeqb, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORDs compare for equality (AVX).
-  INST_3x(vpcmpeqd, kInstVpcmpeqd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpcmpeqd, kInstVpcmpeqd, XmmReg, XmmReg, Mem)
-
-  //! Packed QWORDs compare for equality (AVX).
-  INST_3x(vpcmpeqq, kInstVpcmpeqq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpcmpeqq, kInstVpcmpeqq, XmmReg, XmmReg, Mem)
-
-  //! Packed WORDs compare for equality (AVX).
-  INST_3x(vpcmpeqw, kInstVpcmpeqw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpcmpeqw, kInstVpcmpeqw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTEs compare if greater than (AVX).
-  INST_3x(vpcmpgtb, kInstVpcmpgtb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpcmpgtb, kInstVpcmpgtb, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORDs compare if greater than (AVX).
-  INST_3x(vpcmpgtd, kInstVpcmpgtd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpcmpgtd, kInstVpcmpgtd, XmmReg, XmmReg, Mem)
-
-  //! Packed QWORDs compare if greater than (AVX).
-  INST_3x(vpcmpgtq, kInstVpcmpgtq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpcmpgtq, kInstVpcmpgtq, XmmReg, XmmReg, Mem)
-
-  //! Packed WORDs compare if greater than (AVX).
-  INST_3x(vpcmpgtw, kInstVpcmpgtw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpcmpgtw, kInstVpcmpgtw, XmmReg, XmmReg, Mem)
-
-  //! Packed compare explicit length strings, return index (AVX).
-  INST_3i(vpcmpestri, kInstVpcmpestri, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpcmpestri, kInstVpcmpestri, XmmReg, Mem, Imm)
-
-  //! Packed compare explicit length strings, return mask (AVX).
-  INST_3i(vpcmpestrm, kInstVpcmpestrm, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpcmpestrm, kInstVpcmpestrm, XmmReg, Mem, Imm)
-
-  //! Packed compare implicit length strings, return index (AVX).
-  INST_3i(vpcmpistri, kInstVpcmpistri, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpcmpistri, kInstVpcmpistri, XmmReg, Mem, Imm)
-
-  //! Packed compare implicit length strings, return mask (AVX).
-  INST_3i(vpcmpistrm, kInstVpcmpistrm, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpcmpistrm, kInstVpcmpistrm, XmmReg, Mem, Imm)
-
-  //! Packed DP-FP permute (AVX).
-  INST_3x(vpermilpd, kInstVpermilpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpermilpd, kInstVpermilpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vpermilpd, kInstVpermilpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpermilpd, kInstVpermilpd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3i(vpermilpd, kInstVpermilpd, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpermilpd, kInstVpermilpd, XmmReg, Mem, Imm)
-  //! \overload
-  INST_3i(vpermilpd, kInstVpermilpd, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_3i(vpermilpd, kInstVpermilpd, YmmReg, Mem, Imm)
-
-  //! Packed SP-FP permute (AVX).
-  INST_3x(vpermilps, kInstVpermilps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpermilps, kInstVpermilps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vpermilps, kInstVpermilps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpermilps, kInstVpermilps, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3i(vpermilps, kInstVpermilps, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpermilps, kInstVpermilps, XmmReg, Mem, Imm)
-  //! \overload
-  INST_3i(vpermilps, kInstVpermilps, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_3i(vpermilps, kInstVpermilps, YmmReg, Mem, Imm)
-
-  //! Packed 128-bit FP permute (AVX).
-  INST_4i(vperm2f128, kInstVperm2f128, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vperm2f128, kInstVperm2f128, YmmReg, YmmReg, Mem, Imm)
-
-  //! Extract BYTE (AVX).
-  INST_3i(vpextrb, kInstVpextrb, GpReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpextrb, kInstVpextrb, Mem, XmmReg, Imm)
-
-  //! Extract DWORD (AVX).
-  INST_3i(vpextrd, kInstVpextrd, GpReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpextrd, kInstVpextrd, Mem, XmmReg, Imm)
-
-  //! Extract WORD (AVX).
-  INST_3i(vpextrw, kInstVpextrw, GpReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpextrw, kInstVpextrw, Mem, XmmReg, Imm)
-
-  //! Packed DWORD horizontal add (AVX).
-  INST_3x(vphaddd, kInstVphaddd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vphaddd, kInstVphaddd, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD horizontal add with saturation (AVX).
-  INST_3x(vphaddsw, kInstVphaddsw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vphaddsw, kInstVphaddsw, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD horizontal add (AVX).
-  INST_3x(vphaddw, kInstVphaddw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vphaddw, kInstVphaddw, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD horizontal minimum (AVX).
-  INST_2x(vphminposuw, kInstVphminposuw, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vphminposuw, kInstVphminposuw, XmmReg, Mem)
-
-  //! Packed DWORD horizontal subtract (AVX).
-  INST_3x(vphsubd, kInstVphsubd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vphsubd, kInstVphsubd, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD horizontal subtract with saturation (AVX).
-  INST_3x(vphsubsw, kInstVphsubsw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vphsubsw, kInstVphsubsw, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD horizontal subtract (AVX).
-  INST_3x(vphsubw, kInstVphsubw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vphsubw, kInstVphsubw, XmmReg, XmmReg, Mem)
-
-  //! Insert BYTE based on selector (AVX).
-  INST_4i(vpinsrb, kInstVpinsrb, XmmReg, XmmReg, GpReg, Imm)
-  //! \overload
-  INST_4i(vpinsrb, kInstVpinsrb, XmmReg, XmmReg, Mem, Imm)
-
-  //! Insert DWORD based on selector (AVX).
-  INST_4i(vpinsrd, kInstVpinsrd, XmmReg, XmmReg, GpReg, Imm)
-  //! \overload
-  INST_4i(vpinsrd, kInstVpinsrd, XmmReg, XmmReg, Mem, Imm)
-
-  //! Insert WORD based on selector (AVX).
-  INST_4i(vpinsrw, kInstVpinsrw, XmmReg, XmmReg, GpReg, Imm)
-  //! \overload
-  INST_4i(vpinsrw, kInstVpinsrw, XmmReg, XmmReg, Mem, Imm)
-
-  //! Packed multiply and add signed and unsigned bytes (AVX).
-  INST_3x(vpmaddubsw, kInstVpmaddubsw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmaddubsw, kInstVpmaddubsw, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD multiply and add to packed DWORD (AVX).
-  INST_3x(vpmaddwd, kInstVpmaddwd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmaddwd, kInstVpmaddwd, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE maximum (AVX).
-  INST_3x(vpmaxsb, kInstVpmaxsb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmaxsb, kInstVpmaxsb, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD maximum (AVX).
-  INST_3x(vpmaxsd, kInstVpmaxsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmaxsd, kInstVpmaxsd, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD maximum (AVX).
-  INST_3x(vpmaxsw, kInstVpmaxsw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmaxsw, kInstVpmaxsw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE unsigned maximum (AVX).
-  INST_3x(vpmaxub, kInstVpmaxub, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmaxub, kInstVpmaxub, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD unsigned maximum (AVX).
-  INST_3x(vpmaxud, kInstVpmaxud, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmaxud, kInstVpmaxud, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD unsigned maximum (AVX).
-  INST_3x(vpmaxuw, kInstVpmaxuw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmaxuw, kInstVpmaxuw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE minimum (AVX).
-  INST_3x(vpminsb, kInstVpminsb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpminsb, kInstVpminsb, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD minimum (AVX).
-  INST_3x(vpminsd, kInstVpminsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpminsd, kInstVpminsd, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD minimum (AVX).
-  INST_3x(vpminsw, kInstVpminsw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpminsw, kInstVpminsw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE unsigned minimum (AVX).
-  INST_3x(vpminub, kInstVpminub, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpminub, kInstVpminub, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD unsigned minimum (AVX).
-  INST_3x(vpminud, kInstVpminud, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpminud, kInstVpminud, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD unsigned minimum (AVX).
-  INST_3x(vpminuw, kInstVpminuw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpminuw, kInstVpminuw, XmmReg, XmmReg, Mem)
-
-  //! Move Byte mask to integer (AVX).
-  INST_2x(vpmovmskb, kInstVpmovmskb, GpReg, XmmReg)
-
-  //! BYTE to DWORD with sign extend (AVX).
-  INST_2x(vpmovsxbd, kInstVpmovsxbd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovsxbd, kInstVpmovsxbd, XmmReg, Mem)
-
-  //! Packed BYTE to QWORD with sign extend (AVX).
-  INST_2x(vpmovsxbq, kInstVpmovsxbq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovsxbq, kInstVpmovsxbq, XmmReg, Mem)
-
-  //! Packed BYTE to WORD with sign extend (AVX).
-  INST_2x(vpmovsxbw, kInstVpmovsxbw, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovsxbw, kInstVpmovsxbw, XmmReg, Mem)
-
-  //! Packed DWORD to QWORD with sign extend (AVX).
-  INST_2x(vpmovsxdq, kInstVpmovsxdq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovsxdq, kInstVpmovsxdq, XmmReg, Mem)
-
-  //! Packed WORD to DWORD with sign extend (AVX).
-  INST_2x(vpmovsxwd, kInstVpmovsxwd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovsxwd, kInstVpmovsxwd, XmmReg, Mem)
-
-  //! Packed WORD to QWORD with sign extend (AVX).
-  INST_2x(vpmovsxwq, kInstVpmovsxwq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovsxwq, kInstVpmovsxwq, XmmReg, Mem)
-
-  //! BYTE to DWORD with zero extend (AVX).
-  INST_2x(vpmovzxbd, kInstVpmovzxbd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovzxbd, kInstVpmovzxbd, XmmReg, Mem)
-
-  //! Packed BYTE to QWORD with zero extend (AVX).
-  INST_2x(vpmovzxbq, kInstVpmovzxbq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovzxbq, kInstVpmovzxbq, XmmReg, Mem)
-
-  //! BYTE to WORD with zero extend (AVX).
-  INST_2x(vpmovzxbw, kInstVpmovzxbw, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovzxbw, kInstVpmovzxbw, XmmReg, Mem)
-
-  //! Packed DWORD to QWORD with zero extend (AVX).
-  INST_2x(vpmovzxdq, kInstVpmovzxdq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovzxdq, kInstVpmovzxdq, XmmReg, Mem)
-
-  //! Packed WORD to DWORD with zero extend (AVX).
-  INST_2x(vpmovzxwd, kInstVpmovzxwd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovzxwd, kInstVpmovzxwd, XmmReg, Mem)
-
-  //! Packed WORD to QWORD with zero extend (AVX).
-  INST_2x(vpmovzxwq, kInstVpmovzxwq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpmovzxwq, kInstVpmovzxwq, XmmReg, Mem)
-
-  //! Packed DWORD to QWORD multiply (AVX).
-  INST_3x(vpmuldq, kInstVpmuldq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmuldq, kInstVpmuldq, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD multiply high, round and scale (AVX).
-  INST_3x(vpmulhrsw, kInstVpmulhrsw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmulhrsw, kInstVpmulhrsw, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD unsigned multiply high (AVX).
-  INST_3x(vpmulhuw, kInstVpmulhuw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmulhuw, kInstVpmulhuw, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD multiply high (AVX).
-  INST_3x(vpmulhw, kInstVpmulhw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmulhw, kInstVpmulhw, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD multiply low (AVX).
-  INST_3x(vpmulld, kInstVpmulld, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmulld, kInstVpmulld, XmmReg, XmmReg, Mem)
-
-  //! Packed WORDs multiply low (AVX).
-  INST_3x(vpmullw, kInstVpmullw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmullw, kInstVpmullw, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD multiply to QWORD (AVX).
-  INST_3x(vpmuludq, kInstVpmuludq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpmuludq, kInstVpmuludq, XmmReg, XmmReg, Mem)
-
-  //! Packed bitwise or (AVX).
-  INST_3x(vpor, kInstVpor, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpor, kInstVpor, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD sum of absolute differences (AVX).
-  INST_3x(vpsadbw, kInstVpsadbw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsadbw, kInstVpsadbw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE shuffle (AVX).
-  INST_3x(vpshufb, kInstVpshufb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpshufb, kInstVpshufb, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD shuffle (AVX).
-  INST_3i(vpshufd, kInstVpshufd, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpshufd, kInstVpshufd, XmmReg, Mem, Imm)
-
-  //! Packed WORD shuffle high (AVX).
-  INST_3i(vpshufhw, kInstVpshufhw, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpshufhw, kInstVpshufhw, XmmReg, Mem, Imm)
-
-  //! Packed WORD shuffle low (AVX).
-  INST_3i(vpshuflw, kInstVpshuflw, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vpshuflw, kInstVpshuflw, XmmReg, Mem, Imm)
-
-  //! Packed BYTE sign (AVX).
-  INST_3x(vpsignb, kInstVpsignb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsignb, kInstVpsignb, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD sign (AVX).
-  INST_3x(vpsignd, kInstVpsignd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsignd, kInstVpsignd, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD sign (AVX).
-  INST_3x(vpsignw, kInstVpsignw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsignw, kInstVpsignw, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD shift left logical (AVX).
-  INST_3x(vpslld, kInstVpslld, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpslld, kInstVpslld, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3i(vpslld, kInstVpslld, XmmReg, XmmReg, Imm)
-
-  //! Packed OWORD shift left logical (AVX).
-  INST_3i(vpslldq, kInstVpslldq, XmmReg, XmmReg, Imm)
-
-  //! Packed QWORD shift left logical (AVX).
-  INST_3x(vpsllq, kInstVpsllq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsllq, kInstVpsllq, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3i(vpsllq, kInstVpsllq, XmmReg, XmmReg, Imm)
-
-  //! Packed WORD shift left logical (AVX).
-  INST_3x(vpsllw, kInstVpsllw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsllw, kInstVpsllw, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3i(vpsllw, kInstVpsllw, XmmReg, XmmReg, Imm)
-
-  //! Packed DWORD shift right arithmetic (AVX).
-  INST_3x(vpsrad, kInstVpsrad, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsrad, kInstVpsrad, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3i(vpsrad, kInstVpsrad, XmmReg, XmmReg, Imm)
-
-  //! Packed WORD shift right arithmetic (AVX).
-  INST_3x(vpsraw, kInstVpsraw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsraw, kInstVpsraw, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3i(vpsraw, kInstVpsraw, XmmReg, XmmReg, Imm)
-
-  //! Packed DWORD shift right logical (AVX).
-  INST_3x(vpsrld, kInstVpsrld, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsrld, kInstVpsrld, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3i(vpsrld, kInstVpsrld, XmmReg, XmmReg, Imm)
-
-  //! Scalar OWORD shift right logical (AVX).
-  INST_3i(vpsrldq, kInstVpsrldq, XmmReg, XmmReg, Imm)
-
-  //! Packed QWORD shift right logical (AVX).
-  INST_3x(vpsrlq, kInstVpsrlq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsrlq, kInstVpsrlq, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3i(vpsrlq, kInstVpsrlq, XmmReg, XmmReg, Imm)
-
-  //! Packed WORD shift right logical (AVX).
-  INST_3x(vpsrlw, kInstVpsrlw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsrlw, kInstVpsrlw, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3i(vpsrlw, kInstVpsrlw, XmmReg, XmmReg, Imm)
-
-  //! Packed BYTE subtract (AVX).
-  INST_3x(vpsubb, kInstVpsubb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsubb, kInstVpsubb, XmmReg, XmmReg, Mem)
-
-  //! Packed DWORD subtract (AVX).
-  INST_3x(vpsubd, kInstVpsubd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsubd, kInstVpsubd, XmmReg, XmmReg, Mem)
-
-  //! Packed QWORD subtract (AVX).
-  INST_3x(vpsubq, kInstVpsubq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsubq, kInstVpsubq, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD subtract (AVX).
-  INST_3x(vpsubw, kInstVpsubw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsubw, kInstVpsubw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE subtract with saturation (AVX).
-  INST_3x(vpsubsb, kInstVpsubsb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsubsb, kInstVpsubsb, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD subtract with saturation (AVX).
-  INST_3x(vpsubsw, kInstVpsubsw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsubsw, kInstVpsubsw, XmmReg, XmmReg, Mem)
-
-  //! Packed BYTE subtract with unsigned saturation (AVX).
-  INST_3x(vpsubusb, kInstVpsubusb, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsubusb, kInstVpsubusb, XmmReg, XmmReg, Mem)
-
-  //! Packed WORD subtract with unsigned saturation (AVX).
-  INST_3x(vpsubusw, kInstVpsubusw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpsubusw, kInstVpsubusw, XmmReg, XmmReg, Mem)
-
-  //! Logical compare (AVX).
-  INST_2x(vptest, kInstVptest, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vptest, kInstVptest, XmmReg, Mem)
-  //! \overload
-  INST_2x(vptest, kInstVptest, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vptest, kInstVptest, YmmReg, Mem)
-
-  //! Unpack high packed BYTEs to WORDs (AVX).
-  INST_3x(vpunpckhbw, kInstVpunpckhbw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpunpckhbw, kInstVpunpckhbw, XmmReg, XmmReg, Mem)
-
-  //! Unpack high packed DWORDs to QWORDs (AVX).
-  INST_3x(vpunpckhdq, kInstVpunpckhdq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpunpckhdq, kInstVpunpckhdq, XmmReg, XmmReg, Mem)
-
-  //! Unpack high packed QWORDs to OWORD (AVX).
-  INST_3x(vpunpckhqdq, kInstVpunpckhqdq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpunpckhqdq, kInstVpunpckhqdq, XmmReg, XmmReg, Mem)
-
-  //! Unpack high packed WORDs to DWORDs (AVX).
-  INST_3x(vpunpckhwd, kInstVpunpckhwd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpunpckhwd, kInstVpunpckhwd, XmmReg, XmmReg, Mem)
-
-  //! Unpack low packed BYTEs to WORDs (AVX).
-  INST_3x(vpunpcklbw, kInstVpunpcklbw, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpunpcklbw, kInstVpunpcklbw, XmmReg, XmmReg, Mem)
-
-  //! Unpack low packed DWORDs to QWORDs (AVX).
-  INST_3x(vpunpckldq, kInstVpunpckldq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpunpckldq, kInstVpunpckldq, XmmReg, XmmReg, Mem)
-
-  //! Unpack low packed QWORDs to OWORD (AVX).
-  INST_3x(vpunpcklqdq, kInstVpunpcklqdq, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpunpcklqdq, kInstVpunpcklqdq, XmmReg, XmmReg, Mem)
-
-  //! Unpack low packed WORDs to DWORDs (AVX).
-  INST_3x(vpunpcklwd, kInstVpunpcklwd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpunpcklwd, kInstVpunpcklwd, XmmReg, XmmReg, Mem)
-
-  //! Packed bitwise xor (AVX).
-  INST_3x(vpxor, kInstVpxor, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vpxor, kInstVpxor, XmmReg, XmmReg, Mem)
-
-  //! Packed SP-FP reciprocal (AVX).
-  INST_2x(vrcpps, kInstVrcpps, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vrcpps, kInstVrcpps, XmmReg, Mem)
-  //! \overload
-  INST_2x(vrcpps, kInstVrcpps, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vrcpps, kInstVrcpps, YmmReg, Mem)
-
-  //! Scalar SP-FP reciprocal (AVX).
-  INST_3x(vrcpss, kInstVrcpss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vrcpss, kInstVrcpss, XmmReg, XmmReg, Mem)
-
-  //! Packed SP-FP square root reciprocal (AVX).
-  INST_2x(vrsqrtps, kInstVrsqrtps, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vrsqrtps, kInstVrsqrtps, XmmReg, Mem)
-  //! \overload
-  INST_2x(vrsqrtps, kInstVrsqrtps, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vrsqrtps, kInstVrsqrtps, YmmReg, Mem)
-
-  //! Scalar SP-FP square root reciprocal (AVX).
-  INST_3x(vrsqrtss, kInstVrsqrtss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vrsqrtss, kInstVrsqrtss, XmmReg, XmmReg, Mem)
-
-  //! Packed DP-FP round (AVX).
-  INST_3i(vroundpd, kInstVroundpd, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vroundpd, kInstVroundpd, XmmReg, Mem, Imm)
-  //! \overload
-  INST_3i(vroundpd, kInstVroundpd, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_3i(vroundpd, kInstVroundpd, YmmReg, Mem, Imm)
-
-  //! Packed SP-FP round (AVX).
-  INST_3i(vroundps, kInstVroundps, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vroundps, kInstVroundps, XmmReg, Mem, Imm)
-  //! \overload
-  INST_3i(vroundps, kInstVroundps, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_3i(vroundps, kInstVroundps, YmmReg, Mem, Imm)
-
-  //! Scalar DP-FP round (AVX).
-  INST_4i(vroundsd, kInstVroundsd, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vroundsd, kInstVroundsd, XmmReg, XmmReg, Mem, Imm)
-
-  //! Scalar SP-FP round (AVX).
-  INST_4i(vroundss, kInstVroundss, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vroundss, kInstVroundss, XmmReg, XmmReg, Mem, Imm)
-
-  //! Shuffle DP-FP (AVX).
-  INST_4i(vshufpd, kInstVshufpd, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vshufpd, kInstVshufpd, XmmReg, XmmReg, Mem, Imm)
-  //! \overload
-  INST_4i(vshufpd, kInstVshufpd, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vshufpd, kInstVshufpd, YmmReg, YmmReg, Mem, Imm)
-
-  //! Shuffle SP-FP (AVX).
-  INST_4i(vshufps, kInstVshufps, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vshufps, kInstVshufps, XmmReg, XmmReg, Mem, Imm)
-  //! \overload
-  INST_4i(vshufps, kInstVshufps, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vshufps, kInstVshufps, YmmReg, YmmReg, Mem, Imm)
-
-  //! Packed DP-FP square root (AVX).
-  INST_2x(vsqrtpd, kInstVsqrtpd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vsqrtpd, kInstVsqrtpd, XmmReg, Mem)
-  //! \overload
-  INST_2x(vsqrtpd, kInstVsqrtpd, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vsqrtpd, kInstVsqrtpd, YmmReg, Mem)
-
-  //! Packed SP-FP square root (AVX).
-  INST_2x(vsqrtps, kInstVsqrtps, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vsqrtps, kInstVsqrtps, XmmReg, Mem)
-  //! \overload
-  INST_2x(vsqrtps, kInstVsqrtps, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vsqrtps, kInstVsqrtps, YmmReg, Mem)
-
-  //! Scalar DP-FP square root (AVX).
-  INST_3x(vsqrtsd, kInstVsqrtsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vsqrtsd, kInstVsqrtsd, XmmReg, XmmReg, Mem)
-
-  //! Scalar SP-FP square root (AVX).
-  INST_3x(vsqrtss, kInstVsqrtss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vsqrtss, kInstVsqrtss, XmmReg, XmmReg, Mem)
-
-  //! Store streaming SIMD extension control/status (AVX).
-  INST_1x(vstmxcsr, kInstVstmxcsr, Mem)
-
-  //! Packed DP-FP subtract (AVX).
-  INST_3x(vsubpd, kInstVsubpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vsubpd, kInstVsubpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vsubpd, kInstVsubpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vsubpd, kInstVsubpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP subtract (AVX).
-  INST_3x(vsubps, kInstVsubps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vsubps, kInstVsubps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vsubps, kInstVsubps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vsubps, kInstVsubps, YmmReg, YmmReg, Mem)
-
-  //! Scalar DP-FP subtract (AVX).
-  INST_3x(vsubsd, kInstVsubsd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vsubsd, kInstVsubsd, XmmReg, XmmReg, Mem)
-
-  //! Scalar SP-FP subtract (AVX).
-  INST_3x(vsubss, kInstVsubss, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vsubss, kInstVsubss, XmmReg, XmmReg, Mem)
-
-  //! Logical compare DP-FP (AVX).
-  INST_2x(vtestpd, kInstVtestpd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vtestpd, kInstVtestpd, XmmReg, Mem)
-  //! \overload
-  INST_2x(vtestpd, kInstVtestpd, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vtestpd, kInstVtestpd, YmmReg, Mem)
-
-  //! Logical compare SP-FP (AVX).
-  INST_2x(vtestps, kInstVtestps, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vtestps, kInstVtestps, XmmReg, Mem)
-  //! \overload
-  INST_2x(vtestps, kInstVtestps, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vtestps, kInstVtestps, YmmReg, Mem)
-
-  //! Scalar DP-FP unordered compare and set EFLAGS (AVX).
-  INST_2x(vucomisd, kInstVucomisd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vucomisd, kInstVucomisd, XmmReg, Mem)
-
-  //! Unordered scalar SP-FP compare and set EFLAGS (AVX).
-  INST_2x(vucomiss, kInstVucomiss, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vucomiss, kInstVucomiss, XmmReg, Mem)
-
-  //! Unpack and interleave high packed DP-FP (AVX).
-  INST_3x(vunpckhpd, kInstVunpckhpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vunpckhpd, kInstVunpckhpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vunpckhpd, kInstVunpckhpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vunpckhpd, kInstVunpckhpd, YmmReg, YmmReg, Mem)
-
-  //! Unpack high packed SP-FP data (AVX).
-  INST_3x(vunpckhps, kInstVunpckhps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vunpckhps, kInstVunpckhps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vunpckhps, kInstVunpckhps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vunpckhps, kInstVunpckhps, YmmReg, YmmReg, Mem)
-
-  //! Unpack and interleave low packed DP-FP (AVX).
-  INST_3x(vunpcklpd, kInstVunpcklpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vunpcklpd, kInstVunpcklpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vunpcklpd, kInstVunpcklpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vunpcklpd, kInstVunpcklpd, YmmReg, YmmReg, Mem)
-
-  //! Unpack low packed SP-FP data (AVX).
-  INST_3x(vunpcklps, kInstVunpcklps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vunpcklps, kInstVunpcklps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vunpcklps, kInstVunpcklps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vunpcklps, kInstVunpcklps, YmmReg, YmmReg, Mem)
-
-  //! Packed DP-FP bitwise xor (AVX).
-  INST_3x(vxorpd, kInstVxorpd, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vxorpd, kInstVxorpd, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vxorpd, kInstVxorpd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vxorpd, kInstVxorpd, YmmReg, YmmReg, Mem)
-
-  //! Packed SP-FP bitwise xor (AVX).
-  INST_3x(vxorps, kInstVxorps, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vxorps, kInstVxorps, XmmReg, XmmReg, Mem)
-  //! \overload
-  INST_3x(vxorps, kInstVxorps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vxorps, kInstVxorps, YmmReg, YmmReg, Mem)
-
-  //! Zero all Ymm registers.
-  INST_0x(vzeroall, kInstVzeroall)
-  //! Zero upper 128-bits of all Ymm registers.
-  INST_0x(vzeroupper, kInstVzeroupper)
-
-  // --------------------------------------------------------------------------
-  // [AVX+AESNI]
-  // --------------------------------------------------------------------------
-
-  //! Perform a single round of the AES decryption flow (AVX+AESNI).
-  INST_3x(vaesdec, kInstVaesdec, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaesdec, kInstVaesdec, XmmReg, XmmReg, Mem)
-
-  //! Perform the last round of the AES decryption flow (AVX+AESNI).
-  INST_3x(vaesdeclast, kInstVaesdeclast, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaesdeclast, kInstVaesdeclast, XmmReg, XmmReg, Mem)
-
-  //! Perform a single round of the AES encryption flow (AVX+AESNI).
-  INST_3x(vaesenc, kInstVaesenc, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaesenc, kInstVaesenc, XmmReg, XmmReg, Mem)
-
-  //! Perform the last round of the AES encryption flow (AVX+AESNI).
-  INST_3x(vaesenclast, kInstVaesenclast, XmmReg, XmmReg, XmmReg)
-  //! \overload
-  INST_3x(vaesenclast, kInstVaesenclast, XmmReg, XmmReg, Mem)
-
-  //! Perform the InvMixColumns transformation (AVX+AESNI).
-  INST_2x(vaesimc, kInstVaesimc, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vaesimc, kInstVaesimc, XmmReg, Mem)
-
-  //! Assist in expanding the AES cipher key (AVX+AESNI).
-  INST_3i(vaeskeygenassist, kInstVaeskeygenassist, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_3i(vaeskeygenassist, kInstVaeskeygenassist, XmmReg, Mem, Imm)
-
-  // --------------------------------------------------------------------------
-  // [AVX+PCLMULQDQ]
-  // --------------------------------------------------------------------------
-
-  //! Carry-less multiplication QWORD (AVX+PCLMULQDQ).
-  INST_4i(vpclmulqdq, kInstVpclmulqdq, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vpclmulqdq, kInstVpclmulqdq, XmmReg, XmmReg, Mem, Imm)
-
-  // --------------------------------------------------------------------------
-  // [AVX2]
-  // --------------------------------------------------------------------------
-
-  //! Broadcast low 128-bit element in `o1` to `o0` (AVX2).
-  INST_2x(vbroadcasti128, kInstVbroadcasti128, YmmReg, Mem)
-  //! Broadcast low DP-FP element in `o1` to `o0` (AVX2).
-  INST_2x(vbroadcastsd, kInstVbroadcastsd, YmmReg, XmmReg)
-  //! Broadcast low SP-FP element in `o1` to `o0` (AVX2).
-  INST_2x(vbroadcastss, kInstVbroadcastss, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vbroadcastss, kInstVbroadcastss, YmmReg, XmmReg)
-
-  //! Extract 128-bit element from `o1` to `o0` based on selector (AVX2).
-  INST_3i(vextracti128, kInstVextracti128, XmmReg, YmmReg, Imm)
-  //! \overload
-  INST_3i(vextracti128, kInstVextracti128, Mem, YmmReg, Imm)
-
-  //! Gather DP-FP from DWORD indicies specified in `o1`s VSIB (AVX2).
-  INST_3x(vgatherdpd, kInstVgatherdpd, XmmReg, Mem, XmmReg)
-  //! \overload
-  INST_3x(vgatherdpd, kInstVgatherdpd, YmmReg, Mem, YmmReg)
-
-  //! Gather SP-FP from DWORD indicies specified in `o1`s VSIB (AVX2).
-  INST_3x(vgatherdps, kInstVgatherdps, XmmReg, Mem, XmmReg)
-  //! \overload
-  INST_3x(vgatherdps, kInstVgatherdps, YmmReg, Mem, YmmReg)
-
-  //! Gather DP-FP from QWORD indicies specified in `o1`s VSIB (AVX2).
-  INST_3x(vgatherqpd, kInstVgatherqpd, XmmReg, Mem, XmmReg)
-  //! \overload
-  INST_3x(vgatherqpd, kInstVgatherqpd, YmmReg, Mem, YmmReg)
-
-  //! Gather SP-FP from QWORD indicies specified in `o1`s VSIB (AVX2).
-  INST_3x(vgatherqps, kInstVgatherqps, XmmReg, Mem, XmmReg)
-
-  //! Insert 128-bit of packed data based on selector (AVX2).
-  INST_4i(vinserti128, kInstVinserti128, YmmReg, YmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vinserti128, kInstVinserti128, YmmReg, YmmReg, Mem, Imm)
-
-  //! Load 256-bits aligned using NT hint (AVX2).
-  INST_2x(vmovntdqa, kInstVmovntdqa, YmmReg, Mem)
-
-  //! Packed WORD sums of absolute difference (AVX2).
-  INST_4i(vmpsadbw, kInstVmpsadbw, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vmpsadbw, kInstVmpsadbw, YmmReg, YmmReg, Mem, Imm)
-
-  //! Packed BYTE absolute value (AVX2).
-  INST_2x(vpabsb, kInstVpabsb, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vpabsb, kInstVpabsb, YmmReg, Mem)
-
-  //! Packed DWORD absolute value (AVX2).
-  INST_2x(vpabsd, kInstVpabsd, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vpabsd, kInstVpabsd, YmmReg, Mem)
-
-  //! Packed WORD absolute value (AVX2).
-  INST_2x(vpabsw, kInstVpabsw, YmmReg, YmmReg)
-  //! \overload
-  INST_2x(vpabsw, kInstVpabsw, YmmReg, Mem)
-
-  //! Pack DWORDs to WORDs with signed saturation (AVX2).
-  INST_3x(vpackssdw, kInstVpackssdw, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpackssdw, kInstVpackssdw, YmmReg, YmmReg, Mem)
-
-  //! Pack WORDs to BYTEs with signed saturation (AVX2).
-  INST_3x(vpacksswb, kInstVpacksswb, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpacksswb, kInstVpacksswb, YmmReg, YmmReg, Mem)
-
-  //! Pack DWORDs to WORDs with unsigned saturation (AVX2).
-  INST_3x(vpackusdw, kInstVpackusdw, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpackusdw, kInstVpackusdw, YmmReg, YmmReg, Mem)
-
-  //! Pack WORDs to BYTEs with unsigned saturation (AVX2).
-  INST_3x(vpackuswb, kInstVpackuswb, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpackuswb, kInstVpackuswb, YmmReg, YmmReg, Mem)
-
-  //! Packed BYTE add (AVX2).
-  INST_3x(vpaddb, kInstVpaddb, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpaddb, kInstVpaddb, YmmReg, YmmReg, Mem)
-
-  //! Packed DWORD add (AVX2).
-  INST_3x(vpaddd, kInstVpaddd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpaddd, kInstVpaddd, YmmReg, YmmReg, Mem)
-
-  //! Packed QDWORD add (AVX2).
-  INST_3x(vpaddq, kInstVpaddq, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpaddq, kInstVpaddq, YmmReg, YmmReg, Mem)
-
-  //! Packed WORD add (AVX2).
-  INST_3x(vpaddw, kInstVpaddw, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpaddw, kInstVpaddw, YmmReg, YmmReg, Mem)
-
-  //! Packed BYTE add with saturation (AVX2).
-  INST_3x(vpaddsb, kInstVpaddsb, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpaddsb, kInstVpaddsb, YmmReg, YmmReg, Mem)
-
-  //! Packed WORD add with saturation (AVX2).
-  INST_3x(vpaddsw, kInstVpaddsw, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpaddsw, kInstVpaddsw, YmmReg, YmmReg, Mem)
-
-  //! Packed BYTE add with unsigned saturation (AVX2).
-  INST_3x(vpaddusb, kInstVpaddusb, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpaddusb, kInstVpaddusb, YmmReg, YmmReg, Mem)
-
-  //! Packed WORD add with unsigned saturation (AVX2).
-  INST_3x(vpaddusw, kInstVpaddusw, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpaddusw, kInstVpaddusw, YmmReg, YmmReg, Mem)
-
-  //! Packed align right (AVX2).
-  INST_4i(vpalignr, kInstVpalignr, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vpalignr, kInstVpalignr, YmmReg, YmmReg, Mem, Imm)
-
-  //! Packed bitwise and (AVX2).
-  INST_3x(vpand, kInstVpand, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpand, kInstVpand, YmmReg, YmmReg, Mem)
-
-  //! Packed bitwise and-not (AVX2).
-  INST_3x(vpandn, kInstVpandn, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpandn, kInstVpandn, YmmReg, YmmReg, Mem)
-
-  //! Packed BYTE average (AVX2).
-  INST_3x(vpavgb, kInstVpavgb, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpavgb, kInstVpavgb, YmmReg, YmmReg, Mem)
-
-  //! Packed WORD average (AVX2).
-  INST_3x(vpavgw, kInstVpavgw, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpavgw, kInstVpavgw, YmmReg, YmmReg, Mem)
-
-  //! Packed DWORD blend (AVX2).
-  INST_4i(vpblendd, kInstVpblendd, XmmReg, XmmReg, XmmReg, Imm)
-  //! \overload
-  INST_4i(vpblendd, kInstVpblendd, XmmReg, XmmReg, Mem, Imm)
-  //! \overload
-  INST_4i(vpblendd, kInstVpblendd, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vpblendd, kInstVpblendd, YmmReg, YmmReg, Mem, Imm)
-
-  //! Packed DWORD variable blend (AVX2).
-  INST_4x(vpblendvb, kInstVpblendvb, YmmReg, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_4x(vpblendvb, kInstVpblendvb, YmmReg, YmmReg, Mem, YmmReg)
-
-  //! Packed WORD blend (AVX2).
-  INST_4i(vpblendw, kInstVpblendw, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vpblendw, kInstVpblendw, YmmReg, YmmReg, Mem, Imm)
-
-  //! Broadcast BYTE from `o1` to 128-bits in `o0` (AVX2).
-  INST_2x(vpbroadcastb, kInstVpbroadcastb, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpbroadcastb, kInstVpbroadcastb, XmmReg, Mem)
-  //! Broadcast BYTE from `o1` to 256-bits in `o0` (AVX2).
-  INST_2x(vpbroadcastb, kInstVpbroadcastb, YmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpbroadcastb, kInstVpbroadcastb, YmmReg, Mem)
-
-  //! Broadcast DWORD from `o1` to 128-bits in `o0` (AVX2).
-  INST_2x(vpbroadcastd, kInstVpbroadcastd, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpbroadcastd, kInstVpbroadcastd, XmmReg, Mem)
-  //! Broadcast DWORD from `o1` to 256-bits in `o0` (AVX2).
-  INST_2x(vpbroadcastd, kInstVpbroadcastd, YmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpbroadcastd, kInstVpbroadcastd, YmmReg, Mem)
-
-  //! Broadcast QWORD from `o1` to 128-bits in `o0` (AVX2).
-  INST_2x(vpbroadcastq, kInstVpbroadcastq, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpbroadcastq, kInstVpbroadcastq, XmmReg, Mem)
-  //! Broadcast QWORD from `o1` to 256-bits in `o0` (AVX2).
-  INST_2x(vpbroadcastq, kInstVpbroadcastq, YmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpbroadcastq, kInstVpbroadcastq, YmmReg, Mem)
-
-  //! Broadcast WORD from `o1` to 128-bits in `o0` (AVX2).
-  INST_2x(vpbroadcastw, kInstVpbroadcastw, XmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpbroadcastw, kInstVpbroadcastw, XmmReg, Mem)
-  //! Broadcast WORD from `o1` to 256-bits in `o0` (AVX2).
-  INST_2x(vpbroadcastw, kInstVpbroadcastw, YmmReg, XmmReg)
-  //! \overload
-  INST_2x(vpbroadcastw, kInstVpbroadcastw, YmmReg, Mem)
-
-  //! Packed BYTEs compare for equality (AVX2).
-  INST_3x(vpcmpeqb, kInstVpcmpeqb, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpcmpeqb, kInstVpcmpeqb, YmmReg, YmmReg, Mem)
-
-  //! Packed DWORDs compare for equality (AVX2).
-  INST_3x(vpcmpeqd, kInstVpcmpeqd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpcmpeqd, kInstVpcmpeqd, YmmReg, YmmReg, Mem)
-
-  //! Packed QWORDs compare for equality (AVX2).
-  INST_3x(vpcmpeqq, kInstVpcmpeqq, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpcmpeqq, kInstVpcmpeqq, YmmReg, YmmReg, Mem)
-
-  //! Packed WORDs compare for equality (AVX2).
-  INST_3x(vpcmpeqw, kInstVpcmpeqw, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpcmpeqw, kInstVpcmpeqw, YmmReg, YmmReg, Mem)
-
-  //! Packed BYTEs compare if greater than (AVX2).
-  INST_3x(vpcmpgtb, kInstVpcmpgtb, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpcmpgtb, kInstVpcmpgtb, YmmReg, YmmReg, Mem)
-
-  //! Packed DWORDs compare if greater than (AVX2).
-  INST_3x(vpcmpgtd, kInstVpcmpgtd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpcmpgtd, kInstVpcmpgtd, YmmReg, YmmReg, Mem)
-
-  //! Packed QWORDs compare if greater than (AVX2).
-  INST_3x(vpcmpgtq, kInstVpcmpgtq, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpcmpgtq, kInstVpcmpgtq, YmmReg, YmmReg, Mem)
-
-  //! Packed WORDs compare if greater than (AVX2).
-  INST_3x(vpcmpgtw, kInstVpcmpgtw, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpcmpgtw, kInstVpcmpgtw, YmmReg, YmmReg, Mem)
-
-  //! Packed OWORD permute (AVX2).
-  INST_4i(vperm2i128, kInstVperm2i128, YmmReg, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_4i(vperm2i128, kInstVperm2i128, YmmReg, YmmReg, Mem, Imm)
-
-  //! Packed DWORD permute (AVX2).
-  INST_3x(vpermd, kInstVpermd, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpermd, kInstVpermd, YmmReg, YmmReg, Mem)
-
-  //! Packed DP-FP permute (AVX2).
-  INST_3i(vpermpd, kInstVpermpd, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_3i(vpermpd, kInstVpermpd, YmmReg, Mem, Imm)
-
-  //! Packed SP-FP permute (AVX2).
-  INST_3x(vpermps, kInstVpermps, YmmReg, YmmReg, YmmReg)
-  //! \overload
-  INST_3x(vpermps, kInstVpermps, YmmReg, YmmReg, Mem)
-
-  //! Packed QWORD permute (AVX2).
-  INST_3i(vpermq, kInstVpermq, YmmReg, YmmReg, Imm)
-  //! \overload
-  INST_3i(vpermq, kInstVpermq, YmmReg, Mem, Imm)
-
-  INST_3x(vpgatherdd, kInstVpgatherdd, XmmReg, Mem, XmmReg)
-  INST_3x(vpgatherdd, kInstVpgatherdd, YmmReg, Mem, YmmReg)
-
-  INST_3x(vpgatherdq, kInstVpgatherdq, XmmReg, Mem, XmmReg)
-  INST_3x(vpgatherdq, kInstVpgatherdq, YmmReg, Mem, YmmReg)
-
-  INST_3x(vpgatherqd, kInstVpgatherqd, XmmReg, Mem, XmmReg)
-
-  INST_3x(vpgatherqq, kInstVpgatherqq, XmmReg, Mem, XmmReg)
-  INST_3x(vpgatherqq, kInstVpgatherqq, YmmReg, Mem, YmmReg)
-
-  //! Packed DWORD horizontal add (AVX2).
-  INST_3x(vphaddd, kInstVphaddd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vphaddd, kInstVphaddd, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD horizontal add with saturation (AVX2).
-  INST_3x(vphaddsw, kInstVphaddsw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vphaddsw, kInstVphaddsw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD horizontal add (AVX2).
-  INST_3x(vphaddw, kInstVphaddw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vphaddw, kInstVphaddw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD horizontal subtract (AVX2).
-  INST_3x(vphsubd, kInstVphsubd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vphsubd, kInstVphsubd, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD horizontal subtract with saturation (AVX2).
-  INST_3x(vphsubsw, kInstVphsubsw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vphsubsw, kInstVphsubsw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD horizontal subtract (AVX2).
-  INST_3x(vphsubw, kInstVphsubw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vphsubw, kInstVphsubw, YmmReg, YmmReg, YmmReg)
-
-  //! Move Byte mask to integer (AVX2).
-  INST_2x(vpmovmskb, kInstVpmovmskb, GpReg, YmmReg)
-
-  //! BYTE to DWORD with sign extend (AVX).
-  INST_2x(vpmovsxbd, kInstVpmovsxbd, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovsxbd, kInstVpmovsxbd, YmmReg, XmmReg)
-
-  //! Packed BYTE to QWORD with sign extend (AVX2).
-  INST_2x(vpmovsxbq, kInstVpmovsxbq, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovsxbq, kInstVpmovsxbq, YmmReg, XmmReg)
-
-  //! Packed BYTE to WORD with sign extend (AVX2).
-  INST_2x(vpmovsxbw, kInstVpmovsxbw, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovsxbw, kInstVpmovsxbw, YmmReg, XmmReg)
-
-  //! Packed DWORD to QWORD with sign extend (AVX2).
-  INST_2x(vpmovsxdq, kInstVpmovsxdq, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovsxdq, kInstVpmovsxdq, YmmReg, XmmReg)
-
-  //! Packed WORD to DWORD with sign extend (AVX2).
-  INST_2x(vpmovsxwd, kInstVpmovsxwd, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovsxwd, kInstVpmovsxwd, YmmReg, XmmReg)
-
-  //! Packed WORD to QWORD with sign extend (AVX2).
-  INST_2x(vpmovsxwq, kInstVpmovsxwq, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovsxwq, kInstVpmovsxwq, YmmReg, XmmReg)
-
-  //! BYTE to DWORD with zero extend (AVX2).
-  INST_2x(vpmovzxbd, kInstVpmovzxbd, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovzxbd, kInstVpmovzxbd, YmmReg, XmmReg)
-
-  //! Packed BYTE to QWORD with zero extend (AVX2).
-  INST_2x(vpmovzxbq, kInstVpmovzxbq, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovzxbq, kInstVpmovzxbq, YmmReg, XmmReg)
-
-  //! BYTE to WORD with zero extend (AVX2).
-  INST_2x(vpmovzxbw, kInstVpmovzxbw, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovzxbw, kInstVpmovzxbw, YmmReg, XmmReg)
-
-  //! Packed DWORD to QWORD with zero extend (AVX2).
-  INST_2x(vpmovzxdq, kInstVpmovzxdq, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovzxdq, kInstVpmovzxdq, YmmReg, XmmReg)
-
-  //! Packed WORD to DWORD with zero extend (AVX2).
-  INST_2x(vpmovzxwd, kInstVpmovzxwd, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovzxwd, kInstVpmovzxwd, YmmReg, XmmReg)
-
-  //! Packed WORD to QWORD with zero extend (AVX2).
-  INST_2x(vpmovzxwq, kInstVpmovzxwq, YmmReg, Mem)
-  //! \overload
-  INST_2x(vpmovzxwq, kInstVpmovzxwq, YmmReg, XmmReg)
-
-  //! Packed multiply and add signed and unsigned bytes (AVX2).
-  INST_3x(vpmaddubsw, kInstVpmaddubsw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmaddubsw, kInstVpmaddubsw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD multiply and add to packed DWORD (AVX2).
-  INST_3x(vpmaddwd, kInstVpmaddwd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmaddwd, kInstVpmaddwd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vpmaskmovd, kInstVpmaskmovd, Mem, XmmReg, XmmReg)
-  INST_3x(vpmaskmovd, kInstVpmaskmovd, Mem, YmmReg, YmmReg)
-  INST_3x(vpmaskmovd, kInstVpmaskmovd, XmmReg, XmmReg, Mem)
-  INST_3x(vpmaskmovd, kInstVpmaskmovd, YmmReg, YmmReg, Mem)
-
-  INST_3x(vpmaskmovq, kInstVpmaskmovq, Mem, XmmReg, XmmReg)
-  INST_3x(vpmaskmovq, kInstVpmaskmovq, Mem, YmmReg, YmmReg)
-  INST_3x(vpmaskmovq, kInstVpmaskmovq, XmmReg, XmmReg, Mem)
-  INST_3x(vpmaskmovq, kInstVpmaskmovq, YmmReg, YmmReg, Mem)
-
-  //! Packed BYTE maximum (AVX2).
-  INST_3x(vpmaxsb, kInstVpmaxsb, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmaxsb, kInstVpmaxsb, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD maximum (AVX2).
-  INST_3x(vpmaxsd, kInstVpmaxsd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmaxsd, kInstVpmaxsd, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD maximum (AVX2).
-  INST_3x(vpmaxsw, kInstVpmaxsw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmaxsw, kInstVpmaxsw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed BYTE unsigned maximum (AVX2).
-  INST_3x(vpmaxub, kInstVpmaxub, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmaxub, kInstVpmaxub, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD unsigned maximum (AVX2).
-  INST_3x(vpmaxud, kInstVpmaxud, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmaxud, kInstVpmaxud, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD unsigned maximum (AVX2).
-  INST_3x(vpmaxuw, kInstVpmaxuw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmaxuw, kInstVpmaxuw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed BYTE minimum (AVX2).
-  INST_3x(vpminsb, kInstVpminsb, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpminsb, kInstVpminsb, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD minimum (AVX2).
-  INST_3x(vpminsd, kInstVpminsd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpminsd, kInstVpminsd, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD minimum (AVX2).
-  INST_3x(vpminsw, kInstVpminsw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpminsw, kInstVpminsw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed BYTE unsigned minimum (AVX2).
-  INST_3x(vpminub, kInstVpminub, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpminub, kInstVpminub, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD unsigned minimum (AVX2).
-  INST_3x(vpminud, kInstVpminud, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpminud, kInstVpminud, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD unsigned minimum (AVX2).
-  INST_3x(vpminuw, kInstVpminuw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpminuw, kInstVpminuw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD to QWORD multiply (AVX2).
-  INST_3x(vpmuldq, kInstVpmuldq, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmuldq, kInstVpmuldq, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD multiply high, round and scale (AVX2).
-  INST_3x(vpmulhrsw, kInstVpmulhrsw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmulhrsw, kInstVpmulhrsw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD unsigned multiply high (AVX2).
-  INST_3x(vpmulhuw, kInstVpmulhuw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmulhuw, kInstVpmulhuw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD multiply high (AVX2).
-  INST_3x(vpmulhw, kInstVpmulhw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmulhw, kInstVpmulhw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD multiply low (AVX2).
-  INST_3x(vpmulld, kInstVpmulld, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmulld, kInstVpmulld, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORDs multiply low (AVX2).
-  INST_3x(vpmullw, kInstVpmullw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmullw, kInstVpmullw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD multiply to QWORD (AVX2).
-  INST_3x(vpmuludq, kInstVpmuludq, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpmuludq, kInstVpmuludq, YmmReg, YmmReg, YmmReg)
-
-  //! Packed bitwise or (AVX2).
-  INST_3x(vpor, kInstVpor, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpor, kInstVpor, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD sum of absolute differences (AVX2).
-  INST_3x(vpsadbw, kInstVpsadbw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsadbw, kInstVpsadbw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed BYTE shuffle (AVX2).
-  INST_3x(vpshufb, kInstVpshufb, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpshufb, kInstVpshufb, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD shuffle (AVX2).
-  INST_3i(vpshufd, kInstVpshufd, YmmReg, Mem, Imm)
-  //! \overload
-  INST_3i(vpshufd, kInstVpshufd, YmmReg, YmmReg, Imm)
-
-  //! Packed WORD shuffle high (AVX2).
-  INST_3i(vpshufhw, kInstVpshufhw, YmmReg, Mem, Imm)
-  //! \overload
-  INST_3i(vpshufhw, kInstVpshufhw, YmmReg, YmmReg, Imm)
-
-  //! Packed WORD shuffle low (AVX2).
-  INST_3i(vpshuflw, kInstVpshuflw, YmmReg, Mem, Imm)
-  //! \overload
-  INST_3i(vpshuflw, kInstVpshuflw, YmmReg, YmmReg, Imm)
-
-  //! Packed BYTE sign (AVX2).
-  INST_3x(vpsignb, kInstVpsignb, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsignb, kInstVpsignb, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD sign (AVX2).
-  INST_3x(vpsignd, kInstVpsignd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsignd, kInstVpsignd, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD sign (AVX2).
-  INST_3x(vpsignw, kInstVpsignw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsignw, kInstVpsignw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD shift left logical (AVX2).
-  INST_3x(vpslld, kInstVpslld, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpslld, kInstVpslld, YmmReg, YmmReg, XmmReg)
-  //! \overload
-  INST_3i(vpslld, kInstVpslld, YmmReg, YmmReg, Imm)
-
-  //! Packed OWORD shift left logical (AVX2).
-  INST_3i(vpslldq, kInstVpslldq, YmmReg, YmmReg, Imm)
-
-  //! Packed QWORD shift left logical (AVX2).
-  INST_3x(vpsllq, kInstVpsllq, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsllq, kInstVpsllq, YmmReg, YmmReg, XmmReg)
-  //! \overload
-  INST_3i(vpsllq, kInstVpsllq, YmmReg, YmmReg, Imm)
-
-  INST_3x(vpsllvd, kInstVpsllvd, XmmReg, XmmReg, Mem)
-  INST_3x(vpsllvd, kInstVpsllvd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpsllvd, kInstVpsllvd, YmmReg, YmmReg, Mem)
-  INST_3x(vpsllvd, kInstVpsllvd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vpsllvq, kInstVpsllvq, XmmReg, XmmReg, Mem)
-  INST_3x(vpsllvq, kInstVpsllvq, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpsllvq, kInstVpsllvq, YmmReg, YmmReg, Mem)
-  INST_3x(vpsllvq, kInstVpsllvq, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD shift left logical (AVX2).
-  INST_3x(vpsllw, kInstVpsllw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsllw, kInstVpsllw, YmmReg, YmmReg, XmmReg)
-  //! Packed WORD shift left logical (AVX2).
-  INST_3i(vpsllw, kInstVpsllw, YmmReg, YmmReg, Imm)
-
-  //! Packed DWORD shift right arithmetic (AVX2).
-  INST_3x(vpsrad, kInstVpsrad, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsrad, kInstVpsrad, YmmReg, YmmReg, XmmReg)
-  //! \overload
-  INST_3i(vpsrad, kInstVpsrad, YmmReg, YmmReg, Imm)
-
-  INST_3x(vpsravd, kInstVpsravd, XmmReg, XmmReg, Mem)
-  INST_3x(vpsravd, kInstVpsravd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpsravd, kInstVpsravd, YmmReg, YmmReg, Mem)
-  INST_3x(vpsravd, kInstVpsravd, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD shift right arithmetic (AVX2).
-  INST_3x(vpsraw, kInstVpsraw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsraw, kInstVpsraw, YmmReg, YmmReg, XmmReg)
-  //! \overload
-  INST_3i(vpsraw, kInstVpsraw, YmmReg, YmmReg, Imm)
-
-  //! Packed DWORD shift right logical (AVX2).
-  INST_3x(vpsrld, kInstVpsrld, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsrld, kInstVpsrld, YmmReg, YmmReg, XmmReg)
-  //! \overload
-  INST_3i(vpsrld, kInstVpsrld, YmmReg, YmmReg, Imm)
-
-  //! Scalar OWORD shift right logical (AVX2).
-  INST_3i(vpsrldq, kInstVpsrldq, YmmReg, YmmReg, Imm)
-
-  //! Packed QWORD shift right logical (AVX2).
-  INST_3x(vpsrlq, kInstVpsrlq, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsrlq, kInstVpsrlq, YmmReg, YmmReg, XmmReg)
-  //! \overload
-  INST_3i(vpsrlq, kInstVpsrlq, YmmReg, YmmReg, Imm)
-
-  INST_3x(vpsrlvd, kInstVpsrlvd, XmmReg, XmmReg, Mem)
-  INST_3x(vpsrlvd, kInstVpsrlvd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpsrlvd, kInstVpsrlvd, YmmReg, YmmReg, Mem)
-  INST_3x(vpsrlvd, kInstVpsrlvd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vpsrlvq, kInstVpsrlvq, XmmReg, XmmReg, Mem)
-  INST_3x(vpsrlvq, kInstVpsrlvq, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpsrlvq, kInstVpsrlvq, YmmReg, YmmReg, Mem)
-  INST_3x(vpsrlvq, kInstVpsrlvq, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD shift right logical (AVX2).
-  INST_3x(vpsrlw, kInstVpsrlw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsrlw, kInstVpsrlw, YmmReg, YmmReg, XmmReg)
-  //! \overload
-  INST_3i(vpsrlw, kInstVpsrlw, YmmReg, YmmReg, Imm)
-
-  //! Packed BYTE subtract (AVX2).
-  INST_3x(vpsubb, kInstVpsubb, YmmReg, YmmReg, Mem)
-  INST_3x(vpsubb, kInstVpsubb, YmmReg, YmmReg, YmmReg)
-
-  //! Packed DWORD subtract (AVX2).
-  INST_3x(vpsubd, kInstVpsubd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsubd, kInstVpsubd, YmmReg, YmmReg, YmmReg)
-
-  //! Packed QWORD subtract (AVX2).
-  INST_3x(vpsubq, kInstVpsubq, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsubq, kInstVpsubq, YmmReg, YmmReg, YmmReg)
-
-  //! Packed BYTE subtract with saturation (AVX2).
-  INST_3x(vpsubsb, kInstVpsubsb, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsubsb, kInstVpsubsb, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD subtract with saturation (AVX2).
-  INST_3x(vpsubsw, kInstVpsubsw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsubsw, kInstVpsubsw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed BYTE subtract with unsigned saturation (AVX2).
-  INST_3x(vpsubusb, kInstVpsubusb, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsubusb, kInstVpsubusb, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD subtract with unsigned saturation (AVX2).
-  INST_3x(vpsubusw, kInstVpsubusw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsubusw, kInstVpsubusw, YmmReg, YmmReg, YmmReg)
-
-  //! Packed WORD subtract (AVX2).
-  INST_3x(vpsubw, kInstVpsubw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpsubw, kInstVpsubw, YmmReg, YmmReg, YmmReg)
-
-  //! Unpack high packed BYTEs to WORDs (AVX2).
-  INST_3x(vpunpckhbw, kInstVpunpckhbw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpunpckhbw, kInstVpunpckhbw, YmmReg, YmmReg, YmmReg)
-
-  //! Unpack high packed DWORDs to QWORDs (AVX2).
-  INST_3x(vpunpckhdq, kInstVpunpckhdq, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpunpckhdq, kInstVpunpckhdq, YmmReg, YmmReg, YmmReg)
-
-  //! Unpack high packed QWORDs to OWORD (AVX2).
-  INST_3x(vpunpckhqdq, kInstVpunpckhqdq, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpunpckhqdq, kInstVpunpckhqdq, YmmReg, YmmReg, YmmReg)
-
-  //! Unpack high packed WORDs to DWORDs (AVX2).
-  INST_3x(vpunpckhwd, kInstVpunpckhwd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpunpckhwd, kInstVpunpckhwd, YmmReg, YmmReg, YmmReg)
-
-  //! Unpack low packed BYTEs to WORDs (AVX2).
-  INST_3x(vpunpcklbw, kInstVpunpcklbw, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpunpcklbw, kInstVpunpcklbw, YmmReg, YmmReg, YmmReg)
-
-  //! Unpack low packed DWORDs to QWORDs (AVX2).
-  INST_3x(vpunpckldq, kInstVpunpckldq, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpunpckldq, kInstVpunpckldq, YmmReg, YmmReg, YmmReg)
-
-  //! Unpack low packed QWORDs to OWORD (AVX2).
-  INST_3x(vpunpcklqdq, kInstVpunpcklqdq, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpunpcklqdq, kInstVpunpcklqdq, YmmReg, YmmReg, YmmReg)
-
-  //! Unpack low packed WORDs to DWORDs (AVX2).
-  INST_3x(vpunpcklwd, kInstVpunpcklwd, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpunpcklwd, kInstVpunpcklwd, YmmReg, YmmReg, YmmReg)
-
-  //! Packed bitwise xor (AVX2).
-  INST_3x(vpxor, kInstVpxor, YmmReg, YmmReg, Mem)
-  //! \overload
-  INST_3x(vpxor, kInstVpxor, YmmReg, YmmReg, YmmReg)
-
-  // --------------------------------------------------------------------------
-  // [FMA3]
-  // --------------------------------------------------------------------------
-
-  INST_3x(vfmadd132pd, kInstVfmadd132pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd132pd, kInstVfmadd132pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmadd132pd, kInstVfmadd132pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmadd132pd, kInstVfmadd132pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmadd132ps, kInstVfmadd132ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd132ps, kInstVfmadd132ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmadd132ps, kInstVfmadd132ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmadd132ps, kInstVfmadd132ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmadd132sd, kInstVfmadd132sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd132sd, kInstVfmadd132sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmadd132ss, kInstVfmadd132ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd132ss, kInstVfmadd132ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmadd213pd, kInstVfmadd213pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd213pd, kInstVfmadd213pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmadd213pd, kInstVfmadd213pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmadd213pd, kInstVfmadd213pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmadd213ps, kInstVfmadd213ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd213ps, kInstVfmadd213ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmadd213ps, kInstVfmadd213ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmadd213ps, kInstVfmadd213ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmadd213sd, kInstVfmadd213sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd213sd, kInstVfmadd213sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmadd213ss, kInstVfmadd213ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd213ss, kInstVfmadd213ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmadd231pd, kInstVfmadd231pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd231pd, kInstVfmadd231pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmadd231pd, kInstVfmadd231pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmadd231pd, kInstVfmadd231pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmadd231ps, kInstVfmadd231ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd231ps, kInstVfmadd231ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmadd231ps, kInstVfmadd231ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmadd231ps, kInstVfmadd231ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmadd231sd, kInstVfmadd231sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd231sd, kInstVfmadd231sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmadd231ss, kInstVfmadd231ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfmadd231ss, kInstVfmadd231ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmaddsub132pd, kInstVfmaddsub132pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmaddsub132pd, kInstVfmaddsub132pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmaddsub132pd, kInstVfmaddsub132pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmaddsub132pd, kInstVfmaddsub132pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmaddsub132ps, kInstVfmaddsub132ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmaddsub132ps, kInstVfmaddsub132ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmaddsub132ps, kInstVfmaddsub132ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmaddsub132ps, kInstVfmaddsub132ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmaddsub213pd, kInstVfmaddsub213pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmaddsub213pd, kInstVfmaddsub213pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmaddsub213pd, kInstVfmaddsub213pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmaddsub213pd, kInstVfmaddsub213pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmaddsub213ps, kInstVfmaddsub213ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmaddsub213ps, kInstVfmaddsub213ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmaddsub213ps, kInstVfmaddsub213ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmaddsub213ps, kInstVfmaddsub213ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmaddsub231pd, kInstVfmaddsub231pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmaddsub231pd, kInstVfmaddsub231pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmaddsub231pd, kInstVfmaddsub231pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmaddsub231pd, kInstVfmaddsub231pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmaddsub231ps, kInstVfmaddsub231ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmaddsub231ps, kInstVfmaddsub231ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmaddsub231ps, kInstVfmaddsub231ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmaddsub231ps, kInstVfmaddsub231ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsub132pd, kInstVfmsub132pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub132pd, kInstVfmsub132pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsub132pd, kInstVfmsub132pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsub132pd, kInstVfmsub132pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsub132ps, kInstVfmsub132ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub132ps, kInstVfmsub132ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsub132ps, kInstVfmsub132ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsub132ps, kInstVfmsub132ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsub132sd, kInstVfmsub132sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub132sd, kInstVfmsub132sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmsub132ss, kInstVfmsub132ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub132ss, kInstVfmsub132ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmsub213pd, kInstVfmsub213pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub213pd, kInstVfmsub213pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsub213pd, kInstVfmsub213pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsub213pd, kInstVfmsub213pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsub213ps, kInstVfmsub213ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub213ps, kInstVfmsub213ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsub213ps, kInstVfmsub213ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsub213ps, kInstVfmsub213ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsub213sd, kInstVfmsub213sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub213sd, kInstVfmsub213sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmsub213ss, kInstVfmsub213ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub213ss, kInstVfmsub213ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmsub231pd, kInstVfmsub231pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub231pd, kInstVfmsub231pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsub231pd, kInstVfmsub231pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsub231pd, kInstVfmsub231pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsub231ps, kInstVfmsub231ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub231ps, kInstVfmsub231ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsub231ps, kInstVfmsub231ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsub231ps, kInstVfmsub231ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsub231sd, kInstVfmsub231sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub231sd, kInstVfmsub231sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmsub231ss, kInstVfmsub231ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsub231ss, kInstVfmsub231ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfmsubadd132pd, kInstVfmsubadd132pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsubadd132pd, kInstVfmsubadd132pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsubadd132pd, kInstVfmsubadd132pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsubadd132pd, kInstVfmsubadd132pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsubadd132ps, kInstVfmsubadd132ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsubadd132ps, kInstVfmsubadd132ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsubadd132ps, kInstVfmsubadd132ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsubadd132ps, kInstVfmsubadd132ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsubadd213pd, kInstVfmsubadd213pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsubadd213pd, kInstVfmsubadd213pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsubadd213pd, kInstVfmsubadd213pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsubadd213pd, kInstVfmsubadd213pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsubadd213ps, kInstVfmsubadd213ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsubadd213ps, kInstVfmsubadd213ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsubadd213ps, kInstVfmsubadd213ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsubadd213ps, kInstVfmsubadd213ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsubadd231pd, kInstVfmsubadd231pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsubadd231pd, kInstVfmsubadd231pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsubadd231pd, kInstVfmsubadd231pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsubadd231pd, kInstVfmsubadd231pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfmsubadd231ps, kInstVfmsubadd231ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfmsubadd231ps, kInstVfmsubadd231ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfmsubadd231ps, kInstVfmsubadd231ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfmsubadd231ps, kInstVfmsubadd231ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmadd132pd, kInstVfnmadd132pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd132pd, kInstVfnmadd132pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmadd132pd, kInstVfnmadd132pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmadd132pd, kInstVfnmadd132pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmadd132ps, kInstVfnmadd132ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd132ps, kInstVfnmadd132ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmadd132ps, kInstVfnmadd132ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmadd132ps, kInstVfnmadd132ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmadd132sd, kInstVfnmadd132sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd132sd, kInstVfnmadd132sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmadd132ss, kInstVfnmadd132ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd132ss, kInstVfnmadd132ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmadd213pd, kInstVfnmadd213pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd213pd, kInstVfnmadd213pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmadd213pd, kInstVfnmadd213pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmadd213pd, kInstVfnmadd213pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmadd213ps, kInstVfnmadd213ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd213ps, kInstVfnmadd213ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmadd213ps, kInstVfnmadd213ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmadd213ps, kInstVfnmadd213ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmadd213sd, kInstVfnmadd213sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd213sd, kInstVfnmadd213sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmadd213ss, kInstVfnmadd213ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd213ss, kInstVfnmadd213ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmadd231pd, kInstVfnmadd231pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd231pd, kInstVfnmadd231pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmadd231pd, kInstVfnmadd231pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmadd231pd, kInstVfnmadd231pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmadd231ps, kInstVfnmadd231ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd231ps, kInstVfnmadd231ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmadd231ps, kInstVfnmadd231ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmadd231ps, kInstVfnmadd231ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmadd231sd, kInstVfnmadd231sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd231sd, kInstVfnmadd231sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmadd231ss, kInstVfnmadd231ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmadd231ss, kInstVfnmadd231ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmsub132pd, kInstVfnmsub132pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub132pd, kInstVfnmsub132pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmsub132pd, kInstVfnmsub132pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmsub132pd, kInstVfnmsub132pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmsub132ps, kInstVfnmsub132ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub132ps, kInstVfnmsub132ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmsub132ps, kInstVfnmsub132ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmsub132ps, kInstVfnmsub132ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmsub132sd, kInstVfnmsub132sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub132sd, kInstVfnmsub132sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmsub132ss, kInstVfnmsub132ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub132ss, kInstVfnmsub132ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmsub213pd, kInstVfnmsub213pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub213pd, kInstVfnmsub213pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmsub213pd, kInstVfnmsub213pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmsub213pd, kInstVfnmsub213pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmsub213ps, kInstVfnmsub213ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub213ps, kInstVfnmsub213ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmsub213ps, kInstVfnmsub213ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmsub213ps, kInstVfnmsub213ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmsub213sd, kInstVfnmsub213sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub213sd, kInstVfnmsub213sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmsub213ss, kInstVfnmsub213ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub213ss, kInstVfnmsub213ss, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmsub231pd, kInstVfnmsub231pd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub231pd, kInstVfnmsub231pd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmsub231pd, kInstVfnmsub231pd, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmsub231pd, kInstVfnmsub231pd, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmsub231ps, kInstVfnmsub231ps, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub231ps, kInstVfnmsub231ps, XmmReg, XmmReg, XmmReg)
-  INST_3x(vfnmsub231ps, kInstVfnmsub231ps, YmmReg, YmmReg, Mem)
-  INST_3x(vfnmsub231ps, kInstVfnmsub231ps, YmmReg, YmmReg, YmmReg)
-
-  INST_3x(vfnmsub231sd, kInstVfnmsub231sd, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub231sd, kInstVfnmsub231sd, XmmReg, XmmReg, XmmReg)
-
-  INST_3x(vfnmsub231ss, kInstVfnmsub231ss, XmmReg, XmmReg, Mem)
-  INST_3x(vfnmsub231ss, kInstVfnmsub231ss, XmmReg, XmmReg, XmmReg)
-
-  // --------------------------------------------------------------------------
-  // [FMA4]
-  // --------------------------------------------------------------------------
-
-  INST_4x(vfmaddpd, kInstVfmaddpd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmaddpd, kInstVfmaddpd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmaddpd, kInstVfmaddpd, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfmaddpd, kInstVfmaddpd, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfmaddpd, kInstVfmaddpd, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfmaddpd, kInstVfmaddpd, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfmaddps, kInstVfmaddps, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmaddps, kInstVfmaddps, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmaddps, kInstVfmaddps, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfmaddps, kInstVfmaddps, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfmaddps, kInstVfmaddps, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfmaddps, kInstVfmaddps, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfmaddsd, kInstVfmaddsd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmaddsd, kInstVfmaddsd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmaddsd, kInstVfmaddsd, XmmReg, XmmReg, XmmReg, Mem)
-
-  INST_4x(vfmaddss, kInstVfmaddss, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmaddss, kInstVfmaddss, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmaddss, kInstVfmaddss, XmmReg, XmmReg, XmmReg, Mem)
-
-  INST_4x(vfmaddsubpd, kInstVfmaddsubpd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmaddsubpd, kInstVfmaddsubpd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmaddsubpd, kInstVfmaddsubpd, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfmaddsubpd, kInstVfmaddsubpd, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfmaddsubpd, kInstVfmaddsubpd, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfmaddsubpd, kInstVfmaddsubpd, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfmaddsubps, kInstVfmaddsubps, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmaddsubps, kInstVfmaddsubps, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmaddsubps, kInstVfmaddsubps, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfmaddsubps, kInstVfmaddsubps, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfmaddsubps, kInstVfmaddsubps, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfmaddsubps, kInstVfmaddsubps, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfmsubaddpd, kInstVfmsubaddpd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmsubaddpd, kInstVfmsubaddpd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmsubaddpd, kInstVfmsubaddpd, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfmsubaddpd, kInstVfmsubaddpd, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfmsubaddpd, kInstVfmsubaddpd, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfmsubaddpd, kInstVfmsubaddpd, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfmsubaddps, kInstVfmsubaddps, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmsubaddps, kInstVfmsubaddps, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmsubaddps, kInstVfmsubaddps, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfmsubaddps, kInstVfmsubaddps, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfmsubaddps, kInstVfmsubaddps, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfmsubaddps, kInstVfmsubaddps, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfmsubpd, kInstVfmsubpd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmsubpd, kInstVfmsubpd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmsubpd, kInstVfmsubpd, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfmsubpd, kInstVfmsubpd, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfmsubpd, kInstVfmsubpd, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfmsubpd, kInstVfmsubpd, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfmsubps, kInstVfmsubps, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmsubps, kInstVfmsubps, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmsubps, kInstVfmsubps, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfmsubps, kInstVfmsubps, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfmsubps, kInstVfmsubps, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfmsubps, kInstVfmsubps, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfmsubsd, kInstVfmsubsd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmsubsd, kInstVfmsubsd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmsubsd, kInstVfmsubsd, XmmReg, XmmReg, XmmReg, Mem)
-
-  INST_4x(vfmsubss, kInstVfmsubss, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfmsubss, kInstVfmsubss, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfmsubss, kInstVfmsubss, XmmReg, XmmReg, XmmReg, Mem)
-
-  INST_4x(vfnmaddpd, kInstVfnmaddpd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfnmaddpd, kInstVfnmaddpd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfnmaddpd, kInstVfnmaddpd, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfnmaddpd, kInstVfnmaddpd, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfnmaddpd, kInstVfnmaddpd, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfnmaddpd, kInstVfnmaddpd, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfnmaddps, kInstVfnmaddps, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfnmaddps, kInstVfnmaddps, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfnmaddps, kInstVfnmaddps, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfnmaddps, kInstVfnmaddps, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfnmaddps, kInstVfnmaddps, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfnmaddps, kInstVfnmaddps, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfnmaddsd, kInstVfnmaddsd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfnmaddsd, kInstVfnmaddsd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfnmaddsd, kInstVfnmaddsd, XmmReg, XmmReg, XmmReg, Mem)
-
-  INST_4x(vfnmaddss, kInstVfnmaddss, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfnmaddss, kInstVfnmaddss, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfnmaddss, kInstVfnmaddss, XmmReg, XmmReg, XmmReg, Mem)
-
-  INST_4x(vfnmsubpd, kInstVfnmsubpd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfnmsubpd, kInstVfnmsubpd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfnmsubpd, kInstVfnmsubpd, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfnmsubpd, kInstVfnmsubpd, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfnmsubpd, kInstVfnmsubpd, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfnmsubpd, kInstVfnmsubpd, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfnmsubps, kInstVfnmsubps, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfnmsubps, kInstVfnmsubps, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfnmsubps, kInstVfnmsubps, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vfnmsubps, kInstVfnmsubps, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vfnmsubps, kInstVfnmsubps, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vfnmsubps, kInstVfnmsubps, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vfnmsubsd, kInstVfnmsubsd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfnmsubsd, kInstVfnmsubsd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfnmsubsd, kInstVfnmsubsd, XmmReg, XmmReg, XmmReg, Mem)
-
-  INST_4x(vfnmsubss, kInstVfnmsubss, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vfnmsubss, kInstVfnmsubss, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vfnmsubss, kInstVfnmsubss, XmmReg, XmmReg, XmmReg, Mem)
-
-  // --------------------------------------------------------------------------
-  // [XOP]
-  // --------------------------------------------------------------------------
-
-  INST_2x(vfrczpd, kInstVfrczpd, XmmReg, XmmReg)
-  INST_2x(vfrczpd, kInstVfrczpd, XmmReg, Mem)
-  INST_2x(vfrczpd, kInstVfrczpd, YmmReg, YmmReg)
-  INST_2x(vfrczpd, kInstVfrczpd, YmmReg, Mem)
-
-  INST_2x(vfrczps, kInstVfrczps, XmmReg, XmmReg)
-  INST_2x(vfrczps, kInstVfrczps, XmmReg, Mem)
-  INST_2x(vfrczps, kInstVfrczps, YmmReg, YmmReg)
-  INST_2x(vfrczps, kInstVfrczps, YmmReg, Mem)
-
-  INST_2x(vfrczsd, kInstVfrczsd, XmmReg, XmmReg)
-  INST_2x(vfrczsd, kInstVfrczsd, XmmReg, Mem)
-
-  INST_2x(vfrczss, kInstVfrczss, XmmReg, XmmReg)
-  INST_2x(vfrczss, kInstVfrczss, XmmReg, Mem)
-
-  INST_4x(vpcmov, kInstVpcmov, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpcmov, kInstVpcmov, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpcmov, kInstVpcmov, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vpcmov, kInstVpcmov, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vpcmov, kInstVpcmov, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vpcmov, kInstVpcmov, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4i(vpcomb, kInstVpcomb, XmmReg, XmmReg, XmmReg, Imm)
-  INST_4i(vpcomb, kInstVpcomb, XmmReg, XmmReg, Mem, Imm)
-  INST_4i(vpcomd, kInstVpcomd, XmmReg, XmmReg, XmmReg, Imm)
-  INST_4i(vpcomd, kInstVpcomd, XmmReg, XmmReg, Mem, Imm)
-  INST_4i(vpcomq, kInstVpcomq, XmmReg, XmmReg, XmmReg, Imm)
-  INST_4i(vpcomq, kInstVpcomq, XmmReg, XmmReg, Mem, Imm)
-  INST_4i(vpcomw, kInstVpcomw, XmmReg, XmmReg, XmmReg, Imm)
-  INST_4i(vpcomw, kInstVpcomw, XmmReg, XmmReg, Mem, Imm)
-
-  INST_4i(vpcomub, kInstVpcomub, XmmReg, XmmReg, XmmReg, Imm)
-  INST_4i(vpcomub, kInstVpcomub, XmmReg, XmmReg, Mem, Imm)
-  INST_4i(vpcomud, kInstVpcomud, XmmReg, XmmReg, XmmReg, Imm)
-  INST_4i(vpcomud, kInstVpcomud, XmmReg, XmmReg, Mem, Imm)
-  INST_4i(vpcomuq, kInstVpcomuq, XmmReg, XmmReg, XmmReg, Imm)
-  INST_4i(vpcomuq, kInstVpcomuq, XmmReg, XmmReg, Mem, Imm)
-  INST_4i(vpcomuw, kInstVpcomuw, XmmReg, XmmReg, XmmReg, Imm)
-  INST_4i(vpcomuw, kInstVpcomuw, XmmReg, XmmReg, Mem, Imm)
-
-  INST_4x(vpermil2pd, kInstVpermil2pd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpermil2pd, kInstVpermil2pd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpermil2pd, kInstVpermil2pd, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vpermil2pd, kInstVpermil2pd, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vpermil2pd, kInstVpermil2pd, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vpermil2pd, kInstVpermil2pd, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_4x(vpermil2ps, kInstVpermil2ps, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpermil2ps, kInstVpermil2ps, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpermil2ps, kInstVpermil2ps, XmmReg, XmmReg, XmmReg, Mem)
-  INST_4x(vpermil2ps, kInstVpermil2ps, YmmReg, YmmReg, YmmReg, YmmReg)
-  INST_4x(vpermil2ps, kInstVpermil2ps, YmmReg, YmmReg, Mem, YmmReg)
-  INST_4x(vpermil2ps, kInstVpermil2ps, YmmReg, YmmReg, YmmReg, Mem)
-
-  INST_2x(vphaddbd, kInstVphaddbd, XmmReg, XmmReg)
-  INST_2x(vphaddbd, kInstVphaddbd, XmmReg, Mem)
-  INST_2x(vphaddbq, kInstVphaddbq, XmmReg, XmmReg)
-  INST_2x(vphaddbq, kInstVphaddbq, XmmReg, Mem)
-  INST_2x(vphaddbw, kInstVphaddbw, XmmReg, XmmReg)
-  INST_2x(vphaddbw, kInstVphaddbw, XmmReg, Mem)
-  INST_2x(vphadddq, kInstVphadddq, XmmReg, XmmReg)
-  INST_2x(vphadddq, kInstVphadddq, XmmReg, Mem)
-  INST_2x(vphaddwd, kInstVphaddwd, XmmReg, XmmReg)
-  INST_2x(vphaddwd, kInstVphaddwd, XmmReg, Mem)
-  INST_2x(vphaddwq, kInstVphaddwq, XmmReg, XmmReg)
-  INST_2x(vphaddwq, kInstVphaddwq, XmmReg, Mem)
-
-  INST_2x(vphaddubd, kInstVphaddubd, XmmReg, XmmReg)
-  INST_2x(vphaddubd, kInstVphaddubd, XmmReg, Mem)
-  INST_2x(vphaddubq, kInstVphaddubq, XmmReg, XmmReg)
-  INST_2x(vphaddubq, kInstVphaddubq, XmmReg, Mem)
-  INST_2x(vphaddubw, kInstVphaddubw, XmmReg, XmmReg)
-  INST_2x(vphaddubw, kInstVphaddubw, XmmReg, Mem)
-  INST_2x(vphaddudq, kInstVphaddudq, XmmReg, XmmReg)
-  INST_2x(vphaddudq, kInstVphaddudq, XmmReg, Mem)
-  INST_2x(vphadduwd, kInstVphadduwd, XmmReg, XmmReg)
-  INST_2x(vphadduwd, kInstVphadduwd, XmmReg, Mem)
-  INST_2x(vphadduwq, kInstVphadduwq, XmmReg, XmmReg)
-  INST_2x(vphadduwq, kInstVphadduwq, XmmReg, Mem)
-
-  INST_2x(vphsubbw, kInstVphsubbw, XmmReg, XmmReg)
-  INST_2x(vphsubbw, kInstVphsubbw, XmmReg, Mem)
-  INST_2x(vphsubdq, kInstVphsubdq, XmmReg, XmmReg)
-  INST_2x(vphsubdq, kInstVphsubdq, XmmReg, Mem)
-  INST_2x(vphsubwd, kInstVphsubwd, XmmReg, XmmReg)
-  INST_2x(vphsubwd, kInstVphsubwd, XmmReg, Mem)
-
-  INST_4x(vpmacsdd, kInstVpmacsdd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacsdd, kInstVpmacsdd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpmacsdqh, kInstVpmacsdqh, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacsdqh, kInstVpmacsdqh, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpmacsdql, kInstVpmacsdql, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacsdql, kInstVpmacsdql, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpmacswd, kInstVpmacswd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacswd, kInstVpmacswd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpmacsww, kInstVpmacsww, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacsww, kInstVpmacsww, XmmReg, XmmReg, Mem, XmmReg)
-
-  INST_4x(vpmacssdd, kInstVpmacssdd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacssdd, kInstVpmacssdd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpmacssdqh, kInstVpmacssdqh, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacssdqh, kInstVpmacssdqh, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpmacssdql, kInstVpmacssdql, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacssdql, kInstVpmacssdql, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpmacsswd, kInstVpmacsswd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacsswd, kInstVpmacsswd, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpmacssww, kInstVpmacssww, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmacssww, kInstVpmacssww, XmmReg, XmmReg, Mem, XmmReg)
-
-  INST_4x(vpmadcsswd, kInstVpmadcsswd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmadcsswd, kInstVpmadcsswd, XmmReg, XmmReg, Mem, XmmReg)
-
-  INST_4x(vpmadcswd, kInstVpmadcswd, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpmadcswd, kInstVpmadcswd, XmmReg, XmmReg, Mem, XmmReg)
-
-  INST_4x(vpperm, kInstVpperm, XmmReg, XmmReg, XmmReg, XmmReg)
-  INST_4x(vpperm, kInstVpperm, XmmReg, XmmReg, Mem, XmmReg)
-  INST_4x(vpperm, kInstVpperm, XmmReg, XmmReg, XmmReg, Mem)
-
-  INST_3x(vprotb, kInstVprotb, XmmReg, XmmReg, XmmReg)
-  INST_3x(vprotb, kInstVprotb, XmmReg, Mem, XmmReg)
-  INST_3x(vprotb, kInstVprotb, XmmReg, XmmReg, Mem)
-  INST_3i(vprotb, kInstVprotb, XmmReg, XmmReg, Imm)
-  INST_3i(vprotb, kInstVprotb, XmmReg, Mem, Imm)
-
-  INST_3x(vprotd, kInstVprotd, XmmReg, XmmReg, XmmReg)
-  INST_3x(vprotd, kInstVprotd, XmmReg, Mem, XmmReg)
-  INST_3x(vprotd, kInstVprotd, XmmReg, XmmReg, Mem)
-  INST_3i(vprotd, kInstVprotd, XmmReg, XmmReg, Imm)
-  INST_3i(vprotd, kInstVprotd, XmmReg, Mem, Imm)
-
-  INST_3x(vprotq, kInstVprotq, XmmReg, XmmReg, XmmReg)
-  INST_3x(vprotq, kInstVprotq, XmmReg, Mem, XmmReg)
-  INST_3x(vprotq, kInstVprotq, XmmReg, XmmReg, Mem)
-  INST_3i(vprotq, kInstVprotq, XmmReg, XmmReg, Imm)
-  INST_3i(vprotq, kInstVprotq, XmmReg, Mem, Imm)
-
-  INST_3x(vprotw, kInstVprotw, XmmReg, XmmReg, XmmReg)
-  INST_3x(vprotw, kInstVprotw, XmmReg, Mem, XmmReg)
-  INST_3x(vprotw, kInstVprotw, XmmReg, XmmReg, Mem)
-  INST_3i(vprotw, kInstVprotw, XmmReg, XmmReg, Imm)
-  INST_3i(vprotw, kInstVprotw, XmmReg, Mem, Imm)
-
-  INST_3x(vpshab, kInstVpshab, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpshab, kInstVpshab, XmmReg, Mem, XmmReg)
-  INST_3x(vpshab, kInstVpshab, XmmReg, XmmReg, Mem)
-
-  INST_3x(vpshad, kInstVpshad, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpshad, kInstVpshad, XmmReg, Mem, XmmReg)
-  INST_3x(vpshad, kInstVpshad, XmmReg, XmmReg, Mem)
-
-  INST_3x(vpshaq, kInstVpshaq, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpshaq, kInstVpshaq, XmmReg, Mem, XmmReg)
-  INST_3x(vpshaq, kInstVpshaq, XmmReg, XmmReg, Mem)
-
-  INST_3x(vpshaw, kInstVpshaw, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpshaw, kInstVpshaw, XmmReg, Mem, XmmReg)
-  INST_3x(vpshaw, kInstVpshaw, XmmReg, XmmReg, Mem)
-
-  INST_3x(vpshlb, kInstVpshlb, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpshlb, kInstVpshlb, XmmReg, Mem, XmmReg)
-  INST_3x(vpshlb, kInstVpshlb, XmmReg, XmmReg, Mem)
-
-  INST_3x(vpshld, kInstVpshld, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpshld, kInstVpshld, XmmReg, Mem, XmmReg)
-  INST_3x(vpshld, kInstVpshld, XmmReg, XmmReg, Mem)
-
-  INST_3x(vpshlq, kInstVpshlq, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpshlq, kInstVpshlq, XmmReg, Mem, XmmReg)
-  INST_3x(vpshlq, kInstVpshlq, XmmReg, XmmReg, Mem)
-
-  INST_3x(vpshlw, kInstVpshlw, XmmReg, XmmReg, XmmReg)
-  INST_3x(vpshlw, kInstVpshlw, XmmReg, Mem, XmmReg)
-  INST_3x(vpshlw, kInstVpshlw, XmmReg, XmmReg, Mem)
-
-  // --------------------------------------------------------------------------
-  // [BMI]
-  // --------------------------------------------------------------------------
-
-  //! Bitwise and-not (BMI).
-  INST_3x(andn, kInstAndn, GpReg, GpReg, GpReg)
-  //! \overload
-  INST_3x(andn, kInstAndn, GpReg, GpReg, Mem)
-
-  //! Bit field extract (BMI).
-  INST_3x(bextr, kInstBextr, GpReg, GpReg, GpReg)
-  //! \overload
-  INST_3x(bextr, kInstBextr, GpReg, Mem, GpReg)
-
-  //! Extract lower set isolated bit (BMI).
-  INST_2x(blsi, kInstBlsi, GpReg, GpReg)
-  //! \overload
-  INST_2x(blsi, kInstBlsi, GpReg, Mem)
-
-  //! Get mask up to lowest set bit (BMI).
-  INST_2x(blsmsk, kInstBlsmsk, GpReg, GpReg)
-  //! \overload
-  INST_2x(blsmsk, kInstBlsmsk, GpReg, Mem)
-
-  //! Reset lowest set bit (BMI).
-  INST_2x(blsr, kInstBlsr, GpReg, GpReg)
-  //! \overload
-  INST_2x(blsr, kInstBlsr, GpReg, Mem)
-
-  //! Count the number of trailing zero bits (BMI).
-  INST_2x(tzcnt, kInstTzcnt, GpReg, GpReg)
-  //! \overload
-  INST_2x(tzcnt, kInstTzcnt, GpReg, Mem)
+  INST_2x_(popcnt, kX86InstIdPopcnt, X86GpReg, X86Mem, !o0.isGpb())
 
   // --------------------------------------------------------------------------
   // [LZCNT]
   // --------------------------------------------------------------------------
 
   //! Count the number of leading zero bits (LZCNT).
-  INST_2x(lzcnt, kInstLzcnt, GpReg, GpReg)
+  INST_2x(lzcnt, kX86InstIdLzcnt, X86GpReg, X86GpReg)
   //! \overload
-  INST_2x(lzcnt, kInstLzcnt, GpReg, Mem)
+  INST_2x(lzcnt, kX86InstIdLzcnt, X86GpReg, X86Mem)
+
+  // --------------------------------------------------------------------------
+  // [AESNI]
+  // --------------------------------------------------------------------------
+
+  //! Perform a single round of the AES decryption flow (AESNI).
+  INST_2x(aesdec, kX86InstIdAesdec, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(aesdec, kX86InstIdAesdec, X86XmmReg, X86Mem)
+
+  //! Perform the last round of the AES decryption flow (AESNI).
+  INST_2x(aesdeclast, kX86InstIdAesdeclast, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(aesdeclast, kX86InstIdAesdeclast, X86XmmReg, X86Mem)
+
+  //! Perform a single round of the AES encryption flow (AESNI).
+  INST_2x(aesenc, kX86InstIdAesenc, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(aesenc, kX86InstIdAesenc, X86XmmReg, X86Mem)
+
+  //! Perform the last round of the AES encryption flow (AESNI).
+  INST_2x(aesenclast, kX86InstIdAesenclast, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(aesenclast, kX86InstIdAesenclast, X86XmmReg, X86Mem)
+
+  //! Perform the InvMixColumns transformation (AESNI).
+  INST_2x(aesimc, kX86InstIdAesimc, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(aesimc, kX86InstIdAesimc, X86XmmReg, X86Mem)
+
+  //! Assist in expanding the AES cipher key (AESNI).
+  INST_3i(aeskeygenassist, kX86InstIdAeskeygenassist, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(aeskeygenassist, kX86InstIdAeskeygenassist, X86XmmReg, X86Mem, Imm)
+
+  // --------------------------------------------------------------------------
+  // [PCLMULQDQ]
+  // --------------------------------------------------------------------------
+
+  //! Packed QWORD to OWORD carry-less multiply (PCLMULQDQ).
+  INST_3i(pclmulqdq, kX86InstIdPclmulqdq, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(pclmulqdq, kX86InstIdPclmulqdq, X86XmmReg, X86Mem, Imm)
+
+  // --------------------------------------------------------------------------
+  // [XSAVE]
+  // --------------------------------------------------------------------------
+
+  //! Restore Processor Extended States specified by `EDX:EAX` (XSAVE).
+  INST_1x(xrstor, kX86InstIdXrstor, X86Mem)
+  //! Restore Processor Extended States specified by `EDX:EAX` (XSAVE&X64).
+  INST_1x(xrstor64, kX86InstIdXrstor64, X86Mem)
+
+  //! Save Processor Extended States specified by `EDX:EAX` (XSAVE).
+  INST_1x(xsave, kX86InstIdXsave, X86Mem)
+  //! Save Processor Extended States specified by `EDX:EAX` (XSAVE&X64).
+  INST_1x(xsave64, kX86InstIdXsave64, X86Mem)
+
+  //! Save Processor Extended States specified by `EDX:EAX` (Optimized) (XSAVEOPT).
+  INST_1x(xsaveopt, kX86InstIdXsave, X86Mem)
+  //! Save Processor Extended States specified by `EDX:EAX` (Optimized) (XSAVEOPT&X64).
+  INST_1x(xsaveopt64, kX86InstIdXsave64, X86Mem)
+
+  //! Get XCR - `EDX:EAX <- XCR[ECX]` (XSAVE).
+  INST_0x(xgetbv, kX86InstIdXgetbv)
+  //! Set XCR - `XCR[ECX] <- EDX:EAX` (XSAVE).
+  INST_0x(xsetbv, kX86InstIdXsetbv)
+
+  // --------------------------------------------------------------------------
+  // [AVX]
+  // --------------------------------------------------------------------------
+
+  //! Packed DP-FP add (AVX).
+  INST_3x(vaddpd, kX86InstIdVaddpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaddpd, kX86InstIdVaddpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vaddpd, kX86InstIdVaddpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vaddpd, kX86InstIdVaddpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP add (AVX).
+  INST_3x(vaddps, kX86InstIdVaddps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaddps, kX86InstIdVaddps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vaddps, kX86InstIdVaddps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vaddps, kX86InstIdVaddps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Scalar DP-FP add (AVX)
+  INST_3x(vaddsd, kX86InstIdVaddsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaddsd, kX86InstIdVaddsd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Scalar SP-FP add (AVX)
+  INST_3x(vaddss, kX86InstIdVaddss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaddss, kX86InstIdVaddss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DP-FP add/subtract (AVX).
+  INST_3x(vaddsubpd, kX86InstIdVaddsubpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaddsubpd, kX86InstIdVaddsubpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vaddsubpd, kX86InstIdVaddsubpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vaddsubpd, kX86InstIdVaddsubpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP add/subtract (AVX).
+  INST_3x(vaddsubps, kX86InstIdVaddsubps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaddsubps, kX86InstIdVaddsubps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vaddsubps, kX86InstIdVaddsubps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vaddsubps, kX86InstIdVaddsubps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DP-FP bitwise and (AVX).
+  INST_3x(vandpd, kX86InstIdVandpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vandpd, kX86InstIdVandpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vandpd, kX86InstIdVandpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vandpd, kX86InstIdVandpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP bitwise and (AVX).
+  INST_3x(vandps, kX86InstIdVandps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vandps, kX86InstIdVandps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vandps, kX86InstIdVandps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vandps, kX86InstIdVandps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DP-FP bitwise and-not (AVX).
+  INST_3x(vandnpd, kX86InstIdVandnpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vandnpd, kX86InstIdVandnpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vandnpd, kX86InstIdVandnpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vandnpd, kX86InstIdVandnpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP bitwise and-not (AVX).
+  INST_3x(vandnps, kX86InstIdVandnps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vandnps, kX86InstIdVandnps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vandnps, kX86InstIdVandnps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vandnps, kX86InstIdVandnps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DP-FP blend (AVX).
+  INST_4i(vblendpd, kX86InstIdVblendpd, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vblendpd, kX86InstIdVblendpd, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_4i(vblendpd, kX86InstIdVblendpd, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vblendpd, kX86InstIdVblendpd, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Packed SP-FP blend (AVX).
+  INST_4i(vblendps, kX86InstIdVblendps, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vblendps, kX86InstIdVblendps, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_4i(vblendps, kX86InstIdVblendps, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vblendps, kX86InstIdVblendps, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Packed DP-FP variable blend (AVX).
+  INST_4x(vblendvpd, kX86InstIdVblendvpd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_4x(vblendvpd, kX86InstIdVblendvpd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  //! \overload
+  INST_4x(vblendvpd, kX86InstIdVblendvpd, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_4x(vblendvpd, kX86InstIdVblendvpd, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+
+  //! Packed SP-FP variable blend (AVX).
+  INST_4x(vblendvps, kX86InstIdVblendvps, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_4x(vblendvps, kX86InstIdVblendvps, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  //! \overload
+  INST_4x(vblendvps, kX86InstIdVblendvps, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_4x(vblendvps, kX86InstIdVblendvps, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+
+  //! Broadcast 128-bits of FP data in `o1` to low and high 128-bits in `o0` (AVX).
+  INST_2x(vbroadcastf128, kX86InstIdVbroadcastf128, X86YmmReg, X86Mem)
+  //! Broadcast DP-FP element in `o1` to four locations in `o0` (AVX).
+  INST_2x(vbroadcastsd, kX86InstIdVbroadcastsd, X86YmmReg, X86Mem)
+  //! Broadcast SP-FP element in `o1` to four locations in `o0` (AVX).
+  INST_2x(vbroadcastss, kX86InstIdVbroadcastss, X86XmmReg, X86Mem)
+  //! Broadcast SP-FP element in `o1` to eight locations in `o0` (AVX).
+  INST_2x(vbroadcastss, kX86InstIdVbroadcastss, X86YmmReg, X86Mem)
+
+  //! Packed DP-FP compare (AVX).
+  INST_4i(vcmppd, kX86InstIdVcmppd, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vcmppd, kX86InstIdVcmppd, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_4i(vcmppd, kX86InstIdVcmppd, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vcmppd, kX86InstIdVcmppd, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Packed SP-FP compare (AVX).
+  INST_4i(vcmpps, kX86InstIdVcmpps, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vcmpps, kX86InstIdVcmpps, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_4i(vcmpps, kX86InstIdVcmpps, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vcmpps, kX86InstIdVcmpps, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Scalar DP-FP compare (AVX).
+  INST_4i(vcmpsd, kX86InstIdVcmpsd, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vcmpsd, kX86InstIdVcmpsd, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Scalar SP-FP compare (AVX).
+  INST_4i(vcmpss, kX86InstIdVcmpss, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vcmpss, kX86InstIdVcmpss, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Scalar DP-FP ordered compare and set EFLAGS (AVX).
+  INST_2x(vcomisd, kX86InstIdVcomisd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcomisd, kX86InstIdVcomisd, X86XmmReg, X86Mem)
+
+  //! Scalar SP-FP ordered compare and set EFLAGS (AVX).
+  INST_2x(vcomiss, kX86InstIdVcomiss, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcomiss, kX86InstIdVcomiss, X86XmmReg, X86Mem)
+
+  //! Convert packed QWORDs to packed DP-FP (AVX).
+  INST_2x(vcvtdq2pd, kX86InstIdVcvtdq2pd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtdq2pd, kX86InstIdVcvtdq2pd, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vcvtdq2pd, kX86InstIdVcvtdq2pd, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtdq2pd, kX86InstIdVcvtdq2pd, X86YmmReg, X86Mem)
+
+  //! Convert packed QWORDs to packed SP-FP (AVX).
+  INST_2x(vcvtdq2ps, kX86InstIdVcvtdq2ps, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtdq2ps, kX86InstIdVcvtdq2ps, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vcvtdq2ps, kX86InstIdVcvtdq2ps, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vcvtdq2ps, kX86InstIdVcvtdq2ps, X86YmmReg, X86Mem)
+
+  //! Convert packed DP-FP to packed DWORDs (AVX).
+  INST_2x(vcvtpd2dq, kX86InstIdVcvtpd2dq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtpd2dq, kX86InstIdVcvtpd2dq, X86XmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vcvtpd2dq, kX86InstIdVcvtpd2dq, X86XmmReg, X86Mem)
+
+  //! Convert packed DP-FP to packed SP-FP (AVX).
+  INST_2x(vcvtpd2ps, kX86InstIdVcvtpd2ps, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtpd2ps, kX86InstIdVcvtpd2ps, X86XmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vcvtpd2ps, kX86InstIdVcvtpd2ps, X86XmmReg, X86Mem)
+
+  //! Convert packed SP-FP to packed DWORDs (AVX).
+  INST_2x(vcvtps2dq, kX86InstIdVcvtps2dq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtps2dq, kX86InstIdVcvtps2dq, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vcvtps2dq, kX86InstIdVcvtps2dq, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vcvtps2dq, kX86InstIdVcvtps2dq, X86YmmReg, X86Mem)
+
+  //! Convert packed SP-FP to packed DP-FP (AVX).
+  INST_2x(vcvtps2pd, kX86InstIdVcvtps2pd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtps2pd, kX86InstIdVcvtps2pd, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vcvtps2pd, kX86InstIdVcvtps2pd, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtps2pd, kX86InstIdVcvtps2pd, X86YmmReg, X86Mem)
+
+  //! Convert scalar DP-FP to DWORD (AVX).
+  INST_2x(vcvtsd2si, kX86InstIdVcvtsd2si, X86GpReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtsd2si, kX86InstIdVcvtsd2si, X86GpReg, X86Mem)
+
+  //! Convert scalar DP-FP to scalar SP-FP (AVX).
+  INST_3x(vcvtsd2ss, kX86InstIdVcvtsd2ss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vcvtsd2ss, kX86InstIdVcvtsd2ss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Convert DWORD integer to scalar DP-FP (AVX).
+  INST_3x(vcvtsi2sd, kX86InstIdVcvtsi2sd, X86XmmReg, X86XmmReg, X86GpReg)
+  //! \overload
+  INST_3x(vcvtsi2sd, kX86InstIdVcvtsi2sd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Convert scalar INT32 to SP-FP (AVX).
+  INST_3x(vcvtsi2ss, kX86InstIdVcvtsi2ss, X86XmmReg, X86XmmReg, X86GpReg)
+  //! \overload
+  INST_3x(vcvtsi2ss, kX86InstIdVcvtsi2ss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Convert scalar SP-FP to DP-FP (AVX).
+  INST_3x(vcvtss2sd, kX86InstIdVcvtss2sd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vcvtss2sd, kX86InstIdVcvtss2sd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Convert scalar SP-FP to INT32 (AVX).
+  INST_2x(vcvtss2si, kX86InstIdVcvtss2si, X86GpReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvtss2si, kX86InstIdVcvtss2si, X86GpReg, X86Mem)
+
+  //! Convert with truncation packed DP-FP to packed DWORDs (AVX).
+  INST_2x(vcvttpd2dq, kX86InstIdVcvttpd2dq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvttpd2dq, kX86InstIdVcvttpd2dq, X86XmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vcvttpd2dq, kX86InstIdVcvttpd2dq, X86XmmReg, X86Mem)
+
+  //! Convert with truncation packed SP-FP to packed DWORDs (AVX).
+  INST_2x(vcvttps2dq, kX86InstIdVcvttps2dq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvttps2dq, kX86InstIdVcvttps2dq, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vcvttps2dq, kX86InstIdVcvttps2dq, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vcvttps2dq, kX86InstIdVcvttps2dq, X86YmmReg, X86Mem)
+
+  //! Convert with truncation scalar DP-FP to INT32 (AVX).
+  INST_2x(vcvttsd2si, kX86InstIdVcvttsd2si, X86GpReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvttsd2si, kX86InstIdVcvttsd2si, X86GpReg, X86Mem)
+
+  //! Convert with truncation scalar SP-FP to INT32 (AVX).
+  INST_2x(vcvttss2si, kX86InstIdVcvttss2si, X86GpReg, X86XmmReg)
+  //! \overload
+  INST_2x(vcvttss2si, kX86InstIdVcvttss2si, X86GpReg, X86Mem)
+
+  //! Packed DP-FP divide (AVX).
+  INST_3x(vdivpd, kX86InstIdVdivpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vdivpd, kX86InstIdVdivpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vdivpd, kX86InstIdVdivpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vdivpd, kX86InstIdVdivpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP divide (AVX).
+  INST_3x(vdivps, kX86InstIdVdivps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vdivps, kX86InstIdVdivps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vdivps, kX86InstIdVdivps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vdivps, kX86InstIdVdivps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Scalar DP-FP divide (AVX).
+  INST_3x(vdivsd, kX86InstIdVdivsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vdivsd, kX86InstIdVdivsd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Scalar SP-FP divide (AVX).
+  INST_3x(vdivss, kX86InstIdVdivss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vdivss, kX86InstIdVdivss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DP-FP dot product (AVX).
+  INST_4i(vdppd, kX86InstIdVdppd, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vdppd, kX86InstIdVdppd, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Packed SP-FP dot product (AVX).
+  INST_4i(vdpps, kX86InstIdVdpps, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vdpps, kX86InstIdVdpps, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_4i(vdpps, kX86InstIdVdpps, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vdpps, kX86InstIdVdpps, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Extract 128 bits of packed FP data from `o1` and store results in `o0` (AVX).
+  INST_3i(vextractf128, kX86InstIdVextractf128, X86XmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_3i(vextractf128, kX86InstIdVextractf128, X86Mem, X86YmmReg, Imm)
+
+  //! Extract SP-FP based on selector (AVX).
+  INST_3i(vextractps, kX86InstIdVextractps, X86GpReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vextractps, kX86InstIdVextractps, X86Mem, X86XmmReg, Imm)
+
+  //! Packed DP-FP horizontal add (AVX).
+  INST_3x(vhaddpd, kX86InstIdVhaddpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vhaddpd, kX86InstIdVhaddpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vhaddpd, kX86InstIdVhaddpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vhaddpd, kX86InstIdVhaddpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP horizontal add (AVX).
+  INST_3x(vhaddps, kX86InstIdVhaddps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vhaddps, kX86InstIdVhaddps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vhaddps, kX86InstIdVhaddps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vhaddps, kX86InstIdVhaddps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DP-FP horizontal subtract (AVX).
+  INST_3x(vhsubpd, kX86InstIdVhsubpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vhsubpd, kX86InstIdVhsubpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vhsubpd, kX86InstIdVhsubpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vhsubpd, kX86InstIdVhsubpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP horizontal subtract (AVX).
+  INST_3x(vhsubps, kX86InstIdVhsubps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vhsubps, kX86InstIdVhsubps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vhsubps, kX86InstIdVhsubps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vhsubps, kX86InstIdVhsubps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Insert 128-bit of packed FP data based on selector (AVX).
+  INST_4i(vinsertf128, kX86InstIdVinsertf128, X86YmmReg, X86YmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vinsertf128, kX86InstIdVinsertf128, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Insert SP-FP based on selector (AVX).
+  INST_4i(vinsertps, kX86InstIdVinsertps, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vinsertps, kX86InstIdVinsertps, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Load 128-bits unaligned (AVX).
+  INST_2x(vlddqu, kX86InstIdVlddqu, X86XmmReg, X86Mem)
+  //! Load 256-bits unaligned (AVX).
+  INST_2x(vlddqu, kX86InstIdVlddqu, X86YmmReg, X86Mem)
+
+  //! Load streaming SIMD extension control/status (AVX).
+  INST_1x(vldmxcsr, kX86InstIdVldmxcsr, X86Mem)
+
+  //! Store selected bytes of OWORD to DS:EDI/RDI (AVX).
+  INST_2x(vmaskmovdqu, kX86InstIdVmaskmovdqu, X86XmmReg, X86XmmReg)
+
+  //! Conditionally load packed DP-FP from `o2` using mask in `o1 and store in `o0` (AVX).
+  INST_3x(vmaskmovpd, kX86InstIdVmaskmovpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vmaskmovpd, kX86InstIdVmaskmovpd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vmaskmovpd, kX86InstIdVmaskmovpd, X86Mem, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmaskmovpd, kX86InstIdVmaskmovpd, X86Mem, X86YmmReg, X86YmmReg)
+
+  //! Conditionally load packed SP-FP from `o2` using mask in `o1 and store in `o0` (AVX).
+  INST_3x(vmaskmovps, kX86InstIdVmaskmovps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vmaskmovps, kX86InstIdVmaskmovps, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vmaskmovps, kX86InstIdVmaskmovps, X86Mem, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmaskmovps, kX86InstIdVmaskmovps, X86Mem, X86YmmReg, X86YmmReg)
+
+  //! Packed DP-FP maximum (AVX).
+  INST_3x(vmaxpd, kX86InstIdVmaxpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmaxpd, kX86InstIdVmaxpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vmaxpd, kX86InstIdVmaxpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vmaxpd, kX86InstIdVmaxpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP maximum (AVX).
+  INST_3x(vmaxps, kX86InstIdVmaxps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmaxps, kX86InstIdVmaxps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vmaxps, kX86InstIdVmaxps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vmaxps, kX86InstIdVmaxps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Scalar DP-FP maximum (AVX).
+  INST_3x(vmaxsd, kX86InstIdVmaxsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmaxsd, kX86InstIdVmaxsd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Scalar SP-FP maximum (AVX).
+  INST_3x(vmaxss, kX86InstIdVmaxss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmaxss, kX86InstIdVmaxss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DP-FP minimum (AVX).
+  INST_3x(vminpd, kX86InstIdVminpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vminpd, kX86InstIdVminpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vminpd, kX86InstIdVminpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vminpd, kX86InstIdVminpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP minimum (AVX).
+  INST_3x(vminps, kX86InstIdVminps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vminps, kX86InstIdVminps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vminps, kX86InstIdVminps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vminps, kX86InstIdVminps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Scalar DP-FP minimum (AVX).
+  INST_3x(vminsd, kX86InstIdVminsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vminsd, kX86InstIdVminsd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Scalar SP-FP minimum (AVX).
+  INST_3x(vminss, kX86InstIdVminss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vminss, kX86InstIdVminss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Move 128-bits of aligned packed DP-FP (AVX).
+  INST_2x(vmovapd, kX86InstIdVmovapd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovapd, kX86InstIdVmovapd, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovapd, kX86InstIdVmovapd, X86Mem, X86XmmReg)
+  //! Move 256-bits of aligned packed DP-FP (AVX).
+  INST_2x(vmovapd, kX86InstIdVmovapd, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vmovapd, kX86InstIdVmovapd, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovapd, kX86InstIdVmovapd, X86Mem, X86YmmReg)
+
+  //! Move 128-bits of aligned packed SP-FP (AVX).
+  INST_2x(vmovaps, kX86InstIdVmovaps, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovaps, kX86InstIdVmovaps, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovaps, kX86InstIdVmovaps, X86Mem, X86XmmReg)
+  //! Move 256-bits of aligned packed SP-FP (AVX).
+  INST_2x(vmovaps, kX86InstIdVmovaps, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vmovaps, kX86InstIdVmovaps, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovaps, kX86InstIdVmovaps, X86Mem, X86YmmReg)
+
+  //! Move DWORD (AVX).
+  INST_2x(vmovd, kX86InstIdVmovd, X86XmmReg, X86GpReg)
+  //! \overload
+  INST_2x(vmovd, kX86InstIdVmovd, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovd, kX86InstIdVmovd, X86GpReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovd, kX86InstIdVmovd, X86Mem, X86XmmReg)
+
+  //! Move QWORD (AVX).
+  INST_2x(vmovq, kX86InstIdVmovq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovq, kX86InstIdVmovq, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovq, kX86InstIdVmovq, X86Mem, X86XmmReg)
+
+  //! Move QWORD (AVX and X64 Only).
+  INST_2x(vmovq, kX86InstIdVmovq, X86XmmReg, X86GpReg)
+  //! \overload
+  INST_2x(vmovq, kX86InstIdVmovq, X86GpReg, X86XmmReg)
+
+  //! Move one DP-FP and duplicate (AVX).
+  INST_2x(vmovddup, kX86InstIdVmovddup, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovddup, kX86InstIdVmovddup, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovddup, kX86InstIdVmovddup, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vmovddup, kX86InstIdVmovddup, X86YmmReg, X86Mem)
+
+  //! Move 128-bits aligned (AVX).
+  INST_2x(vmovdqa, kX86InstIdVmovdqa, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovdqa, kX86InstIdVmovdqa, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovdqa, kX86InstIdVmovdqa, X86Mem, X86XmmReg)
+  //! Move 256-bits aligned (AVX).
+  INST_2x(vmovdqa, kX86InstIdVmovdqa, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vmovdqa, kX86InstIdVmovdqa, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovdqa, kX86InstIdVmovdqa, X86Mem, X86YmmReg)
+
+  //! Move 128-bits unaligned (AVX).
+  INST_2x(vmovdqu, kX86InstIdVmovdqu, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovdqu, kX86InstIdVmovdqu, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovdqu, kX86InstIdVmovdqu, X86Mem, X86XmmReg)
+  //! Move 256-bits unaligned (AVX).
+  INST_2x(vmovdqu, kX86InstIdVmovdqu, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vmovdqu, kX86InstIdVmovdqu, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovdqu, kX86InstIdVmovdqu, X86Mem, X86YmmReg)
+
+  //! High to low packed SP-FP (AVX).
+  INST_3x(vmovhlps, kX86InstIdVmovhlps, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  //! Move high packed DP-FP (AVX).
+  INST_3x(vmovhpd, kX86InstIdVmovhpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovhpd, kX86InstIdVmovhpd, X86Mem, X86XmmReg)
+
+  //! Move high packed SP-FP (AVX).
+  INST_3x(vmovhps, kX86InstIdVmovhps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovhps, kX86InstIdVmovhps, X86Mem, X86XmmReg)
+
+  //! Move low to high packed SP-FP (AVX).
+  INST_3x(vmovlhps, kX86InstIdVmovlhps, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  //! Move low packed DP-FP (AVX).
+  INST_3x(vmovlpd, kX86InstIdVmovlpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovlpd, kX86InstIdVmovlpd, X86Mem, X86XmmReg)
+
+  //! Move low packed SP-FP (AVX).
+  INST_3x(vmovlps, kX86InstIdVmovlps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovlps, kX86InstIdVmovlps, X86Mem, X86XmmReg)
+
+  //! Extract packed DP-FP sign mask (AVX).
+  INST_2x(vmovmskpd, kX86InstIdVmovmskpd, X86GpReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovmskpd, kX86InstIdVmovmskpd, X86GpReg, X86YmmReg)
+
+  //! Extract packed SP-FP sign mask (AVX).
+  INST_2x(vmovmskps, kX86InstIdVmovmskps, X86GpReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovmskps, kX86InstIdVmovmskps, X86GpReg, X86YmmReg)
+
+  //! Store 128-bits using NT hint (AVX).
+  INST_2x(vmovntdq, kX86InstIdVmovntdq, X86Mem, X86XmmReg)
+  //! Store 256-bits using NT hint (AVX).
+  INST_2x(vmovntdq, kX86InstIdVmovntdq, X86Mem, X86YmmReg)
+
+  //! Store 128-bits aligned using NT hint (AVX).
+  INST_2x(vmovntdqa, kX86InstIdVmovntdqa, X86XmmReg, X86Mem)
+
+  //! Store packed DP-FP (128-bits) using NT hint (AVX).
+  INST_2x(vmovntpd, kX86InstIdVmovntpd, X86Mem, X86XmmReg)
+  //! Store packed DP-FP (256-bits) using NT hint (AVX).
+  INST_2x(vmovntpd, kX86InstIdVmovntpd, X86Mem, X86YmmReg)
+
+  //! Store packed SP-FP (128-bits) using NT hint (AVX).
+  INST_2x(vmovntps, kX86InstIdVmovntps, X86Mem, X86XmmReg)
+  //! Store packed SP-FP (256-bits) using NT hint (AVX).
+  INST_2x(vmovntps, kX86InstIdVmovntps, X86Mem, X86YmmReg)
+
+  //! Move scalar DP-FP (AVX).
+  INST_3x(vmovsd, kX86InstIdVmovsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovsd, kX86InstIdVmovsd, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovsd, kX86InstIdVmovsd, X86Mem, X86XmmReg)
+
+  //! Move packed SP-FP high and duplicate (AVX).
+  INST_2x(vmovshdup, kX86InstIdVmovshdup, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovshdup, kX86InstIdVmovshdup, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovshdup, kX86InstIdVmovshdup, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vmovshdup, kX86InstIdVmovshdup, X86YmmReg, X86Mem)
+
+  //! Move packed SP-FP low and duplicate (AVX).
+  INST_2x(vmovsldup, kX86InstIdVmovsldup, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovsldup, kX86InstIdVmovsldup, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovsldup, kX86InstIdVmovsldup, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vmovsldup, kX86InstIdVmovsldup, X86YmmReg, X86Mem)
+
+  //! Move scalar SP-FP (AVX).
+  INST_3x(vmovss, kX86InstIdVmovss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovss, kX86InstIdVmovss, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovss, kX86InstIdVmovss, X86Mem, X86XmmReg)
+
+  //! Move 128-bits of unaligned packed DP-FP (AVX).
+  INST_2x(vmovupd, kX86InstIdVmovupd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovupd, kX86InstIdVmovupd, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovupd, kX86InstIdVmovupd, X86Mem, X86XmmReg)
+  //! Move 256-bits of unaligned packed DP-FP (AVX).
+  INST_2x(vmovupd, kX86InstIdVmovupd, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vmovupd, kX86InstIdVmovupd, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovupd, kX86InstIdVmovupd, X86Mem, X86YmmReg)
+
+  //! Move 128-bits of unaligned packed SP-FP (AVX).
+  INST_2x(vmovups, kX86InstIdVmovups, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vmovups, kX86InstIdVmovups, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovups, kX86InstIdVmovups, X86Mem, X86XmmReg)
+  //! Move 256-bits of unaligned packed SP-FP (AVX).
+  INST_2x(vmovups, kX86InstIdVmovups, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vmovups, kX86InstIdVmovups, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vmovups, kX86InstIdVmovups, X86Mem, X86YmmReg)
+
+  //! Packed WORD sums of absolute difference (AVX).
+  INST_4i(vmpsadbw, kX86InstIdVmpsadbw, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vmpsadbw, kX86InstIdVmpsadbw, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Packed DP-FP multiply (AVX).
+  INST_3x(vmulpd, kX86InstIdVmulpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmulpd, kX86InstIdVmulpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vmulpd, kX86InstIdVmulpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vmulpd, kX86InstIdVmulpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP multiply (AVX).
+  INST_3x(vmulps, kX86InstIdVmulps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmulps, kX86InstIdVmulps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vmulps, kX86InstIdVmulps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vmulps, kX86InstIdVmulps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP multiply (AVX).
+  INST_3x(vmulsd, kX86InstIdVmulsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmulsd, kX86InstIdVmulsd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Scalar SP-FP multiply (AVX).
+  INST_3x(vmulss, kX86InstIdVmulss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vmulss, kX86InstIdVmulss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DP-FP bitwise or (AVX).
+  INST_3x(vorpd, kX86InstIdVorpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vorpd, kX86InstIdVorpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vorpd, kX86InstIdVorpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vorpd, kX86InstIdVorpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP bitwise or (AVX).
+  INST_3x(vorps, kX86InstIdVorps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vorps, kX86InstIdVorps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vorps, kX86InstIdVorps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vorps, kX86InstIdVorps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed BYTE absolute value (AVX).
+  INST_2x(vpabsb, kX86InstIdVpabsb, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpabsb, kX86InstIdVpabsb, X86XmmReg, X86Mem)
+
+  //! Packed DWORD absolute value (AVX).
+  INST_2x(vpabsd, kX86InstIdVpabsd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpabsd, kX86InstIdVpabsd, X86XmmReg, X86Mem)
+
+  //! Packed WORD absolute value (AVX).
+  INST_2x(vpabsw, kX86InstIdVpabsw, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpabsw, kX86InstIdVpabsw, X86XmmReg, X86Mem)
+
+  //! Pack DWORDs to WORDs with signed saturation (AVX).
+  INST_3x(vpackssdw, kX86InstIdVpackssdw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpackssdw, kX86InstIdVpackssdw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Pack WORDs to BYTEs with signed saturation (AVX).
+  INST_3x(vpacksswb, kX86InstIdVpacksswb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpacksswb, kX86InstIdVpacksswb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Pack DWORDs to WORDs with unsigned saturation (AVX).
+  INST_3x(vpackusdw, kX86InstIdVpackusdw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpackusdw, kX86InstIdVpackusdw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Pack WORDs to BYTEs with unsigned saturation (AVX).
+  INST_3x(vpackuswb, kX86InstIdVpackuswb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpackuswb, kX86InstIdVpackuswb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE add (AVX).
+  INST_3x(vpaddb, kX86InstIdVpaddb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpaddb, kX86InstIdVpaddb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD add (AVX).
+  INST_3x(vpaddd, kX86InstIdVpaddd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpaddd, kX86InstIdVpaddd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed QWORD add (AVX).
+  INST_3x(vpaddq, kX86InstIdVpaddq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpaddq, kX86InstIdVpaddq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD add (AVX).
+  INST_3x(vpaddw, kX86InstIdVpaddw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpaddw, kX86InstIdVpaddw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE add with saturation (AVX).
+  INST_3x(vpaddsb, kX86InstIdVpaddsb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpaddsb, kX86InstIdVpaddsb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD add with saturation (AVX).
+  INST_3x(vpaddsw, kX86InstIdVpaddsw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpaddsw, kX86InstIdVpaddsw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE add with unsigned saturation (AVX).
+  INST_3x(vpaddusb, kX86InstIdVpaddusb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpaddusb, kX86InstIdVpaddusb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD add with unsigned saturation (AVX).
+  INST_3x(vpaddusw, kX86InstIdVpaddusw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpaddusw, kX86InstIdVpaddusw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed align right (AVX).
+  INST_4i(vpalignr, kX86InstIdVpalignr, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vpalignr, kX86InstIdVpalignr, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Packed bitwise and (AVX).
+  INST_3x(vpand, kX86InstIdVpand, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpand, kX86InstIdVpand, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed bitwise and-not (AVX).
+  INST_3x(vpandn, kX86InstIdVpandn, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpandn, kX86InstIdVpandn, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE average (AVX).
+  INST_3x(vpavgb, kX86InstIdVpavgb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpavgb, kX86InstIdVpavgb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD average (AVX).
+  INST_3x(vpavgw, kX86InstIdVpavgw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpavgw, kX86InstIdVpavgw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE variable blend (AVX).
+  INST_4x(vpblendvb, kX86InstIdVpblendvb, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_4x(vpblendvb, kX86InstIdVpblendvb, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+
+  //! Packed WORD blend (AVX).
+  INST_4i(vpblendw, kX86InstIdVpblendw, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vpblendw, kX86InstIdVpblendw, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Packed BYTEs compare for equality (AVX).
+  INST_3x(vpcmpeqb, kX86InstIdVpcmpeqb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpcmpeqb, kX86InstIdVpcmpeqb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORDs compare for equality (AVX).
+  INST_3x(vpcmpeqd, kX86InstIdVpcmpeqd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpcmpeqd, kX86InstIdVpcmpeqd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed QWORDs compare for equality (AVX).
+  INST_3x(vpcmpeqq, kX86InstIdVpcmpeqq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpcmpeqq, kX86InstIdVpcmpeqq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORDs compare for equality (AVX).
+  INST_3x(vpcmpeqw, kX86InstIdVpcmpeqw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpcmpeqw, kX86InstIdVpcmpeqw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTEs compare if greater than (AVX).
+  INST_3x(vpcmpgtb, kX86InstIdVpcmpgtb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpcmpgtb, kX86InstIdVpcmpgtb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORDs compare if greater than (AVX).
+  INST_3x(vpcmpgtd, kX86InstIdVpcmpgtd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpcmpgtd, kX86InstIdVpcmpgtd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed QWORDs compare if greater than (AVX).
+  INST_3x(vpcmpgtq, kX86InstIdVpcmpgtq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpcmpgtq, kX86InstIdVpcmpgtq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORDs compare if greater than (AVX).
+  INST_3x(vpcmpgtw, kX86InstIdVpcmpgtw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpcmpgtw, kX86InstIdVpcmpgtw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed compare explicit length strings, return index (AVX).
+  INST_3i(vpcmpestri, kX86InstIdVpcmpestri, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpcmpestri, kX86InstIdVpcmpestri, X86XmmReg, X86Mem, Imm)
+
+  //! Packed compare explicit length strings, return mask (AVX).
+  INST_3i(vpcmpestrm, kX86InstIdVpcmpestrm, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpcmpestrm, kX86InstIdVpcmpestrm, X86XmmReg, X86Mem, Imm)
+
+  //! Packed compare implicit length strings, return index (AVX).
+  INST_3i(vpcmpistri, kX86InstIdVpcmpistri, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpcmpistri, kX86InstIdVpcmpistri, X86XmmReg, X86Mem, Imm)
+
+  //! Packed compare implicit length strings, return mask (AVX).
+  INST_3i(vpcmpistrm, kX86InstIdVpcmpistrm, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpcmpistrm, kX86InstIdVpcmpistrm, X86XmmReg, X86Mem, Imm)
+
+  //! Packed DP-FP permute (AVX).
+  INST_3x(vpermilpd, kX86InstIdVpermilpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpermilpd, kX86InstIdVpermilpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpermilpd, kX86InstIdVpermilpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpermilpd, kX86InstIdVpermilpd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpermilpd, kX86InstIdVpermilpd, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpermilpd, kX86InstIdVpermilpd, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_3i(vpermilpd, kX86InstIdVpermilpd, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_3i(vpermilpd, kX86InstIdVpermilpd, X86YmmReg, X86Mem, Imm)
+
+  //! Packed SP-FP permute (AVX).
+  INST_3x(vpermilps, kX86InstIdVpermilps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpermilps, kX86InstIdVpermilps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpermilps, kX86InstIdVpermilps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpermilps, kX86InstIdVpermilps, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpermilps, kX86InstIdVpermilps, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpermilps, kX86InstIdVpermilps, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_3i(vpermilps, kX86InstIdVpermilps, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_3i(vpermilps, kX86InstIdVpermilps, X86YmmReg, X86Mem, Imm)
+
+  //! Packed 128-bit FP permute (AVX).
+  INST_4i(vperm2f128, kX86InstIdVperm2f128, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vperm2f128, kX86InstIdVperm2f128, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Extract BYTE (AVX).
+  INST_3i(vpextrb, kX86InstIdVpextrb, X86GpReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpextrb, kX86InstIdVpextrb, X86Mem, X86XmmReg, Imm)
+
+  //! Extract DWORD (AVX).
+  INST_3i(vpextrd, kX86InstIdVpextrd, X86GpReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpextrd, kX86InstIdVpextrd, X86Mem, X86XmmReg, Imm)
+
+  //! Extract QWORD (AVX and X64 Only).
+  INST_3i(vpextrq, kX86InstIdVpextrq, X86GpReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpextrq, kX86InstIdVpextrq, X86Mem, X86XmmReg, Imm)
+
+  //! Extract WORD (AVX).
+  INST_3i(vpextrw, kX86InstIdVpextrw, X86GpReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpextrw, kX86InstIdVpextrw, X86Mem, X86XmmReg, Imm)
+
+  //! Packed DWORD horizontal add (AVX).
+  INST_3x(vphaddd, kX86InstIdVphaddd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vphaddd, kX86InstIdVphaddd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD horizontal add with saturation (AVX).
+  INST_3x(vphaddsw, kX86InstIdVphaddsw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vphaddsw, kX86InstIdVphaddsw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD horizontal add (AVX).
+  INST_3x(vphaddw, kX86InstIdVphaddw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vphaddw, kX86InstIdVphaddw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD horizontal minimum (AVX).
+  INST_2x(vphminposuw, kX86InstIdVphminposuw, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vphminposuw, kX86InstIdVphminposuw, X86XmmReg, X86Mem)
+
+  //! Packed DWORD horizontal subtract (AVX).
+  INST_3x(vphsubd, kX86InstIdVphsubd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vphsubd, kX86InstIdVphsubd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD horizontal subtract with saturation (AVX).
+  INST_3x(vphsubsw, kX86InstIdVphsubsw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vphsubsw, kX86InstIdVphsubsw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD horizontal subtract (AVX).
+  INST_3x(vphsubw, kX86InstIdVphsubw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vphsubw, kX86InstIdVphsubw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Insert BYTE based on selector (AVX).
+  INST_4i(vpinsrb, kX86InstIdVpinsrb, X86XmmReg, X86XmmReg, X86GpReg, Imm)
+  //! \overload
+  INST_4i(vpinsrb, kX86InstIdVpinsrb, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Insert DWORD based on selector (AVX).
+  INST_4i(vpinsrd, kX86InstIdVpinsrd, X86XmmReg, X86XmmReg, X86GpReg, Imm)
+  //! \overload
+  INST_4i(vpinsrd, kX86InstIdVpinsrd, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Insert QWORD based on selector (AVX and X64 Only).
+  INST_4i(vpinsrq, kX86InstIdVpinsrq, X86XmmReg, X86XmmReg, X86GpReg, Imm)
+  //! \overload
+  INST_4i(vpinsrq, kX86InstIdVpinsrq, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Insert WORD based on selector (AVX).
+  INST_4i(vpinsrw, kX86InstIdVpinsrw, X86XmmReg, X86XmmReg, X86GpReg, Imm)
+  //! \overload
+  INST_4i(vpinsrw, kX86InstIdVpinsrw, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Packed multiply and add signed and unsigned bytes (AVX).
+  INST_3x(vpmaddubsw, kX86InstIdVpmaddubsw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmaddubsw, kX86InstIdVpmaddubsw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD multiply and add to packed DWORD (AVX).
+  INST_3x(vpmaddwd, kX86InstIdVpmaddwd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmaddwd, kX86InstIdVpmaddwd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE maximum (AVX).
+  INST_3x(vpmaxsb, kX86InstIdVpmaxsb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmaxsb, kX86InstIdVpmaxsb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD maximum (AVX).
+  INST_3x(vpmaxsd, kX86InstIdVpmaxsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmaxsd, kX86InstIdVpmaxsd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD maximum (AVX).
+  INST_3x(vpmaxsw, kX86InstIdVpmaxsw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmaxsw, kX86InstIdVpmaxsw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE unsigned maximum (AVX).
+  INST_3x(vpmaxub, kX86InstIdVpmaxub, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmaxub, kX86InstIdVpmaxub, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD unsigned maximum (AVX).
+  INST_3x(vpmaxud, kX86InstIdVpmaxud, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmaxud, kX86InstIdVpmaxud, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD unsigned maximum (AVX).
+  INST_3x(vpmaxuw, kX86InstIdVpmaxuw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmaxuw, kX86InstIdVpmaxuw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE minimum (AVX).
+  INST_3x(vpminsb, kX86InstIdVpminsb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpminsb, kX86InstIdVpminsb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD minimum (AVX).
+  INST_3x(vpminsd, kX86InstIdVpminsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpminsd, kX86InstIdVpminsd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD minimum (AVX).
+  INST_3x(vpminsw, kX86InstIdVpminsw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpminsw, kX86InstIdVpminsw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE unsigned minimum (AVX).
+  INST_3x(vpminub, kX86InstIdVpminub, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpminub, kX86InstIdVpminub, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD unsigned minimum (AVX).
+  INST_3x(vpminud, kX86InstIdVpminud, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpminud, kX86InstIdVpminud, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD unsigned minimum (AVX).
+  INST_3x(vpminuw, kX86InstIdVpminuw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpminuw, kX86InstIdVpminuw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Move Byte mask to integer (AVX).
+  INST_2x(vpmovmskb, kX86InstIdVpmovmskb, X86GpReg, X86XmmReg)
+
+  //! BYTE to DWORD with sign extend (AVX).
+  INST_2x(vpmovsxbd, kX86InstIdVpmovsxbd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovsxbd, kX86InstIdVpmovsxbd, X86XmmReg, X86Mem)
+
+  //! Packed BYTE to QWORD with sign extend (AVX).
+  INST_2x(vpmovsxbq, kX86InstIdVpmovsxbq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovsxbq, kX86InstIdVpmovsxbq, X86XmmReg, X86Mem)
+
+  //! Packed BYTE to WORD with sign extend (AVX).
+  INST_2x(vpmovsxbw, kX86InstIdVpmovsxbw, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovsxbw, kX86InstIdVpmovsxbw, X86XmmReg, X86Mem)
+
+  //! Packed DWORD to QWORD with sign extend (AVX).
+  INST_2x(vpmovsxdq, kX86InstIdVpmovsxdq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovsxdq, kX86InstIdVpmovsxdq, X86XmmReg, X86Mem)
+
+  //! Packed WORD to DWORD with sign extend (AVX).
+  INST_2x(vpmovsxwd, kX86InstIdVpmovsxwd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovsxwd, kX86InstIdVpmovsxwd, X86XmmReg, X86Mem)
+
+  //! Packed WORD to QWORD with sign extend (AVX).
+  INST_2x(vpmovsxwq, kX86InstIdVpmovsxwq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovsxwq, kX86InstIdVpmovsxwq, X86XmmReg, X86Mem)
+
+  //! BYTE to DWORD with zero extend (AVX).
+  INST_2x(vpmovzxbd, kX86InstIdVpmovzxbd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovzxbd, kX86InstIdVpmovzxbd, X86XmmReg, X86Mem)
+
+  //! Packed BYTE to QWORD with zero extend (AVX).
+  INST_2x(vpmovzxbq, kX86InstIdVpmovzxbq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovzxbq, kX86InstIdVpmovzxbq, X86XmmReg, X86Mem)
+
+  //! BYTE to WORD with zero extend (AVX).
+  INST_2x(vpmovzxbw, kX86InstIdVpmovzxbw, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovzxbw, kX86InstIdVpmovzxbw, X86XmmReg, X86Mem)
+
+  //! Packed DWORD to QWORD with zero extend (AVX).
+  INST_2x(vpmovzxdq, kX86InstIdVpmovzxdq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovzxdq, kX86InstIdVpmovzxdq, X86XmmReg, X86Mem)
+
+  //! Packed WORD to DWORD with zero extend (AVX).
+  INST_2x(vpmovzxwd, kX86InstIdVpmovzxwd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovzxwd, kX86InstIdVpmovzxwd, X86XmmReg, X86Mem)
+
+  //! Packed WORD to QWORD with zero extend (AVX).
+  INST_2x(vpmovzxwq, kX86InstIdVpmovzxwq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpmovzxwq, kX86InstIdVpmovzxwq, X86XmmReg, X86Mem)
+
+  //! Packed DWORD to QWORD multiply (AVX).
+  INST_3x(vpmuldq, kX86InstIdVpmuldq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmuldq, kX86InstIdVpmuldq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD multiply high, round and scale (AVX).
+  INST_3x(vpmulhrsw, kX86InstIdVpmulhrsw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmulhrsw, kX86InstIdVpmulhrsw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD unsigned multiply high (AVX).
+  INST_3x(vpmulhuw, kX86InstIdVpmulhuw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmulhuw, kX86InstIdVpmulhuw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD multiply high (AVX).
+  INST_3x(vpmulhw, kX86InstIdVpmulhw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmulhw, kX86InstIdVpmulhw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD multiply low (AVX).
+  INST_3x(vpmulld, kX86InstIdVpmulld, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmulld, kX86InstIdVpmulld, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORDs multiply low (AVX).
+  INST_3x(vpmullw, kX86InstIdVpmullw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmullw, kX86InstIdVpmullw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD multiply to QWORD (AVX).
+  INST_3x(vpmuludq, kX86InstIdVpmuludq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpmuludq, kX86InstIdVpmuludq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed bitwise or (AVX).
+  INST_3x(vpor, kX86InstIdVpor, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpor, kX86InstIdVpor, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD sum of absolute differences (AVX).
+  INST_3x(vpsadbw, kX86InstIdVpsadbw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsadbw, kX86InstIdVpsadbw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE shuffle (AVX).
+  INST_3x(vpshufb, kX86InstIdVpshufb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpshufb, kX86InstIdVpshufb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD shuffle (AVX).
+  INST_3i(vpshufd, kX86InstIdVpshufd, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpshufd, kX86InstIdVpshufd, X86XmmReg, X86Mem, Imm)
+
+  //! Packed WORD shuffle high (AVX).
+  INST_3i(vpshufhw, kX86InstIdVpshufhw, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpshufhw, kX86InstIdVpshufhw, X86XmmReg, X86Mem, Imm)
+
+  //! Packed WORD shuffle low (AVX).
+  INST_3i(vpshuflw, kX86InstIdVpshuflw, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vpshuflw, kX86InstIdVpshuflw, X86XmmReg, X86Mem, Imm)
+
+  //! Packed BYTE sign (AVX).
+  INST_3x(vpsignb, kX86InstIdVpsignb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsignb, kX86InstIdVpsignb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD sign (AVX).
+  INST_3x(vpsignd, kX86InstIdVpsignd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsignd, kX86InstIdVpsignd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD sign (AVX).
+  INST_3x(vpsignw, kX86InstIdVpsignw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsignw, kX86InstIdVpsignw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD shift left logical (AVX).
+  INST_3x(vpslld, kX86InstIdVpslld, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpslld, kX86InstIdVpslld, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpslld, kX86InstIdVpslld, X86XmmReg, X86XmmReg, Imm)
+
+  //! Packed OWORD shift left logical (AVX).
+  INST_3i(vpslldq, kX86InstIdVpslldq, X86XmmReg, X86XmmReg, Imm)
+
+  //! Packed QWORD shift left logical (AVX).
+  INST_3x(vpsllq, kX86InstIdVpsllq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsllq, kX86InstIdVpsllq, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpsllq, kX86InstIdVpsllq, X86XmmReg, X86XmmReg, Imm)
+
+  //! Packed WORD shift left logical (AVX).
+  INST_3x(vpsllw, kX86InstIdVpsllw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsllw, kX86InstIdVpsllw, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpsllw, kX86InstIdVpsllw, X86XmmReg, X86XmmReg, Imm)
+
+  //! Packed DWORD shift right arithmetic (AVX).
+  INST_3x(vpsrad, kX86InstIdVpsrad, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsrad, kX86InstIdVpsrad, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpsrad, kX86InstIdVpsrad, X86XmmReg, X86XmmReg, Imm)
+
+  //! Packed WORD shift right arithmetic (AVX).
+  INST_3x(vpsraw, kX86InstIdVpsraw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsraw, kX86InstIdVpsraw, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpsraw, kX86InstIdVpsraw, X86XmmReg, X86XmmReg, Imm)
+
+  //! Packed DWORD shift right logical (AVX).
+  INST_3x(vpsrld, kX86InstIdVpsrld, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsrld, kX86InstIdVpsrld, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpsrld, kX86InstIdVpsrld, X86XmmReg, X86XmmReg, Imm)
+
+  //! Scalar OWORD shift right logical (AVX).
+  INST_3i(vpsrldq, kX86InstIdVpsrldq, X86XmmReg, X86XmmReg, Imm)
+
+  //! Packed QWORD shift right logical (AVX).
+  INST_3x(vpsrlq, kX86InstIdVpsrlq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsrlq, kX86InstIdVpsrlq, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpsrlq, kX86InstIdVpsrlq, X86XmmReg, X86XmmReg, Imm)
+
+  //! Packed WORD shift right logical (AVX).
+  INST_3x(vpsrlw, kX86InstIdVpsrlw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsrlw, kX86InstIdVpsrlw, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3i(vpsrlw, kX86InstIdVpsrlw, X86XmmReg, X86XmmReg, Imm)
+
+  //! Packed BYTE subtract (AVX).
+  INST_3x(vpsubb, kX86InstIdVpsubb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsubb, kX86InstIdVpsubb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DWORD subtract (AVX).
+  INST_3x(vpsubd, kX86InstIdVpsubd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsubd, kX86InstIdVpsubd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed QWORD subtract (AVX).
+  INST_3x(vpsubq, kX86InstIdVpsubq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsubq, kX86InstIdVpsubq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD subtract (AVX).
+  INST_3x(vpsubw, kX86InstIdVpsubw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsubw, kX86InstIdVpsubw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE subtract with saturation (AVX).
+  INST_3x(vpsubsb, kX86InstIdVpsubsb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsubsb, kX86InstIdVpsubsb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD subtract with saturation (AVX).
+  INST_3x(vpsubsw, kX86InstIdVpsubsw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsubsw, kX86InstIdVpsubsw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed BYTE subtract with unsigned saturation (AVX).
+  INST_3x(vpsubusb, kX86InstIdVpsubusb, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsubusb, kX86InstIdVpsubusb, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed WORD subtract with unsigned saturation (AVX).
+  INST_3x(vpsubusw, kX86InstIdVpsubusw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpsubusw, kX86InstIdVpsubusw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Logical compare (AVX).
+  INST_2x(vptest, kX86InstIdVptest, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vptest, kX86InstIdVptest, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vptest, kX86InstIdVptest, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vptest, kX86InstIdVptest, X86YmmReg, X86Mem)
+
+  //! Unpack high packed BYTEs to WORDs (AVX).
+  INST_3x(vpunpckhbw, kX86InstIdVpunpckhbw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpunpckhbw, kX86InstIdVpunpckhbw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Unpack high packed DWORDs to QWORDs (AVX).
+  INST_3x(vpunpckhdq, kX86InstIdVpunpckhdq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpunpckhdq, kX86InstIdVpunpckhdq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Unpack high packed QWORDs to OWORD (AVX).
+  INST_3x(vpunpckhqdq, kX86InstIdVpunpckhqdq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpunpckhqdq, kX86InstIdVpunpckhqdq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Unpack high packed WORDs to DWORDs (AVX).
+  INST_3x(vpunpckhwd, kX86InstIdVpunpckhwd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpunpckhwd, kX86InstIdVpunpckhwd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Unpack low packed BYTEs to WORDs (AVX).
+  INST_3x(vpunpcklbw, kX86InstIdVpunpcklbw, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpunpcklbw, kX86InstIdVpunpcklbw, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Unpack low packed DWORDs to QWORDs (AVX).
+  INST_3x(vpunpckldq, kX86InstIdVpunpckldq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpunpckldq, kX86InstIdVpunpckldq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Unpack low packed QWORDs to OWORD (AVX).
+  INST_3x(vpunpcklqdq, kX86InstIdVpunpcklqdq, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpunpcklqdq, kX86InstIdVpunpcklqdq, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Unpack low packed WORDs to DWORDs (AVX).
+  INST_3x(vpunpcklwd, kX86InstIdVpunpcklwd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpunpcklwd, kX86InstIdVpunpcklwd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed bitwise xor (AVX).
+  INST_3x(vpxor, kX86InstIdVpxor, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vpxor, kX86InstIdVpxor, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed SP-FP reciprocal (AVX).
+  INST_2x(vrcpps, kX86InstIdVrcpps, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vrcpps, kX86InstIdVrcpps, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vrcpps, kX86InstIdVrcpps, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vrcpps, kX86InstIdVrcpps, X86YmmReg, X86Mem)
+
+  //! Scalar SP-FP reciprocal (AVX).
+  INST_3x(vrcpss, kX86InstIdVrcpss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vrcpss, kX86InstIdVrcpss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed SP-FP square root reciprocal (AVX).
+  INST_2x(vrsqrtps, kX86InstIdVrsqrtps, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vrsqrtps, kX86InstIdVrsqrtps, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vrsqrtps, kX86InstIdVrsqrtps, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vrsqrtps, kX86InstIdVrsqrtps, X86YmmReg, X86Mem)
+
+  //! Scalar SP-FP square root reciprocal (AVX).
+  INST_3x(vrsqrtss, kX86InstIdVrsqrtss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vrsqrtss, kX86InstIdVrsqrtss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Packed DP-FP round (AVX).
+  INST_3i(vroundpd, kX86InstIdVroundpd, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vroundpd, kX86InstIdVroundpd, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_3i(vroundpd, kX86InstIdVroundpd, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_3i(vroundpd, kX86InstIdVroundpd, X86YmmReg, X86Mem, Imm)
+
+  //! Packed SP-FP round (AVX).
+  INST_3i(vroundps, kX86InstIdVroundps, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vroundps, kX86InstIdVroundps, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_3i(vroundps, kX86InstIdVroundps, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_3i(vroundps, kX86InstIdVroundps, X86YmmReg, X86Mem, Imm)
+
+  //! Scalar DP-FP round (AVX).
+  INST_4i(vroundsd, kX86InstIdVroundsd, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vroundsd, kX86InstIdVroundsd, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Scalar SP-FP round (AVX).
+  INST_4i(vroundss, kX86InstIdVroundss, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vroundss, kX86InstIdVroundss, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  //! Shuffle DP-FP (AVX).
+  INST_4i(vshufpd, kX86InstIdVshufpd, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vshufpd, kX86InstIdVshufpd, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_4i(vshufpd, kX86InstIdVshufpd, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vshufpd, kX86InstIdVshufpd, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Shuffle SP-FP (AVX).
+  INST_4i(vshufps, kX86InstIdVshufps, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vshufps, kX86InstIdVshufps, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_4i(vshufps, kX86InstIdVshufps, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vshufps, kX86InstIdVshufps, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Packed DP-FP square root (AVX).
+  INST_2x(vsqrtpd, kX86InstIdVsqrtpd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vsqrtpd, kX86InstIdVsqrtpd, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vsqrtpd, kX86InstIdVsqrtpd, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vsqrtpd, kX86InstIdVsqrtpd, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP square root (AVX).
+  INST_2x(vsqrtps, kX86InstIdVsqrtps, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vsqrtps, kX86InstIdVsqrtps, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vsqrtps, kX86InstIdVsqrtps, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vsqrtps, kX86InstIdVsqrtps, X86YmmReg, X86Mem)
+
+  //! Scalar DP-FP square root (AVX).
+  INST_3x(vsqrtsd, kX86InstIdVsqrtsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vsqrtsd, kX86InstIdVsqrtsd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Scalar SP-FP square root (AVX).
+  INST_3x(vsqrtss, kX86InstIdVsqrtss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vsqrtss, kX86InstIdVsqrtss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Store streaming SIMD extension control/status (AVX).
+  INST_1x(vstmxcsr, kX86InstIdVstmxcsr, X86Mem)
+
+  //! Packed DP-FP subtract (AVX).
+  INST_3x(vsubpd, kX86InstIdVsubpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vsubpd, kX86InstIdVsubpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vsubpd, kX86InstIdVsubpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vsubpd, kX86InstIdVsubpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP subtract (AVX).
+  INST_3x(vsubps, kX86InstIdVsubps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vsubps, kX86InstIdVsubps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vsubps, kX86InstIdVsubps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vsubps, kX86InstIdVsubps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Scalar DP-FP subtract (AVX).
+  INST_3x(vsubsd, kX86InstIdVsubsd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vsubsd, kX86InstIdVsubsd, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Scalar SP-FP subtract (AVX).
+  INST_3x(vsubss, kX86InstIdVsubss, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vsubss, kX86InstIdVsubss, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Logical compare DP-FP (AVX).
+  INST_2x(vtestpd, kX86InstIdVtestpd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vtestpd, kX86InstIdVtestpd, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vtestpd, kX86InstIdVtestpd, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vtestpd, kX86InstIdVtestpd, X86YmmReg, X86Mem)
+
+  //! Logical compare SP-FP (AVX).
+  INST_2x(vtestps, kX86InstIdVtestps, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vtestps, kX86InstIdVtestps, X86XmmReg, X86Mem)
+  //! \overload
+  INST_2x(vtestps, kX86InstIdVtestps, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vtestps, kX86InstIdVtestps, X86YmmReg, X86Mem)
+
+  //! Scalar DP-FP unordered compare and set EFLAGS (AVX).
+  INST_2x(vucomisd, kX86InstIdVucomisd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vucomisd, kX86InstIdVucomisd, X86XmmReg, X86Mem)
+
+  //! Unordered scalar SP-FP compare and set EFLAGS (AVX).
+  INST_2x(vucomiss, kX86InstIdVucomiss, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vucomiss, kX86InstIdVucomiss, X86XmmReg, X86Mem)
+
+  //! Unpack and interleave high packed DP-FP (AVX).
+  INST_3x(vunpckhpd, kX86InstIdVunpckhpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vunpckhpd, kX86InstIdVunpckhpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vunpckhpd, kX86InstIdVunpckhpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vunpckhpd, kX86InstIdVunpckhpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Unpack high packed SP-FP data (AVX).
+  INST_3x(vunpckhps, kX86InstIdVunpckhps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vunpckhps, kX86InstIdVunpckhps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vunpckhps, kX86InstIdVunpckhps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vunpckhps, kX86InstIdVunpckhps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Unpack and interleave low packed DP-FP (AVX).
+  INST_3x(vunpcklpd, kX86InstIdVunpcklpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vunpcklpd, kX86InstIdVunpcklpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vunpcklpd, kX86InstIdVunpcklpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vunpcklpd, kX86InstIdVunpcklpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Unpack low packed SP-FP data (AVX).
+  INST_3x(vunpcklps, kX86InstIdVunpcklps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vunpcklps, kX86InstIdVunpcklps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vunpcklps, kX86InstIdVunpcklps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vunpcklps, kX86InstIdVunpcklps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DP-FP bitwise xor (AVX).
+  INST_3x(vxorpd, kX86InstIdVxorpd, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vxorpd, kX86InstIdVxorpd, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vxorpd, kX86InstIdVxorpd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vxorpd, kX86InstIdVxorpd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed SP-FP bitwise xor (AVX).
+  INST_3x(vxorps, kX86InstIdVxorps, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vxorps, kX86InstIdVxorps, X86XmmReg, X86XmmReg, X86Mem)
+  //! \overload
+  INST_3x(vxorps, kX86InstIdVxorps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vxorps, kX86InstIdVxorps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Zero all Ymm registers.
+  INST_0x(vzeroall, kX86InstIdVzeroall)
+  //! Zero upper 128-bits of all Ymm registers.
+  INST_0x(vzeroupper, kX86InstIdVzeroupper)
+
+  // --------------------------------------------------------------------------
+  // [AVX+AESNI]
+  // --------------------------------------------------------------------------
+
+  //! Perform a single round of the AES decryption flow (AVX+AESNI).
+  INST_3x(vaesdec, kX86InstIdVaesdec, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaesdec, kX86InstIdVaesdec, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Perform the last round of the AES decryption flow (AVX+AESNI).
+  INST_3x(vaesdeclast, kX86InstIdVaesdeclast, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaesdeclast, kX86InstIdVaesdeclast, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Perform a single round of the AES encryption flow (AVX+AESNI).
+  INST_3x(vaesenc, kX86InstIdVaesenc, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaesenc, kX86InstIdVaesenc, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Perform the last round of the AES encryption flow (AVX+AESNI).
+  INST_3x(vaesenclast, kX86InstIdVaesenclast, X86XmmReg, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_3x(vaesenclast, kX86InstIdVaesenclast, X86XmmReg, X86XmmReg, X86Mem)
+
+  //! Perform the InvMixColumns transformation (AVX+AESNI).
+  INST_2x(vaesimc, kX86InstIdVaesimc, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vaesimc, kX86InstIdVaesimc, X86XmmReg, X86Mem)
+
+  //! Assist in expanding the AES cipher key (AVX+AESNI).
+  INST_3i(vaeskeygenassist, kX86InstIdVaeskeygenassist, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_3i(vaeskeygenassist, kX86InstIdVaeskeygenassist, X86XmmReg, X86Mem, Imm)
+
+  // --------------------------------------------------------------------------
+  // [AVX+PCLMULQDQ]
+  // --------------------------------------------------------------------------
+
+  //! Carry-less multiplication QWORD (AVX+PCLMULQDQ).
+  INST_4i(vpclmulqdq, kX86InstIdVpclmulqdq, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vpclmulqdq, kX86InstIdVpclmulqdq, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  // --------------------------------------------------------------------------
+  // [AVX2]
+  // --------------------------------------------------------------------------
+
+  //! Broadcast low 128-bit element in `o1` to `o0` (AVX2).
+  INST_2x(vbroadcasti128, kX86InstIdVbroadcasti128, X86YmmReg, X86Mem)
+  //! Broadcast low DP-FP element in `o1` to `o0` (AVX2).
+  INST_2x(vbroadcastsd, kX86InstIdVbroadcastsd, X86YmmReg, X86XmmReg)
+  //! Broadcast low SP-FP element in `o1` to `o0` (AVX2).
+  INST_2x(vbroadcastss, kX86InstIdVbroadcastss, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vbroadcastss, kX86InstIdVbroadcastss, X86YmmReg, X86XmmReg)
+
+  //! Extract 128-bit element from `o1` to `o0` based on selector (AVX2).
+  INST_3i(vextracti128, kX86InstIdVextracti128, X86XmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_3i(vextracti128, kX86InstIdVextracti128, X86Mem, X86YmmReg, Imm)
+
+  //! Gather DP-FP from DWORD indicies specified in `o1`s VSIB (AVX2).
+  INST_3x(vgatherdpd, kX86InstIdVgatherdpd, X86XmmReg, X86Mem, X86XmmReg)
+  //! \overload
+  INST_3x(vgatherdpd, kX86InstIdVgatherdpd, X86YmmReg, X86Mem, X86YmmReg)
+
+  //! Gather SP-FP from DWORD indicies specified in `o1`s VSIB (AVX2).
+  INST_3x(vgatherdps, kX86InstIdVgatherdps, X86XmmReg, X86Mem, X86XmmReg)
+  //! \overload
+  INST_3x(vgatherdps, kX86InstIdVgatherdps, X86YmmReg, X86Mem, X86YmmReg)
+
+  //! Gather DP-FP from QWORD indicies specified in `o1`s VSIB (AVX2).
+  INST_3x(vgatherqpd, kX86InstIdVgatherqpd, X86XmmReg, X86Mem, X86XmmReg)
+  //! \overload
+  INST_3x(vgatherqpd, kX86InstIdVgatherqpd, X86YmmReg, X86Mem, X86YmmReg)
+
+  //! Gather SP-FP from QWORD indicies specified in `o1`s VSIB (AVX2).
+  INST_3x(vgatherqps, kX86InstIdVgatherqps, X86XmmReg, X86Mem, X86XmmReg)
+
+  //! Insert 128-bit of packed data based on selector (AVX2).
+  INST_4i(vinserti128, kX86InstIdVinserti128, X86YmmReg, X86YmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vinserti128, kX86InstIdVinserti128, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Load 256-bits aligned using NT hint (AVX2).
+  INST_2x(vmovntdqa, kX86InstIdVmovntdqa, X86YmmReg, X86Mem)
+
+  //! Packed WORD sums of absolute difference (AVX2).
+  INST_4i(vmpsadbw, kX86InstIdVmpsadbw, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vmpsadbw, kX86InstIdVmpsadbw, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Packed BYTE absolute value (AVX2).
+  INST_2x(vpabsb, kX86InstIdVpabsb, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vpabsb, kX86InstIdVpabsb, X86YmmReg, X86Mem)
+
+  //! Packed DWORD absolute value (AVX2).
+  INST_2x(vpabsd, kX86InstIdVpabsd, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vpabsd, kX86InstIdVpabsd, X86YmmReg, X86Mem)
+
+  //! Packed WORD absolute value (AVX2).
+  INST_2x(vpabsw, kX86InstIdVpabsw, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_2x(vpabsw, kX86InstIdVpabsw, X86YmmReg, X86Mem)
+
+  //! Pack DWORDs to WORDs with signed saturation (AVX2).
+  INST_3x(vpackssdw, kX86InstIdVpackssdw, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpackssdw, kX86InstIdVpackssdw, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Pack WORDs to BYTEs with signed saturation (AVX2).
+  INST_3x(vpacksswb, kX86InstIdVpacksswb, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpacksswb, kX86InstIdVpacksswb, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Pack DWORDs to WORDs with unsigned saturation (AVX2).
+  INST_3x(vpackusdw, kX86InstIdVpackusdw, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpackusdw, kX86InstIdVpackusdw, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Pack WORDs to BYTEs with unsigned saturation (AVX2).
+  INST_3x(vpackuswb, kX86InstIdVpackuswb, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpackuswb, kX86InstIdVpackuswb, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed BYTE add (AVX2).
+  INST_3x(vpaddb, kX86InstIdVpaddb, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpaddb, kX86InstIdVpaddb, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DWORD add (AVX2).
+  INST_3x(vpaddd, kX86InstIdVpaddd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpaddd, kX86InstIdVpaddd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed QDWORD add (AVX2).
+  INST_3x(vpaddq, kX86InstIdVpaddq, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpaddq, kX86InstIdVpaddq, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed WORD add (AVX2).
+  INST_3x(vpaddw, kX86InstIdVpaddw, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpaddw, kX86InstIdVpaddw, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed BYTE add with saturation (AVX2).
+  INST_3x(vpaddsb, kX86InstIdVpaddsb, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpaddsb, kX86InstIdVpaddsb, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed WORD add with saturation (AVX2).
+  INST_3x(vpaddsw, kX86InstIdVpaddsw, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpaddsw, kX86InstIdVpaddsw, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed BYTE add with unsigned saturation (AVX2).
+  INST_3x(vpaddusb, kX86InstIdVpaddusb, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpaddusb, kX86InstIdVpaddusb, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed WORD add with unsigned saturation (AVX2).
+  INST_3x(vpaddusw, kX86InstIdVpaddusw, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpaddusw, kX86InstIdVpaddusw, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed align right (AVX2).
+  INST_4i(vpalignr, kX86InstIdVpalignr, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vpalignr, kX86InstIdVpalignr, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Packed bitwise and (AVX2).
+  INST_3x(vpand, kX86InstIdVpand, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpand, kX86InstIdVpand, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed bitwise and-not (AVX2).
+  INST_3x(vpandn, kX86InstIdVpandn, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpandn, kX86InstIdVpandn, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed BYTE average (AVX2).
+  INST_3x(vpavgb, kX86InstIdVpavgb, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpavgb, kX86InstIdVpavgb, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed WORD average (AVX2).
+  INST_3x(vpavgw, kX86InstIdVpavgw, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpavgw, kX86InstIdVpavgw, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DWORD blend (AVX2).
+  INST_4i(vpblendd, kX86InstIdVpblendd, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  //! \overload
+  INST_4i(vpblendd, kX86InstIdVpblendd, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  //! \overload
+  INST_4i(vpblendd, kX86InstIdVpblendd, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vpblendd, kX86InstIdVpblendd, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Packed DWORD variable blend (AVX2).
+  INST_4x(vpblendvb, kX86InstIdVpblendvb, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_4x(vpblendvb, kX86InstIdVpblendvb, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+
+  //! Packed WORD blend (AVX2).
+  INST_4i(vpblendw, kX86InstIdVpblendw, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vpblendw, kX86InstIdVpblendw, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Broadcast BYTE from `o1` to 128-bits in `o0` (AVX2).
+  INST_2x(vpbroadcastb, kX86InstIdVpbroadcastb, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpbroadcastb, kX86InstIdVpbroadcastb, X86XmmReg, X86Mem)
+  //! Broadcast BYTE from `o1` to 256-bits in `o0` (AVX2).
+  INST_2x(vpbroadcastb, kX86InstIdVpbroadcastb, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpbroadcastb, kX86InstIdVpbroadcastb, X86YmmReg, X86Mem)
+
+  //! Broadcast DWORD from `o1` to 128-bits in `o0` (AVX2).
+  INST_2x(vpbroadcastd, kX86InstIdVpbroadcastd, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpbroadcastd, kX86InstIdVpbroadcastd, X86XmmReg, X86Mem)
+  //! Broadcast DWORD from `o1` to 256-bits in `o0` (AVX2).
+  INST_2x(vpbroadcastd, kX86InstIdVpbroadcastd, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpbroadcastd, kX86InstIdVpbroadcastd, X86YmmReg, X86Mem)
+
+  //! Broadcast QWORD from `o1` to 128-bits in `o0` (AVX2).
+  INST_2x(vpbroadcastq, kX86InstIdVpbroadcastq, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpbroadcastq, kX86InstIdVpbroadcastq, X86XmmReg, X86Mem)
+  //! Broadcast QWORD from `o1` to 256-bits in `o0` (AVX2).
+  INST_2x(vpbroadcastq, kX86InstIdVpbroadcastq, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpbroadcastq, kX86InstIdVpbroadcastq, X86YmmReg, X86Mem)
+
+  //! Broadcast WORD from `o1` to 128-bits in `o0` (AVX2).
+  INST_2x(vpbroadcastw, kX86InstIdVpbroadcastw, X86XmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpbroadcastw, kX86InstIdVpbroadcastw, X86XmmReg, X86Mem)
+  //! Broadcast WORD from `o1` to 256-bits in `o0` (AVX2).
+  INST_2x(vpbroadcastw, kX86InstIdVpbroadcastw, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_2x(vpbroadcastw, kX86InstIdVpbroadcastw, X86YmmReg, X86Mem)
+
+  //! Packed BYTEs compare for equality (AVX2).
+  INST_3x(vpcmpeqb, kX86InstIdVpcmpeqb, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpcmpeqb, kX86InstIdVpcmpeqb, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DWORDs compare for equality (AVX2).
+  INST_3x(vpcmpeqd, kX86InstIdVpcmpeqd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpcmpeqd, kX86InstIdVpcmpeqd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed QWORDs compare for equality (AVX2).
+  INST_3x(vpcmpeqq, kX86InstIdVpcmpeqq, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpcmpeqq, kX86InstIdVpcmpeqq, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed WORDs compare for equality (AVX2).
+  INST_3x(vpcmpeqw, kX86InstIdVpcmpeqw, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpcmpeqw, kX86InstIdVpcmpeqw, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed BYTEs compare if greater than (AVX2).
+  INST_3x(vpcmpgtb, kX86InstIdVpcmpgtb, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpcmpgtb, kX86InstIdVpcmpgtb, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DWORDs compare if greater than (AVX2).
+  INST_3x(vpcmpgtd, kX86InstIdVpcmpgtd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpcmpgtd, kX86InstIdVpcmpgtd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed QWORDs compare if greater than (AVX2).
+  INST_3x(vpcmpgtq, kX86InstIdVpcmpgtq, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpcmpgtq, kX86InstIdVpcmpgtq, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed WORDs compare if greater than (AVX2).
+  INST_3x(vpcmpgtw, kX86InstIdVpcmpgtw, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpcmpgtw, kX86InstIdVpcmpgtw, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed OWORD permute (AVX2).
+  INST_4i(vperm2i128, kX86InstIdVperm2i128, X86YmmReg, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_4i(vperm2i128, kX86InstIdVperm2i128, X86YmmReg, X86YmmReg, X86Mem, Imm)
+
+  //! Packed DWORD permute (AVX2).
+  INST_3x(vpermd, kX86InstIdVpermd, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpermd, kX86InstIdVpermd, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed DP-FP permute (AVX2).
+  INST_3i(vpermpd, kX86InstIdVpermpd, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_3i(vpermpd, kX86InstIdVpermpd, X86YmmReg, X86Mem, Imm)
+
+  //! Packed SP-FP permute (AVX2).
+  INST_3x(vpermps, kX86InstIdVpermps, X86YmmReg, X86YmmReg, X86YmmReg)
+  //! \overload
+  INST_3x(vpermps, kX86InstIdVpermps, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed QWORD permute (AVX2).
+  INST_3i(vpermq, kX86InstIdVpermq, X86YmmReg, X86YmmReg, Imm)
+  //! \overload
+  INST_3i(vpermq, kX86InstIdVpermq, X86YmmReg, X86Mem, Imm)
+
+  INST_3x(vpgatherdd, kX86InstIdVpgatherdd, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpgatherdd, kX86InstIdVpgatherdd, X86YmmReg, X86Mem, X86YmmReg)
+
+  INST_3x(vpgatherdq, kX86InstIdVpgatherdq, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpgatherdq, kX86InstIdVpgatherdq, X86YmmReg, X86Mem, X86YmmReg)
+
+  INST_3x(vpgatherqd, kX86InstIdVpgatherqd, X86XmmReg, X86Mem, X86XmmReg)
+
+  INST_3x(vpgatherqq, kX86InstIdVpgatherqq, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpgatherqq, kX86InstIdVpgatherqq, X86YmmReg, X86Mem, X86YmmReg)
+
+  //! Packed DWORD horizontal add (AVX2).
+  INST_3x(vphaddd, kX86InstIdVphaddd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vphaddd, kX86InstIdVphaddd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD horizontal add with saturation (AVX2).
+  INST_3x(vphaddsw, kX86InstIdVphaddsw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vphaddsw, kX86InstIdVphaddsw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD horizontal add (AVX2).
+  INST_3x(vphaddw, kX86InstIdVphaddw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vphaddw, kX86InstIdVphaddw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD horizontal subtract (AVX2).
+  INST_3x(vphsubd, kX86InstIdVphsubd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vphsubd, kX86InstIdVphsubd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD horizontal subtract with saturation (AVX2).
+  INST_3x(vphsubsw, kX86InstIdVphsubsw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vphsubsw, kX86InstIdVphsubsw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD horizontal subtract (AVX2).
+  INST_3x(vphsubw, kX86InstIdVphsubw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vphsubw, kX86InstIdVphsubw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Move Byte mask to integer (AVX2).
+  INST_2x(vpmovmskb, kX86InstIdVpmovmskb, X86GpReg, X86YmmReg)
+
+  //! BYTE to DWORD with sign extend (AVX).
+  INST_2x(vpmovsxbd, kX86InstIdVpmovsxbd, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovsxbd, kX86InstIdVpmovsxbd, X86YmmReg, X86XmmReg)
+
+  //! Packed BYTE to QWORD with sign extend (AVX2).
+  INST_2x(vpmovsxbq, kX86InstIdVpmovsxbq, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovsxbq, kX86InstIdVpmovsxbq, X86YmmReg, X86XmmReg)
+
+  //! Packed BYTE to WORD with sign extend (AVX2).
+  INST_2x(vpmovsxbw, kX86InstIdVpmovsxbw, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovsxbw, kX86InstIdVpmovsxbw, X86YmmReg, X86XmmReg)
+
+  //! Packed DWORD to QWORD with sign extend (AVX2).
+  INST_2x(vpmovsxdq, kX86InstIdVpmovsxdq, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovsxdq, kX86InstIdVpmovsxdq, X86YmmReg, X86XmmReg)
+
+  //! Packed WORD to DWORD with sign extend (AVX2).
+  INST_2x(vpmovsxwd, kX86InstIdVpmovsxwd, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovsxwd, kX86InstIdVpmovsxwd, X86YmmReg, X86XmmReg)
+
+  //! Packed WORD to QWORD with sign extend (AVX2).
+  INST_2x(vpmovsxwq, kX86InstIdVpmovsxwq, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovsxwq, kX86InstIdVpmovsxwq, X86YmmReg, X86XmmReg)
+
+  //! BYTE to DWORD with zero extend (AVX2).
+  INST_2x(vpmovzxbd, kX86InstIdVpmovzxbd, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovzxbd, kX86InstIdVpmovzxbd, X86YmmReg, X86XmmReg)
+
+  //! Packed BYTE to QWORD with zero extend (AVX2).
+  INST_2x(vpmovzxbq, kX86InstIdVpmovzxbq, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovzxbq, kX86InstIdVpmovzxbq, X86YmmReg, X86XmmReg)
+
+  //! BYTE to WORD with zero extend (AVX2).
+  INST_2x(vpmovzxbw, kX86InstIdVpmovzxbw, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovzxbw, kX86InstIdVpmovzxbw, X86YmmReg, X86XmmReg)
+
+  //! Packed DWORD to QWORD with zero extend (AVX2).
+  INST_2x(vpmovzxdq, kX86InstIdVpmovzxdq, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovzxdq, kX86InstIdVpmovzxdq, X86YmmReg, X86XmmReg)
+
+  //! Packed WORD to DWORD with zero extend (AVX2).
+  INST_2x(vpmovzxwd, kX86InstIdVpmovzxwd, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovzxwd, kX86InstIdVpmovzxwd, X86YmmReg, X86XmmReg)
+
+  //! Packed WORD to QWORD with zero extend (AVX2).
+  INST_2x(vpmovzxwq, kX86InstIdVpmovzxwq, X86YmmReg, X86Mem)
+  //! \overload
+  INST_2x(vpmovzxwq, kX86InstIdVpmovzxwq, X86YmmReg, X86XmmReg)
+
+  //! Packed multiply and add signed and unsigned bytes (AVX2).
+  INST_3x(vpmaddubsw, kX86InstIdVpmaddubsw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmaddubsw, kX86InstIdVpmaddubsw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD multiply and add to packed DWORD (AVX2).
+  INST_3x(vpmaddwd, kX86InstIdVpmaddwd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmaddwd, kX86InstIdVpmaddwd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vpmaskmovd, kX86InstIdVpmaskmovd, X86Mem, X86XmmReg, X86XmmReg)
+  INST_3x(vpmaskmovd, kX86InstIdVpmaskmovd, X86Mem, X86YmmReg, X86YmmReg)
+  INST_3x(vpmaskmovd, kX86InstIdVpmaskmovd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vpmaskmovd, kX86InstIdVpmaskmovd, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_3x(vpmaskmovq, kX86InstIdVpmaskmovq, X86Mem, X86XmmReg, X86XmmReg)
+  INST_3x(vpmaskmovq, kX86InstIdVpmaskmovq, X86Mem, X86YmmReg, X86YmmReg)
+  INST_3x(vpmaskmovq, kX86InstIdVpmaskmovq, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vpmaskmovq, kX86InstIdVpmaskmovq, X86YmmReg, X86YmmReg, X86Mem)
+
+  //! Packed BYTE maximum (AVX2).
+  INST_3x(vpmaxsb, kX86InstIdVpmaxsb, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmaxsb, kX86InstIdVpmaxsb, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD maximum (AVX2).
+  INST_3x(vpmaxsd, kX86InstIdVpmaxsd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmaxsd, kX86InstIdVpmaxsd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD maximum (AVX2).
+  INST_3x(vpmaxsw, kX86InstIdVpmaxsw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmaxsw, kX86InstIdVpmaxsw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed BYTE unsigned maximum (AVX2).
+  INST_3x(vpmaxub, kX86InstIdVpmaxub, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmaxub, kX86InstIdVpmaxub, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD unsigned maximum (AVX2).
+  INST_3x(vpmaxud, kX86InstIdVpmaxud, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmaxud, kX86InstIdVpmaxud, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD unsigned maximum (AVX2).
+  INST_3x(vpmaxuw, kX86InstIdVpmaxuw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmaxuw, kX86InstIdVpmaxuw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed BYTE minimum (AVX2).
+  INST_3x(vpminsb, kX86InstIdVpminsb, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpminsb, kX86InstIdVpminsb, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD minimum (AVX2).
+  INST_3x(vpminsd, kX86InstIdVpminsd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpminsd, kX86InstIdVpminsd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD minimum (AVX2).
+  INST_3x(vpminsw, kX86InstIdVpminsw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpminsw, kX86InstIdVpminsw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed BYTE unsigned minimum (AVX2).
+  INST_3x(vpminub, kX86InstIdVpminub, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpminub, kX86InstIdVpminub, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD unsigned minimum (AVX2).
+  INST_3x(vpminud, kX86InstIdVpminud, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpminud, kX86InstIdVpminud, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD unsigned minimum (AVX2).
+  INST_3x(vpminuw, kX86InstIdVpminuw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpminuw, kX86InstIdVpminuw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD to QWORD multiply (AVX2).
+  INST_3x(vpmuldq, kX86InstIdVpmuldq, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmuldq, kX86InstIdVpmuldq, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD multiply high, round and scale (AVX2).
+  INST_3x(vpmulhrsw, kX86InstIdVpmulhrsw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmulhrsw, kX86InstIdVpmulhrsw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD unsigned multiply high (AVX2).
+  INST_3x(vpmulhuw, kX86InstIdVpmulhuw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmulhuw, kX86InstIdVpmulhuw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD multiply high (AVX2).
+  INST_3x(vpmulhw, kX86InstIdVpmulhw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmulhw, kX86InstIdVpmulhw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD multiply low (AVX2).
+  INST_3x(vpmulld, kX86InstIdVpmulld, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmulld, kX86InstIdVpmulld, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORDs multiply low (AVX2).
+  INST_3x(vpmullw, kX86InstIdVpmullw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmullw, kX86InstIdVpmullw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD multiply to QWORD (AVX2).
+  INST_3x(vpmuludq, kX86InstIdVpmuludq, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpmuludq, kX86InstIdVpmuludq, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed bitwise or (AVX2).
+  INST_3x(vpor, kX86InstIdVpor, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpor, kX86InstIdVpor, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD sum of absolute differences (AVX2).
+  INST_3x(vpsadbw, kX86InstIdVpsadbw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsadbw, kX86InstIdVpsadbw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed BYTE shuffle (AVX2).
+  INST_3x(vpshufb, kX86InstIdVpshufb, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpshufb, kX86InstIdVpshufb, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD shuffle (AVX2).
+  INST_3i(vpshufd, kX86InstIdVpshufd, X86YmmReg, X86Mem, Imm)
+  //! \overload
+  INST_3i(vpshufd, kX86InstIdVpshufd, X86YmmReg, X86YmmReg, Imm)
+
+  //! Packed WORD shuffle high (AVX2).
+  INST_3i(vpshufhw, kX86InstIdVpshufhw, X86YmmReg, X86Mem, Imm)
+  //! \overload
+  INST_3i(vpshufhw, kX86InstIdVpshufhw, X86YmmReg, X86YmmReg, Imm)
+
+  //! Packed WORD shuffle low (AVX2).
+  INST_3i(vpshuflw, kX86InstIdVpshuflw, X86YmmReg, X86Mem, Imm)
+  //! \overload
+  INST_3i(vpshuflw, kX86InstIdVpshuflw, X86YmmReg, X86YmmReg, Imm)
+
+  //! Packed BYTE sign (AVX2).
+  INST_3x(vpsignb, kX86InstIdVpsignb, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsignb, kX86InstIdVpsignb, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD sign (AVX2).
+  INST_3x(vpsignd, kX86InstIdVpsignd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsignd, kX86InstIdVpsignd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD sign (AVX2).
+  INST_3x(vpsignw, kX86InstIdVpsignw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsignw, kX86InstIdVpsignw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD shift left logical (AVX2).
+  INST_3x(vpslld, kX86InstIdVpslld, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpslld, kX86InstIdVpslld, X86YmmReg, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_3i(vpslld, kX86InstIdVpslld, X86YmmReg, X86YmmReg, Imm)
+
+  //! Packed OWORD shift left logical (AVX2).
+  INST_3i(vpslldq, kX86InstIdVpslldq, X86YmmReg, X86YmmReg, Imm)
+
+  //! Packed QWORD shift left logical (AVX2).
+  INST_3x(vpsllq, kX86InstIdVpsllq, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsllq, kX86InstIdVpsllq, X86YmmReg, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_3i(vpsllq, kX86InstIdVpsllq, X86YmmReg, X86YmmReg, Imm)
+
+  INST_3x(vpsllvd, kX86InstIdVpsllvd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vpsllvd, kX86InstIdVpsllvd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpsllvd, kX86InstIdVpsllvd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vpsllvd, kX86InstIdVpsllvd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vpsllvq, kX86InstIdVpsllvq, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vpsllvq, kX86InstIdVpsllvq, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpsllvq, kX86InstIdVpsllvq, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vpsllvq, kX86InstIdVpsllvq, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD shift left logical (AVX2).
+  INST_3x(vpsllw, kX86InstIdVpsllw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsllw, kX86InstIdVpsllw, X86YmmReg, X86YmmReg, X86XmmReg)
+  //! Packed WORD shift left logical (AVX2).
+  INST_3i(vpsllw, kX86InstIdVpsllw, X86YmmReg, X86YmmReg, Imm)
+
+  //! Packed DWORD shift right arithmetic (AVX2).
+  INST_3x(vpsrad, kX86InstIdVpsrad, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsrad, kX86InstIdVpsrad, X86YmmReg, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_3i(vpsrad, kX86InstIdVpsrad, X86YmmReg, X86YmmReg, Imm)
+
+  INST_3x(vpsravd, kX86InstIdVpsravd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vpsravd, kX86InstIdVpsravd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpsravd, kX86InstIdVpsravd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vpsravd, kX86InstIdVpsravd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD shift right arithmetic (AVX2).
+  INST_3x(vpsraw, kX86InstIdVpsraw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsraw, kX86InstIdVpsraw, X86YmmReg, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_3i(vpsraw, kX86InstIdVpsraw, X86YmmReg, X86YmmReg, Imm)
+
+  //! Packed DWORD shift right logical (AVX2).
+  INST_3x(vpsrld, kX86InstIdVpsrld, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsrld, kX86InstIdVpsrld, X86YmmReg, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_3i(vpsrld, kX86InstIdVpsrld, X86YmmReg, X86YmmReg, Imm)
+
+  //! Scalar OWORD shift right logical (AVX2).
+  INST_3i(vpsrldq, kX86InstIdVpsrldq, X86YmmReg, X86YmmReg, Imm)
+
+  //! Packed QWORD shift right logical (AVX2).
+  INST_3x(vpsrlq, kX86InstIdVpsrlq, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsrlq, kX86InstIdVpsrlq, X86YmmReg, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_3i(vpsrlq, kX86InstIdVpsrlq, X86YmmReg, X86YmmReg, Imm)
+
+  INST_3x(vpsrlvd, kX86InstIdVpsrlvd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vpsrlvd, kX86InstIdVpsrlvd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpsrlvd, kX86InstIdVpsrlvd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vpsrlvd, kX86InstIdVpsrlvd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vpsrlvq, kX86InstIdVpsrlvq, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vpsrlvq, kX86InstIdVpsrlvq, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpsrlvq, kX86InstIdVpsrlvq, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vpsrlvq, kX86InstIdVpsrlvq, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD shift right logical (AVX2).
+  INST_3x(vpsrlw, kX86InstIdVpsrlw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsrlw, kX86InstIdVpsrlw, X86YmmReg, X86YmmReg, X86XmmReg)
+  //! \overload
+  INST_3i(vpsrlw, kX86InstIdVpsrlw, X86YmmReg, X86YmmReg, Imm)
+
+  //! Packed BYTE subtract (AVX2).
+  INST_3x(vpsubb, kX86InstIdVpsubb, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vpsubb, kX86InstIdVpsubb, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed DWORD subtract (AVX2).
+  INST_3x(vpsubd, kX86InstIdVpsubd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsubd, kX86InstIdVpsubd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed QWORD subtract (AVX2).
+  INST_3x(vpsubq, kX86InstIdVpsubq, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsubq, kX86InstIdVpsubq, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed BYTE subtract with saturation (AVX2).
+  INST_3x(vpsubsb, kX86InstIdVpsubsb, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsubsb, kX86InstIdVpsubsb, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD subtract with saturation (AVX2).
+  INST_3x(vpsubsw, kX86InstIdVpsubsw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsubsw, kX86InstIdVpsubsw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed BYTE subtract with unsigned saturation (AVX2).
+  INST_3x(vpsubusb, kX86InstIdVpsubusb, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsubusb, kX86InstIdVpsubusb, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD subtract with unsigned saturation (AVX2).
+  INST_3x(vpsubusw, kX86InstIdVpsubusw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsubusw, kX86InstIdVpsubusw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed WORD subtract (AVX2).
+  INST_3x(vpsubw, kX86InstIdVpsubw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpsubw, kX86InstIdVpsubw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Unpack high packed BYTEs to WORDs (AVX2).
+  INST_3x(vpunpckhbw, kX86InstIdVpunpckhbw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpunpckhbw, kX86InstIdVpunpckhbw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Unpack high packed DWORDs to QWORDs (AVX2).
+  INST_3x(vpunpckhdq, kX86InstIdVpunpckhdq, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpunpckhdq, kX86InstIdVpunpckhdq, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Unpack high packed QWORDs to OWORD (AVX2).
+  INST_3x(vpunpckhqdq, kX86InstIdVpunpckhqdq, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpunpckhqdq, kX86InstIdVpunpckhqdq, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Unpack high packed WORDs to DWORDs (AVX2).
+  INST_3x(vpunpckhwd, kX86InstIdVpunpckhwd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpunpckhwd, kX86InstIdVpunpckhwd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Unpack low packed BYTEs to WORDs (AVX2).
+  INST_3x(vpunpcklbw, kX86InstIdVpunpcklbw, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpunpcklbw, kX86InstIdVpunpcklbw, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Unpack low packed DWORDs to QWORDs (AVX2).
+  INST_3x(vpunpckldq, kX86InstIdVpunpckldq, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpunpckldq, kX86InstIdVpunpckldq, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Unpack low packed QWORDs to OWORD (AVX2).
+  INST_3x(vpunpcklqdq, kX86InstIdVpunpcklqdq, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpunpcklqdq, kX86InstIdVpunpcklqdq, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Unpack low packed WORDs to DWORDs (AVX2).
+  INST_3x(vpunpcklwd, kX86InstIdVpunpcklwd, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpunpcklwd, kX86InstIdVpunpcklwd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  //! Packed bitwise xor (AVX2).
+  INST_3x(vpxor, kX86InstIdVpxor, X86YmmReg, X86YmmReg, X86Mem)
+  //! \overload
+  INST_3x(vpxor, kX86InstIdVpxor, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  // --------------------------------------------------------------------------
+  // [FMA3]
+  // --------------------------------------------------------------------------
+
+  INST_3x(vfmadd132pd, kX86InstIdVfmadd132pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd132pd, kX86InstIdVfmadd132pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmadd132pd, kX86InstIdVfmadd132pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmadd132pd, kX86InstIdVfmadd132pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmadd132ps, kX86InstIdVfmadd132ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd132ps, kX86InstIdVfmadd132ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmadd132ps, kX86InstIdVfmadd132ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmadd132ps, kX86InstIdVfmadd132ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmadd132sd, kX86InstIdVfmadd132sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd132sd, kX86InstIdVfmadd132sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmadd132ss, kX86InstIdVfmadd132ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd132ss, kX86InstIdVfmadd132ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmadd213pd, kX86InstIdVfmadd213pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd213pd, kX86InstIdVfmadd213pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmadd213pd, kX86InstIdVfmadd213pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmadd213pd, kX86InstIdVfmadd213pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmadd213ps, kX86InstIdVfmadd213ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd213ps, kX86InstIdVfmadd213ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmadd213ps, kX86InstIdVfmadd213ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmadd213ps, kX86InstIdVfmadd213ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmadd213sd, kX86InstIdVfmadd213sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd213sd, kX86InstIdVfmadd213sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmadd213ss, kX86InstIdVfmadd213ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd213ss, kX86InstIdVfmadd213ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmadd231pd, kX86InstIdVfmadd231pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd231pd, kX86InstIdVfmadd231pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmadd231pd, kX86InstIdVfmadd231pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmadd231pd, kX86InstIdVfmadd231pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmadd231ps, kX86InstIdVfmadd231ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd231ps, kX86InstIdVfmadd231ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmadd231ps, kX86InstIdVfmadd231ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmadd231ps, kX86InstIdVfmadd231ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmadd231sd, kX86InstIdVfmadd231sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd231sd, kX86InstIdVfmadd231sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmadd231ss, kX86InstIdVfmadd231ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmadd231ss, kX86InstIdVfmadd231ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmaddsub132pd, kX86InstIdVfmaddsub132pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmaddsub132pd, kX86InstIdVfmaddsub132pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmaddsub132pd, kX86InstIdVfmaddsub132pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmaddsub132pd, kX86InstIdVfmaddsub132pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmaddsub132ps, kX86InstIdVfmaddsub132ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmaddsub132ps, kX86InstIdVfmaddsub132ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmaddsub132ps, kX86InstIdVfmaddsub132ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmaddsub132ps, kX86InstIdVfmaddsub132ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmaddsub213pd, kX86InstIdVfmaddsub213pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmaddsub213pd, kX86InstIdVfmaddsub213pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmaddsub213pd, kX86InstIdVfmaddsub213pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmaddsub213pd, kX86InstIdVfmaddsub213pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmaddsub213ps, kX86InstIdVfmaddsub213ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmaddsub213ps, kX86InstIdVfmaddsub213ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmaddsub213ps, kX86InstIdVfmaddsub213ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmaddsub213ps, kX86InstIdVfmaddsub213ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmaddsub231pd, kX86InstIdVfmaddsub231pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmaddsub231pd, kX86InstIdVfmaddsub231pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmaddsub231pd, kX86InstIdVfmaddsub231pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmaddsub231pd, kX86InstIdVfmaddsub231pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmaddsub231ps, kX86InstIdVfmaddsub231ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmaddsub231ps, kX86InstIdVfmaddsub231ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmaddsub231ps, kX86InstIdVfmaddsub231ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmaddsub231ps, kX86InstIdVfmaddsub231ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsub132pd, kX86InstIdVfmsub132pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub132pd, kX86InstIdVfmsub132pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsub132pd, kX86InstIdVfmsub132pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsub132pd, kX86InstIdVfmsub132pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsub132ps, kX86InstIdVfmsub132ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub132ps, kX86InstIdVfmsub132ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsub132ps, kX86InstIdVfmsub132ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsub132ps, kX86InstIdVfmsub132ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsub132sd, kX86InstIdVfmsub132sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub132sd, kX86InstIdVfmsub132sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmsub132ss, kX86InstIdVfmsub132ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub132ss, kX86InstIdVfmsub132ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmsub213pd, kX86InstIdVfmsub213pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub213pd, kX86InstIdVfmsub213pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsub213pd, kX86InstIdVfmsub213pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsub213pd, kX86InstIdVfmsub213pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsub213ps, kX86InstIdVfmsub213ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub213ps, kX86InstIdVfmsub213ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsub213ps, kX86InstIdVfmsub213ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsub213ps, kX86InstIdVfmsub213ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsub213sd, kX86InstIdVfmsub213sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub213sd, kX86InstIdVfmsub213sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmsub213ss, kX86InstIdVfmsub213ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub213ss, kX86InstIdVfmsub213ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmsub231pd, kX86InstIdVfmsub231pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub231pd, kX86InstIdVfmsub231pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsub231pd, kX86InstIdVfmsub231pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsub231pd, kX86InstIdVfmsub231pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsub231ps, kX86InstIdVfmsub231ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub231ps, kX86InstIdVfmsub231ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsub231ps, kX86InstIdVfmsub231ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsub231ps, kX86InstIdVfmsub231ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsub231sd, kX86InstIdVfmsub231sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub231sd, kX86InstIdVfmsub231sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmsub231ss, kX86InstIdVfmsub231ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsub231ss, kX86InstIdVfmsub231ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfmsubadd132pd, kX86InstIdVfmsubadd132pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsubadd132pd, kX86InstIdVfmsubadd132pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsubadd132pd, kX86InstIdVfmsubadd132pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsubadd132pd, kX86InstIdVfmsubadd132pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsubadd132ps, kX86InstIdVfmsubadd132ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsubadd132ps, kX86InstIdVfmsubadd132ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsubadd132ps, kX86InstIdVfmsubadd132ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsubadd132ps, kX86InstIdVfmsubadd132ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsubadd213pd, kX86InstIdVfmsubadd213pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsubadd213pd, kX86InstIdVfmsubadd213pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsubadd213pd, kX86InstIdVfmsubadd213pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsubadd213pd, kX86InstIdVfmsubadd213pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsubadd213ps, kX86InstIdVfmsubadd213ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsubadd213ps, kX86InstIdVfmsubadd213ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsubadd213ps, kX86InstIdVfmsubadd213ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsubadd213ps, kX86InstIdVfmsubadd213ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsubadd231pd, kX86InstIdVfmsubadd231pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsubadd231pd, kX86InstIdVfmsubadd231pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsubadd231pd, kX86InstIdVfmsubadd231pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsubadd231pd, kX86InstIdVfmsubadd231pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfmsubadd231ps, kX86InstIdVfmsubadd231ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfmsubadd231ps, kX86InstIdVfmsubadd231ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfmsubadd231ps, kX86InstIdVfmsubadd231ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfmsubadd231ps, kX86InstIdVfmsubadd231ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmadd132pd, kX86InstIdVfnmadd132pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd132pd, kX86InstIdVfnmadd132pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmadd132pd, kX86InstIdVfnmadd132pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmadd132pd, kX86InstIdVfnmadd132pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmadd132ps, kX86InstIdVfnmadd132ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd132ps, kX86InstIdVfnmadd132ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmadd132ps, kX86InstIdVfnmadd132ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmadd132ps, kX86InstIdVfnmadd132ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmadd132sd, kX86InstIdVfnmadd132sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd132sd, kX86InstIdVfnmadd132sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmadd132ss, kX86InstIdVfnmadd132ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd132ss, kX86InstIdVfnmadd132ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmadd213pd, kX86InstIdVfnmadd213pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd213pd, kX86InstIdVfnmadd213pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmadd213pd, kX86InstIdVfnmadd213pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmadd213pd, kX86InstIdVfnmadd213pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmadd213ps, kX86InstIdVfnmadd213ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd213ps, kX86InstIdVfnmadd213ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmadd213ps, kX86InstIdVfnmadd213ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmadd213ps, kX86InstIdVfnmadd213ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmadd213sd, kX86InstIdVfnmadd213sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd213sd, kX86InstIdVfnmadd213sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmadd213ss, kX86InstIdVfnmadd213ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd213ss, kX86InstIdVfnmadd213ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmadd231pd, kX86InstIdVfnmadd231pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd231pd, kX86InstIdVfnmadd231pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmadd231pd, kX86InstIdVfnmadd231pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmadd231pd, kX86InstIdVfnmadd231pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmadd231ps, kX86InstIdVfnmadd231ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd231ps, kX86InstIdVfnmadd231ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmadd231ps, kX86InstIdVfnmadd231ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmadd231ps, kX86InstIdVfnmadd231ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmadd231sd, kX86InstIdVfnmadd231sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd231sd, kX86InstIdVfnmadd231sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmadd231ss, kX86InstIdVfnmadd231ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmadd231ss, kX86InstIdVfnmadd231ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmsub132pd, kX86InstIdVfnmsub132pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub132pd, kX86InstIdVfnmsub132pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmsub132pd, kX86InstIdVfnmsub132pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmsub132pd, kX86InstIdVfnmsub132pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmsub132ps, kX86InstIdVfnmsub132ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub132ps, kX86InstIdVfnmsub132ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmsub132ps, kX86InstIdVfnmsub132ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmsub132ps, kX86InstIdVfnmsub132ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmsub132sd, kX86InstIdVfnmsub132sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub132sd, kX86InstIdVfnmsub132sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmsub132ss, kX86InstIdVfnmsub132ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub132ss, kX86InstIdVfnmsub132ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmsub213pd, kX86InstIdVfnmsub213pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub213pd, kX86InstIdVfnmsub213pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmsub213pd, kX86InstIdVfnmsub213pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmsub213pd, kX86InstIdVfnmsub213pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmsub213ps, kX86InstIdVfnmsub213ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub213ps, kX86InstIdVfnmsub213ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmsub213ps, kX86InstIdVfnmsub213ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmsub213ps, kX86InstIdVfnmsub213ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmsub213sd, kX86InstIdVfnmsub213sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub213sd, kX86InstIdVfnmsub213sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmsub213ss, kX86InstIdVfnmsub213ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub213ss, kX86InstIdVfnmsub213ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmsub231pd, kX86InstIdVfnmsub231pd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub231pd, kX86InstIdVfnmsub231pd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmsub231pd, kX86InstIdVfnmsub231pd, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmsub231pd, kX86InstIdVfnmsub231pd, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmsub231ps, kX86InstIdVfnmsub231ps, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub231ps, kX86InstIdVfnmsub231ps, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vfnmsub231ps, kX86InstIdVfnmsub231ps, X86YmmReg, X86YmmReg, X86Mem)
+  INST_3x(vfnmsub231ps, kX86InstIdVfnmsub231ps, X86YmmReg, X86YmmReg, X86YmmReg)
+
+  INST_3x(vfnmsub231sd, kX86InstIdVfnmsub231sd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub231sd, kX86InstIdVfnmsub231sd, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  INST_3x(vfnmsub231ss, kX86InstIdVfnmsub231ss, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3x(vfnmsub231ss, kX86InstIdVfnmsub231ss, X86XmmReg, X86XmmReg, X86XmmReg)
+
+  // --------------------------------------------------------------------------
+  // [FMA4]
+  // --------------------------------------------------------------------------
+
+  INST_4x(vfmaddpd, kX86InstIdVfmaddpd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmaddpd, kX86InstIdVfmaddpd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmaddpd, kX86InstIdVfmaddpd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfmaddpd, kX86InstIdVfmaddpd, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfmaddpd, kX86InstIdVfmaddpd, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfmaddpd, kX86InstIdVfmaddpd, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfmaddps, kX86InstIdVfmaddps, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmaddps, kX86InstIdVfmaddps, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmaddps, kX86InstIdVfmaddps, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfmaddps, kX86InstIdVfmaddps, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfmaddps, kX86InstIdVfmaddps, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfmaddps, kX86InstIdVfmaddps, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfmaddsd, kX86InstIdVfmaddsd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmaddsd, kX86InstIdVfmaddsd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmaddsd, kX86InstIdVfmaddsd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_4x(vfmaddss, kX86InstIdVfmaddss, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmaddss, kX86InstIdVfmaddss, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmaddss, kX86InstIdVfmaddss, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_4x(vfmaddsubpd, kX86InstIdVfmaddsubpd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmaddsubpd, kX86InstIdVfmaddsubpd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmaddsubpd, kX86InstIdVfmaddsubpd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfmaddsubpd, kX86InstIdVfmaddsubpd, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfmaddsubpd, kX86InstIdVfmaddsubpd, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfmaddsubpd, kX86InstIdVfmaddsubpd, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfmaddsubps, kX86InstIdVfmaddsubps, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmaddsubps, kX86InstIdVfmaddsubps, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmaddsubps, kX86InstIdVfmaddsubps, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfmaddsubps, kX86InstIdVfmaddsubps, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfmaddsubps, kX86InstIdVfmaddsubps, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfmaddsubps, kX86InstIdVfmaddsubps, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfmsubaddpd, kX86InstIdVfmsubaddpd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmsubaddpd, kX86InstIdVfmsubaddpd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmsubaddpd, kX86InstIdVfmsubaddpd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfmsubaddpd, kX86InstIdVfmsubaddpd, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfmsubaddpd, kX86InstIdVfmsubaddpd, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfmsubaddpd, kX86InstIdVfmsubaddpd, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfmsubaddps, kX86InstIdVfmsubaddps, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmsubaddps, kX86InstIdVfmsubaddps, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmsubaddps, kX86InstIdVfmsubaddps, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfmsubaddps, kX86InstIdVfmsubaddps, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfmsubaddps, kX86InstIdVfmsubaddps, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfmsubaddps, kX86InstIdVfmsubaddps, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfmsubpd, kX86InstIdVfmsubpd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmsubpd, kX86InstIdVfmsubpd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmsubpd, kX86InstIdVfmsubpd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfmsubpd, kX86InstIdVfmsubpd, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfmsubpd, kX86InstIdVfmsubpd, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfmsubpd, kX86InstIdVfmsubpd, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfmsubps, kX86InstIdVfmsubps, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmsubps, kX86InstIdVfmsubps, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmsubps, kX86InstIdVfmsubps, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfmsubps, kX86InstIdVfmsubps, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfmsubps, kX86InstIdVfmsubps, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfmsubps, kX86InstIdVfmsubps, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfmsubsd, kX86InstIdVfmsubsd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmsubsd, kX86InstIdVfmsubsd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmsubsd, kX86InstIdVfmsubsd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_4x(vfmsubss, kX86InstIdVfmsubss, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfmsubss, kX86InstIdVfmsubss, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfmsubss, kX86InstIdVfmsubss, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_4x(vfnmaddpd, kX86InstIdVfnmaddpd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfnmaddpd, kX86InstIdVfnmaddpd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfnmaddpd, kX86InstIdVfnmaddpd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfnmaddpd, kX86InstIdVfnmaddpd, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfnmaddpd, kX86InstIdVfnmaddpd, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfnmaddpd, kX86InstIdVfnmaddpd, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfnmaddps, kX86InstIdVfnmaddps, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfnmaddps, kX86InstIdVfnmaddps, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfnmaddps, kX86InstIdVfnmaddps, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfnmaddps, kX86InstIdVfnmaddps, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfnmaddps, kX86InstIdVfnmaddps, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfnmaddps, kX86InstIdVfnmaddps, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfnmaddsd, kX86InstIdVfnmaddsd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfnmaddsd, kX86InstIdVfnmaddsd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfnmaddsd, kX86InstIdVfnmaddsd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_4x(vfnmaddss, kX86InstIdVfnmaddss, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfnmaddss, kX86InstIdVfnmaddss, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfnmaddss, kX86InstIdVfnmaddss, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_4x(vfnmsubpd, kX86InstIdVfnmsubpd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfnmsubpd, kX86InstIdVfnmsubpd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfnmsubpd, kX86InstIdVfnmsubpd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfnmsubpd, kX86InstIdVfnmsubpd, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfnmsubpd, kX86InstIdVfnmsubpd, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfnmsubpd, kX86InstIdVfnmsubpd, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfnmsubps, kX86InstIdVfnmsubps, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfnmsubps, kX86InstIdVfnmsubps, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfnmsubps, kX86InstIdVfnmsubps, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vfnmsubps, kX86InstIdVfnmsubps, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vfnmsubps, kX86InstIdVfnmsubps, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vfnmsubps, kX86InstIdVfnmsubps, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vfnmsubsd, kX86InstIdVfnmsubsd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfnmsubsd, kX86InstIdVfnmsubsd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfnmsubsd, kX86InstIdVfnmsubsd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_4x(vfnmsubss, kX86InstIdVfnmsubss, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vfnmsubss, kX86InstIdVfnmsubss, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vfnmsubss, kX86InstIdVfnmsubss, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+
+  // --------------------------------------------------------------------------
+  // [XOP]
+  // --------------------------------------------------------------------------
+
+  INST_2x(vfrczpd, kX86InstIdVfrczpd, X86XmmReg, X86XmmReg)
+  INST_2x(vfrczpd, kX86InstIdVfrczpd, X86XmmReg, X86Mem)
+  INST_2x(vfrczpd, kX86InstIdVfrczpd, X86YmmReg, X86YmmReg)
+  INST_2x(vfrczpd, kX86InstIdVfrczpd, X86YmmReg, X86Mem)
+
+  INST_2x(vfrczps, kX86InstIdVfrczps, X86XmmReg, X86XmmReg)
+  INST_2x(vfrczps, kX86InstIdVfrczps, X86XmmReg, X86Mem)
+  INST_2x(vfrczps, kX86InstIdVfrczps, X86YmmReg, X86YmmReg)
+  INST_2x(vfrczps, kX86InstIdVfrczps, X86YmmReg, X86Mem)
+
+  INST_2x(vfrczsd, kX86InstIdVfrczsd, X86XmmReg, X86XmmReg)
+  INST_2x(vfrczsd, kX86InstIdVfrczsd, X86XmmReg, X86Mem)
+
+  INST_2x(vfrczss, kX86InstIdVfrczss, X86XmmReg, X86XmmReg)
+  INST_2x(vfrczss, kX86InstIdVfrczss, X86XmmReg, X86Mem)
+
+  INST_4x(vpcmov, kX86InstIdVpcmov, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpcmov, kX86InstIdVpcmov, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpcmov, kX86InstIdVpcmov, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vpcmov, kX86InstIdVpcmov, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vpcmov, kX86InstIdVpcmov, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vpcmov, kX86InstIdVpcmov, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4i(vpcomb, kX86InstIdVpcomb, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  INST_4i(vpcomb, kX86InstIdVpcomb, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  INST_4i(vpcomd, kX86InstIdVpcomd, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  INST_4i(vpcomd, kX86InstIdVpcomd, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  INST_4i(vpcomq, kX86InstIdVpcomq, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  INST_4i(vpcomq, kX86InstIdVpcomq, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  INST_4i(vpcomw, kX86InstIdVpcomw, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  INST_4i(vpcomw, kX86InstIdVpcomw, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  INST_4i(vpcomub, kX86InstIdVpcomub, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  INST_4i(vpcomub, kX86InstIdVpcomub, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  INST_4i(vpcomud, kX86InstIdVpcomud, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  INST_4i(vpcomud, kX86InstIdVpcomud, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  INST_4i(vpcomuq, kX86InstIdVpcomuq, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  INST_4i(vpcomuq, kX86InstIdVpcomuq, X86XmmReg, X86XmmReg, X86Mem, Imm)
+  INST_4i(vpcomuw, kX86InstIdVpcomuw, X86XmmReg, X86XmmReg, X86XmmReg, Imm)
+  INST_4i(vpcomuw, kX86InstIdVpcomuw, X86XmmReg, X86XmmReg, X86Mem, Imm)
+
+  INST_4x(vpermil2pd, kX86InstIdVpermil2pd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpermil2pd, kX86InstIdVpermil2pd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpermil2pd, kX86InstIdVpermil2pd, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vpermil2pd, kX86InstIdVpermil2pd, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vpermil2pd, kX86InstIdVpermil2pd, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vpermil2pd, kX86InstIdVpermil2pd, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_4x(vpermil2ps, kX86InstIdVpermil2ps, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpermil2ps, kX86InstIdVpermil2ps, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpermil2ps, kX86InstIdVpermil2ps, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+  INST_4x(vpermil2ps, kX86InstIdVpermil2ps, X86YmmReg, X86YmmReg, X86YmmReg, X86YmmReg)
+  INST_4x(vpermil2ps, kX86InstIdVpermil2ps, X86YmmReg, X86YmmReg, X86Mem, X86YmmReg)
+  INST_4x(vpermil2ps, kX86InstIdVpermil2ps, X86YmmReg, X86YmmReg, X86YmmReg, X86Mem)
+
+  INST_2x(vphaddbd, kX86InstIdVphaddbd, X86XmmReg, X86XmmReg)
+  INST_2x(vphaddbd, kX86InstIdVphaddbd, X86XmmReg, X86Mem)
+  INST_2x(vphaddbq, kX86InstIdVphaddbq, X86XmmReg, X86XmmReg)
+  INST_2x(vphaddbq, kX86InstIdVphaddbq, X86XmmReg, X86Mem)
+  INST_2x(vphaddbw, kX86InstIdVphaddbw, X86XmmReg, X86XmmReg)
+  INST_2x(vphaddbw, kX86InstIdVphaddbw, X86XmmReg, X86Mem)
+  INST_2x(vphadddq, kX86InstIdVphadddq, X86XmmReg, X86XmmReg)
+  INST_2x(vphadddq, kX86InstIdVphadddq, X86XmmReg, X86Mem)
+  INST_2x(vphaddwd, kX86InstIdVphaddwd, X86XmmReg, X86XmmReg)
+  INST_2x(vphaddwd, kX86InstIdVphaddwd, X86XmmReg, X86Mem)
+  INST_2x(vphaddwq, kX86InstIdVphaddwq, X86XmmReg, X86XmmReg)
+  INST_2x(vphaddwq, kX86InstIdVphaddwq, X86XmmReg, X86Mem)
+
+  INST_2x(vphaddubd, kX86InstIdVphaddubd, X86XmmReg, X86XmmReg)
+  INST_2x(vphaddubd, kX86InstIdVphaddubd, X86XmmReg, X86Mem)
+  INST_2x(vphaddubq, kX86InstIdVphaddubq, X86XmmReg, X86XmmReg)
+  INST_2x(vphaddubq, kX86InstIdVphaddubq, X86XmmReg, X86Mem)
+  INST_2x(vphaddubw, kX86InstIdVphaddubw, X86XmmReg, X86XmmReg)
+  INST_2x(vphaddubw, kX86InstIdVphaddubw, X86XmmReg, X86Mem)
+  INST_2x(vphaddudq, kX86InstIdVphaddudq, X86XmmReg, X86XmmReg)
+  INST_2x(vphaddudq, kX86InstIdVphaddudq, X86XmmReg, X86Mem)
+  INST_2x(vphadduwd, kX86InstIdVphadduwd, X86XmmReg, X86XmmReg)
+  INST_2x(vphadduwd, kX86InstIdVphadduwd, X86XmmReg, X86Mem)
+  INST_2x(vphadduwq, kX86InstIdVphadduwq, X86XmmReg, X86XmmReg)
+  INST_2x(vphadduwq, kX86InstIdVphadduwq, X86XmmReg, X86Mem)
+
+  INST_2x(vphsubbw, kX86InstIdVphsubbw, X86XmmReg, X86XmmReg)
+  INST_2x(vphsubbw, kX86InstIdVphsubbw, X86XmmReg, X86Mem)
+  INST_2x(vphsubdq, kX86InstIdVphsubdq, X86XmmReg, X86XmmReg)
+  INST_2x(vphsubdq, kX86InstIdVphsubdq, X86XmmReg, X86Mem)
+  INST_2x(vphsubwd, kX86InstIdVphsubwd, X86XmmReg, X86XmmReg)
+  INST_2x(vphsubwd, kX86InstIdVphsubwd, X86XmmReg, X86Mem)
+
+  INST_4x(vpmacsdd, kX86InstIdVpmacsdd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacsdd, kX86InstIdVpmacsdd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpmacsdqh, kX86InstIdVpmacsdqh, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacsdqh, kX86InstIdVpmacsdqh, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpmacsdql, kX86InstIdVpmacsdql, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacsdql, kX86InstIdVpmacsdql, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpmacswd, kX86InstIdVpmacswd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacswd, kX86InstIdVpmacswd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpmacsww, kX86InstIdVpmacsww, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacsww, kX86InstIdVpmacsww, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+
+  INST_4x(vpmacssdd, kX86InstIdVpmacssdd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacssdd, kX86InstIdVpmacssdd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpmacssdqh, kX86InstIdVpmacssdqh, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacssdqh, kX86InstIdVpmacssdqh, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpmacssdql, kX86InstIdVpmacssdql, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacssdql, kX86InstIdVpmacssdql, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpmacsswd, kX86InstIdVpmacsswd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacsswd, kX86InstIdVpmacsswd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpmacssww, kX86InstIdVpmacssww, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmacssww, kX86InstIdVpmacssww, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+
+  INST_4x(vpmadcsswd, kX86InstIdVpmadcsswd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmadcsswd, kX86InstIdVpmadcsswd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+
+  INST_4x(vpmadcswd, kX86InstIdVpmadcswd, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpmadcswd, kX86InstIdVpmadcswd, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+
+  INST_4x(vpperm, kX86InstIdVpperm, X86XmmReg, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_4x(vpperm, kX86InstIdVpperm, X86XmmReg, X86XmmReg, X86Mem, X86XmmReg)
+  INST_4x(vpperm, kX86InstIdVpperm, X86XmmReg, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_3x(vprotb, kX86InstIdVprotb, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vprotb, kX86InstIdVprotb, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vprotb, kX86InstIdVprotb, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3i(vprotb, kX86InstIdVprotb, X86XmmReg, X86XmmReg, Imm)
+  INST_3i(vprotb, kX86InstIdVprotb, X86XmmReg, X86Mem, Imm)
+
+  INST_3x(vprotd, kX86InstIdVprotd, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vprotd, kX86InstIdVprotd, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vprotd, kX86InstIdVprotd, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3i(vprotd, kX86InstIdVprotd, X86XmmReg, X86XmmReg, Imm)
+  INST_3i(vprotd, kX86InstIdVprotd, X86XmmReg, X86Mem, Imm)
+
+  INST_3x(vprotq, kX86InstIdVprotq, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vprotq, kX86InstIdVprotq, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vprotq, kX86InstIdVprotq, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3i(vprotq, kX86InstIdVprotq, X86XmmReg, X86XmmReg, Imm)
+  INST_3i(vprotq, kX86InstIdVprotq, X86XmmReg, X86Mem, Imm)
+
+  INST_3x(vprotw, kX86InstIdVprotw, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vprotw, kX86InstIdVprotw, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vprotw, kX86InstIdVprotw, X86XmmReg, X86XmmReg, X86Mem)
+  INST_3i(vprotw, kX86InstIdVprotw, X86XmmReg, X86XmmReg, Imm)
+  INST_3i(vprotw, kX86InstIdVprotw, X86XmmReg, X86Mem, Imm)
+
+  INST_3x(vpshab, kX86InstIdVpshab, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpshab, kX86InstIdVpshab, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpshab, kX86InstIdVpshab, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_3x(vpshad, kX86InstIdVpshad, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpshad, kX86InstIdVpshad, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpshad, kX86InstIdVpshad, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_3x(vpshaq, kX86InstIdVpshaq, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpshaq, kX86InstIdVpshaq, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpshaq, kX86InstIdVpshaq, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_3x(vpshaw, kX86InstIdVpshaw, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpshaw, kX86InstIdVpshaw, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpshaw, kX86InstIdVpshaw, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_3x(vpshlb, kX86InstIdVpshlb, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpshlb, kX86InstIdVpshlb, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpshlb, kX86InstIdVpshlb, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_3x(vpshld, kX86InstIdVpshld, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpshld, kX86InstIdVpshld, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpshld, kX86InstIdVpshld, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_3x(vpshlq, kX86InstIdVpshlq, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpshlq, kX86InstIdVpshlq, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpshlq, kX86InstIdVpshlq, X86XmmReg, X86XmmReg, X86Mem)
+
+  INST_3x(vpshlw, kX86InstIdVpshlw, X86XmmReg, X86XmmReg, X86XmmReg)
+  INST_3x(vpshlw, kX86InstIdVpshlw, X86XmmReg, X86Mem, X86XmmReg)
+  INST_3x(vpshlw, kX86InstIdVpshlw, X86XmmReg, X86XmmReg, X86Mem)
+
+  // --------------------------------------------------------------------------
+  // [BMI]
+  // --------------------------------------------------------------------------
+
+  //! Bitwise and-not (BMI).
+  INST_3x(andn, kX86InstIdAndn, X86GpReg, X86GpReg, X86GpReg)
+  //! \overload
+  INST_3x(andn, kX86InstIdAndn, X86GpReg, X86GpReg, X86Mem)
+
+  //! Bit field extract (BMI).
+  INST_3x(bextr, kX86InstIdBextr, X86GpReg, X86GpReg, X86GpReg)
+  //! \overload
+  INST_3x(bextr, kX86InstIdBextr, X86GpReg, X86Mem, X86GpReg)
+
+  //! Extract lower set isolated bit (BMI).
+  INST_2x(blsi, kX86InstIdBlsi, X86GpReg, X86GpReg)
+  //! \overload
+  INST_2x(blsi, kX86InstIdBlsi, X86GpReg, X86Mem)
+
+  //! Get mask up to lowest set bit (BMI).
+  INST_2x(blsmsk, kX86InstIdBlsmsk, X86GpReg, X86GpReg)
+  //! \overload
+  INST_2x(blsmsk, kX86InstIdBlsmsk, X86GpReg, X86Mem)
+
+  //! Reset lowest set bit (BMI).
+  INST_2x(blsr, kX86InstIdBlsr, X86GpReg, X86GpReg)
+  //! \overload
+  INST_2x(blsr, kX86InstIdBlsr, X86GpReg, X86Mem)
+
+  //! Count the number of trailing zero bits (BMI).
+  INST_2x(tzcnt, kX86InstIdTzcnt, X86GpReg, X86GpReg)
+  //! \overload
+  INST_2x(tzcnt, kX86InstIdTzcnt, X86GpReg, X86Mem)
 
   // --------------------------------------------------------------------------
   // [BMI2]
   // --------------------------------------------------------------------------
 
   //! Zero high bits starting with specified bit position (BMI2).
-  INST_3x(bzhi, kInstBzhi, GpReg, GpReg, GpReg)
+  INST_3x(bzhi, kX86InstIdBzhi, X86GpReg, X86GpReg, X86GpReg)
   //! \overload
-  INST_3x(bzhi, kInstBzhi, GpReg, Mem, GpReg)
+  INST_3x(bzhi, kX86InstIdBzhi, X86GpReg, X86Mem, X86GpReg)
 
   //! Unsigned multiply without affecting flags (BMI2).
-  INST_3x(mulx, kInstMulx, GpReg, GpReg, GpReg)
+  INST_3x(mulx, kX86InstIdMulx, X86GpReg, X86GpReg, X86GpReg)
   //! \overload
-  INST_3x(mulx, kInstMulx, GpReg, GpReg, Mem)
+  INST_3x(mulx, kX86InstIdMulx, X86GpReg, X86GpReg, X86Mem)
 
   //! Parallel bits deposit (BMI2).
-  INST_3x(pdep, kInstPdep, GpReg, GpReg, GpReg)
+  INST_3x(pdep, kX86InstIdPdep, X86GpReg, X86GpReg, X86GpReg)
   //! \overload
-  INST_3x(pdep, kInstPdep, GpReg, GpReg, Mem)
+  INST_3x(pdep, kX86InstIdPdep, X86GpReg, X86GpReg, X86Mem)
 
   //! Parallel bits extract (BMI2).
-  INST_3x(pext, kInstPext, GpReg, GpReg, GpReg)
+  INST_3x(pext, kX86InstIdPext, X86GpReg, X86GpReg, X86GpReg)
   //! \overload
-  INST_3x(pext, kInstPext, GpReg, GpReg, Mem)
+  INST_3x(pext, kX86InstIdPext, X86GpReg, X86GpReg, X86Mem)
 
   //! Rotate right without affecting flags (BMI2).
-  INST_3i(rorx, kInstRorx, GpReg, GpReg, Imm)
+  INST_3i(rorx, kX86InstIdRorx, X86GpReg, X86GpReg, Imm)
   //! \overload
-  INST_3i(rorx, kInstRorx, GpReg, Mem, Imm)
+  INST_3i(rorx, kX86InstIdRorx, X86GpReg, X86Mem, Imm)
 
   //! Shift arithmetic right without affecting flags (BMI2).
-  INST_3x(sarx, kInstSarx, GpReg, GpReg, GpReg)
+  INST_3x(sarx, kX86InstIdSarx, X86GpReg, X86GpReg, X86GpReg)
   //! \overload
-  INST_3x(sarx, kInstSarx, GpReg, Mem, GpReg)
+  INST_3x(sarx, kX86InstIdSarx, X86GpReg, X86Mem, X86GpReg)
 
   //! Shift logical left without affecting flags (BMI2).
-  INST_3x(shlx, kInstShlx, GpReg, GpReg, GpReg)
+  INST_3x(shlx, kX86InstIdShlx, X86GpReg, X86GpReg, X86GpReg)
   //! \overload
-  INST_3x(shlx, kInstShlx, GpReg, Mem, GpReg)
+  INST_3x(shlx, kX86InstIdShlx, X86GpReg, X86Mem, X86GpReg)
 
   //! Shift logical right without affecting flags (BMI2).
-  INST_3x(shrx, kInstShrx, GpReg, GpReg, GpReg)
+  INST_3x(shrx, kX86InstIdShrx, X86GpReg, X86GpReg, X86GpReg)
   //! \overload
-  INST_3x(shrx, kInstShrx, GpReg, Mem, GpReg)
+  INST_3x(shrx, kX86InstIdShrx, X86GpReg, X86Mem, X86GpReg)
 
   // --------------------------------------------------------------------------
   // [RDRAND]
   // --------------------------------------------------------------------------
 
-  //! Store a random number in destination register.
+  //! Store a random number in destination register (RDRAND).
   //!
   //! Please do not use this instruction in cryptographic software. The result
-  //! doesn't necessarily have to be random which may cause a major security
-  //! issue in the software that relies on it.
-  INST_1x(rdrand, kInstRdrand, GpReg)
+  //! doesn't necessarily have to be random, which may cause a major security
+  //! hole in the software.
+  INST_1x(rdrand, kX86InstIdRdrand, X86GpReg)
 
   // --------------------------------------------------------------------------
   // [F16C]
   // --------------------------------------------------------------------------
 
   //! Convert packed HP-FP to SP-FP.
-  INST_2x(vcvtph2ps, kInstVcvtph2ps, XmmReg, XmmReg)
+  INST_2x(vcvtph2ps, kX86InstIdVcvtph2ps, X86XmmReg, X86XmmReg)
   //! \overload
-  INST_2x(vcvtph2ps, kInstVcvtph2ps, XmmReg, Mem)
+  INST_2x(vcvtph2ps, kX86InstIdVcvtph2ps, X86XmmReg, X86Mem)
   //! \overload
-  INST_2x(vcvtph2ps, kInstVcvtph2ps, YmmReg, XmmReg)
+  INST_2x(vcvtph2ps, kX86InstIdVcvtph2ps, X86YmmReg, X86XmmReg)
   //! \overload
-  INST_2x(vcvtph2ps, kInstVcvtph2ps, YmmReg, Mem)
+  INST_2x(vcvtph2ps, kX86InstIdVcvtph2ps, X86YmmReg, X86Mem)
 
   //! Convert packed SP-FP to HP-FP.
-  INST_3i(vcvtps2ph, kInstVcvtps2ph, XmmReg, XmmReg, Imm)
+  INST_3i(vcvtps2ph, kX86InstIdVcvtps2ph, X86XmmReg, X86XmmReg, Imm)
   //! \overload
-  INST_3i(vcvtps2ph, kInstVcvtps2ph, Mem, XmmReg, Imm)
+  INST_3i(vcvtps2ph, kX86InstIdVcvtps2ph, X86Mem, X86XmmReg, Imm)
   //! \overload
-  INST_3i(vcvtps2ph, kInstVcvtps2ph, XmmReg, YmmReg, Imm)
+  INST_3i(vcvtps2ph, kX86InstIdVcvtps2ph, X86XmmReg, X86YmmReg, Imm)
   //! \overload
-  INST_3i(vcvtps2ph, kInstVcvtps2ph, Mem, YmmReg, Imm)
-};
-
-//! \}
-
-} // x86x64 namespace
-} // asmjit namespace
-
-// ============================================================================
-// [asmjit::x86]
-// ============================================================================
-
-#if defined(ASMJIT_BUILD_X86)
-
-namespace asmjit {
-namespace x86 {
-
-//! \addtogroup asmjit_x86x64_general
-//! \{
-
-//! X86-only assembler.
-struct Assembler : public X86X64Assembler {
-  ASMJIT_NO_COPY(Assembler)
-
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_API Assembler(Runtime* runtime);
-  ASMJIT_API virtual ~Assembler();
-
-  // --------------------------------------------------------------------------
-  // [Reloc]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_API virtual size_t _relocCode(void* dst, Ptr base) const;
-
-  // --------------------------------------------------------------------------
-  // [Emit]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_API virtual Error _emit(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2, const Operand& o3);
-
-  // -------------------------------------------------------------------------
-  // [Options]
-  // -------------------------------------------------------------------------
-
-  ASMJIT_X86X64_EMIT_OPTIONS(Assembler)
-
-  // --------------------------------------------------------------------------
-  // [X86-Only Instructions]
-  // --------------------------------------------------------------------------
-
-  //! Decimal adjust AL after addition (32-bit).
-  INST_0x(daa, kInstDaa)
-  //! Decimal adjust AL after subtraction (32-bit).
-  INST_0x(das, kInstDas)
-
-  //! Pop all Gp registers - EDI|ESI|EBP|Ign|EBX|EDX|ECX|EAX.
-  INST_0x(popa, kInstPopa)
-  //! Push all Gp registers - EAX|ECX|EDX|EBX|ESP|EBP|ESI|EDI.
-  INST_0x(pusha, kInstPusha)
-};
-
-//! \}
-
-} // x86 namespace
-} // asmjit namespace
-
-#endif // ASMJIT_BUILD_X86
-
-// ============================================================================
-// [asmjit::x64]
-// ============================================================================
-
-#if defined(ASMJIT_BUILD_X64)
-
-namespace asmjit {
-namespace x64 {
-
-//! \addtogroup asmjit_x86x64_general
-//! \{
-
-//! X64-only assembler.
-struct Assembler : public X86X64Assembler {
-  ASMJIT_NO_COPY(Assembler)
-
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_API Assembler(Runtime* runtime);
-  ASMJIT_API virtual ~Assembler();
-
-  // --------------------------------------------------------------------------
-  // [Reloc]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_API virtual size_t _relocCode(void* dst, Ptr base) const;
-
-  // --------------------------------------------------------------------------
-  // [Emit]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_API virtual Error _emit(uint32_t code, const Operand& o0, const Operand& o1, const Operand& o2, const Operand& o3);
-
-  // --------------------------------------------------------------------------
-  // [Options]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_X86X64_EMIT_OPTIONS(Assembler)
-
-  // --------------------------------------------------------------------------
-  // [X64-Only Instructions]
-  // --------------------------------------------------------------------------
-
-  //! Convert DWORD to QWORD (RAX <- Sign Extend EAX).
-  INST_0x(cdqe, kInstCdqe)
-  //! Convert QWORD to OWORD (RDX:RAX <- Sign Extend RAX).
-  INST_0x(cqo, kInstCqo)
-
-  //! Compares the 128-bit value in RDX:RAX with the memory operand (64-bit).
-  INST_1x(cmpxchg16b, kInstCmpxchg16b, Mem)
-
-  //! Move DWORD to QWORD with sign-extension.
-  INST_2x(movsxd, kInstMovsxd, GpReg, GpReg)
-  //! \overload
-  INST_2x(movsxd, kInstMovsxd, GpReg, Mem)
-
-  //! Load Ecx/Rcx QWORDs from ds:[Esi/Rri] to Rax.
-  INST_0x(rep_lodsq, kInstRepLodsq)
-  //! Move Ecx/Rcx QWORDs from ds:[Esi/Rsi] to es:[Edi/Rdi].
-  INST_0x(rep_movsq, kInstRepMovsq)
-  //! Fill Ecx/Rcx QWORDs at es:[Edi/Rdi] with Rax.
-  INST_0x(rep_stosq, kInstRepStosq)
-
-  //! Repeated find nonmatching QWORDs in ES:[EDI/RDI] and DS:[ESI/RDI].
-  INST_0x(repe_cmpsq, kInstRepeCmpsq)
-  //! Find non-rax QWORD starting at ES:[EDI/RDI].
-  INST_0x(repe_scasq, kInstRepeScasq)
-
-  //! Repeated find nonmatching QWORDs in ES:[EDI/RDI] and DS:[ESI/RDI].
-  INST_0x(repne_cmpsq, kInstRepneCmpsq)
-  //! Find RAX, starting at ES:[EDI/RDI].
-  INST_0x(repne_scasq, kInstRepneScasq)
-
-  using X86X64Assembler::movq;
-
-  //! \overload
-  INST_2x(movq, kInstMovq, GpReg, MmReg)
-  //! \overload
-  INST_2x(movq, kInstMovq, MmReg, GpReg)
-
-  //! \overload
-  INST_2x(movq, kInstMovq, GpReg, XmmReg)
-  //! \overload
-  INST_2x(movq, kInstMovq, XmmReg, GpReg)
-
-  // --------------------------------------------------------------------------
-  // [AVX]
-  // --------------------------------------------------------------------------
-
-  INST_2x(vmovq, kInstVmovq, XmmReg, GpReg)
-  INST_2x(vmovq, kInstVmovq, GpReg, XmmReg)
-
-  INST_3i(vpextrq, kInstVpextrq, GpReg, XmmReg, Imm)
-  INST_3i(vpextrq, kInstVpextrq, Mem, XmmReg, Imm)
-
-  INST_4i(vpinsrq, kInstVpinsrq, XmmReg, XmmReg, GpReg, Imm)
-  INST_4i(vpinsrq, kInstVpinsrq, XmmReg, XmmReg, Mem, Imm)
+  INST_3i(vcvtps2ph, kX86InstIdVcvtps2ph, X86Mem, X86YmmReg, Imm)
 
   // --------------------------------------------------------------------------
   // [FSGSBASE]
   // --------------------------------------------------------------------------
 
-  INST_1x(rdfsbase, kInstRdfsbase, GpReg)
-  INST_1x(rdgsbase, kInstRdgsbase, GpReg)
-  INST_1x(wrfsbase, kInstWrfsbase, GpReg)
-  INST_1x(wrgsbase, kInstWrgsbase, GpReg)
-};
-
-//! \}
-
-} // x64 namespace
-} // asmjit namespace
-
-#endif // ASMJIT_BUILD_X64
-
-// ============================================================================
-// [CodeGen-End]
-// ============================================================================
+  INST_1x(rdfsbase, kX86InstIdRdfsbase, X86GpReg)
+  INST_1x(rdgsbase, kX86InstIdRdgsbase, X86GpReg)
+  INST_1x(wrfsbase, kX86InstIdWrfsbase, X86GpReg)
+  INST_1x(wrgsbase, kX86InstIdWrgsbase, X86GpReg)
 
 #undef INST_0x
 
@@ -6606,10 +6661,17 @@ struct Assembler : public X86X64Assembler {
 #undef INST_3x
 #undef INST_3x_
 #undef INST_3i
+#undef INST_3ii
 
 #undef INST_4x
 #undef INST_4x_
 #undef INST_4i
+#undef INST_4ii
+};
+
+//! \}
+
+} // asmjit namespace
 
 // [Api-End]
 #include "../apiend.h"

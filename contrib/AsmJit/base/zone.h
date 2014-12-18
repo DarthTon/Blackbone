@@ -33,7 +33,7 @@ namespace asmjit {
 //! Zone memory allocators are designed to allocate data of short lifetime. The
 //! data used by `Assembler` and `Compiler` has a very short lifetime, thus, is
 //! allocated by `Zone`. The advantage is that `Zone` can free all of the data
-//! allocated at once by calling `clear()` or `reset()`.
+//! allocated at once by calling `reset()` or by `Zone` destructor.
 struct Zone {
   // --------------------------------------------------------------------------
   // [Block]
@@ -71,7 +71,7 @@ struct Zone {
     //! Link to the next block.
     Block* next;
 
-    //! Data->
+    //! Data.
     uint8_t data[sizeof(void*)];
   };
 
@@ -94,23 +94,17 @@ struct Zone {
   //! Destroy the `Zone` instance.
   //!
   //! This will destroy the `Zone` instance and release all blocks of memory
-  //! allocated by it. It performs implicit `reset()`.
+  //! allocated by it. It performs implicit `reset(true)`.
   ASMJIT_API ~Zone();
 
   // --------------------------------------------------------------------------
-  // [Clear / Reset]
+  // [Reset]
   // --------------------------------------------------------------------------
 
-  //! Clear the `Zone`, but keep all blocks allocated so they can be reused.
+  //! Reset the `Zone` invalidating all blocks allocated.
   //!
-  //! This is the preferred way of invalidating objects allocated by `Zone`.
-  ASMJIT_API void clear();
-
-  //! Reset the `Zone` releasing all blocks allocated.
-  //!
-  //! Calling `reset()` does complete cleanup, it releases all blocks allocated
-  //! by `Zone`.
-  ASMJIT_API void reset();
+  //! If `releaseMemory` is true all buffers will be released to the system.
+  ASMJIT_API void reset(bool releaseMemory = false);
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -128,8 +122,8 @@ struct Zone {
   //! Allocate `size` bytes of memory.
   //!
   //! Pointer returned is valid until the `Zone` instance is destroyed or reset
-  //! by calling `clear()` or `reset()`. If you plan to make an instance of C++
-  //! from the given pointer use placement `new` and `delete` operators:
+  //! by calling `reset()`. If you plan to make an instance of C++ from the
+  //! given pointer use placement `new` and `delete` operators:
   //!
   //! ~~~
   //! using namespace asmjit;

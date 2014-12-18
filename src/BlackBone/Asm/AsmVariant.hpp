@@ -84,7 +84,7 @@ namespace blackbone
             , imm_float_val( _imm_fpu )
             , new_imm_val( 0 ) { }
 
-        BLACKBONE_API AsmVariant( asmjit::host::GpReg _reg )
+        BLACKBONE_API AsmVariant( asmjit::GpReg _reg )
             : type( reg )
             , size( sizeof(size_t) )
             , reg_val( _reg )
@@ -92,22 +92,22 @@ namespace blackbone
             , new_imm_val( 0 ) { }
 
         // Stack variable
-        BLACKBONE_API AsmVariant( asmjit::host::Mem _mem )
+        BLACKBONE_API AsmVariant( asmjit::Mem _mem )
             : type( mem )
             , size( sizeof(size_t) )
             , mem_val( _mem )
             , imm_double_val( -1.0 ) { }
 
         // Pointer to stack address
-        BLACKBONE_API AsmVariant( asmjit::host::Mem* _mem )
+        BLACKBONE_API AsmVariant( asmjit::Mem* _mem )
             : type( mem_ptr )
             , size( sizeof(size_t) )
             , mem_val( *_mem )
             , imm_double_val( -1.0 )
             , new_imm_val( 0 ) { }
 
-        BLACKBONE_API AsmVariant( const asmjit::host::Mem* _mem )
-            : AsmVariant( const_cast<asmjit::host::Mem*>(_mem) ) { }
+        BLACKBONE_API AsmVariant( const asmjit::Mem* _mem )
+            : AsmVariant( const_cast<asmjit::Mem*>(_mem) ) { }
 
         template <typename T>
         AsmVariant( T* ptr )
@@ -207,8 +207,8 @@ namespace blackbone
         eType         type;             // Variable type
         size_t        size;             // Variable size
 
-        asmjit::host::GpReg reg_val;          // General purpose register
-        asmjit::host::Mem   mem_val;          // Memory pointer
+        asmjit::GpReg reg_val;          // General purpose register
+        asmjit::Mem   mem_val;          // Memory pointer
 
         // Immediate values
         union

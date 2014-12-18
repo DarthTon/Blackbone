@@ -50,11 +50,13 @@ public:
     /// <param name="EventPtr">Event memory location</param>
     /// <param name="errPtr">Error code memory location</param>
     /// <param name="rtype">Return type</param>
-    virtual void SaveRetValAndSignalEvent( size_t pSetEvent, 
-                                           size_t ResultPtr, 
-                                           size_t EventPtr, 
-                                           size_t errPtr, 
-                                           eReturnType rtype = rt_int32 );
+    virtual void SaveRetValAndSignalEvent( 
+        size_t pSetEvent, 
+        size_t ResultPtr,
+        size_t EventPtr,
+        size_t errPtr,
+        eReturnType rtype = rt_int32
+        );
 
     /// <summary>
     /// Does nothing under x86

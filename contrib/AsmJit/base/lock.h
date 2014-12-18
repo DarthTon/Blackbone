@@ -74,9 +74,13 @@ struct Lock {
   // --------------------------------------------------------------------------
 
   //! Get handle.
-  ASMJIT_INLINE Handle& getHandle() { return _handle; }
+  ASMJIT_INLINE Handle& getHandle() {
+    return _handle;
+  }
   //! \overload
-  ASMJIT_INLINE const Handle& getHandle() const { return _handle; }
+  ASMJIT_INLINE const Handle& getHandle() const {
+    return _handle;
+  }
 
   // --------------------------------------------------------------------------
   // [Members]

@@ -896,9 +896,9 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
     // ActivateActCtx
     if (_pAContext.valid())
     {
-        a->mov( asmjit::host::zax, _pAContext.ptr<size_t>() );
-        a->mov( asmjit::host::zax, asmjit::host::dword_ptr( asmjit::host::zax ) );
-        a.GenCall( static_cast<size_t>(pActivateActx.procAddress), { 0, asmjit::host::zax, _pAContext.ptr<size_t>() + sizeof(HANDLE) } );
+        a->mov( a->zax, _pAContext.ptr<size_t>() );
+        a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
+        a.GenCall( static_cast<size_t>(pActivateActx.procAddress), { 0, a->zax, _pAContext.ptr<size_t>() + sizeof( HANDLE ) } );
     }
 
     // Function order
@@ -946,9 +946,9 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
     // DeactivateActCtx
     if (_pAContext.valid())
     {
-        a->mov( asmjit::host::zax, _pAContext.ptr<size_t>() + sizeof(HANDLE) );
-        a->mov( asmjit::host::zax, asmjit::host::dword_ptr( asmjit::host::zax ) );
-        a.GenCall( static_cast<size_t>(pDeactivateeActx.procAddress), { 0, asmjit::host::zax } );
+        a->mov( a->zax, _pAContext.ptr<size_t>() + sizeof(HANDLE) );
+        a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
+        a.GenCall( static_cast<size_t>(pDeactivateeActx.procAddress), { 0, a->zax } );
     }
 
     _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
@@ -1011,16 +1011,16 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
 
         a->push( _pAContext.ptr<uint32_t>() + static_cast<uint32_t>(sizeof( HANDLE )) );
         a->mov( asmjit::host::eax, static_cast<uint32_t>(pCreateActx.procAddress) );
-        a->call( asmjit::host::zax );
+        a->call( a->zax );
         a->mov( asmjit::host::edx, _pAContext.ptr<uint32_t>() );
         //a->mov( asmjit::host::dword_ptr( asmjit::host::edx ), asmjit::host::eax );
         a->dw( '\x01\x02' );
 
         auto pTermThd = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll" ), "NtTerminateThread" );
-        a->push( asmjit::host::zax );
+        a->push( a->zax );
         a->push( uint32_t( 0 ) );
         a->mov( asmjit::host::eax, static_cast<uint32_t>(pTermThd.procAddress) );
-        a->call( asmjit::host::zax );
+        a->call( a->zax );
         a->ret( 4 );
         
         // Write path to file
@@ -1039,8 +1039,8 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
 
         a.GenCall( static_cast<size_t>(pCreateActx.procAddress), { _pAContext.ptr<size_t>() + sizeof(HANDLE) } );
 
-        a->mov( asmjit::host::zdx, _pAContext.ptr<size_t>() );
-        a->mov( asmjit::host::intptr_ptr( asmjit::host::zdx ), asmjit::host::zax );
+        a->mov( a->zdx, _pAContext.ptr<size_t>() );
+        a->mov( a->intptr_ptr( a->zdx ), a->zax );
 
         _process.remote().AddReturnWithEvent( a );
         a.GenEpilogue();

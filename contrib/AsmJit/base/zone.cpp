@@ -34,41 +34,46 @@ Zone::Zone(size_t blockSize) {
 }
 
 Zone::~Zone() {
-  reset();
+  reset(true);
 }
 
 // ============================================================================
-// [asmjit::Zone - Clear / Reset]
+// [asmjit::Zone - Reset]
 // ============================================================================
 
-void Zone::clear() {
+void Zone::reset(bool releaseMemory) {
   Block* cur = _block;
 
   // Can't be altered.
   if (cur == &Zone_zeroBlock)
     return;
 
-  while (cur->prev != NULL)
-    cur = cur->prev;
+  if (releaseMemory) {
+    // Since cur can be in the middle of the double-linked list, we have to
+    // traverse to both directions `prev` and `next` separately.
+    Block* next = cur->next;
+    do {
+      Block* prev = cur->prev;
+      ASMJIT_FREE(cur);
+      cur = prev;
+    } while (cur != NULL);
 
-  cur->pos = cur->data;
-  _block = cur;
-}
+    cur = next;
+    while (cur != NULL) {
+      next = cur->next;
+      ASMJIT_FREE(cur);
+      cur = next;
+    }
 
-void Zone::reset() {
-  Block* cur = _block;
+    _block = const_cast<Zone::Block*>(&Zone_zeroBlock);
+  }
+  else {
+    while (cur->prev != NULL)
+      cur = cur->prev;
 
-  // Can't be altered.
-  if (cur == &Zone_zeroBlock)
-    return;
-
-  do {
-    Block* prev = cur->prev;
-    ASMJIT_FREE(cur);
-    cur = prev;
-  } while (cur != NULL);
-
-  _block = const_cast<Zone::Block*>(&Zone_zeroBlock);
+    cur->pos = cur->data;
+    _block = cur;
+  }
 }
 
 // ============================================================================
@@ -83,7 +88,7 @@ void* Zone::_alloc(size_t size) {
   // in the current block, see `alloc()` implementation for more details.
   ASMJIT_ASSERT(curBlock == &Zone_zeroBlock || curBlock->getRemainingSize() < size);
 
-  // If the `Zone` has been cleared the current block doesn't have to be the
+  // If the `Zone` has been reset the current block doesn't have to be the
   // last one. Check if there is a block that can be used instead of allocating
   // a new one. If there is a `next` block it's completely unused, we don't have
   // to check for remaining bytes.

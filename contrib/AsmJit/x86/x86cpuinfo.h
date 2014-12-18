@@ -15,120 +15,150 @@
 #include "../apibegin.h"
 
 namespace asmjit {
-namespace x86x64 {
 
 // ============================================================================
 // [Forward Declarations]
 // ============================================================================
 
-struct CpuInfo;
+struct X86CpuInfo;
 
-//! \addtogroup asmjit_x86x64_general
+//! \addtogroup asmjit_x86_general
 //! \{
 
 // ============================================================================
-// [asmjit::x86x64::kCpuFeature]
+// [asmjit::kX86CpuFeature]
 // ============================================================================
 
 //! X86 CPU features.
-ASMJIT_ENUM(kCpuFeature) {
+ASMJIT_ENUM(kX86CpuFeature) {
+  //! Cpu has Not-Execute-Bit.
+  kX86CpuFeatureNX = 0,
   //! Cpu has multithreading.
-  kCpuFeatureMultithreading = 1,
-  //! Cpu has execute disable bit.
-  kCpuFeatureExecuteDisableBit,
+  kX86CpuFeatureMT,
   //! Cpu has RDTSC.
-  kCpuFeatureRdtsc,
+  kX86CpuFeatureRDTSC,
   //! Cpu has RDTSCP.
-  kCpuFeatureRdtscp,
+  kX86CpuFeatureRDTSCP,
   //! Cpu has CMOV.
-  kCpuFeatureCmov,
+  kX86CpuFeatureCMOV,
   //! Cpu has CMPXCHG8B.
-  kCpuFeatureCmpXchg8B,
-  //! Cpu has CMPXCHG16B (x64).
-  kCpuFeatureCmpXchg16B,
+  kX86CpuFeatureCMPXCHG8B,
+  //! Cpu has CMPXCHG16B (X64).
+  kX86CpuFeatureCMPXCHG16B,
   //! Cpu has CLFUSH.
-  kCpuFeatureClflush,
+  kX86CpuFeatureCLFLUSH,
+  //! Cpu has CLFUSH (Optimized).
+  kX86CpuFeatureCLFLUSHOpt,
   //! Cpu has PREFETCH.
-  kCpuFeaturePrefetch,
+  kX86CpuFeaturePREFETCH,
+  //! Cpu has PREFETCHWT1.
+  kX86CpuFeaturePREFETCHWT1,
   //! Cpu has LAHF/SAHF.
-  kCpuFeatureLahfSahf,
+  kX86CpuFeatureLahfSahf,
   //! Cpu has FXSAVE/FXRSTOR.
-  kCpuFeatureFxsr,
-  //! Cpu has FXSAVE/FXRSTOR optimizations.
-  kCpuFeatureFfxsr,
+  kX86CpuFeatureFXSR,
+  //! Cpu has FXSAVE/FXRSTOR (Optimized).
+  kX86CpuFeatureFXSROpt,
   //! Cpu has MMX.
-  kCpuFeatureMmx,
+  kX86CpuFeatureMMX,
   //! Cpu has extended MMX.
-  kCpuFeatureMmxExt,
+  kX86CpuFeatureMMX2,
   //! Cpu has 3dNow!
-  kCpuFeature3dNow,
+  kX86CpuFeature3DNOW,
   //! Cpu has enchanced 3dNow!
-  kCpuFeature3dNowExt,
+  kX86CpuFeature3DNOW2,
   //! Cpu has SSE.
-  kCpuFeatureSse,
+  kX86CpuFeatureSSE,
   //! Cpu has SSE2.
-  kCpuFeatureSse2,
+  kX86CpuFeatureSSE2,
   //! Cpu has SSE3.
-  kCpuFeatureSse3,
-  //! Cpu has Supplemental SSE3 (SSSE3).
-  kCpuFeatureSsse3,
+  kX86CpuFeatureSSE3,
+  //! Cpu has SSSE3.
+  kX86CpuFeatureSSSE3,
   //! Cpu has SSE4.A.
-  kCpuFeatureSse4A,
+  kX86CpuFeatureSSE4A,
   //! Cpu has SSE4.1.
-  kCpuFeatureSse41,
+  kX86CpuFeatureSSE4_1,
   //! Cpu has SSE4.2.
-  kCpuFeatureSse42,
+  kX86CpuFeatureSSE4_2,
   //! Cpu has Misaligned SSE (MSSE).
-  kCpuFeatureMsse,
+  kX86CpuFeatureMSSE,
   //! Cpu has MONITOR and MWAIT.
-  kCpuFeatureMonitorMWait,
+  kX86CpuFeatureMONITOR,
   //! Cpu has MOVBE.
-  kCpuFeatureMovbe,
+  kX86CpuFeatureMOVBE,
   //! Cpu has POPCNT.
-  kCpuFeaturePopcnt,
+  kX86CpuFeaturePOPCNT,
   //! Cpu has LZCNT.
-  kCpuFeatureLzcnt,
+  kX86CpuFeatureLZCNT,
   //! Cpu has AESNI.
-  kCpuFeatureAesni,
+  kX86CpuFeatureAESNI,
   //! Cpu has PCLMULQDQ.
-  kCpuFeaturePclmulqdq,
+  kX86CpuFeaturePCLMULQDQ,
   //! Cpu has RDRAND.
-  kCpuFeatureRdrand,
+  kX86CpuFeatureRDRAND,
+  //! Cpu has RDSEED.
+  kX86CpuFeatureRDSEED,
+  //! Cpu has SHA-1 and SHA-256.
+  kX86CpuFeatureSHA,
+  //! Cpu has XSAVE support - XSAVE/XRSTOR, XSETBV/XGETBV, and XCR0.
+  kX86CpuFeatureXSave,
+  //! OS has enabled XSAVE, you can call XGETBV to get value of XCR0.
+  kX86CpuFeatureXSaveOS,
   //! Cpu has AVX.
-  kCpuFeatureAvx,
+  kX86CpuFeatureAVX,
   //! Cpu has AVX2.
-  kCpuFeatureAvx2,
+  kX86CpuFeatureAVX2,
   //! Cpu has F16C.
-  kCpuFeatureF16C,
+  kX86CpuFeatureF16C,
   //! Cpu has FMA3.
-  kCpuFeatureFma3,
+  kX86CpuFeatureFMA3,
   //! Cpu has FMA4.
-  kCpuFeatureFma4,
+  kX86CpuFeatureFMA4,
   //! Cpu has XOP.
-  kCpuFeatureXop,
+  kX86CpuFeatureXOP,
   //! Cpu has BMI.
-  kCpuFeatureBmi,
+  kX86CpuFeatureBMI,
   //! Cpu has BMI2.
-  kCpuFeatureBmi2,
+  kX86CpuFeatureBMI2,
   //! Cpu has HLE.
-  kCpuFeatureHle,
+  kX86CpuFeatureHLE,
   //! Cpu has RTM.
-  kCpuFeatureRtm,
+  kX86CpuFeatureRTM,
+  //! Cpu has ADX.
+  kX86CpuFeatureADX,
+  //! Cpu has MPX (Memory Protection Extensions).
+  kX86CpuFeatureMPX,
   //! Cpu has FSGSBASE.
-  kCpuFeatureFsGsBase,
-  //! Cpu has enhanced REP MOVSB/STOSB.
-  kCpuFeatureRepMovsbStosbExt,
+  kX86CpuFeatureFSGSBase,
+  //! Cpu has optimized REP MOVSB/STOSB.
+  kX86CpuFeatureMOVSBSTOSBOpt,
+
+  //! Cpu has AVX-512F (Foundation).
+  kX86CpuFeatureAVX512F,
+  //! Cpu has AVX-512CD (Conflict Detection).
+  kX86CpuFeatureAVX512CD,
+  //! Cpu has AVX-512PF (Prefetch Instructions).
+  kX86CpuFeatureAVX512PF,
+  //! Cpu has AVX-512ER (Exponential and Reciprocal Instructions).
+  kX86CpuFeatureAVX512ER,
+  //! Cpu has AVX-512DQ (DWord/QWord).
+  kX86CpuFeatureAVX512DQ,
+  //! Cpu has AVX-512BW (Byte/Word).
+  kX86CpuFeatureAVX512BW,
+  //! Cpu has AVX VL (Vector Length Excensions).
+  kX86CpuFeatureAVX512VL,
 
   //! Count of X86/X64 Cpu features.
-  kCpuFeatureCount
+  kX86CpuFeatureCount
 };
 
 // ============================================================================
-// [asmjit::x86x64::CpuId]
+// [asmjit::X86CpuId]
 // ============================================================================
 
 //! X86/X64 CPUID output.
-union CpuId {
+union X86CpuId {
   //! EAX/EBX/ECX/EDX output.
   uint32_t i[4];
 
@@ -145,33 +175,33 @@ union CpuId {
 };
 
 // ============================================================================
-// [asmjit::x86x64::CpuUtil]
+// [asmjit::X86CpuUtil]
 // ============================================================================
 
 #if defined(ASMJIT_HOST_X86) || defined(ASMJIT_HOST_X64)
 //! CPU utilities available only if the host processor is X86/X64.
-struct CpuUtil {
+struct X86CpuUtil {
   //! Get the result of calling CPUID instruction to `out`.
-  ASMJIT_API static void callCpuId(uint32_t inEax, uint32_t inEcx, CpuId* out);
+  ASMJIT_API static void callCpuId(uint32_t inEax, uint32_t inEcx, X86CpuId* out);
 
   //! Detect the Host CPU.
-  ASMJIT_API static void detect(CpuInfo* cpuInfo);
+  ASMJIT_API static void detect(X86CpuInfo* cpuInfo);
 };
 #endif // ASMJIT_HOST_X86 || ASMJIT_HOST_X64
 
 // ============================================================================
-// [asmjit::x86x64::CpuInfo]
+// [asmjit::X86CpuInfo]
 // ============================================================================
 
-struct CpuInfo : public BaseCpuInfo {
-  ASMJIT_NO_COPY(CpuInfo)
+struct X86CpuInfo : public CpuInfo {
+  ASMJIT_NO_COPY(X86CpuInfo)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE CpuInfo(uint32_t size = sizeof(CpuInfo)) :
-    BaseCpuInfo(size) {}
+  ASMJIT_INLINE X86CpuInfo(uint32_t size = sizeof(X86CpuInfo)) :
+    CpuInfo(size) {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -201,10 +231,12 @@ struct CpuInfo : public BaseCpuInfo {
   // [Statics]
   // --------------------------------------------------------------------------
 
-  //! Get global instance of `x86x64::CpuInfo`.
-  static ASMJIT_INLINE const CpuInfo* getHost() {
-    return static_cast<const CpuInfo*>(BaseCpuInfo::getHost());
+#if defined(ASMJIT_HOST_X86) || defined(ASMJIT_HOST_X64)
+  //! Get global instance of `X86CpuInfo`.
+  static ASMJIT_INLINE const X86CpuInfo* getHost() {
+    return static_cast<const X86CpuInfo*>(CpuInfo::getHost());
   }
+#endif // ASMJIT_HOST_X86 || ASMJIT_HOST_X64
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -222,7 +254,6 @@ struct CpuInfo : public BaseCpuInfo {
 
 //! \}
 
-} // x86x64 namespace
 } // asmjit namespace
 
 // [Api-End]

@@ -49,11 +49,11 @@ int main( int /*argc*/, char* /*argv*/[] )
     TestPEB( proc );
     TestTEB( proc );
     TestPatterns();
-    TestLocalHook();
+    //TestLocalHook();
     TestRemoteCall();
-    TestRemoteHook();
-    TestDriver();
-    TestRemoteMem();
+    //TestRemoteHook();
+    //TestDriver();
+    //TestRemoteMem();
     TestMMap();
     
 	return 0;

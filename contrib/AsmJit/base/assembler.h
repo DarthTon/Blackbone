@@ -10,11 +10,10 @@
 
 // [Dependencies - AsmJit]
 #include "../base/codegen.h"
+#include "../base/containers.h"
 #include "../base/error.h"
 #include "../base/logger.h"
 #include "../base/operand.h"
-#include "../base/podlist.h"
-#include "../base/podvector.h"
 #include "../base/runtime.h"
 #include "../base/zone.h"
 
@@ -27,13 +26,13 @@ namespace asmjit {
 //! \{
 
 // ============================================================================
-// [asmjit::kInstCode]
+// [asmjit::kInstId]
 // ============================================================================
 
 //! Instruction codes (stub).
-ASMJIT_ENUM(kInstCode) {
+ASMJIT_ENUM(kInstId) {
   //! No instruction.
-  kInstNone = 0
+  kInstIdNone = 0
 };
 
 // ============================================================================
@@ -43,7 +42,7 @@ ASMJIT_ENUM(kInstCode) {
 //! Instruction options (stub).
 ASMJIT_ENUM(kInstOptions) {
   //! No instruction options.
-  kInstOptionNone = 0x00,
+  kInstOptionNone = 0x00000000,
 
   //! Emit short form of the instruction.
   //!
@@ -54,7 +53,8 @@ ASMJIT_ENUM(kInstOptions) {
   //! can be dangerous if the short jmp/jcc is required, but not encodable due
   //! to large displacement, in such case an error happens and the whole
   //! assembler/compiler stream is unusable.
-  kInstOptionShortForm = 0x01,
+  kInstOptionShortForm = 0x00000001,
+
   //! Emit long form of the instruction.
   //!
   //! X86/X64:
@@ -62,12 +62,13 @@ ASMJIT_ENUM(kInstOptions) {
   //! Long form is mosrlt related to jmp and jcc instructions, but like the
   //! `kInstOptionShortForm` option it can be used by other instructions
   //! supporting both 8-bit and 32-bit immediates.
-  kInstOptionLongForm = 0x02,
+  kInstOptionLongForm = 0x00000002,
 
   //! Condition is likely to be taken.
-  kInstOptionTaken = 0x04,
+  kInstOptionTaken = 0x00000004,
+
   //! Condition is unlikely to be taken.
-  kInstOptionNotTaken = 0x08
+  kInstOptionNotTaken = 0x00000008
 };
 
 // ============================================================================
@@ -132,7 +133,7 @@ struct RelocData {
 };
 
 // ============================================================================
-// [asmjit::BaseAssembler]
+// [asmjit::Assembler]
 // ============================================================================
 
 //! Base assembler.
@@ -140,30 +141,27 @@ struct RelocData {
 //! This class implements the base interface to an assembler. The architecture
 //! specific API is implemented by backends.
 //!
-//! @sa BaseCompiler.
-struct BaseAssembler : public CodeGen {
-  ASMJIT_NO_COPY(BaseAssembler)
+//! \sa Compiler.
+struct ASMJIT_VCLASS Assembler : public CodeGen {
+  ASMJIT_NO_COPY(Assembler)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a new `BaseAssembler` instance.
-  ASMJIT_API BaseAssembler(Runtime* runtime);
-  //! Destroy the `BaseAssembler` instance.
-  ASMJIT_API virtual ~BaseAssembler();
+  //! Create a new `Assembler` instance.
+  ASMJIT_API Assembler(Runtime* runtime);
+  //! Destroy the `Assembler` instance.
+  ASMJIT_API virtual ~Assembler();
 
   // --------------------------------------------------------------------------
-  // [Clear / Reset]
+  // [Reset]
   // --------------------------------------------------------------------------
 
-  //! Clear everything, but not deallocate buffers.
-  ASMJIT_API void clear();
-  //! Reset everything (means also to free all buffers).
-  ASMJIT_API void reset();
-  //! Called by clear() and reset() to clear all data related to derived class
-  //! implementation.
-  ASMJIT_API virtual void _purge();
+  //! Reset the assembler.
+  //!
+  //! If `releaseMemory` is true all buffers will be released to the system.
+  ASMJIT_API void reset(bool releaseMemory = false);
 
   // --------------------------------------------------------------------------
   // [Buffer]
@@ -325,31 +323,58 @@ struct BaseAssembler : public CodeGen {
   // [Label]
   // --------------------------------------------------------------------------
 
-  //! Get count of labels created.
+  //! Get number of labels created.
   ASMJIT_INLINE size_t getLabelsCount() const {
-    return _labels.getLength();
+    return _labelList.getLength();
   }
 
-  //! Get whether `label` is created.
-  ASMJIT_INLINE bool isLabelCreated(const Label& label) const {
-    return static_cast<size_t>(label.getId()) < _labels.getLength();
+  //! Get whether the `label` is valid (created by the assembler).
+  ASMJIT_INLINE bool isLabelValid(const Label& label) const {
+    return isLabelValid(label.getId());
   }
 
-  //! \internal
+  //! \overload
+  ASMJIT_INLINE bool isLabelValid(uint32_t id) const {
+    return static_cast<size_t>(id) < _labelList.getLength();
+  }
+
+  //! Get whether the `label` is bound.
   //!
+  //! \note It's an error to pass label that is not valid. Check the validity
+  //! of the label by using `isLabelValid()` method before the bound check if
+  //! you are not sure about its validity, otherwise you may hit an assertion
+  //! failure in debug mode, and undefined behavior in release mode.
+  ASMJIT_INLINE bool isLabelBound(const Label& label) const {
+    return isLabelBound(label.getId());
+  }
+
+  //! \overload
+  ASMJIT_INLINE bool isLabelBound(uint32_t id) const {
+    ASMJIT_ASSERT(isLabelValid(id));
+
+    return _labelList[id].offset != -1;
+  }
+
+  //! Get `label` offset or -1 if the label is not yet bound.
+  ASMJIT_INLINE intptr_t getLabelOffset(const Label& label) const {
+    return getLabelOffset(label.getId());
+  }
+
+  //! \overload
+  ASMJIT_INLINE intptr_t getLabelOffset(uint32_t id) const {
+    ASMJIT_ASSERT(isLabelValid(id));
+    return _labelList[id].offset;
+  }
+
   //! Get `LabelData` by `label`.
   ASMJIT_INLINE LabelData* getLabelData(const Label& label) const {
-    return getLabelDataById(label.getId());
+    return getLabelData(label.getId());
   }
 
-  //! \internal
-  //!
-  //! Get `LabelData` by `id`.
-  ASMJIT_INLINE LabelData* getLabelDataById(uint32_t id) const {
-    ASMJIT_ASSERT(id != kInvalidValue);
-    ASMJIT_ASSERT(id < _labels.getLength());
-
-    return const_cast<LabelData*>(&_labels[id]);
+  //! \overload
+  ASMJIT_INLINE LabelData* getLabelData(uint32_t id) const {
+    ASMJIT_ASSERT(isLabelValid(id));
+    return const_cast<LabelData*>(&_labelList[id]);
   }
 
   //! \internal
@@ -375,21 +400,16 @@ struct BaseAssembler : public CodeGen {
   }
 
   //! Bind label to the current offset.
-  virtual void _bind(const Label& label) = 0;
-
-  //! Bind label to the current offset.
   //!
   //! \note Label can be bound only once!
-  ASMJIT_INLINE void bind(const Label& label) {
-    _bind(label);
-  }
+  ASMJIT_API virtual Error bind(const Label& label);
 
   // --------------------------------------------------------------------------
   // [Embed]
   // --------------------------------------------------------------------------
 
   //! Embed data into the code buffer.
-  ASMJIT_API Error embed(const void* data, uint32_t size);
+  ASMJIT_API virtual Error embed(const void* data, uint32_t size);
 
   // --------------------------------------------------------------------------
   // [Align]
@@ -400,57 +420,41 @@ struct BaseAssembler : public CodeGen {
   //! Typical usage of this is to align labels at start of the inner loops.
   //!
   //! Inserts `nop()` instructions or CPU optimized NOPs.
-  ASMJIT_INLINE Error align(uint32_t mode, uint32_t offset) {
-    return _align(mode, offset);
-  }
-
-  //! \internal
-  //!
-  //! Align target buffer to `m` bytes.
-  virtual Error _align(uint32_t mode, uint32_t offset) = 0;
+  virtual Error align(uint32_t mode, uint32_t offset) = 0;
 
   // --------------------------------------------------------------------------
   // [Reloc]
   // --------------------------------------------------------------------------
 
-  //! Simplifed version of `relocCode()` method designed for JIT.
+  //! Relocate the code to `baseAddress` and copy to `dst`.
   //!
-  //! \overload
-  ASMJIT_INLINE size_t relocCode(void* dst) const {
-    return _relocCode(dst, static_cast<Ptr>((uintptr_t)dst));
-  }
-
-  //! Relocate code to a given address `dst`.
+  //! \param dst Contains the location where the relocated code should be
+  //! copied. The pointer can be address returned by virtual memory allocator
+  //! or any other address that has sufficient space.
   //!
-  //! \param dst Refers the location where the relocated code should be copied.
-  //! The pointer can be address returned by virtual memory allocator or any
-  //! custom address.
+  //! \param base Base address used for relocation. The `JitRuntime` always
+  //! sets the `base` address to be the same as `dst`, but other runtimes, for
+  //! example `StaticRuntime`, do not have to follow this rule.
   //!
-  //! \param base Base address used for relocation. `JitRuntime` always sets
-  //! `base` address to be the same as `dst`, but other runtimes do not have
-  //! to follow this rule.
+  //! \retval The number bytes actually used. If the code generator reserved
+  //! space for possible trampolines, but didn't use it, the number of bytes
+  //! used can actually be less than the expected worst case. Virtual memory
+  //! allocator can shrink the memory allocated first time.
   //!
-  //! \retval The number bytes used. If the code generator reserved space for
-  //! possible trampolines, but these weren't generated, the number of bytes
-  //! used can be actually less than the expected worst case. Virtual memory
-  //! allocator can in such case return some memory back to the pool.
-  //!
-  //! A given buffer will be overwritten, to get number of bytes required use
-  //! `getCodeSize()`.
-  ASMJIT_INLINE size_t relocCode(void* dst, Ptr base) const {
-    return _relocCode(dst, base);
-  }
+  //! A given buffer will be overwritten, to get the number of bytes required,
+  //! use `getCodeSize()`.
+  ASMJIT_API size_t relocCode(void* dst, Ptr baseAddress = kNoBaseAddress) const;
 
   //! \internal
   //!
   //! Reloc code.
-  virtual size_t _relocCode(void* dst, Ptr base) const = 0;
+  virtual size_t _relocCode(void* dst, Ptr baseAddress) const = 0;
 
   // --------------------------------------------------------------------------
   // [Make]
   // --------------------------------------------------------------------------
 
-  ASMJIT_API void* make();
+  ASMJIT_API virtual void* make();
 
   // --------------------------------------------------------------------------
   // [Emit]
@@ -508,16 +512,15 @@ struct BaseAssembler : public CodeGen {
   //! Size of possible trampolines.
   uint32_t _trampolineSize;
 
-  //! Inline comment that will be logged by the next instruction and
-  //! set to NULL.
+  //! Inline comment that will be logged by the next instruction and set to NULL.
   const char* _comment;
   //! Unused `LabelLink` structures pool.
   LabelLink* _unusedLinks;
 
-  //! Labels data.
-  PodVector<LabelData> _labels;
-  //! Relocations data.
-  PodVector<RelocData> _relocData;
+  //! LabelData list.
+  PodVector<LabelData> _labelList;
+  //! RelocData list.
+  PodVector<RelocData> _relocList;
 };
 
 //! \}
@@ -526,7 +529,7 @@ struct BaseAssembler : public CodeGen {
 // [Defined-Later]
 // ============================================================================
 
-ASMJIT_INLINE Label::Label(BaseAssembler& a) : Operand(NoInit) {
+ASMJIT_INLINE Label::Label(Assembler& a) : Operand(NoInit) {
   a._newLabel(this);
 }
 

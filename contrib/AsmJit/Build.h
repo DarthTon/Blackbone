@@ -9,9 +9,11 @@
 #define _ASMJIT_BUILD_H
 
 // [Include]
-#if !defined(ASMJIT_CONFIG_FILE)
-#include "./config.h"
-#endif // !ASMJIT_CONFIG_FILE
+#if defined(ASMJIT_CONFIG_FILE)
+# include ASMJIT_CONFIG_FILE
+#else
+# include "./config.h"
+#endif // ASMJIT_CONFIG_FILE
 
 // Turn off deprecation warnings when compiling AsmJit.
 #if defined(ASMJIT_EXPORTS) && defined(_MSC_VER)
@@ -35,9 +37,9 @@
 // [asmjit::build - Sanity]
 // ============================================================================
 
-#if defined(ASMJIT_DISABLE_INST_NAMES) && !defined(ASMJIT_DISABLE_LOGGER)
-# error "ASMJIT_DISABLE_INST_NAMES requires ASMJIT_DISABLE_LOGGER to be defined."
-#endif // ASMJIT_DISABLE_INST_NAMES && !ASMJIT_DISABLE_LOGGER
+#if defined(ASMJIT_DISABLE_NAMES) && !defined(ASMJIT_DISABLE_LOGGER)
+# error "ASMJIT_DISABLE_NAMES requires ASMJIT_DISABLE_LOGGER to be defined."
+#endif // ASMJIT_DISABLE_NAMES && !ASMJIT_DISABLE_LOGGER
 
 // ============================================================================
 // [asmjit::build - OS]
@@ -127,34 +129,55 @@
 # define ASMJIT_STATIC
 #endif // ASMJIT_EMBED && !ASMJIT_STATIC
 
-#if !defined(ASMJIT_API)
-# if defined(ASMJIT_STATIC)
-#  define ASMJIT_API
-# elif defined(ASMJIT_OS_WINDOWS)
-#  if defined(__GNUC__) || defined(__clang__)
-#   if defined(ASMJIT_EXPORTS)
-#    define ASMJIT_API __attribute__((dllexport))
-#   else
-#    define ASMJIT_API __attribute__((dllimport))
-#   endif
-#  elif defined(ASMJIT_EXPORTS)
+#if defined(ASMJIT_STATIC)
+# define ASMJIT_API
+#elif defined(ASMJIT_OS_WINDOWS)
+# if (defined(__GNUC__) || defined(__clang__)) && !defined(__MINGW32__)
+#  if defined(ASMJIT_EXPORTS)
+#   define ASMJIT_API __attribute__((dllexport))
+#  else
+#   define ASMJIT_API __attribute__((dllimport))
+#  endif // ASMJIT_EXPORTS
+# else
+#  if defined(ASMJIT_EXPORTS)
 #   define ASMJIT_API __declspec(dllexport)
 #  else
 #   define ASMJIT_API __declspec(dllimport)
 #  endif
-# else
-#  if defined(__GNUC__)
-#   if __GNUC__ >= 4
-#    define ASMJIT_API __attribute__((visibility("default")))
-#    define ASMJIT_VAR extern ASMJIT_API
-#   endif
-#  endif
 # endif
+#elif defined(__GNUC__) && (__GNUC__ >= 4)
+# define ASMJIT_API __attribute__((visibility("default")))
+#endif
+
+#if !defined(ASMJIT_API)
+# define ASMJIT_API
 #endif // ASMJIT_API
+
+// This is basically a workaround. When using MSVC and marking class as DLL
+// export everything is exported, which is unwanted since there are many
+// inlines which mimic instructions. MSVC automatically exports typeinfo and
+// vtable if at least one symbol of that class is exported. However, GCC has
+// some strange behavior that even if one or more symbol is exported it doesn't
+// export `typeinfo` unless the class itself is marked as "visibility(default)".
+#if !defined(ASMJIT_OS_WINDOWS) && (defined(__GNUC__) || defined (__clang__))
+# define ASMJIT_VCLASS ASMJIT_API
+#else
+# define ASMJIT_VCLASS
+#endif
 
 #if !defined(ASMJIT_VAR)
 # define ASMJIT_VAR extern ASMJIT_API
 #endif // !ASMJIT_VAR
+
+#if defined(_MSC_VER)
+# define ASMJIT_INLINE __forceinline
+#elif defined(__clang__)
+# define ASMJIT_INLINE inline __attribute__((always_inline)) __attribute__((visibility("hidden")))
+#elif defined(__GNUC__)
+# define ASMJIT_INLINE inline __attribute__((always_inline))
+#else
+# define ASMJIT_INLINE inline
+#endif
 
 #if defined(ASMJIT_HOST_X86)
 # if defined(__GNUC__) || defined(__clang__)
@@ -165,23 +188,15 @@
 #  define ASMJIT_STDCALL   __attribute__((stdcall))
 #  define ASMJIT_CDECL     __attribute__((cdecl))
 # else
-#  define ASMJIT_FASTCALL   __fastcall
-#  define ASMJIT_STDCALL    __stdcall
-#  define ASMJIT_CDECL      __cdecl
+#  define ASMJIT_FASTCALL  __fastcall
+#  define ASMJIT_STDCALL   __stdcall
+#  define ASMJIT_CDECL     __cdecl
 # endif
 #else
 # define ASMJIT_FASTCALL
 # define ASMJIT_STDCALL
 # define ASMJIT_CDECL
 #endif // ASMJIT_HOST_X86
-
-#if defined(_MSC_VER)
-# define ASMJIT_INLINE __forceinline
-#elif (defined(__GNUC__) || defined(__clang__)) && !defined(__MINGW32__)
-# define ASMJIT_INLINE inline __attribute__((always_inline))
-#else
-# define ASMJIT_INLINE inline
-#endif
 
 // ============================================================================
 // [asmjit::build - Enum]
@@ -218,13 +233,22 @@
 #endif
 
 // ============================================================================
+// [asmjit::build - BLEND_OFFSET_OF]
+// ============================================================================
+
+//! Cross-platform solution to get offset of `_Field_` in `_Struct_`.
+#define ASMJIT_OFFSET_OF(_Struct_, _Field_) \
+  static_cast<int>((intptr_t) ((const uint8_t*) &((const _Struct_*)0x1)->_Field_) - 1)
+
+// ============================================================================
 // [asmjit::build - ASMJIT_ARRAY_SIZE]
 // ============================================================================
 
-#define ASMJIT_ARRAY_SIZE(_Array_) (sizeof(_Array_) / sizeof(*_Array_))
+#define ASMJIT_ARRAY_SIZE(_Array_) \
+  (sizeof(_Array_) / sizeof(*_Array_))
 
 // ============================================================================
-// [asmjit::build - ASMJIT_DEBUG]
+// [asmjit::build - ASMJIT_DEBUG / ASMJIT_TRACE]
 // ============================================================================
 
 // If ASMJIT_DEBUG and ASMJIT_RELEASE is not defined ASMJIT_DEBUG will be
@@ -235,6 +259,19 @@
 #  define ASMJIT_DEBUG
 # endif // _DEBUG
 #endif // !ASMJIT_DEBUG && !ASMJIT_RELEASE
+
+// ASMJIT_TRACE is only used by sources and private headers. It's safe to make
+// it unavailable outside of AsmJit.
+#if defined(ASMJIT_EXPORTS)
+namespace asmjit { static inline int disabledTrace(...) { return 0; } }
+# if defined(ASMJIT_TRACE)
+#  define ASMJIT_TSEC(_Section_) _Section_
+#  define ASMJIT_TLOG ::printf(__VA_ARGS__)
+# else
+#  define ASMJIT_TSEC(_Section_) do {} while(0)
+#  define ASMJIT_TLOG 0 && ::asmjit::disabledTrace
+# endif // ASMJIT_TRACE
+#endif // ASMJIT_EXPORTS
 
 // ============================================================================
 // [asmjit::build - ASMJIT_UNUSED]
@@ -266,9 +303,9 @@ public:
 // [asmjit::build - StdInt]
 // ============================================================================
 
-#if defined(__MINGW32__) || defined(__MINGW64__)
+#if defined(__MINGW32__)
 # include <sys/types.h>
-#endif // __MINGW32__ || __MINGW64__
+#endif // __MINGW32__
 
 #if defined(_MSC_VER) && (_MSC_VER < 1600)
 # if !defined(ASMJIT_SUPRESS_STD_TYPES)
@@ -311,10 +348,15 @@ typedef unsigned __int64 uint64_t;
 
 #if defined(ASMJIT_OS_WINDOWS) && !defined(ASMJIT_SUPRESS_WINDOWS_H)
 
+# if !defined(WIN32_LEAN_AND_MEAN)
+#  define WIN32_LEAN_AND_MEAN
+#  define ASMJIT_UNDEF_WIN32_LEAN_AND_MEAN
+# endif // !WIN32_LEAN_AND_MEAN
+
 # if !defined(NOMINMAX)
 #  define NOMINMAX
 #  define ASMJIT_UNDEF_NOMINMAX
-# endif
+# endif // !NOMINMAX
 
 # include <windows.h>
 
@@ -323,15 +365,20 @@ typedef unsigned __int64 uint64_t;
 #  undef ASMJIT_UNDEF_NOMINMAX
 # endif
 
+# if defined(ASMJIT_UNDEF_WIN32_LEAN_AND_MEAN)
+#  undef WIN32_LEAN_AND_MEAN
+#  undef ASMJIT_UNDEF_WIN32_LEAN_AND_MEAN
+# endif
+
 #endif // ASMJIT_OS_WINDOWS  && !ASMJIT_SUPRESS_WINDOWS_H
 
 // ============================================================================
 // [asmjit::build - Test]
 // ============================================================================
 
-// Include test if building for unit testing.
+// Include a unit testing package if this is a `asmjit_test` build.
 #if defined(ASMJIT_TEST)
-#include "./test/test.h"
+#include "./test/broken.h"
 #endif // ASMJIT_TEST
 
 // [Guard]

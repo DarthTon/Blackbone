@@ -138,7 +138,7 @@ private:
 
         this->_origSize = jmpToThunk->getCodeSize( );
 #else
-        jmpToThunk->jmp( _buf );
+        jmpToThunk->jmp( (asmjit::Ptr)_buf );
         this->_origSize = jmpToThunk->getCodeSize();
 #endif
         
@@ -154,11 +154,16 @@ private:
         jmpToHook->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ) , (uint32_t)this );
 #endif // USE64
 
-        jmpToHook->jmp( &HookHandler<Fn, C>::Handler );
+        jmpToHook->jmp( (asmjit::Ptr)&HookHandler<Fn, C>::Handler );
         jmpToHook->relocCode( this->_buf );
 
-        BOOL res = WriteProcessMemory( GetCurrentProcess(), this->_original, this->_newCode,
-                                       jmpToThunk->relocCode( this->_newCode, (uintptr_t)this->_original ), NULL );
+        BOOL res = WriteProcessMemory( 
+            GetCurrentProcess(), 
+            this->_original,
+            this->_newCode,
+            jmpToThunk->relocCode( this->_newCode, (uintptr_t)this->_original ),
+            NULL
+            );
         
         return (this->_hooked = (res == TRUE));
     }

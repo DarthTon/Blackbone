@@ -8,8 +8,8 @@
 #define ASMJIT_EXPORTS
 
 // [Dependencies - AsmJit]
+#include "../base/containers.h"
 #include "../base/intutil.h"
-#include "../base/podvector.h"
 
 // [Api-Begin]
 #include "../apibegin.h"
@@ -21,6 +21,26 @@ namespace asmjit {
 // ============================================================================
 
 const PodVectorData PodVectorBase::_nullData = { 0, 0 };
+
+// ============================================================================
+// [asmjit::PodVectorBase - Reset]
+// ============================================================================
+
+//! Clear vector data and free internal buffer.
+void PodVectorBase::reset(bool releaseMemory) {
+  PodVectorData* d = _d;
+
+  if (d == &_nullData)
+    return;
+
+  if (releaseMemory) {
+    ASMJIT_FREE(d);
+    _d = const_cast<PodVectorData*>(&_nullData);
+    return;
+  }
+
+  d->length = 0;
+}
 
 // ============================================================================
 // [asmjit::PodVectorBase - Helpers]

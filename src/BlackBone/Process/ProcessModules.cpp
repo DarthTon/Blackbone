@@ -630,7 +630,7 @@ bool ProcessModules::InjectPureIL(
 
     // Scary assembler code incoming!
     AsmJitHelper a;
-    AsmStackAllocator sa( 0x30 );   // 0x30 - 6 arguments of ExecuteInDefaultAppDomain
+    AsmStackAllocator sa( a.assembler(), 0x30 );   // 0x30 - 6 arguments of ExecuteInDefaultAppDomain
 
     // Stack will be reserved manually
     a.EnableX64CallStack( false );
@@ -659,159 +659,159 @@ bool ProcessModules::InjectPureIL(
 #else
     GpReg callReg = edx;
 
-    a->push( zbp );
-    a->mov( zbp, zsp );
+    a->push( a->zbp );
+    a->mov( a->zbp, a->zsp );
 #endif
 
     // function prologue  
-    a->sub( zsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
-    a->xor_( zsi, zsi );
+    a->sub( a->zsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
+    a->xor_( a->zsi, a->zsi );
 
     // CLRCreateInstance()
     a.GenCall( (size_t)CreateInstanceAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
     // success?
-    a->test( zax, zax );
+    a->test( a->zax, a->zax );
     a->jnz( L_Error1 );
 
     // pMetaHost->GetRuntime()
-    a->mov( zax, stack_MetaHost );
-    a->mov( zcx, intptr_ptr( zax ) );
-    a->mov( callReg, intptr_ptr( zcx, 3 * sizeof( void* ) ) );
-    a.GenCall( callReg, { zcx, address_VersionString, address_IID_ICLRRuntimeInfo, &stack_RuntimeInfo } );
+    a->mov( a->zax, stack_MetaHost );
+    a->mov( a->zcx, a->intptr_ptr( a->zax ) );
+    a->mov( callReg, a->intptr_ptr( a->zcx, 3 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx, address_VersionString, address_IID_ICLRRuntimeInfo, &stack_RuntimeInfo } );
     // success?
-    a->test( zax, zax );
+    a->test( a->zax, a->zax );
     a->jnz( L_Error2 );
     
     // pRuntimeInterface->IsStarted()
-    a->mov( zcx, stack_RuntimeInfo );
-    a->mov( zax, intptr_ptr( zcx ) );
-    a->mov( callReg, intptr_ptr( zax, 14 * sizeof( void* ) ) );
-    a.GenCall( callReg, { zcx, &stack_IsStarted, &stack_StartupFlags } );
+    a->mov( a->zcx, stack_RuntimeInfo );
+    a->mov( a->zax, a->intptr_ptr( a->zcx ) );
+    a->mov( callReg, a->intptr_ptr( a->zax, 14 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx, &stack_IsStarted, &stack_StartupFlags } );
     // success?
-    a->test( zax, zax );
+    a->test( a->zax, a->zax );
     a->jnz( L_Error3 );
 
     // pRuntimeTime->GetInterface()
-    a->mov( zcx, stack_RuntimeInfo );
-    a->mov( zax, intptr_ptr( zcx ) );
-    a->mov( callReg, intptr_ptr( zax, 9 * sizeof( void* ) ) );
-    a.GenCall( callReg, { zcx, address_CLSID_CLRRuntimeHost, address_IID_ICLRRuntimeHost, &stack_RuntimeHost } );
+    a->mov( a->zcx, stack_RuntimeInfo );
+    a->mov( a->zax, a->intptr_ptr( a->zcx ) );
+    a->mov( callReg, a->intptr_ptr( a->zax, 9 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx, address_CLSID_CLRRuntimeHost, address_IID_ICLRRuntimeHost, &stack_RuntimeHost } );
     // success?
-    a->test( zax, zax );
+    a->test( a->zax, a->zax );
     a->jnz( L_Error3 );
 
     // jump if already started
-    a->cmp( stack_IsStarted, zsi );
+    a->cmp( stack_IsStarted, a->zsi );
     a->jne( L_SkipStart ); 
 
     // pRuntimeHost->Start()
-    a->mov( zcx, stack_RuntimeHost );
-    a->mov( zax, intptr_ptr( zcx ) );
-    a->mov( callReg, intptr_ptr( zax, 3 * sizeof( void* ) ) );
-    a.GenCall( callReg, { zcx } );
+    a->mov( a->zcx, stack_RuntimeHost );
+    a->mov( a->zax, a->intptr_ptr( a->zcx ) );
+    a->mov( callReg, a->intptr_ptr( a->zax, 3 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx } );
     // success?
-    a->test( zax, zax );
+    a->test( a->zax, a->zax );
     a->jnz( L_Error5 );
 
     // pRuntimeHost->ExecuteInDefaultAppDomain()
     a->bind( L_SkipStart );
 
-    a->mov( zcx, stack_RuntimeHost );
-    a->mov( zax, intptr_ptr( zcx ) );
-    a->mov( callReg, intptr_ptr( zax, 11 * sizeof( void* ) ) );
-    a.GenCall( callReg, { zcx, address_netAssemblyDll, address_netAssemblyClass, address_netAssemblyMethod,
+    a->mov( a->zcx, stack_RuntimeHost );
+    a->mov( a->zax, a->intptr_ptr( a->zcx ) );
+    a->mov( callReg, a->intptr_ptr( a->zax, 11 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx, address_netAssemblyDll, address_netAssemblyClass, address_netAssemblyMethod,
                           address_netAssemblyArgs, &stack_returnCode } );
     // success?
-    a->test( zax, zax );
+    a->test( a->zax, a->zax );
     a->jnz( L_Error6 );
 
     // Release unneeded interfaces
-    a->mov( zcx, stack_RuntimeHost );
+    a->mov( a->zcx, stack_RuntimeHost );
     a->call( L_ReleaseInterface );
-    a->mov( zcx, stack_RuntimeInfo );
+    a->mov( a->zcx, stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( zcx, stack_MetaHost );
+    a->mov( a->zcx, stack_MetaHost );
     a->call( L_ReleaseInterface );
 
     // Write the managed code's return value to the first DWORD
     // in the allocated buffer
     a->mov( eax, stack_returnCode );
-    a->mov( zdx, address.ptr<size_t>() );
-    a->mov( dword_ptr( zdx ), eax );
-    a->mov( zax, 0 );
+    a->mov( a->zdx, address.ptr<size_t>() );
+    a->mov( dword_ptr( a->zdx ), eax );
+    a->mov( a->zax, 0 );
 
     // stack restoration
     a->bind( L_Exit );
 
 #ifdef USE64
-    a->add( zsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
+    a->add( a->zsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
 #else
-    a->mov( zsp, zbp );
-    a->pop( zbp );
+    a->mov( a->zsp, a->zbp );
+    a->pop( a->zbp );
 #endif
 
     a->ret();
 
     // CLRCreateInstance() failed
     a->bind( L_Error1 );
-    a->mov( zax, 1 );
+    a->mov( a->zax, 1 );
     a->jmp( L_Exit );
 
     // pMetaHost->GetRuntime() failed
     a->bind( L_Error2 );
-    a->mov( zcx, stack_MetaHost );
+    a->mov( a->zcx, stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( zax, 2 );
+    a->mov( a->zax, 2 );
     a->jmp( L_Exit );
 
     // pRuntimeInterface->IsStarted() failed
     a->bind( L_Error3 );
-    a->mov( zcx, stack_RuntimeInfo );
+    a->mov( a->zcx, stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( zcx, stack_MetaHost );
+    a->mov( a->zcx, stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( zax, 3 );
+    a->mov( a->zax, 3 );
     a->jmp( L_Exit );
 
     // pRuntimeTime->GetInterface() failed
     a->bind( L_Error4 );
-    a->mov( zcx, stack_RuntimeInfo );
+    a->mov( a->zcx, stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( zcx, stack_MetaHost );
+    a->mov( a->zcx, stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( zax, 4 );
+    a->mov( a->zax, 4 );
     a->jmp( L_Exit );
 
     // pRuntimeHost->Start() failed
     a->bind( L_Error5 );
-    a->mov( zcx, stack_RuntimeHost );
+    a->mov( a->zcx, stack_RuntimeHost );
     a->call( L_ReleaseInterface );
-    a->mov( zcx, stack_RuntimeInfo );
+    a->mov( a->zcx, stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( zcx, stack_MetaHost );
+    a->mov( a->zcx, stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( zax, 5 );
+    a->mov( a->zax, 5 );
     a->jmp( L_Exit );
 
     // pRuntimeHost->ExecuteInDefaultAppDomain() failed
     a->bind( L_Error6 );
-    a->push( zax );
-    a->mov( zcx, stack_RuntimeHost );
+    a->push( a->zax );
+    a->mov( a->zcx, stack_RuntimeHost );
     a->call( L_ReleaseInterface );
-    a->mov( zcx, stack_RuntimeInfo );
+    a->mov( a->zcx, stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( zcx, stack_MetaHost );
+    a->mov( a->zcx, stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( zax, 6 );
-    a->pop( zax );
+    a->mov( a->zax, 6 );
+    a->pop( a->zax );
     a->jmp( L_Exit );
 
     // void __fastcall ReleaseInterface(IUnknown* pInterface)
     a->bind( L_ReleaseInterface );
-    a->mov( zax, zcx );
-    a->mov( zcx, intptr_ptr( zax ) );
-    a->mov( callReg, intptr_ptr( zcx, 2 * sizeof( void* ) ) );
-    a.GenCall( callReg, { zax } );
+    a->mov( a->zax, a->zcx );
+    a->mov( a->zcx, a->intptr_ptr( a->zax ) );
+    a->mov( callReg, a->intptr_ptr( a->zcx, 2 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zax } );
 
     a->ret();
 

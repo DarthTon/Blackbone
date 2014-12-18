@@ -337,7 +337,7 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     int hookDataOfs = sizeof( HookData ) * opType;
 
     AsmJitHelper a;
-    AsmStackAllocator sa( 0x60 );
+    AsmStackAllocator sa( a.assembler(), 0x60 );
     asmjit::Label skip1 = a->newLabel();
     ALLOC_STACK_VAR( sa, data, OperationData );
     ALLOC_STACK_VAR( sa, junk, SIZE_T );
@@ -462,7 +462,7 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     int hookDataOfs = sizeof( HookData ) * opType;
 
     AsmJitHelper a;
-    AsmStackAllocator sa;
+    AsmStackAllocator sa( a.assembler() );
     asmjit::Label skip1 = a->newLabel();
     ALLOC_STACK_VAR( sa, data, OperationData );
     ALLOC_STACK_VAR( sa, junk, DWORD );
@@ -480,7 +480,7 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     for (int i = 0; i < argc[opType]; i++)
         a->push( asmjit::host::dword_ptr( asmjit::host::ebp, (argc[opType] - i) * 4 + 4 ) );
 
-    a->call( (void*)(_targetShare + hookDataOfs + FIELD_OFFSET( HookData, original_code )) );
+    a->call( _targetShare + hookDataOfs + FIELD_OFFSET( HookData, original_code ) );
 
     // Test if call was successful
     a->test( asmjit::host::eax, asmjit::host::eax );

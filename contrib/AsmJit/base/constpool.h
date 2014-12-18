@@ -128,9 +128,12 @@ struct ConstPoolTree {
       if (link != NULL) {
         ASMJIT_ASSERT(top != kHeightLimit);
         stack[top++] = node;
+
+        node = link;
         continue;
       }
 
+_Visit:
       visitor.visit(node);
       link = node->_link[1];
 
@@ -143,6 +146,7 @@ struct ConstPoolTree {
         break;
 
       node = stack[--top];
+      goto _Visit;
     }
   }
 

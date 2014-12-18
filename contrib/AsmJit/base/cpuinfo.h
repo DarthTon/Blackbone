@@ -43,12 +43,12 @@ ASMJIT_ENUM(kCpuVendor) {
 };
 
 // ============================================================================
-// [asmjit::BaseCpuInfo]
+// [asmjit::CpuInfo]
 // ============================================================================
 
 //! Base cpu information.
-struct BaseCpuInfo {
-  ASMJIT_NO_COPY(BaseCpuInfo)
+struct CpuInfo {
+  ASMJIT_NO_COPY(CpuInfo)
 
   //! \internal
   enum {
@@ -59,7 +59,7 @@ struct BaseCpuInfo {
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE BaseCpuInfo(uint32_t size = sizeof(BaseCpuInfo)) : _size(size) {}
+  ASMJIT_INLINE CpuInfo(uint32_t size = sizeof(CpuInfo)) : _size(size) {}
 
   // --------------------------------------------------------------------------
   // [Accessors]
@@ -78,8 +78,9 @@ struct BaseCpuInfo {
   ASMJIT_INLINE uint32_t getModel() const { return _model; }
   //! Get CPU stepping.
   ASMJIT_INLINE uint32_t getStepping() const { return _stepping; }
-  //! Get CPU cores count (or sum of all cores of all procesors).
-  ASMJIT_INLINE uint32_t getCoresCount() const { return _coresCount; }
+
+  //! Get number of hardware threads available.
+  ASMJIT_INLINE uint32_t getHwThreadsCount() const { return _hwThreadsCount; }
 
   //! Get whether CPU has a `feature`.
   ASMJIT_INLINE bool hasFeature(uint32_t feature) const {
@@ -90,7 +91,7 @@ struct BaseCpuInfo {
   }
 
   //! Add a CPU `feature`.
-  ASMJIT_INLINE BaseCpuInfo& addFeature(uint32_t feature) {
+  ASMJIT_INLINE CpuInfo& addFeature(uint32_t feature) {
     ASMJIT_ASSERT(feature < sizeof(_features) * 8);
 
     _features[feature / kFeaturesPerUInt32] |= (1U << (feature % kFeaturesPerUInt32));
@@ -101,11 +102,11 @@ struct BaseCpuInfo {
   // [Statics]
   // --------------------------------------------------------------------------
 
-  //! Detect number of cores (or sum of all cores of all processors).
-  static ASMJIT_API uint32_t detectNumberOfCores();
+  //! Detect the number of hardware threads.
+  static ASMJIT_API uint32_t detectHwThreadsCount();
 
   //! Get host cpu.
-  static ASMJIT_API const BaseCpuInfo* getHost();
+  static ASMJIT_API const CpuInfo* getHost();
 
   // --------------------------------------------------------------------------
   // [Members]
@@ -127,8 +128,9 @@ struct BaseCpuInfo {
   uint32_t _model;
   //! Cpu stepping.
   uint32_t _stepping;
-  //! Cpu cores count (or sum of all CPU cores of all processors).
-  uint32_t _coresCount;
+
+  //! Number of hardware threads.
+  uint32_t _hwThreadsCount;
 
   //! Cpu features bitfield.
   uint32_t _features[4];

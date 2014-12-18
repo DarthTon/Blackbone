@@ -30,10 +30,10 @@
 namespace asmjit {
 
 // ============================================================================
-// [asmjit::BaseCpuInfo - DetectNumberOfCores]
+// [asmjit::CpuInfo - DetectHwThreadsCount]
 // ============================================================================
 
-uint32_t BaseCpuInfo::detectNumberOfCores() {
+uint32_t CpuInfo::detectHwThreadsCount() {
 #if defined(ASMJIT_OS_WINDOWS)
   SYSTEM_INFO info;
   ::GetSystemInfo(&info);
@@ -51,22 +51,22 @@ uint32_t BaseCpuInfo::detectNumberOfCores() {
 }
 
 // ============================================================================
-// [asmjit::BaseCpuInfo - GetHost]
+// [asmjit::CpuInfo - GetHost]
 // ============================================================================
 
 #if defined(ASMJIT_HOST_X86) || defined(ASMJIT_HOST_X64)
-struct HostCpuInfo : public x86x64::CpuInfo {
-  ASMJIT_INLINE HostCpuInfo() : CpuInfo() {
-    x86x64::CpuUtil::detect(this);
+struct AutoX86CpuInfo : public X86CpuInfo {
+  ASMJIT_INLINE AutoX86CpuInfo() : X86CpuInfo() {
+    X86CpuUtil::detect(this);
   }
 };
 #else
 #error "AsmJit - Unsupported CPU."
 #endif // ASMJIT_HOST || ASMJIT_HOST_X64
 
-const BaseCpuInfo* BaseCpuInfo::getHost() {
+const CpuInfo* CpuInfo::getHost() {
 #if defined(ASMJIT_HOST_X86) || defined(ASMJIT_HOST_X64)
-  static HostCpuInfo cpuInfo;
+  static AutoX86CpuInfo cpuInfo;
 #else
 #error "AsmJit - Unsupported CPU."
 #endif // ASMJIT_HOST || ASMJIT_HOST_X64

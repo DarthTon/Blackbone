@@ -121,15 +121,6 @@ FileLogger::FileLogger(FILE* stream) : _stream(NULL) {
 FileLogger::~FileLogger() {}
 
 // ============================================================================
-// [asmjit::FileLogger - Accessors]
-// ============================================================================
-
-//! Set file stream.
-void FileLogger::setStream(FILE* stream) {
-  _stream = stream;
-}
-
-// ============================================================================
 // [asmjit::FileLogger - Logging]
 // ============================================================================
 

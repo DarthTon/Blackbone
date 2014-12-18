@@ -27,7 +27,7 @@ void AsmHelper64::GenPrologue( bool switchMode /*= false*/ )
         SwitchTo64();
 
         // Align stack
-        _assembler.and_( asmjit::host::zsp, 0xFFFFFFFFFFFFFFF0 );
+        _assembler.and_( _assembler.zsp, 0xFFFFFFFFFFFFFFF0 );
     }
     else
     {
@@ -225,8 +225,8 @@ void AsmHelper64::PushArg( const AsmVariant& arg, size_t index )
 template<typename _Type>
 void AsmHelper64::PushArgp( const _Type& arg, size_t index, bool fpu /*= false*/ )
 {
-    static const asmjit::host::GpReg regs[] = { asmjit::host::rcx, asmjit::host::rdx, asmjit::host::r8, asmjit::host::r9 };
-    static const asmjit::host::XmmReg xregs[] = { asmjit::host::xmm0, asmjit::host::xmm1, asmjit::host::xmm2, asmjit::host::xmm3 };
+    static const asmjit::GpReg regs[] = { asmjit::host::rcx, asmjit::host::rdx, asmjit::host::r8, asmjit::host::r9 };
+    static const asmjit::XmmReg xregs[] = { asmjit::host::xmm0, asmjit::host::xmm1, asmjit::host::xmm2, asmjit::host::xmm3 };
 
     // Pass via register
     if (index < 4)

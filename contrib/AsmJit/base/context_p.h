@@ -20,40 +20,40 @@
 
 namespace asmjit {
 
-//! \addtogroup asmjit_base_tree
+//! \addtogroup asmjit_base_compiler
 //! \{
 
 // ============================================================================
-// [asmjit::BaseContext]
+// [asmjit::Context]
 // ============================================================================
 
 //! \internal
 //!
-//! Code generation context is the logic behind `BaseCompiler`. The context is
-//! used to compile the code stored in `BaseCompiler`.
-struct BaseContext {
-  ASMJIT_NO_COPY(BaseContext)
+//! Code generation context is the logic behind `Compiler`. The context is
+//! used to compile the code stored in `Compiler`.
+struct Context {
+  ASMJIT_NO_COPY(Context)
 
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  BaseContext(BaseCompiler* compiler);
-  virtual ~BaseContext();
+  Context(Compiler* compiler);
+  virtual ~Context();
 
   // --------------------------------------------------------------------------
   // [Reset]
   // --------------------------------------------------------------------------
 
   //! Reset the whole context.
-  virtual void reset();
+  virtual void reset(bool releaseMemory = false);
 
   // --------------------------------------------------------------------------
   // [Accessors]
   // --------------------------------------------------------------------------
 
   //! Get compiler.
-  ASMJIT_INLINE BaseCompiler* getCompiler() const { return _compiler; }
+  ASMJIT_INLINE Compiler* getCompiler() const { return _compiler; }
 
   //! Get function.
   ASMJIT_INLINE FuncNode* getFunc() const { return _func; }
@@ -89,23 +89,24 @@ struct BaseContext {
   // --------------------------------------------------------------------------
 
   //! Get current state.
-  ASMJIT_INLINE BaseVarState* getState() const {
+  ASMJIT_INLINE VarState* getState() const {
     return _state;
   }
 
   //! Load current state from `target` state.
-  virtual void loadState(BaseVarState* src) = 0;
-  //! Save current state, returning new `BaseVarState` instance.
-  virtual BaseVarState* saveState() = 0;
+  virtual void loadState(VarState* src) = 0;
+
+  //! Save current state, returning new `VarState` instance.
+  virtual VarState* saveState() = 0;
 
   //! Change the current state to `target` state.
-  virtual void switchState(BaseVarState* src) = 0;
+  virtual void switchState(VarState* src) = 0;
 
   //! Change the current state to the intersection of two states `a` and `b`.
-  virtual void intersectStates(BaseVarState* a, BaseVarState* b) = 0;
+  virtual void intersectStates(VarState* a, VarState* b) = 0;
 
   // --------------------------------------------------------------------------
-  // [Mem]
+  // [Context]
   // --------------------------------------------------------------------------
 
   ASMJIT_INLINE Error _registerContextVar(VarData* vd) {
@@ -169,7 +170,7 @@ struct BaseContext {
   // [Analyze]
   // --------------------------------------------------------------------------
 
-  //! Preform variable liveness analysis.
+  //! Perform variable liveness analysis.
   //!
   //! Analysis phase iterates over nodes in reverse order and generates a bit
   //! array describing variables that are alive at every node in the function.
@@ -179,7 +180,7 @@ struct BaseContext {
   //!
   //! When a label is found all jumps to that label are followed and analysis
   //! repeats until all variables are resolved.
-  virtual Error analyze() = 0;
+  virtual Error livenessAnalysis();
 
   // --------------------------------------------------------------------------
   // [Annotate]
@@ -193,6 +194,12 @@ struct BaseContext {
 
   //! Translate code by allocating registers and handling state changes.
   virtual Error translate() = 0;
+
+  // --------------------------------------------------------------------------
+  // [Schedule]
+  // --------------------------------------------------------------------------
+
+  virtual Error schedule();
 
   // --------------------------------------------------------------------------
   // [Cleanup]
@@ -210,19 +217,27 @@ struct BaseContext {
   // [Serialize]
   // --------------------------------------------------------------------------
 
-  virtual Error serialize(BaseAssembler* assembler, Node* start, Node* stop) = 0;
+  virtual Error serialize(Assembler* assembler, Node* start, Node* stop) = 0;
 
   // --------------------------------------------------------------------------
   // [Members]
   // --------------------------------------------------------------------------
 
   //! Compiler.
-  BaseCompiler* _compiler;
+  Compiler* _compiler;
   //! Function.
   FuncNode* _func;
 
   //! Zone allocator.
   Zone _baseZone;
+
+  //! \internal
+  //!
+  //! Offset (how many bytes to add) to `VarMap` to get `VarAttr` array. Used
+  //! by liveness analysis shared across all backends. This is needed because
+  //! `VarMap` is a base class for a specialized version that liveness analysis
+  //! doesn't use, it just needs `VarAttr` array.
+  uint32_t _varMapToVaListOffset;
 
   //! Start of the current active scope.
   Node* _start;
@@ -277,7 +292,7 @@ struct BaseContext {
   uint32_t _annotationLength;
 
   //! Current state (used by register allocator).
-  BaseVarState* _state;
+  VarState* _state;
 };
 
 //! \}

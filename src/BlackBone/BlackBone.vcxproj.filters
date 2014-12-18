@@ -132,19 +132,13 @@
     <ClCompile Include="Asm\LDasm.c">
       <Filter>AsmJit\Helpers</Filter>
     </ClCompile>
+    <ClCompile Include="PE\PEImage.cpp">
+      <Filter>PE</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86assembler.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86compiler.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86context.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86cpuinfo.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86func.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86inst.cpp">
@@ -153,10 +147,7 @@
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86operand.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86regs.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86util.cpp">
+    <ClCompile Include="..\..\contrib\AsmJit\x86\x86operand_regs.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\base\assembler.cpp">
@@ -165,13 +156,10 @@
     <ClCompile Include="..\..\contrib\AsmJit\base\codegen.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\compiler.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\base\constpool.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\context.cpp">
+    <ClCompile Include="..\..\contrib\AsmJit\base\containers.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\base\cpuinfo.cpp">
@@ -189,9 +177,6 @@
     <ClCompile Include="..\..\contrib\AsmJit\base\operand.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\podvector.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\base\runtime.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
@@ -203,9 +188,6 @@
     </ClCompile>
     <ClCompile Include="..\..\contrib\AsmJit\base\zone.cpp">
       <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="PE\PEImage.cpp">
-      <Filter>PE</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -357,19 +339,16 @@
     <ClInclude Include="Asm\LDasm.h">
       <Filter>AsmJit\Helpers</Filter>
     </ClInclude>
+    <ClInclude Include="PE\PEImage.h">
+      <Filter>PE</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc\Thunk.hpp">
+      <Filter>Misc</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86assembler.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86compiler.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86context_p.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86cpuinfo.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86func.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86inst.h">
@@ -378,31 +357,22 @@
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86operand.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86regs.h">
+    <ClInclude Include="..\..\contrib\AsmJit\apibegin.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86util.h">
+    <ClInclude Include="..\..\contrib\AsmJit\apiend.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\ApiBegin.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\ApiEnd.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\AsmJit.h">
+    <ClInclude Include="..\..\contrib\AsmJit\asmjit.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\Build.h">
+    <ClInclude Include="..\..\contrib\AsmJit\build.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\Config.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\contrib.h">
+    <ClInclude Include="..\..\contrib\AsmJit\config.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\host.h">
@@ -417,13 +387,10 @@
     <ClInclude Include="..\..\contrib\AsmJit\base\codegen.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\compiler.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base\constpool.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\context_p.h">
+    <ClInclude Include="..\..\contrib\AsmJit\base\containers.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base\cpuinfo.h">
@@ -444,12 +411,6 @@
     <ClInclude Include="..\..\contrib\AsmJit\base\operand.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\podlist.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\podvector.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base\runtime.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
@@ -464,12 +425,6 @@
     </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base\zone.h">
       <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="PE\PEImage.h">
-      <Filter>PE</Filter>
-    </ClInclude>
-    <ClInclude Include="Misc\Thunk.hpp">
-      <Filter>Misc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

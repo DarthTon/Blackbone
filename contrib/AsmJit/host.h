@@ -11,28 +11,49 @@
 // [Dependencies - Core]
 #include "base.h"
 
-// [Host - Helpers]
-#define ASMJIT_USE_HOST(_Arch_) \
-  namespace asmjit { \
-    namespace host { \
-      using namespace ::asmjit::_Arch_; \
-    } \
-  }
+// ============================================================================
+// [asmjit::host - X86 / X64]
+// ============================================================================
 
-// [Host - X86]
-#if defined(ASMJIT_HOST_X86)
+#if defined(ASMJIT_HOST_X86) || defined(ASMJIT_HOST_X64)
 #include "x86.h"
-ASMJIT_USE_HOST(x86)
-#endif // ASMJIT_HOST_X86
 
-// [Host - X64]
-#if defined(ASMJIT_HOST_X64)
-#include "x86.h"
-ASMJIT_USE_HOST(x64)
-#endif // ASMJIT_HOST_X64
+namespace asmjit {
 
-// [Host - Cleanup]
-#undef ASMJIT_USE_HOST
+// Define `asmjit::host` namespace wrapping `asmjit::x86`.
+namespace host { using namespace ::asmjit::x86; }
+
+// Define host assembler.
+typedef X86Assembler HostAssembler;
+
+// Define host operands.
+typedef X86GpReg GpReg;
+typedef X86FpReg FpReg;
+typedef X86MmReg MmReg;
+typedef X86XmmReg XmmReg;
+typedef X86YmmReg YmmReg;
+typedef X86SegReg SegReg;
+typedef X86Mem Mem;
+
+// Define host utilities.
+typedef X86CpuInfo HostCpuInfo;
+
+// Define host compiler and related.
+#if !defined(ASMJIT_DISABLE_COMPILER)
+typedef X86Compiler HostCompiler;
+typedef X86CallNode HostCallNode;
+typedef X86FuncDecl HostFuncDecl;
+typedef X86FuncNode HostFuncNode;
+
+typedef X86GpVar GpVar;
+typedef X86MmVar MmVar;
+typedef X86XmmVar XmmVar;
+typedef X86YmmVar YmmVar;
+#endif // !ASMJIT_DISABLE_COMPILER
+
+} // asmjit namespace
+
+#endif // ASMJIT_HOST_X86 || ASMJIT_HOST_X64
 
 // [Guard]
 #endif // _ASMJIT_HOST_H

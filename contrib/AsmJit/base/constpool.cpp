@@ -162,19 +162,6 @@ void ConstPool::reset() {
 // [asmjit::ConstPool - Ops]
 // ============================================================================
 
-static ASMJIT_INLINE size_t ConstPool_getGapIndex(size_t size) {
-  if (size <=  1)
-    return ConstPool::kIndex1;
-  else if (size <=  3)
-    return ConstPool::kIndex2;
-  else if (size <=  7)
-    return ConstPool::kIndex4;
-  else if (size <= 15)
-    return ConstPool::kIndex8;
-  else
-    return ConstPool::kIndex16;
-}
-
 static ASMJIT_INLINE ConstPoolGap* ConstPool_allocGap(ConstPool* self) {
   ConstPoolGap* gap = self->_gapPool;
   if (gap == NULL)
@@ -372,7 +359,7 @@ void ConstPool::fill(void* dst) {
 
 #if defined(ASMJIT_TEST)
 UNIT(base_constpool) {
-  Zone zone(16192);
+  Zone zone(32384 - kZoneOverhead);
   ConstPool pool(&zone);
 
   uint32_t i;
@@ -396,7 +383,7 @@ UNIT(base_constpool) {
       EXPECT(prevOffset + 8 == curOffset,
         "pool.add() - Returned incorrect curOffset.");
       EXPECT(pool.getSize() == (i + 1) * 8,
-        "pool.getSize() - Reports incorrect size.");
+        "pool.getSize() - Reported incorrect size.");
       prevOffset = curOffset;
     }
 
@@ -455,7 +442,7 @@ UNIT(base_constpool) {
       "pool.add() - Didn't return aligned offset.");
   }
 
-  INFO("Adding 2 byte constant verify the gap is filled.");
+  INFO("Adding 2 byte constant to verify the gap is filled.");
   {
     uint16_t c = 0xFFFE;
     size_t offset;
@@ -481,7 +468,6 @@ UNIT(base_constpool) {
   INFO("Checking pool alignment when combined constants are added.");
   {
     uint8_t bytes[32] = { 0 };
-    uint64_t c = 0;
     size_t offset;
 
     pool.add(bytes, 1, offset);

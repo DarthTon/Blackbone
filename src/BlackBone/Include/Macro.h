@@ -91,6 +91,8 @@ inline size_t Align( size_t val, size_t alignment )
 // Offset of 'LastStatus' field in TEB
 #define LAST_STATUS_OFS (0x598 + 0x197 * WordSize)
 
+typedef long NTSTATUS;
+
 /// <summary>
 /// Get last NT status
 /// </summary>

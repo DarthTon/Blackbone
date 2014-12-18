@@ -13,8 +13,9 @@ namespace blackbone
 class AsmStackAllocator
 {
 public:
-    BLACKBONE_API AsmStackAllocator( intptr_t baseval = 0x28 )
-        : disp_ofst( sizeof(size_t) )
+    BLACKBONE_API AsmStackAllocator( asmjit::X86Assembler* pAsm, intptr_t baseval = 0x28 )
+        : _pAsm( pAsm )
+        , disp_ofst( sizeof(size_t) )
     {
 #ifdef USE64
         disp_ofst = baseval;
@@ -28,15 +29,15 @@ public:
     /// </summary>
     /// <param name="size">Variable size</param>
     /// <returns>Variable memory object</returns>
-    BLACKBONE_API asmjit::host::Mem AllocVar( intptr_t size )
+    BLACKBONE_API asmjit::Mem AllocVar( intptr_t size )
     {
         // Align on word length
         size = Align( size, sizeof(size_t) );
 
 #ifdef USE64
-        auto val = asmjit::host::Mem( asmjit::host::zsp, static_cast<int32_t>(disp_ofst), static_cast<int32_t>(size) );
+        auto val = asmjit::Mem( _pAsm->zsp, static_cast<int32_t>(disp_ofst), static_cast<int32_t>(size) );
 #else
-        auto val = asmjit::host::Mem( asmjit::host::zbp, -disp_ofst - size, size );
+        auto val = asmjit::Mem( _pAsm->zbp, -disp_ofst - size, size );
 #endif
         disp_ofst += size;
         return val;
@@ -49,14 +50,14 @@ public:
     /// <param name="count">Array elements count.</param>
     /// <param name="size">Element size.</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool AllocArray( asmjit::host::Mem arr[], int count, intptr_t size )
+    BLACKBONE_API bool AllocArray( asmjit::Mem arr[], int count, intptr_t size )
     {
         for (int i = 0; i < count; i++)
         {
 #ifdef USE64
-            arr[i] = asmjit::host::Mem( asmjit::host::zsp, static_cast<int32_t>(disp_ofst), static_cast<int32_t>(size) );
+            arr[i] = asmjit::Mem( _pAsm->zsp, static_cast<int32_t>(disp_ofst), static_cast<int32_t>(size) );
 #else
-            arr[i] = asmjit::host::Mem( asmjit::host::zbp, -disp_ofst - size, size );
+            arr[i] = asmjit::Mem( _pAsm->zbp, -disp_ofst - size, size );
 #endif
             disp_ofst += size;
         }
@@ -71,17 +72,18 @@ public:
     BLACKBONE_API inline intptr_t getTotalSize() const { return disp_ofst; };
 
 private:
-    intptr_t disp_ofst;     // Next variable stack offset
+    asmjit::X86Assembler* _pAsm;    // Underlying assembler
+    intptr_t disp_ofst;             // Next variable stack offset
 };
 
 //
 //  Helpers
 //
-#define ALLOC_STACK_VAR(worker, name, type) asmjit::host::Mem name( worker.AllocVar( sizeof(type) ) );
-#define ALLOC_STACK_VAR_S(worker, name, size) asmjit::host::Mem name( worker.AllocVar( size ) );
+#define ALLOC_STACK_VAR(worker, name, type) asmjit::Mem name( worker.AllocVar( sizeof(type) ) );
+#define ALLOC_STACK_VAR_S(worker, name, size) asmjit::Mem name( worker.AllocVar( size ) );
 
 #define ALLOC_STACK_ARRAY(worker, name, type, count) \
-    asmjit::host::Mem name[count]; \
+    asmjit::Mem name[count]; \
     worker.AllocArray( name, count, sizeof(type) );
 
 }

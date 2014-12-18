@@ -156,9 +156,13 @@ private:
     /// <param name="cc">Calling convention</param>
     /// <param name="retType">Return type</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool PrepareCallAssembly( AsmHelperBase& a, const void* pfn,
-                                            std::vector<blackbone::AsmVariant>& args,
-                                            eCalligConvention cc, eReturnType retType );
+    BLACKBONE_API bool PrepareCallAssembly(
+        AsmHelperBase& a, 
+        const void* pfn,
+        std::vector<blackbone::AsmVariant>& args,
+        eCalligConvention cc,
+        eReturnType retType
+        );
 
 #pragma warning(disable : 4127)
 

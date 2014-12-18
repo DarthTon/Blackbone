@@ -59,7 +59,7 @@ public:
         jmpToHook->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ), (uint32_t)this );
 #endif // USE64
 
-        jmpToHook->jmp( this->_internalHandler );
+        jmpToHook->jmp( (asmjit::Ptr)this->_internalHandler );
         jmpToHook->relocCode( this->_buf );
 
         // Modify VTable copy

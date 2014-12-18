@@ -28,7 +28,9 @@ namespace asmjit {
 
 //! Features of \ref CodeGen.
 ASMJIT_ENUM(kCodeGen) {
-  //! Emit optimized code-alignment sequences (true by default).
+  //! Emit optimized code-alignment sequences (`Assembler` and `Compiler`).
+  //!
+  //! Default `true`.
   //!
   //! X86/X64
   //! -------
@@ -37,12 +39,14 @@ ASMJIT_ENUM(kCodeGen) {
   //! opcode that is mostly shown by disassemblers as nop. However there are
   //! more optimized align sequences for 2-11 bytes that may execute faster.
   //! If this feature is enabled asmjit will generate specialized sequences
-  //! for alignment between 1 to 11 bytes. Also when `x86x64::Compiler` is
-  //! used, it may add rex prefixes into the code to make some instructions
-  //! greater so no alignment sequences are needed.
+  //! for alignment between 1 to 11 bytes. Also when `X86Compiler` is used,
+  //! it can add REX prefixes into the code to make some instructions greater
+  //! so no alignment sequence is needed.
   kCodeGenOptimizedAlign = 0,
 
-  //! Emit jump-prediction hints (false by default).
+  //! Emit jump-prediction hints (`Assembler` and `Compiler`).
+  //!
+  //! Default `false`.
   //!
   //! X86/X64
   //! -------
@@ -55,9 +59,24 @@ ASMJIT_ENUM(kCodeGen) {
   //! If this option is enabled these hints will be emitted.
   //!
   //! This feature is disabled by default, because the only processor that
-  //! used to take into consideration prediction hints was P4 that is not used
-  //! anymore.
-  kCodeGenPredictedJumps = 1
+  //! used to take into consideration prediction hints was P4. Newer processors
+  //! implement heuristics for branch prediction that ignores any static hints.
+  kCodeGenPredictedJumps = 1,
+
+  //! Schedule instructions so they can be executed faster (`Compiler` only).
+  //!
+  //! Default `false` - has to be explicitly enabled as the scheduler needs
+  //! some time to run.
+  //!
+  //! X86/X64
+  //! -------
+  //!
+  //! If scheduling is enabled AsmJit will try to reorder instructions to
+  //! minimize dependency chain. Scheduler always runs after the registers are
+  //! allocated so it doesn't change count of register allocs/spills.
+  //!
+  //! This feature is highly experimental and untested.
+  kCodeGenEnableScheduler = 2
 };
 
 // ============================================================================
@@ -66,7 +85,9 @@ ASMJIT_ENUM(kCodeGen) {
 
 //! Code aligning mode.
 ASMJIT_ENUM(kAlignMode) {
+  //! Align by emitting a sequence that can be executed (code).
   kAlignCode = 0,
+  //! Align by emitting sequence that shouldn't be executed (data).
   kAlignData = 1
 };
 
@@ -76,9 +97,13 @@ ASMJIT_ENUM(kAlignMode) {
 
 //! Relocation mode.
 ASMJIT_ENUM(kRelocMode) {
+  //! Relocate an absolute address to an absolute address.
   kRelocAbsToAbs = 0,
+  //! Relocate a relative address to an absolute address.
   kRelocRelToAbs = 1,
+  //! Relocate an absolute address to a relative address.
   kRelocAbsToRel = 2,
+  //! Relocate an absolute address to a relative address or use trampoline.
   kRelocTrampoline = 3
 };
 
@@ -86,8 +111,8 @@ ASMJIT_ENUM(kRelocMode) {
 // [asmjit::CodeGen]
 // ============================================================================
 
-//! Abstract class defining basics of \ref Assembler and \ref BaseCompiler.
-struct CodeGen {
+//! Abstract class defining basics of \ref Assembler and \ref Compiler.
+struct ASMJIT_VCLASS CodeGen {
   ASMJIT_NO_COPY(CodeGen)
 
   // --------------------------------------------------------------------------
@@ -142,7 +167,33 @@ struct CodeGen {
   }
 
   // --------------------------------------------------------------------------
-  // [Error]
+  // [BaseAddress]
+  // --------------------------------------------------------------------------
+
+  //! Get whether the code-generator has a base address.
+  //!
+  //! \sa \ref getBaseAddress()
+  ASMJIT_INLINE bool hasBaseAddress() const {
+    return _baseAddress != kNoBaseAddress;
+  }
+
+  //! Get the base address.
+  ASMJIT_INLINE Ptr getBaseAddress() const {
+    return _baseAddress;
+  }
+
+  //! Set the base address to `baseAddress`.
+  ASMJIT_INLINE void setBaseAddress(Ptr baseAddress) {
+    _baseAddress = baseAddress;
+  }
+
+  //! Reset the base address.
+  ASMJIT_INLINE void resetBaseAddress() {
+    setBaseAddress(kNoBaseAddress);
+  }
+
+  // --------------------------------------------------------------------------
+  // [LastError / ErrorHandler]
   // --------------------------------------------------------------------------
 
   //! Get last error code.
@@ -154,7 +205,7 @@ struct CodeGen {
   ASMJIT_API Error setError(Error error, const char* message = NULL);
 
   //! Clear the last error code.
-  ASMJIT_INLINE void clearError() {
+  ASMJIT_INLINE void resetError() {
     _error = kErrorOk;
   }
 
@@ -167,47 +218,59 @@ struct CodeGen {
   ASMJIT_API Error setErrorHandler(ErrorHandler* handler);
 
   //! Clear error handler.
-  ASMJIT_INLINE Error clearErrorHandler() {
+  ASMJIT_INLINE Error resetErrorHandler() {
     return setErrorHandler(NULL);
   }
 
   // --------------------------------------------------------------------------
-  // [Features]
+  // [Code-Generation Features]
   // --------------------------------------------------------------------------
 
   //! Get code-generator `feature`.
-  ASMJIT_API bool hasFeature(uint32_t feature) const;
+  ASMJIT_INLINE bool hasFeature(uint32_t feature) const {
+    ASMJIT_ASSERT(feature < 32);
+
+    return (_features & (1 << feature)) != 0;
+  }
+
   //! Set code-generator `feature` to `value`.
-  ASMJIT_API Error setFeature(uint32_t feature, bool value);
+  ASMJIT_INLINE void setFeature(uint32_t feature, bool value) {
+    ASMJIT_ASSERT(feature < 32);
+
+    feature = static_cast<uint32_t>(value) << feature;
+    _features = (_features & ~feature) | feature;
+  }
+
+  //! Get code-generator features.
+  ASMJIT_INLINE uint32_t getFeatures() const {
+    return _features;
+  }
+
+  //! Set code-generator features.
+  ASMJIT_INLINE void setFeatures(uint32_t features) {
+    _features = features;
+  }
 
   // --------------------------------------------------------------------------
-  // [Options]
+  // [Instruction Options]
   // --------------------------------------------------------------------------
 
   //! Get options of the next instruction.
-  ASMJIT_INLINE uint32_t getOptions() const {
-    return _options;
+  ASMJIT_INLINE uint32_t getInstOptions() const {
+    return _instOptions;
   }
 
-  //! Set options of the next instruction.
-  ASMJIT_INLINE void setOptions(uint32_t options) {
-    _options = options;
-  }
-
-  //! Get options of the next instruction and clear them.
-  ASMJIT_INLINE uint32_t getOptionsAndClear() {
-    uint32_t options = _options;
-    _options = 0;
-    return options;
+  //! Get options of the next instruction and reset them.
+  ASMJIT_INLINE uint32_t getInstOptionsAndReset() {
+    uint32_t instOptions = _instOptions;
+    _instOptions = 0;
+    return instOptions;
   };
 
-  // --------------------------------------------------------------------------
-  // [Purge]
-  // --------------------------------------------------------------------------
-
-  //! Called by \ref clear() and \ref reset() to clear all data used by the
-  //! code generator.
-  virtual void _purge() = 0;
+  //! Set options of the next instruction.
+  ASMJIT_INLINE void setInstOptions(uint32_t instOptions) {
+    _instOptions = instOptions;
+  }
 
   // --------------------------------------------------------------------------
   // [Make]
@@ -225,31 +288,39 @@ struct CodeGen {
   // [Members]
   // --------------------------------------------------------------------------
 
-  //! Runtime.
+  //! Target runtime.
   Runtime* _runtime;
 
 #if !defined(ASMJIT_DISABLE_LOGGER)
   //! Logger.
   Logger* _logger;
 #else
-  // Makes the libraries built with/without logging support binary compatible.
+  //! \internal
+  //!
+  //! Makes libraries built with or without logging support binary compatible.
   void* _logger;
 #endif // ASMJIT_DISABLE_LOGGER
 
   //! Error handler, called by \ref setError().
   ErrorHandler* _errorHandler;
 
-  //! Target architecture.
-  uint8_t _arch;
-  //! Target general-purpose register size (4 or 8 bytes).
-  uint8_t _regSize;
-  //! Target features.
-  uint8_t _features;
-  //! Last error code.
-  uint8_t _error;
+  //! Base address (-1 if unknown/not used).
+  Ptr _baseAddress;
 
-  //! Options for the next generated instruction (only 8-bits used).
-  uint32_t _options;
+  //! Target architecture ID.
+  uint8_t _arch;
+  //! Target architecture GP register size in bytes (4 or 8).
+  uint8_t _regSize;
+  //! \internal
+  uint16_t _reserved;
+
+  //! Code-Generation features, used by \ref hasFeature() and \ref setFeature().
+  uint32_t _features;
+  //! Options affecting the next instruction.
+  uint32_t _instOptions;
+
+  //! Last error code.
+  uint32_t _error;
 
   //! Base zone.
   Zone _baseZone;

@@ -64,7 +64,7 @@
 //!
 //! @section AsmJit_Main_HomePage AsmJit Homepage
 //!
-//! - https://github.com/kobalicekp/asmjit
+//! - https://github.com/kobalicek/asmjit
 
 // ============================================================================
 // [asmjit_base]
@@ -85,10 +85,10 @@
 //!
 //! Contains all `asmjit` classes and helper functions that are architecture
 //! independent or abstract. Abstract classes are implemented by the backend,
-//! for example `BaseAssembler` is implemented by `x86x64::X86X64Assembler`.
+//! for example `Assembler` is implemented by `X86Assembler`.
 //!
-//! - See `BaseAssembler` for low level code generation documentation.
-//! - See `BaseCompiler` for high level code generation documentation.
+//! - See `Assembler` for low level code generation documentation.
+//! - See `Compiler` for high level code generation documentation.
 //! - See `Operand` for operand's overview.
 //!
 //! Logging and Error Handling
@@ -117,10 +117,10 @@
 //! \sa \ref Logger, \ref FileLogger, \ref StringLogger.
 
 // ============================================================================
-// [asmjit_base_tree]
+// [asmjit_base_compiler]
 // ============================================================================
 
-//! \defgroup asmjit_base_tree AsmJit Code-Tree
+//! \defgroup asmjit_base_compiler AsmJit Compiler
 //! \ingroup asmjit_base
 //!
 //! \brief AsmJit code-tree used by Compiler.
@@ -128,7 +128,7 @@
 //! AsmJit intermediate code-tree is a double-linked list that is made of nodes
 //! that represent assembler instructions, directives, labels and high-level
 //! constructs compiler is using to represent functions and function calls. The
-//! node list can only be used together with \ref BaseCompiler.
+//! node list can only be used together with \ref Compiler.
 //!
 //! TODO
 
@@ -175,14 +175,14 @@
 //! Integer utilities are all implemented by a static class \ref IntUtil.
 //! There are utilities for bit manipulation and bit counting, utilities to get
 //! an integer minimum / maximum and various other helpers required to perform
-//! alignment checks and binary casting from float to integer and vica versa->
+//! alignment checks and binary casting from float to integer and vica versa.
 //!
 //! Vector Utilities
 //! ----------------
 //!
 //! SIMD code generation often requires to embed constants after each function
-//! or a block of functions generated. AsmJit contains classes `Vec64Data`,
-//! `Vec128Data` and `Vec256Data` that can be used to prepare data useful when
+//! or a block of functions generated. AsmJit contains classes `Vec64`,
+//! `Vec128` and `Vec256` that can be used to prepare data useful when
 //! generating SIMD code.
 //!
 //! X86/X64 code generator contains member functions `dmm`, `dxmm` and `dymm`
@@ -193,19 +193,19 @@
 //! embedding constants manually after the function body.
 
 // ============================================================================
-// [asmjit_x86x64]
+// [asmjit_x86]
 // ============================================================================
 
-//! \defgroup asmjit_x86x64 X86/X64
+//! \defgroup asmjit_x86 X86/X64
 //!
 //! \brief X86/X64 module
 
 // ============================================================================
-// [asmjit_x86x64_general]
+// [asmjit_x86_general]
 // ============================================================================
 
-//! \defgroup asmjit_x86x64_general X86/X64 General API
-//! \ingroup asmjit_x86x64
+//! \defgroup asmjit_x86_general X86/X64 General API
+//! \ingroup asmjit_x86
 //!
 //! \brief X86/X64 general API.
 //!
@@ -235,23 +235,22 @@
 //! `BaseMem` class. These functions are used to make operands that represents
 //! memory addresses:
 //!
-//! - `asmjit::ptr()`
-//! - `asmjit::byte_ptr()`
-//! - `asmjit::host::word_ptr()`
-//! - `asmjit::host::dword_ptr()`
-//! - `asmjit::host::qword_ptr()`
-//! - `asmjit::tword_ptr()`
-//! - `asmjit::oword_ptr()`
-//! - `asmjit::yword_ptr()`
-//! - `asmjit::intptr_ptr()`
+//! - `asmjit::ptr()`       - Address size not specified.
+//! - `asmjit::byte_ptr()`  - 1 byte.
+//! - `asmjit::word_ptr()`  - 2 bytes (Gpw size).
+//! - `asmjit::dword_ptr()` - 4 bytes (Gpd size).
+//! - `asmjit::qword_ptr()` - 8 bytes (Gpq/Mm size).
+//! - `asmjit::tword_ptr()` - 10 bytes (FPU).
+//! - `asmjit::oword_ptr()` - 16 bytes (Xmm size).
+//! - `asmjit::yword_ptr()` - 32 bytes (Ymm size).
+//! - `asmjit::zword_ptr()` - 64 bytes (Zmm size).
 //!
 //! Most useful function to make pointer should be `asmjit::ptr()`. It creates
-//! pointer to the target with uzspecified size. Uzspecified size works in all
+//! pointer to the target with unspecified size. Unspecified size works in all
 //! intrinsics where are used registers (this means that size is specified by
 //! register operand or by instruction itself). For example `asmjit::ptr()`
-//! can't be used with @c asmjit::host::Assembler::inc() instruction. In this case
-//! size must be specified and it's also reason to make difference between
-//! pointer sizes.
+//! can't be used with `Assembler::inc()` instruction. In this case size must
+//! be specified and it's also reason to make difference between pointer sizes.
 //!
 //! Supported are simple address forms `[base + displacement]` and complex
 //! address forms `[base + index * scale + displacement]`.
@@ -260,8 +259,8 @@
 //! ------------------
 //!
 //! Immediate values are constants thats passed directly after instruction
-//! opcode. To create such value use @c asmjit::imm() or @c asmjit::imm_u()
-//! methods to create signed or unsigned immediate value.
+//! opcode. To create such value use `imm()` or `imm_u()` methods to create
+//! signed or unsigned immediate value.
 //!
 //! X86/X64 CPU Information
 //! -----------------------
@@ -270,22 +269,22 @@
 //! the host X86/X64 processor. AsmJit contains utilities that can get the most
 //! important information related to the features supported by the CPU and the
 //! host operating system, in addition to host processor name and number of
-//! cores. Class `CpuInfo` extends `BaseCpuInfo` and provides functionality
+//! cores. Class `X86CpuInfo` extends `CpuInfo` and provides functionality
 //! specific to X86 and X64.
 //!
 //! By default AsmJit queries the CPU information after the library is loaded
 //! and the queried information is reused by all instances of `JitRuntime`.
-//! The global instance of `CpuInfo` can't be changed, because it will affect
+//! The global instance of `X86CpuInfo` can't be changed, because it will affect
 //! the code generation of all `Runtime`s. If there is a need to have a
 //! specific CPU information which contains modified features or processor
-//! vendor it's possible by creating a new instance of `CpuInfo` and setting
-//! up its members. `CpuUtil::detect` can be used to detect CPU features into
-//! an existing `CpuInfo` instance - it may become handly if only one property
+//! vendor it's possible by creating a new instance of `X86CpuInfo` and setting
+//! up its members. `X86CpuUtil::detect` can be used to detect CPU features into
+//! an existing `X86CpuInfo` instance - it may become handly if only one property
 //! has to be turned on/off.
 //!
-//! If the high-level interface `CpuInfo` offers is not enough there is also
-//! `CpuUtil::callCpuId` helper that can be used to call CPUID instruction with
-//! a given parameters and to consume the output.
+//! If the high-level interface `X86CpuInfo` offers is not enough there is also
+//! `X86CpuUtil::callCpuId` helper that can be used to call CPUID instruction
+//! with a given parameters and to consume the output.
 //!
 //! Cpu detection is important when generating a JIT code that may or may not
 //! use certain CPU features. For example there used to be a SSE/SSE2 detection
@@ -295,15 +294,14 @@
 //!
 //! ~~~
 //! using namespace asmjit;
-//! using namespace asmjit::host;
 //!
-//! // Get `CpuInfo` global instance.
-//! const CpuInfo* cpuInfo = CpuInfo::getHost();
+//! // Get `X86CpuInfo` global instance.
+//! const X86CpuInfo* cpuInfo = X86CpuInfo::getHost();
 //!
-//! if (cpuInfo->hasFeature(kCpuFeatureSse2)) {
+//! if (cpuInfo->hasFeature(kX86CpuFeatureSSE2)) {
 //!   // Processor has SSE2.
 //! }
-//! else if (cpuInfo->hasFeature(kCpuFeatureMmx)) {
+//! else if (cpuInfo->hasFeature(kX86CpuFeatureMMX)) {
 //!   // Processor doesn't have SSE2, but has MMX.
 //! }
 //! else {
@@ -317,8 +315,8 @@
 //! using namespace asmjit;
 //!
 //! // Call cpuid, first two arguments are passed in Eax/Ecx.
-//! CpuId out;
-//! CpuUtil::callCpuId(0, 0, &out);
+//! X86CpuId out;
+//! X86CpuUtil::callCpuId(0, 0, &out);
 //!
 //! // If Eax argument is 0, Ebx, Ecx and Edx registers are filled with a cpu vendor.
 //! char cpuVendor[13];
@@ -332,29 +330,29 @@
 //! ~~~
 
 // ============================================================================
-// [asmjit_x86x64_tree]
+// [asmjit_x86_compiler]
 // ============================================================================
 
-//! \defgroup asmjit_x86x64_tree X86/X64 Code-Tree
-//! \ingroup asmjit_x86x64
+//! \defgroup asmjit_x86_compiler X86/X64 Code-Tree
+//! \ingroup asmjit_x86
 //!
 //! \brief X86/X64 code-tree and helpers.
 
 // ============================================================================
-// [asmjit_x86x64_inst]
+// [asmjit_x86_inst]
 // ============================================================================
 
-//! \defgroup asmjit_x86x64_inst X86/X64 Instructions
-//! \ingroup asmjit_x86x64
+//! \defgroup asmjit_x86_inst X86/X64 Instructions
+//! \ingroup asmjit_x86
 //!
 //! \brief X86/X64 low-level instruction definitions.
 
 // ============================================================================
-// [asmjit_x86x64_util]
+// [asmjit_x86_util]
 // ============================================================================
 
-//! \defgroup asmjit_x86x64_util X86/X64 Utilities
-//! \ingroup asmjit_x86x64
+//! \defgroup asmjit_x86_util X86/X64 Utilities
+//! \ingroup asmjit_x86
 //!
 //! \brief X86/X64 utility classes.
 

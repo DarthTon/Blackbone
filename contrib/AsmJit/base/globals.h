@@ -20,6 +20,20 @@ namespace asmjit {
 //! \{
 
 // ============================================================================
+// [asmjit::Ptr / SignedPtr]
+// ============================================================================
+
+//! 64-bit unsigned pointer, compatible with JIT and non-JIT generators.
+//!
+//! This is the preferred pointer type to use with AsmJit library. It has a
+//! capability to hold any pointer for any architecture making it an ideal
+//! candidate for cross-platform code generation.
+typedef uint64_t Ptr;
+
+//! 64-bit signed pointer, like \ref Ptr, but made signed.
+typedef int64_t SignedPtr;
+
+// ============================================================================
 // [asmjit::kGlobals]
 // ============================================================================
 
@@ -30,6 +44,9 @@ namespace asmjit {
 //! string is not known and has to be determined.
 static const size_t kInvalidIndex = ~static_cast<size_t>(0);
 
+//! Invalid base address.
+static const Ptr kNoBaseAddress = static_cast<Ptr>(static_cast<SignedPtr>(-1));
+
 //! Global constants.
 ASMJIT_ENUM(kGlobals) {
   //! Invalid value or operand id.
@@ -37,6 +54,8 @@ ASMJIT_ENUM(kGlobals) {
 
   //! Invalid register index.
   kInvalidReg = 0xFF,
+  //! Invalid variable type.
+  kInvalidVar = 0xFF,
 
   //! Host memory allocator overhead.
   //!
@@ -86,20 +105,6 @@ ASMJIT_ENUM(kArch) {
   //! Whether the host is 64-bit.
   kArchHost64Bit = sizeof(intptr_t) >= 8
 };
-
-// ============================================================================
-// [asmjit::Ptr / SignedPtr]
-// ============================================================================
-
-//! 64-bit unsigned pointer, compatible with JIT and non-JIT generators.
-//!
-//! This is the preferred pointer type to use with AsmJit library. It has a
-//! capability to hold any pointer for any architecture making it an ideal
-//! candidate for cross-platform code generation.
-typedef uint64_t Ptr;
-
-//! 64-bit signed pointer, like \ref Ptr, but made signed.
-typedef int64_t SignedPtr;
 
 //! \}
 

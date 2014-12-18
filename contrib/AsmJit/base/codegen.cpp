@@ -24,11 +24,13 @@ CodeGen::CodeGen(Runtime* runtime) :
   _runtime(runtime),
   _logger(NULL),
   _errorHandler(NULL),
+  _baseAddress(runtime->getBaseAddress()),
   _arch(kArchNone),
   _regSize(0),
-  _features(static_cast<uint8_t>(IntUtil::mask(kCodeGenOptimizedAlign))),
+  _reserved(0),
+  _features(IntUtil::mask(kCodeGenOptimizedAlign)),
+  _instOptions(0),
   _error(kErrorOk),
-  _options(0),
   _baseZone(16384 - kZoneOverhead) {}
 
 CodeGen::~CodeGen() {
@@ -57,12 +59,20 @@ Error CodeGen::setError(Error error, const char* message) {
     return kErrorOk;
   }
 
-  if (message == NULL)
+  if (message == NULL) {
+#if !defined(ASMJIT_DISABLE_NAMES)
     message = ErrorUtil::asString(error);
+#else
+    static const char noMessage[] = "";
+    message = noMessage;
+#endif // ASMJIT_DISABLE_NAMES
+  }
 
   // Error handler is called before logger so logging can be skipped if error
   // has been handled.
   ErrorHandler* handler = _errorHandler;
+  ASMJIT_TLOG("[ERROR] %s %s\n", message, !handler ? "(Possibly unhandled?)" : "");
+
   if (handler != NULL && handler->handleError(error, message))
     return error;
 
@@ -92,28 +102,6 @@ Error CodeGen::setErrorHandler(ErrorHandler* handler) {
     handler = handler->addRef();
 
   _errorHandler = handler;
-  return kErrorOk;
-}
-
-// ============================================================================
-// [asmjit::CodeGen - Features]
-// ============================================================================
-
-bool CodeGen::hasFeature(uint32_t feature) const {
-  if (feature >= sizeof(_features) * 8)
-    return false;
-
-  feature = 1 << feature;
-  return (_features & feature) != 0;
-}
-
-Error CodeGen::setFeature(uint32_t feature, bool value) {
-  if (feature >= sizeof(_features) * 8)
-    return setError(kErrorInvalidArgument);
-
-  feature = static_cast<uint32_t>(value) << feature;
-  _features = static_cast<uint8_t>((static_cast<uint32_t>(_features) & ~feature) | feature);
-
   return kErrorOk;
 }
 

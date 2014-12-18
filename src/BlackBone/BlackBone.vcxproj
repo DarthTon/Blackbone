@@ -175,7 +175,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;CONSOLE_TRACE;BLACKBONE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;CONSOLE_TRACE;BLACKBONE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <BasicRuntimeChecks>UninitializedLocalUsageCheck</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -218,7 +218,7 @@
       </PrecompiledHeader>
       <WarningLevel>Level4</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;CONSOLE_TRACE;BLACKBONE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;CONSOLE_TRACE;BLACKBONE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
     </ClCompile>
@@ -257,7 +257,7 @@
       <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;BLACBONE_NO_TRACE;BLACKBONE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;BLACBONE_NO_TRACE;BLACKBONE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>
       </SDLCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
@@ -315,7 +315,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;BLACBONE_NO_TRACE;BLACKBONE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;BLACBONE_NO_TRACE;BLACKBONE_STATIC;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
@@ -357,28 +357,22 @@
   <ItemGroup>
     <ClCompile Include="..\..\contrib\AsmJit\base\assembler.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\codegen.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\base\compiler.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\constpool.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\base\context.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\base\containers.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\cpuinfo.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\cputicks.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\error.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\globals.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\operand.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\base\podvector.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\runtime.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\string.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\vmem.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\base\zone.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86assembler.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86compiler.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86context.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86cpuinfo.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86func.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86inst.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86operand.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86regs.cpp" />
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86util.cpp" />
+    <ClCompile Include="..\..\contrib\AsmJit\x86\x86operand_regs.cpp" />
     <ClCompile Include="Asm\AsmHelper32.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|x64'">true</ExcludedFromBuild>
@@ -423,42 +417,33 @@
     <ClCompile Include="Subsystem\x86Subsystem.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\contrib\AsmJit\ApiBegin.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\ApiEnd.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\AsmJit.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\apibegin.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\apiend.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\asmjit.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\assembler.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\codegen.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\base\compiler.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\constpool.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\base\context_p.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\base\containers.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\cpuinfo.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\cputicks.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\error.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\globals.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\lock.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\operand.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\base\podlist.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\base\podvector.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\runtime.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\string.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\vectypes.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\vmem.h" />
     <ClInclude Include="..\..\contrib\AsmJit\base\zone.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\Build.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\Config.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\contrib.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\build.h" />
+    <ClInclude Include="..\..\contrib\AsmJit\config.h" />
     <ClInclude Include="..\..\contrib\AsmJit\host.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86assembler.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86compiler.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86context_p.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86cpuinfo.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86func.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86inst.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86operand.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86regs.h" />
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86util.h" />
     <ClInclude Include="Asm\AsmHelper.h" />
     <ClInclude Include="Asm\AsmHelper32.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>

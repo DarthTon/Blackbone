@@ -55,7 +55,7 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt /
     // 0x30 - EXCEPTION_RECORD.ExceptionInformation[2]
     // 0x38 - EXCEPTION_RECORD.ExceptionInformation[3]
     //
-    ea->mov( asmjit::host::rax, qword_ptr( asmjit::host::rcx ) );
+    ea->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rcx ) );
     ea->cmp( asmjit::host::dword_ptr( asmjit::host::rax ), EH_EXCEPTION_NUMBER );
     ea->jne( lExit );
     ea->mov( asmjit::host::rdx, pTargetBase );
@@ -65,20 +65,20 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt /
     ea->add( asmjit::host::rdx, imageSize );
     ea->cmp( asmjit::host::r8, asmjit::host::rdx );;
     ea->jg( lExit );
-    ea->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_PURE_MAGIC_NUMBER1 );;
+    ea->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_PURE_MAGIC_NUMBER1 );
     ea->jne( lExit );
     ea->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), 0 );
     ea->jne( lExit );
     ea->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_MAGIC_NUMBER1 );
-    ea->mov( asmjit::host::rcx, qword_ptr( asmjit::host::rcx ) );
+    ea->mov( asmjit::host::rcx, asmjit::host::qword_ptr( asmjit::host::rcx ) );
     ea->mov( asmjit::host::rdx, pTargetBase );
     ea->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), asmjit::host::rdx );
     ea->bind( lExit );
     ea->xor_( asmjit::host::rax, asmjit::host::rax );
     ea->ret();
-    ea->emit( 0xCC );
-    ea->emit( 0xCC );
-    ea->emit( 0xCC );
+    ea->db( 0xCC );
+    ea->db( 0xCC );
+    ea->db( 0xCC );
 
     if (_pVEHCode.Write( 0, ea->getCodeSize(), ea->make() ) != STATUS_SUCCESS)
     {
