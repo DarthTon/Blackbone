@@ -821,7 +821,8 @@ bool ProcessModules::InjectPureIL(
 
     std::vector<uint8_t> codeBuffer( codeSize );
 
-    a->relocCode( codeBuffer.data(), codeAddress );
+    a->setBaseAddress( codeAddress );
+    a->relocCode( codeBuffer.data() );
     if (address.Write( offset, codeSize, codeBuffer.data() ) != STATUS_SUCCESS)
     {
         returnCode = 17;

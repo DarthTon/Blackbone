@@ -34,9 +34,13 @@ public:
     /// <param name="order">Call order. Hook before original or vice versa</param>
     /// <param name="retType">Return value. Use origianl or value from hook</param>
     /// <returns>true on success</returns>
-    bool Hook( type ptr, hktype hkPtr, HookType::e type,
-               CallOrder::e order = CallOrder::HookFirst,
-               ReturnMethod::e retType = ReturnMethod::UseOriginal )
+    bool Hook(
+        type ptr,
+        hktype hkPtr,
+        HookType::e type,
+        CallOrder::e order = CallOrder::HookFirst,
+        ReturnMethod::e retType = ReturnMethod::UseOriginal
+        )
     { 
         if (this->_hooked)
             return false;
@@ -73,9 +77,14 @@ public:
     /// <param name="order">Call order. Hook before original or vice versa</param>
     /// <param name="retType">Return value. Use origianl or value from hook</param>
     /// <returns>true on success</returns>
-    bool Hook( type Ptr, hktypeC hkPtr, C* pClass, HookType::e type,
-               CallOrder::e order = CallOrder::HookFirst,
-               ReturnMethod::e retType = ReturnMethod::UseOriginal )
+    bool Hook(
+        type Ptr,
+        hktypeC hkPtr,
+        C* pClass,
+        HookType::e type,
+        CallOrder::e order = CallOrder::HookFirst,
+        ReturnMethod::e retType = ReturnMethod::UseOriginal
+        )
     {
         this->_callbackClass = pClass;
         return Hook( Ptr, brutal_cast<hktype>(hkPtr), type, order, retType );
@@ -157,15 +166,15 @@ private:
         jmpToHook->jmp( (asmjit::Ptr)&HookHandler<Fn, C>::Handler );
         jmpToHook->relocCode( this->_buf );
 
-        BOOL res = WriteProcessMemory( 
-            GetCurrentProcess(), 
-            this->_original,
-            this->_newCode,
-            jmpToThunk->relocCode( this->_newCode, (uintptr_t)this->_original ),
-            NULL
-            );
-        
-        return (this->_hooked = (res == TRUE));
+        jmpToThunk->setBaseAddress( (uintptr_t)this->_original );
+        auto codeSize = jmpToThunk->relocCode( this->_newCode );
+
+        DWORD flOld = 0;
+        VirtualProtect( this->_original, codeSize, PAGE_EXECUTE_READWRITE, &flOld );
+        memcpy( this->_original, this->_newCode, codeSize );
+        VirtualProtect( this->_original, codeSize, flOld, &flOld );
+    
+        return (this->_hooked = codeSize != 0);
     }
 
     /// <summary>
@@ -190,9 +199,14 @@ private:
         memcpy( this->_origCode, this->_original, this->_origSize );
 
         // Write break instruction
+        DWORD flOld = 0;
+        VirtualProtect( this->_original, this->_origSize, PAGE_EXECUTE_READWRITE, &flOld );
+        memcpy( this->_original, this->_newCode, this->_origSize );
+        VirtualProtect( this->_original, this->_origSize, flOld, &flOld );
+
         BOOL res = WriteProcessMemory( GetCurrentProcess(), this->_original, this->_newCode, this->_origSize, NULL );
 
-        return (this->_hooked = (res == TRUE));
+        return this->_hooked = TRUE;
     }
 
     /// <summary>

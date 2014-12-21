@@ -40,7 +40,6 @@ void TestTEB( Process& proc )
     std::wcout << std::dec;
 }
 
-
 int main( int /*argc*/, char* /*argv*/[] )
 {
     Process proc;
@@ -49,12 +48,12 @@ int main( int /*argc*/, char* /*argv*/[] )
     TestPEB( proc );
     TestTEB( proc );
     TestPatterns();
-    //TestLocalHook();
+    TestLocalHook();
     TestRemoteCall();
-    //TestRemoteHook();
-    //TestDriver();
-    //TestRemoteMem();
+    TestRemoteHook();
+    TestDriver();
+    TestRemoteMem();
     TestMMap();
     
-	return 0;
+    return 0;
 }

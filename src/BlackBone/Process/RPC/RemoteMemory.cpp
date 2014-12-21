@@ -421,8 +421,8 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     a->add( asmjit::host::rsp, stack_size );
     a->ret();
 
-    a->relocCode( (uint8_t*)_pSharedData + hookDataOfs + FIELD_OFFSET( HookData, hook_code ), 
-                  _targetShare + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
+    a->setBaseAddress( _targetShare + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
+    a->relocCode( (uint8_t*)_pSharedData + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
 }
 
 /// <summary>
@@ -534,8 +534,8 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     a->bind( skip1 );
     a.GenEpilogue( false, argc[opType] * 4 );
 
-    a->relocCode( (uint8_t*)_pSharedData + hookDataOfs + FIELD_OFFSET( HookData, hook_code ),
-                  _targetShare + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
+    a->setBaseAddress( _targetShare + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
+    a->relocCode( (uint8_t*)_pSharedData + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
 }
 
 /// <summary>
