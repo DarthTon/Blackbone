@@ -1,6 +1,7 @@
 #include "MExcept.h"
 #include "../Process/Process.h"
 #include "../Include/Macro.h"
+#include "../Misc/Trace.hpp"
 #include "../Asm/LDasm.h"
 
 LONG CALLBACK VectoredHandler( PEXCEPTION_POINTERS ExceptionInfo );
@@ -33,20 +34,51 @@ MExcept::~MExcept()
 /// </summary>
 /// <param name="pTargetBase">Target image base address</param>
 /// <param name="imageSize">Size of the image</param>
+/// <param name="mt">Mosule type</param>
+/// <param name="partial">Partial exception support</param>
 /// <returns>Error code</returns>
-NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt /*= mt_default*/ )
+NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, bool partial )
 {    
-    AsmJitHelper ea;
+    AsmJitHelper a;
     uint64_t result = 0;
     
+#ifdef USE64 
+
+    // Add module to module table
+    if (!_pModTable.valid())
+    {
+        _pModTable = _proc.memory().Allocate( 0x1000 );
+        _pModTable.Release();
+        if (!_pModTable.valid())
+            return LastNtStatus();
+    }
+
+    ModuleTable table;
+    _pModTable.Read ( 0, table );
+
+    // Add new entry to the table
+    table.entry[table.count].base = pTargetBase;
+    table.entry[table.count].size = imageSize;
+    table.count++;
+
+    _pModTable.Write( 0, table );
+
+    // No handler required
+    if (partial)
+        return STATUS_SUCCESS;
+
     // VEH codecave
     _pVEHCode = _proc.memory().Allocate( 0x2000 );
     _pVEHCode.Release();
     if (!_pVEHCode.valid())
         return LastNtStatus();
 
-#ifdef USE64 
-    asmjit::Label lExit = ea->newLabel();
+    BLACBONE_TRACE( "ManualMap: Vectored hander: 0x%p\n", _pVEHCode.ptr() );
+
+    asmjit::Label lExit  = a->newLabel();
+    asmjit::Label lLoop1 = a->newLabel();
+    asmjit::Label skip1  = a->newLabel();
+    asmjit::Label found1 = a->newLabel();
 
     //
     // Assembly code for VectoredHandler64
@@ -55,32 +87,53 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt /
     // 0x30 - EXCEPTION_RECORD.ExceptionInformation[2]
     // 0x38 - EXCEPTION_RECORD.ExceptionInformation[3]
     //
-    ea->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rcx ) );
-    ea->cmp( asmjit::host::dword_ptr( asmjit::host::rax ), EH_EXCEPTION_NUMBER );
-    ea->jne( lExit );
-    ea->mov( asmjit::host::rdx, pTargetBase );
-    ea->mov( asmjit::host::r8, asmjit::host::qword_ptr( asmjit::host::rax, 0x30 ) );
-    ea->cmp( asmjit::host::r8, asmjit::host::rdx );;
-    ea->jl( lExit );
-    ea->add( asmjit::host::rdx, imageSize );
-    ea->cmp( asmjit::host::r8, asmjit::host::rdx );;
-    ea->jg( lExit );
-    ea->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_PURE_MAGIC_NUMBER1 );
-    ea->jne( lExit );
-    ea->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), 0 );
-    ea->jne( lExit );
-    ea->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_MAGIC_NUMBER1 );
-    ea->mov( asmjit::host::rcx, asmjit::host::qword_ptr( asmjit::host::rcx ) );
-    ea->mov( asmjit::host::rdx, pTargetBase );
-    ea->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), asmjit::host::rdx );
-    ea->bind( lExit );
-    ea->xor_( asmjit::host::rax, asmjit::host::rax );
-    ea->ret();
-    ea->db( 0xCC );
-    ea->db( 0xCC );
-    ea->db( 0xCC );
+    a->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rcx ) );
+    a->cmp( asmjit::host::dword_ptr( asmjit::host::rax ), EH_EXCEPTION_NUMBER );            // Exception code
+    a->jne( lExit );
+    a->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_PURE_MAGIC_NUMBER1 );    // Sub code
+    a->jne( lExit );
+    a->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), 0 );                        // Image base
+    a->jne( lExit );
 
-    if (_pVEHCode.Write( 0, ea->getCodeSize(), ea->make() ) != STATUS_SUCCESS)
+    a->mov( asmjit::host::r9, _pModTable.ptr() );
+    a->mov( asmjit::host::rdx, asmjit::host::qword_ptr( asmjit::host::r9 ) );               // Record count
+    a->add( asmjit::host::r9, sizeof( table.count ) );
+    a->xor_( asmjit::host::r10, asmjit::host::r10 );
+
+    a->bind( lLoop1 );
+
+    a->mov( asmjit::host::r8, asmjit::host::qword_ptr( asmjit::host::rax, 0x30 ) );
+    a->mov( asmjit::host::r11, asmjit::host::qword_ptr( asmjit::host::r9 ) );
+    a->cmp( asmjit::host::r8, asmjit::host::r11 );
+    a->jl( skip1 );
+    a->add( asmjit::host::r11, asmjit::host::qword_ptr( asmjit::host::r9, sizeof( table.entry[0].base ) ) );    // Size
+    a->cmp( asmjit::host::r8, asmjit::host::r11 );
+    a->jg( skip1 );
+
+    a->jmp( found1 );
+
+    a->bind( skip1 );
+    a->add( asmjit::host::r9, sizeof( ExceptionModule ) );
+    a->add( asmjit::host::r10, 1 );
+    a->cmp( asmjit::host::r10, asmjit::host::rdx );
+    a->jne( lLoop1 );
+
+    a->jmp( lExit );
+    
+    a->bind( found1 );
+    a->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_MAGIC_NUMBER1 );
+    a->mov( asmjit::host::rcx, asmjit::host::qword_ptr( asmjit::host::rcx ) );
+    a->mov( asmjit::host::rdx, asmjit::host::qword_ptr( asmjit::host::r9 ) );
+    a->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), asmjit::host::rdx );
+
+    a->bind( lExit );
+    a->xor_( asmjit::host::rax, asmjit::host::rax );
+    a->ret();
+    a->db( 0xCC );
+    a->db( 0xCC );
+    a->db( 0xCC );
+
+    if (_pVEHCode.Write( 0, a->getCodeSize(), a->make() ) != STATUS_SUCCESS)
     {
         _pVEHCode.Free();
         return LastNtStatus();
@@ -88,6 +141,16 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt /
 #else
     UNREFERENCED_PARAMETER( pTargetBase );
     UNREFERENCED_PARAMETER( imageSize );
+
+    // No handler required
+    if (partial)
+        return STATUS_SUCCESS;
+
+    // VEH codecave
+    _pVEHCode = _proc.memory().Allocate( 0x2000 );
+    _pVEHCode.Release();
+    if (!_pVEHCode.valid())
+        return LastNtStatus();
 
     // Resolve compiler incremental table address if any
     void *pFunc = ResolveJmp( &VectoredHandler );
@@ -138,25 +201,26 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt /
     if (pAddHandler == 0)
         return STATUS_NOT_FOUND;
 
-    ea->reset();
-    ea.GenPrologue();
+    a->reset();
+    a.GenPrologue();
 
-    ea.GenCall( static_cast<size_t>(pAddHandler), { 0, _pVEHCode.ptr<size_t>() } );
+    a.GenCall( static_cast<size_t>(pAddHandler), { 0, _pVEHCode.ptr<size_t>() } );
 
-    _proc.remote().AddReturnWithEvent( ea, mt );
-    ea.GenEpilogue();
+    _proc.remote().AddReturnWithEvent( a, mt );
+    a.GenEpilogue();
 
-    _proc.remote().ExecInWorkerThread( ea->make(), ea->getCodeSize(), result );
+    _proc.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     _hVEH = static_cast<size_t>(result);
-        
-    return (result == 0 ? STATUS_NOT_FOUND : STATUS_SUCCESS);
+
+    return (_hVEH == 0 ? STATUS_NOT_FOUND : STATUS_SUCCESS);
 }
 
 /// <summary>
 /// Removes VEH from target process
 /// </summary>
-/// <returns></returns>
-NTSTATUS MExcept::RemoveVEH()
+/// <param name="partial">Partial exception support</param>
+/// <returns>Status code</returns>
+NTSTATUS MExcept::RemoveVEH( bool partial )
 {  
     AsmJitHelper a;
     uint64_t result = 0;
@@ -174,9 +238,15 @@ NTSTATUS MExcept::RemoveVEH()
     _proc.remote().AddReturnWithEvent( a );
     a.GenEpilogue();
 
-    _proc.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-    _pVEHCode.Free();
-    _hVEH = 0;
+    // Destroy table and handler
+    if (!partial)
+    {
+        _proc.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
+        _pVEHCode.Free();
+        _hVEH = 0;
+
+        _pModTable.Free();
+    }        
 
     return STATUS_SUCCESS;
 }

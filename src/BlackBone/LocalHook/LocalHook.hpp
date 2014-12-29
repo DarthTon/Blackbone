@@ -204,7 +204,7 @@ private:
         memcpy( this->_original, this->_newCode, this->_origSize );
         VirtualProtect( this->_original, this->_origSize, flOld, &flOld );
 
-        BOOL res = WriteProcessMemory( GetCurrentProcess(), this->_original, this->_newCode, this->_origSize, NULL );
+        WriteProcessMemory( GetCurrentProcess(), this->_original, this->_newCode, this->_origSize, NULL );
 
         return this->_hooked = TRUE;
     }

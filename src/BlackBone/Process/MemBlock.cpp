@@ -19,9 +19,7 @@ MemBlock::MemBlock()
 /// <param name="size">Block size</param>
 /// <param name="prot">Memory protection</param>
 /// <param name="own">true if caller will be responsible for block deallocation</param>
-MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, 
-                    size_t size, DWORD prot, bool own /*= true*/,
-                    bool physical /*= false*/)
+MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own /*= true*/, bool physical /*= false*/ )
     : _ptr( ptr )
     , _memory( mem )
     , _size( size )
@@ -143,7 +141,8 @@ NTSTATUS MemBlock::Free( size_t size /*= 0*/ )
     {
         size = Align( size, 0x1000 );
 
-        NTSTATUS status = _physical ? Driver().FreeMem( _memory->core().pid(), _ptr, size, MEM_RELEASE ) : _memory->Free( _ptr, size, size == 0 ? MEM_RELEASE : MEM_DECOMMIT );
+        NTSTATUS status = _physical ? Driver().FreeMem( _memory->core().pid(), _ptr, size, MEM_RELEASE ) :
+            _memory->Free( _ptr, size, size == 0 ? MEM_RELEASE : MEM_DECOMMIT );
 
         if (!NT_SUCCESS( status ))
             return LastNtStatus();

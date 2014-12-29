@@ -58,9 +58,14 @@ public:
     /// <param name="size">Block size</param>
     /// <param name="prot">Memory protection</param>
     /// <param name="own">true if caller will be responsible for block deallocation</param>
-    BLACKBONE_API MemBlock( class ProcessMemory* mem, ptr_t ptr, 
-                            size_t size, DWORD prot, bool own = true, 
-                            bool physical = false );
+    BLACKBONE_API MemBlock( 
+        class ProcessMemory* mem, 
+        ptr_t ptr, 
+        size_t size, 
+        DWORD prot,
+        bool own = true, 
+        bool physical = false 
+        );
 
     BLACKBONE_API ~MemBlock();
 
@@ -72,7 +77,12 @@ public:
     /// <param name="desired">Desired base address of new block</param>
     /// <param name="protection">Win32 Memory protection flags</param>
     /// <returns>Memory block. If failed - returned block will be invalid</returns>
-    BLACKBONE_API static MemBlock Allocate( class ProcessMemory& process, size_t size, ptr_t desired = 0, DWORD protection = PAGE_EXECUTE_READWRITE );
+    BLACKBONE_API static MemBlock Allocate(
+        class ProcessMemory& process,
+        size_t size,
+        ptr_t desired = 0, 
+        DWORD protection = PAGE_EXECUTE_READWRITE 
+        );
 
     /// <summary>
     /// Reallocate existing block for new size
@@ -131,9 +141,21 @@ public:
     T Read( size_t offset, const T& def_val )
     {
         T res = def_val;
-        Read( offset, sizeof(T), &res );
+        Read( offset, sizeof( T ), &res );
         return res;
-    };
+    }
+
+    /// <summary>
+    /// Read data
+    /// </summary>
+    /// <param name="offset">Data offset in block</param>
+    /// <param name="def_val">Read data</param>
+    /// <returns>Status code</returns>
+    template<class T>
+    NTSTATUS Read( size_t offset, T& val )
+    {
+        return Read( offset, sizeof( val ), &val );
+    }
 
     /// <summary>
     /// Write data
@@ -144,7 +166,7 @@ public:
     template<class T>
     NTSTATUS Write( size_t offset, const T& data )
     {
-        return Write( offset, sizeof(T), &data );
+        return Write( offset, sizeof( data ), &data );
     }
 
     /// <summary>

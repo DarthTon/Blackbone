@@ -283,13 +283,17 @@ const ModuleData* MMap::FindOrMapModule(
         ProtectImageMemory( pImage.get() );
 
     // Make exception handling possible (C and C++)
-    if (!(flags & NoExceptions) && !EnableExceptions( pImage.get() ))
+    if (!(flags & NoExceptions))
     {
-        BLACBONE_TRACE( L"ManualMap: Failed to enable exception handling for image %ls", pImage->FileName.c_str() );
+        status = EnableExceptions( pImage.get() );
+        if (!NT_SUCCESS( status ) && status != STATUS_NOT_FOUND)
+        {
+            BLACBONE_TRACE( L"ManualMap: Failed to enable exception handling for image %ls", pImage->FileName.c_str() );
 
-        pImage->peImage.Release();
-        _process.modules().RemoveManualModule( pImage->FileName, mt );
-        return nullptr;
+            pImage->peImage.Release();
+            _process.modules().RemoveManualModule( pImage->FileName, mt );
+            return nullptr;
+        }
     }
 
     // Unlink image from VAD list
@@ -583,14 +587,6 @@ bool MMap::RelocateImage( ImageContext* pImage )
 /// <returns></returns>
 const ModuleData* MMap::FindOrMapDependency( ImageContext* pImage, std::wstring& path )
 {
-    // For win32 one exception handler is enough
-    // For amd64 each image must have it's own handler to resolve C++ exceptions properly
-#ifdef USE64
-    eLoadFlags newFlags = static_cast<eLoadFlags>(pImage->flags | NoSxS | NoDelayLoad);
-#else
-    eLoadFlags newFlags = static_cast<eLoadFlags>(pImage->flags | NoSxS | NoDelayLoad | PartialExcept);
-#endif
-
     // Already loaded
     auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType(), pImage->FileName.c_str() );
     if (hMod)
@@ -610,7 +606,7 @@ const ModuleData* MMap::FindOrMapDependency( ImageContext* pImage, std::wstring&
 
     // Loading method
     if (pImage->flags & ManualImports)
-        return FindOrMapModule( path, nullptr, 0, false, newFlags );
+        return FindOrMapModule( path, nullptr, 0, false, pImage->flags | NoSxS | NoDelayLoad | PartialExcept );
     else
         return _process.modules().Inject( path );
 };
@@ -711,13 +707,14 @@ bool MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
 /// </summary>
 /// <param name="pImage">image data</param>
 /// <returns>true on success</returns>
-bool MMap::EnableExceptions( ImageContext* pImage )
+NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
 {
     BLACBONE_TRACE( L"ManualMap: Enabling exception support for image '%ls'", pImage->FileName.c_str() );
+    bool partial = (pImage->flags & PartialExcept) != 0;
+
 #ifdef USE64
     size_t size = pImage->peImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_EXCEPTION );
-    IMAGE_RUNTIME_FUNCTION_ENTRY *pExpTable = 
-        reinterpret_cast<decltype(pExpTable)>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXCEPTION ));
+    auto pExpTable = reinterpret_cast<PIMAGE_RUNTIME_FUNCTION_ENTRY>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXCEPTION ));
 
     // Invoke RtlAddFunctionTable
     if(pExpTable)
@@ -726,35 +723,39 @@ bool MMap::EnableExceptions( ImageContext* pImage )
         uint64_t result = 0;
 
         pImage->pExpTableAddr = REBASE( pExpTable, pImage->peImage.base(), pImage->imgMem.ptr<ptr_t>() );
-        auto pAddTable = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
-                                                       "RtlAddFunctionTable" );
+        auto pAddTable = _process.modules().GetExport( 
+            _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
+            "RtlAddFunctionTable" 
+            );
 
         a.GenPrologue();
-        a.GenCall( static_cast<size_t>(pAddTable.procAddress), { pImage->pExpTableAddr, 
-                                                                  size / sizeof(IMAGE_RUNTIME_FUNCTION_ENTRY),
-                                                                  pImage->imgMem.ptr<size_t>() } );
+        a.GenCall( 
+            static_cast<size_t>(pAddTable.procAddress), {
+            pImage->pExpTableAddr,
+            size / sizeof( IMAGE_RUNTIME_FUNCTION_ENTRY ),
+            pImage->imgMem.ptr<size_t>() }
+        );
 
         _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
         a.GenEpilogue();
 
-        if (_process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result ) != STATUS_SUCCESS)
-            return false;
+        auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
+        if (!NT_SUCCESS( status ))
+            return status;
 
-        if (pImage->flags & CreateLdrRef)
-            return true;
-        else
-            return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType() ) == STATUS_SUCCESS);
+        return (pImage->flags & CreateLdrRef) ? STATUS_SUCCESS : 
+            MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
     }
+    // No exception table
     else
-        return false;
+        return STATUS_NOT_FOUND;
 #else
     bool safeseh = false;
     _process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->peImage.imageSize(), safeseh );
 
-    if ((pImage->flags & PartialExcept) || safeseh)
-        return true;
-    else
-        return (MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType() ) == STATUS_SUCCESS);
+    return safeseh ? STATUS_SUCCESS : 
+        MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
+
 #endif
 }
 
@@ -763,40 +764,37 @@ bool MMap::EnableExceptions( ImageContext* pImage )
 /// </summary>
 /// <param name="pImage">image data</param>
 /// <returns>true on success</returns>
-bool MMap::DisableExceptions( ImageContext* pImage )
+NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
 {
     BLACBONE_TRACE( L"ManualMap: Disabling exception support for image '%ls'", pImage->FileName.c_str() );
+
 #ifdef USE64
-    if(pImage->pExpTableAddr)
-    {      
+    if (pImage->pExpTableAddr)
+    {
         AsmJitHelper a;
         size_t result = 0;
 
+        auto pRemoveTable = _process.modules().GetExport(
+            _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
+            "RtlDeleteFunctionTable"
+            );
+
         a.GenPrologue();
-
-        auto pRmoveTable = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
-                                                         "RtlDeleteFunctionTable" );
-
         // RtlDeleteFunctionTable(pExpTable);
-        a.GenCall( static_cast<size_t>(pRmoveTable.procAddress), { pImage->pExpTableAddr } );
+        a.GenCall( static_cast<size_t>(pRemoveTable.procAddress), { pImage->pExpTableAddr } );
         _process.remote().AddReturnWithEvent( a );
         a.GenEpilogue();
 
-        if (_process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result ) != STATUS_SUCCESS)
-            return false;
+        auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
+        if (!NT_SUCCESS( status ))
+            return status;
 
-        if (pImage->flags & CreateLdrRef)
-            return true;
-        else
-            return (MExcept::RemoveVEH() == STATUS_SUCCESS);
+        return MExcept::RemoveVEH( (pImage->flags & CreateLdrRef) != 0 );
     }
     else
-        return false;
+        return STATUS_NOT_FOUND;
 #else
-    if (pImage->flags & (PartialExcept | NoExceptions))
-        return true;
-    else
-        return (MExcept::RemoveVEH() == STATUS_SUCCESS);
+    return MExcept::RemoveVEH( (pImage->flags & PartialExcept) != 0 );
 
 #endif
 }

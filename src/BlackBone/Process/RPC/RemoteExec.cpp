@@ -42,7 +42,10 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
         return dwResult;
 
     bool switchMode = (_proc.core().native()->GetWow64Barrier().type == wow_64_32);
-    auto pExitThread = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, switchMode ? mt_mod64 : mt_default ), "NtTerminateThread" ).procAddress;
+    auto pExitThread = _mods.GetExport( _mods.GetModule(
+        L"ntdll.dll", LdrList, switchMode ? mt_mod64 : mt_default ),
+        "NtTerminateThread" ).procAddress;
+
     if (pExitThread == 0)
         return LastNtStatus( STATUS_NOT_FOUND );
 

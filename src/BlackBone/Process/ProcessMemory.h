@@ -88,6 +88,18 @@ public:
     };
 
     /// <summary>
+    /// Read data
+    /// </summary>
+    /// <param name="dwAddress">Address to read from</param>
+    /// <param name="result">Read data</param>
+    /// <returns>Status code</returns>
+    template<class T>
+    inline NTSTATUS Read( ptr_t dwAddress, T& result )
+    {
+        return Read( dwAddress, sizeof( result ), &result );
+    };
+
+    /// <summary>
     /// Write data
     /// </summary>
     /// <param name="dwSize">Size of data to write</param>

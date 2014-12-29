@@ -206,14 +206,14 @@ private:
     /// </summary>
     /// <param name="pImage">image data</param>
     /// <returns>true on success</returns>
-    bool EnableExceptions( ImageContext* pImage );
+    NTSTATUS EnableExceptions( ImageContext* pImage );
 
     /// <summary>
     /// Remove custom exception handler
     /// </summary>
     /// <param name="pImage">image data</param>
     /// <returns>true on success</returns>
-    bool DisableExceptions( ImageContext* pImage );
+    NTSTATUS DisableExceptions( ImageContext* pImage );
 
     /// <summary>
     /// Create activation context

@@ -7,6 +7,25 @@ namespace blackbone
 {
 
 /// <summary>
+/// x64 exception module info 
+/// </summary>
+struct ExceptionModule
+{
+    ptr_t base;
+    ptr_t size;
+};
+
+
+/// <summary>
+/// x64 module table
+/// </summary>
+struct ModuleTable
+{
+    ptr_t count;                    // Number of used entries
+    ExceptionModule entry[250];     // Module data
+};
+
+/// <summary>
 /// Exception handling support for arbitrary code
 /// </summary>
 class MExcept
@@ -26,14 +45,17 @@ protected:
     /// </summary>
     /// <param name="pTargetBase">Target image base address</param>
     /// <param name="imageSize">Size of the image</param>
+    /// <param name="mt">Mosule type</param>
+    /// <param name="partial">Partial exception support</param>
     /// <returns>Error code</returns>
-    BLACKBONE_API NTSTATUS CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt = mt_default );
+    BLACKBONE_API NTSTATUS CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, bool partial );
 
     /// <summary>
     /// Removes VEH from target process
     /// </summary>
-    /// <returns></returns>
-    BLACKBONE_API NTSTATUS RemoveVEH();
+    /// <param name="partial">Partial exception support</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS RemoveVEH( bool partial );
 
 private:
     MExcept( const MExcept& ) = delete;
@@ -42,6 +64,7 @@ private:
 private:
     class Process& _proc;   // Underlying process
     MemBlock _pVEHCode;     // VEH function codecave
+    MemBlock _pModTable;    // x64 module address range table
     size_t   _hVEH = 0;     // VEH handle
 };
 

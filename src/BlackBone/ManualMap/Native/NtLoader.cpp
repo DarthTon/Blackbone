@@ -253,38 +253,39 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
 
     for(DWORD i = 0; i < table.Count; i++)
     {
-        if(Entries[i].ImageBase == ModuleBase)
-        {
-            // If Image has SAFESEH, RtlInsertInvertedFunctionTable is enough
-            if (Entries[i].SizeOfTable != 0)
-                return safeseh = true;
+        if(Entries[i].ImageBase != ModuleBase)
+            continue;
+     
+        // If Image has SAFESEH, RtlInsertInvertedFunctionTable is enough
+        if (Entries[i].SizeOfTable != 0)
+            return safeseh = true;
 
-            //
-            // Create fake Exception directory
-            // Directory will be filled later, during exception handling
-            //
-            PIMAGE_RUNTIME_FUNCTION_ENTRY pImgEntry = nullptr;
+        //
+        // Create fake Exception directory
+        // Directory will be filled later, during exception handling
+        //
+        PIMAGE_RUNTIME_FUNCTION_ENTRY pImgEntry = nullptr;
 
-            // Allocate memory for 256 possible handlers
-            auto block = _process.memory().Allocate( sizeof(DWORD)* 0x100, PAGE_READWRITE );
-            block.Release();
-            pImgEntry = block.ptr<decltype(pImgEntry)>();
+        // Allocate memory for 256 possible handlers
+        auto block = _process.memory().Allocate( sizeof( DWORD ) * 0x100, PAGE_READWRITE );
+        block.Release();
+        pImgEntry = block.ptr<decltype(pImgEntry)>();
 
-            auto pEncoded = EncodeSystemPointer( pImgEntry );
+        auto pEncoded = EncodeSystemPointer( pImgEntry );
 
-            // m_LdrpInvertedFunctionTable->Entries[i].ExceptionDirectory
-            size_t field_ofst = reinterpret_cast<size_t>(&Entries[i].ExceptionDirectory) 
-                              - reinterpret_cast<size_t>(&table);
+        // m_LdrpInvertedFunctionTable->Entries[i].ExceptionDirectory
+        size_t field_ofst = reinterpret_cast<size_t>(&Entries[i].ExceptionDirectory)
+            - reinterpret_cast<size_t>(&table);
 
-            // In Win10 _LdrpInvertedFunctionTable is located in mrdata section
-            // mrdata is read-only by default 
-            // LdrProtectMrdata is used to make it writable when needed
-            DWORD flOld = 0;
-            _process.memory().Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), PAGE_EXECUTE_READWRITE, &flOld );
-            auto status = _process.memory().Write( _LdrpInvertedFunctionTable + field_ofst, pEncoded );
+        // In Win10 _LdrpInvertedFunctionTable is located in mrdata section
+        // mrdata is read-only by default 
+        // LdrProtectMrdata is used to make it writable when needed
+        DWORD flOld = 0;
+        _process.memory().Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), PAGE_EXECUTE_READWRITE, &flOld );
+        auto status = _process.memory().Write( _LdrpInvertedFunctionTable + field_ofst, pEncoded );
+        _process.memory().Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), flOld, &flOld );
 
-            return NT_SUCCESS( status );
-        }
+        return NT_SUCCESS( status );
     }
 
     return false;
