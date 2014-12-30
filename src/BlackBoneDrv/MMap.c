@@ -312,8 +312,8 @@ NTSTATUS BBMapUserImage(
     // Event
     if (context.pSync)
         ObDereferenceObject( context.pSync );
-    /*if (context.hSync)
-    ZwClose( context.hSync );*/
+    if (context.hSync)
+        ZwClose( context.hSync );
 
     // Worker thread
     if (context.pWorker)
