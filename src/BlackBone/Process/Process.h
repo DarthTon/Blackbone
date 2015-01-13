@@ -6,6 +6,7 @@
 #include "Threads/Threads.h"
 #include "RPC/RemoteExec.h"
 #include "RPC/RemoteHook.h"
+#include "RPC/RemoteLocalHook.h"
 #include "../ManualMap/Native/NtLoader.h"
 #include "../ManualMap/MMap.h"
 
@@ -141,14 +142,15 @@ public:
     //
     // Subroutines
     //
-    BLACKBONE_API inline ProcessCore&    core()      { return _core; }       // Core routines and native 
-    BLACKBONE_API inline ProcessMemory&  memory()    { return _memory; }     // Memory manipulations
-    BLACKBONE_API inline ProcessModules& modules()   { return _modules; }    // Module management
-    BLACKBONE_API inline ProcessThreads& threads()   { return _threads; }    // Threads
-    BLACKBONE_API inline RemoteHook&     hooks()     { return _hooks; }      // Hooking code remotely
-    BLACKBONE_API inline RemoteExec&     remote()    { return _remote; }     // Remote code execution
-    BLACKBONE_API inline MMap&           mmap()      { return _mmap; }       // Manual module mapping
-    BLACKBONE_API inline NtLdr&          nativeLdr() { return _nativeLdr; }  // Native loader routines
+    BLACKBONE_API inline ProcessCore&     core()       { return _core;       }  // Core routines and native 
+    BLACKBONE_API inline ProcessMemory&   memory()     { return _memory;     }  // Memory manipulations
+    BLACKBONE_API inline ProcessModules&  modules()    { return _modules;    }  // Module management
+    BLACKBONE_API inline ProcessThreads&  threads()    { return _threads;    }  // Threads
+    BLACKBONE_API inline RemoteHook&      hooks()      { return _hooks;      }  // Hooking code remotely
+    BLACKBONE_API inline RemoteLocalHook& localHooks() { return _localHooks; }  // Hooking code remotely
+    BLACKBONE_API inline RemoteExec&      remote()     { return _remote;     }  // Remote code execution
+    BLACKBONE_API inline MMap&            mmap()       { return _mmap;       }  // Manual module mapping
+    BLACKBONE_API inline NtLdr&           nativeLdr()  { return _nativeLdr;  }  // Native loader routines
 
 private:
     /// <summary>
@@ -160,15 +162,17 @@ private:
 
     Process(const Process&) = delete;
     Process& operator =(const Process&) = delete;
+
 private:
-    ProcessCore    _core;       // Core routines and native subsystem
-    ProcessModules _modules;    // Module management
-    ProcessMemory  _memory;     // Memory manipulations
-    ProcessThreads _threads;    // Threads
-    RemoteHook     _hooks;      // Hooking code remotely
-    RemoteExec     _remote;     // Remote code execution
-    MMap           _mmap;       // Manual module mapping
-    NtLdr          _nativeLdr;  // Native loader routines
+    ProcessCore     _core;          // Core routines and native subsystem
+    ProcessModules  _modules;       // Module management
+    ProcessMemory   _memory;        // Memory manipulations
+    ProcessThreads  _threads;       // Threads
+    RemoteHook      _hooks;         // Hooking code remotely
+    RemoteLocalHook _localHooks;    // In-process remote hooks
+    RemoteExec      _remote;        // Remote code execution
+    MMap            _mmap;          // Manual module mapping
+    NtLdr           _nativeLdr;     // Native loader routines
 };
 
 }

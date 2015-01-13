@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../Include/Winheaders.h"
 #include "../Include/NativeStructures.h"
 #include "../Subsystem/Wow64Subsystem.h"
 #include "../Subsystem/x86Subsystem.h"

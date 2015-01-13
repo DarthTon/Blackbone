@@ -120,8 +120,9 @@ public:
     /// Inject image into target process
     /// </summary>
     /// <param name="path">Full-qualified image path</param>
+    /// <param name="pStatus">Injection status code</param>
     /// <returns>Module info. nullptr if failed</returns>
-    BLACKBONE_API const ModuleData* Inject( const std::wstring& path );
+    BLACKBONE_API const ModuleData* Inject( const std::wstring& path, NTSTATUS* pStatus = nullptr );
 
 #ifdef COMPILER_MSVC
     /// <summary>

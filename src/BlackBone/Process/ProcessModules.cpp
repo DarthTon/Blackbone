@@ -343,9 +343,11 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
 /// Inject image into target process
 /// </summary>
 /// <param name="path">Full-qualified image path</param>
+/// <param name="pStatus">Injection status code</param>
 /// <returns>Module info. nullptr if failed</returns>
-const ModuleData* ProcessModules::Inject( const std::wstring& path )
+const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pStatus /*= nullptr*/ )
 {
+    NTSTATUS status = STATUS_SUCCESS;
     const ModuleData* mod = nullptr;
     ptr_t res = 0;
     auto& barrier = _core.native()->GetWow64Barrier();
@@ -358,7 +360,12 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
 
     // Already loaded
     if ((mod = GetModule( path, LdrList, img.mType() )) != nullptr)
+    {
+        if (pStatus)
+            *pStatus = STATUS_IMAGE_ALREADY_LOADED;
+
         return mod;
+    }
 
     // Image path
     UNICODE_STRING ustr = { 0 };
@@ -378,7 +385,7 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
     // Try to use LoadLibrary if possible
     if (pLoadLibrary != 0 && sameArch)
     {
-        _proc.remote().ExecDirect( pLoadLibrary, modName.ptr<ptr_t>() + sizeof(ustr) );
+        _proc.remote().ExecDirect( pLoadLibrary, modName.ptr() + sizeof( ustr ) );
     }
     // Can't generate code through WOW64 barrier
     else if ((barrier.type != wow_32_64 && img.mType() == mt_mod64) ||
@@ -386,7 +393,12 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
     {
         auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" ).procAddress;
         if (pLdrLoadDll == 0)
+        {
+            if (pStatus)
+                *pStatus = STATUS_NOT_FOUND;
+
             return nullptr;
+        }
 
         // Patch LdrFindOrMapDll to enable kernel32.dll loading
         #ifdef USE64
@@ -410,8 +422,13 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path )
         a.GenCall( (size_t)pLdrLoadDll, { 0, 0, modName.ptr<size_t>(), modName.ptr<size_t>() + 0x800 } );
         a->ret();
 
-        _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
+        status = _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
+        if (NT_SUCCESS( status ))
+            status = static_cast<NTSTATUS>(res);
     }
+
+    if (pStatus)
+        *pStatus = status;
 
     if (res == STATUS_SUCCESS)
         return GetModule( path, LdrList, img.mType() );

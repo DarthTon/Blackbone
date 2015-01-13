@@ -25,9 +25,6 @@
     <Filter Include="ManualMap\Native">
       <UniqueIdentifier>{ed49eaa5-5d59-4422-9da7-4e68f2e82774}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Process\RPC">
-      <UniqueIdentifier>{f688ae04-991b-40b2-9243-89e38275be42}</UniqueIdentifier>
-    </Filter>
     <Filter Include="AsmJit">
       <UniqueIdentifier>{400c27bd-fb7a-4125-abf2-90a4bdb04f09}</UniqueIdentifier>
     </Filter>
@@ -45,6 +42,9 @@
     </Filter>
     <Filter Include="AsmJit\Core">
       <UniqueIdentifier>{84644925-22dd-4022-be68-30ddf267b977}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Process\Remote">
+      <UniqueIdentifier>{f688ae04-991b-40b2-9243-89e38275be42}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -82,10 +82,10 @@
       <Filter>Process\Threads</Filter>
     </ClCompile>
     <ClCompile Include="Process\RPC\RemoteExec.cpp">
-      <Filter>Process\RPC</Filter>
+      <Filter>Process\Remote</Filter>
     </ClCompile>
     <ClCompile Include="Process\RPC\RemoteHook.cpp">
-      <Filter>Process\RPC</Filter>
+      <Filter>Process\Remote</Filter>
     </ClCompile>
     <ClCompile Include="PE\ImageNET.cpp">
       <Filter>PE</Filter>
@@ -121,7 +121,7 @@
       <Filter>DriverControl</Filter>
     </ClCompile>
     <ClCompile Include="Process\RPC\RemoteMemory.cpp">
-      <Filter>Process\RPC</Filter>
+      <Filter>Process\Remote</Filter>
     </ClCompile>
     <ClCompile Include="Asm\AsmHelper32.cpp">
       <Filter>AsmJit\Helpers</Filter>
@@ -189,6 +189,9 @@
     <ClCompile Include="..\..\contrib\AsmJit\base\zone.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
+    <ClCompile Include="Process\RPC\RemoteLocalHook.cpp">
+      <Filter>Process\Remote</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
@@ -226,16 +229,16 @@
       <Filter>Process\Threads</Filter>
     </ClInclude>
     <ClInclude Include="Process\RPC\RemoteContext.hpp">
-      <Filter>Process\RPC</Filter>
+      <Filter>Process\Remote</Filter>
     </ClInclude>
     <ClInclude Include="Process\RPC\RemoteExec.h">
-      <Filter>Process\RPC</Filter>
+      <Filter>Process\Remote</Filter>
     </ClInclude>
     <ClInclude Include="Process\RPC\RemoteFunction.hpp">
-      <Filter>Process\RPC</Filter>
+      <Filter>Process\Remote</Filter>
     </ClInclude>
     <ClInclude Include="Process\RPC\RemoteHook.h">
-      <Filter>Process\RPC</Filter>
+      <Filter>Process\Remote</Filter>
     </ClInclude>
     <ClInclude Include="PE\ImageNET.h">
       <Filter>PE</Filter>
@@ -316,7 +319,7 @@
       <Filter>DriverControl</Filter>
     </ClInclude>
     <ClInclude Include="Process\RPC\RemoteMemory.h">
-      <Filter>Process\RPC</Filter>
+      <Filter>Process\Remote</Filter>
     </ClInclude>
     <ClInclude Include="Asm\AsmHelper64.h">
       <Filter>AsmJit\Helpers</Filter>
@@ -425,6 +428,9 @@
     </ClInclude>
     <ClInclude Include="..\..\contrib\AsmJit\base\zone.h">
       <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="Process\RPC\RemoteLocalHook.h">
+      <Filter>Process\Remote</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

@@ -16,9 +16,9 @@ namespace CallOrder
 {
 enum e
 {
-    HookFirst,
-    HookLast,
-    NoOriginal,
+    HookFirst,      // Hook called before original function
+    HookLast,       // Hook called after original function
+    NoOriginal,     // Original function doesn't get called
 };
 }
 
@@ -40,8 +40,8 @@ namespace ReturnMethod
 {
     enum e
     {
-        UseNew,
-        UseOriginal
+        UseNew,         // Return value returned by hook
+        UseOriginal     // Return original function value
     };
 }
 

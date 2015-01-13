@@ -1,8 +1,7 @@
 #pragma once
 
-#include "../../Include/Winheaders.h"
-#include "../ProcessMemory.h"
 #include "../ProcessCore.h"
+#include "../ProcessMemory.h"
 #include "../Threads/Thread.h"
 #include "../../Include/Macro.h"
 

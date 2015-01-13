@@ -357,7 +357,10 @@ ptr_t NativeWow64::getTEB( HANDLE hThread, _TEB64* pteb )
     static ptr_t ntQit = _local.GetProcAddress64( _local.getNTDLL64(), "NtQueryInformationThread" );
 
     if (ntQit == 0)
+    {
         LastNtStatus( STATUS_ORDINAL_NOT_FOUND );
+        return 0;
+    }
 
     _local.X64Call( ntQit, hThread, 0, &info, sizeof(info), &bytes );
 

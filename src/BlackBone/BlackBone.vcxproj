@@ -408,6 +408,7 @@
     <ClCompile Include="Process\ProcessModules.cpp" />
     <ClCompile Include="Process\RPC\RemoteExec.cpp" />
     <ClCompile Include="Process\RPC\RemoteHook.cpp" />
+    <ClCompile Include="Process\RPC\RemoteLocalHook.cpp" />
     <ClCompile Include="Process\RPC\RemoteMemory.cpp" />
     <ClCompile Include="Process\Threads\Thread.cpp" />
     <ClCompile Include="Process\Threads\Threads.cpp" />
@@ -499,6 +500,7 @@
     <ClInclude Include="Process\RPC\RemoteExec.h" />
     <ClInclude Include="Process\RPC\RemoteFunction.hpp" />
     <ClInclude Include="Process\RPC\RemoteHook.h" />
+    <ClInclude Include="Process\RPC\RemoteLocalHook.h" />
     <ClInclude Include="Process\RPC\RemoteMemory.h" />
     <ClInclude Include="Process\Threads\Thread.h" />
     <ClInclude Include="Process\Threads\Threads.h" />
