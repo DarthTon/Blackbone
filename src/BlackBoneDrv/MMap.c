@@ -291,7 +291,7 @@ NTSTATUS BBMapUserImage(
         __try{
             BBCallInitializers( &context, (flags & KNoTLS) != 0 );
         }
-        __except (EXCEPTION_EXECUTE_HANDLER){
+        __except (EXCEPTION_EXECUTE_HANDLER) {
             DPRINT( "BlackBone: %s: Exception during initialization phase.Exception code 0x%X\n", __FUNCTION__, GetExceptionCode() );
             status = STATUS_UNHANDLED_EXCEPTION;
         }
@@ -1215,7 +1215,7 @@ void BBCallInitializers( IN PMMAP_CONTEXT pContext, IN BOOLEAN noTLS )
             PVOID pBase = (PUCHAR)pEntry->baseAddress + pSection->VirtualAddress;
             SIZE_T secSize = pSection->Misc.VirtualSize;
 
-            if (pEntry->flags & KWipeHeader)
+            if (pEntry->flags & KHideVAD)
             {
                 RtlZeroMemory( pBase, secSize );
             }
@@ -1267,9 +1267,40 @@ void BBCallTlsInitializers( IN PMMAP_CONTEXT pContext, IN PVOID imageBase )
     if (!pHeaders)
         return;
 
+    // No TLS directory
     PVOID pTLS = RtlImageDirectoryEntryToData( imageBase, TRUE, IMAGE_DIRECTORY_ENTRY_TLS, &size );
     if (!pTLS)
         return;
+
+    // Prepare static TLS a bit
+    // Still not compatible with LdrpQueueDeferredTlsData in Win8.1, but I'm tired of this shit
+    if (!pContext->tlsInitialized && TLS_VAL_T( pHeaders, pTLS, StartAddressOfRawData ) != 0)
+    {
+        PVOID pTLSMem = NULL;
+        SIZE_T tlsSize = 0x1000;
+
+        if (NT_SUCCESS( ZwAllocateVirtualMemory( ZwCurrentProcess(), &pTLSMem, 0, &tlsSize, MEM_COMMIT, PAGE_READWRITE ) ))
+        {
+            PUCHAR pTeb64 = PsGetThreadTeb( pContext->pWorker );
+
+            // WOW64
+            if (PsGetProcessWow64Process( pContext->pProcess ) != NULL)
+            {
+                // TEB32 is 2 pages after TEB64
+                *(PULONG)(pTeb64 + 0x2000 + 0x2C) = (ULONG)pTLSMem;
+                *(PULONG)pTLSMem = (ULONG)TLS_VAL_T( pHeaders, pTLS, StartAddressOfRawData );
+            }
+            // Native
+            else
+            {
+                *(PVOID*)(pTeb64 + 0x58) = pTLSMem;
+                *(PULONGLONG)pTLSMem = TLS_VAL_T( pHeaders, pTLS, StartAddressOfRawData );
+            }
+
+            DPRINT( "BlackBone: %s: Static TLS buffer: 0x%p\n", __FUNCTION__, pTLSMem );
+            pContext->tlsInitialized = TRUE;
+        }
+    }
     
     for ( PUCHAR pCallback = (PUCHAR)TLS_VAL_T( pHeaders, pTLS, AddressOfCallBacks );
           ((IMAGE64( pHeaders ) ? *(PULONGLONG)pCallback : *(PULONG)pCallback)) != 0;

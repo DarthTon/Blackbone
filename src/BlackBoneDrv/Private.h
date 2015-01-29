@@ -2,11 +2,11 @@
 
 #include "Imports.h"
 
-#ifdef DBG
+//#ifdef DBG
 #define DPRINT(format, ...) DbgPrintEx(DPFLTR_IHVDRIVER_ID, DPFLTR_ERROR_LEVEL, format, __VA_ARGS__)
-#else
-#define DPRINT(...)
-#endif
+//#else
+//#define DPRINT(...)
+//#endif
 
 #define BB_POOL_TAG 'enoB'
 
@@ -105,7 +105,8 @@ extern MMPTE ValidKernelPte;
 /// </summary>
 typedef struct _DYNAMIC_DATA
 {
-    WinVer ver;             // OS version
+    WinVer  ver;            // OS version
+    BOOLEAN correctBuild;   // OS kernel build number is correct and supported
 
     ULONG KExecOpt;         // KPROCESS::ExecuteOptions 
     ULONG Protection;       // EPROCESS::Protection

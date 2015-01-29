@@ -101,11 +101,17 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         {
             MODULE_DATA mod = { 0 };
 
-            status = BBMapUserImage(
-                pProcess, &ustrPath, systemBuffer,
-                pData->imageSize, pData->asImage, pData->flags,
-                pData->initRVA, pData->initArg, &mod
-                );
+            __try {
+                status = BBMapUserImage(
+                    pProcess, &ustrPath, systemBuffer,
+                    pData->imageSize, pData->asImage, pData->flags,
+                    pData->initRVA, pData->initArg, &mod
+                    );
+            }
+            __except (EXCEPTION_EXECUTE_HANDLER){
+                DPRINT( "BlackBone: %s: Fatal exception in BBMapUserImage. Exception code 0x%x\n", 
+                        __FUNCTION__, GetExceptionCode() );
+            }
 
             KeUnstackDetachProcess( &apc );
 

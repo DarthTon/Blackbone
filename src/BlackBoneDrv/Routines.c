@@ -198,6 +198,13 @@ NTSTATUS BBUnlinkHandleTable( IN PUNLINK_HTABLE pUnlink )
         return STATUS_INVALID_ADDRESS;
     }
 
+    // Validate build
+    if (dynData.correctBuild == FALSE)
+    {
+        DPRINT( "BlackBone: %s: Unsupported kernel build version\n", __FUNCTION__ );
+        return STATUS_INVALID_KERNEL_INFO_VERSION;
+    }
+
     status = PsLookupProcessByProcessId( (HANDLE)pUnlink->pid, &pProcess );
     if (NT_SUCCESS( status ))
     {
@@ -205,6 +212,9 @@ NTSTATUS BBUnlinkHandleTable( IN PUNLINK_HTABLE pUnlink )
 
         // Unlink process handle table
         fnExRemoveHandleTable ExRemoveHandleTable = (fnExRemoveHandleTable)((ULONG_PTR)GetKernelBase() + dynData.ExRemoveTable);
+        //DPRINT( "BlackBone: %s: ExRemoveHandleTable address 0x%p. Object Table offset: 0x%X\n", 
+               // __FUNCTION__, ExRemoveHandleTable, dynData.ObjTable );
+
         ExRemoveHandleTable( pTable );
     }
     else

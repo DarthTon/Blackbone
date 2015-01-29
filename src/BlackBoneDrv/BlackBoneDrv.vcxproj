@@ -213,7 +213,7 @@
       <PreprocessorDefinitions>_WIN7_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>copy /y "$(TargetPath)" \\PC\c$\$(TargetFileName)</Command>
+      <Command>copy /y "$(TargetPath)" \\Win7_x64\c$\$(TargetFileName)</Command>
     </PostBuildEvent>
     <Link>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>

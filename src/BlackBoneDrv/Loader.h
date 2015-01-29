@@ -69,6 +69,7 @@ typedef struct _USER_CONTEXT
         ULONG retVal32;             // Function return value
     };
 
+    //UCHAR tlsBuf[0x100];
 } USER_CONTEXT, *PUSER_CONTEXT;
 
 /// <summary>
@@ -86,6 +87,7 @@ typedef struct _MMAP_CONTEXT
     PKEVENT pSync;          // APC sync object
     PVOID pSetEvent;        // ZwSetEvent address
     PVOID pLoadImage;       // LdrLoadDll address
+    BOOLEAN tlsInitialized; // Static TLS was initialized
 } MMAP_CONTEXT, *PMMAP_CONTEXT;
 
 /// <summary>

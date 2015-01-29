@@ -94,17 +94,22 @@ MmCopyVirtualMemory(
     OUT PSIZE_T NumberOfBytesCopied 
     );
 
-NTSYSAPI
+NTKERNELAPI
 PPEB 
 NTAPI
 PsGetProcessPeb( IN PEPROCESS Process );
 
-NTSYSAPI
+NTKERNELAPI
+PVOID
+NTAPI
+PsGetThreadTeb( IN PETHREAD Thread );
+
+NTKERNELAPI
 PVOID
 NTAPI
 PsGetProcessWow64Process( IN PEPROCESS Process );
 
-NTSYSAPI
+NTKERNELAPI
 PVOID
 NTAPI
 PsGetCurrentProcessWow64Process( );
@@ -114,11 +119,10 @@ BOOLEAN
 NTAPI
 KeTestAlertThread( IN KPROCESSOR_MODE AlertMode );
 
-NTSYSAPI
+NTKERNELAPI
 BOOLEAN
 NTAPI
 PsIsProtectedProcess( IN PEPROCESS Process );
-
 
 typedef VOID( NTAPI *PKNORMAL_ROUTINE )
     (

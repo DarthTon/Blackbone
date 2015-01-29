@@ -8,12 +8,12 @@ DYNAMIC_DATA dynData;
 
 NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING registryPath );
 NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData );
+NTSTATUS BBGetBuildNO( OUT PULONG pBuildNo );
 VOID     BBUnload( IN PDRIVER_OBJECT DriverObject );
 
-#pragma alloc_text(PAGE, DriverEntry)
-#pragma alloc_text(PAGE, BBUnload)
+#pragma alloc_text(INIT, DriverEntry)
 #pragma alloc_text(PAGE, BBInitDynamicData)
-
+#pragma alloc_text(PAGE, BBGetBuildNO)
 
 /*
 */
@@ -103,6 +103,75 @@ VOID BBUnload( IN PDRIVER_OBJECT DriverObject )
     return;
 }
 
+/// <summary>
+/// Get kernel build number
+/// </summary>
+/// <param name="pBuildNO">Build number.</param>
+/// <returns>Status code</returns>
+NTSTATUS BBGetBuildNO( OUT PULONG pBuildNo )
+{
+    ASSERT( pBuildNo != NULL );
+    if (pBuildNo == 0)
+        return STATUS_INVALID_PARAMETER;
+
+    NTSTATUS status = STATUS_SUCCESS;
+    UNICODE_STRING strRegKey = { 0 };
+    UNICODE_STRING strRegValue = { 0 };
+    UNICODE_STRING strVerVal = { 0 };
+    HANDLE hKey = NULL;
+    OBJECT_ATTRIBUTES keyAttr = { 0 };
+    RtlUnicodeStringInit( &strRegKey, L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion" );
+    RtlUnicodeStringInit( &strRegValue, L"BuildLabEx" );
+
+    InitializeObjectAttributes( &keyAttr, &strRegKey, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, NULL, NULL );
+
+    status = ZwOpenKey( &hKey, KEY_READ, &keyAttr );
+    if (NT_SUCCESS( status ))
+    {
+        PKEY_VALUE_FULL_INFORMATION pValueInfo = ExAllocatePoolWithTag( PagedPool, 0x1000, BB_POOL_TAG );
+        ULONG bytes = 0;
+
+        if (pValueInfo)
+        {
+            status = ZwQueryValueKey( hKey, &strRegValue, KeyValueFullInformation, pValueInfo, 0x1000, &bytes );
+            if (NT_SUCCESS( status ))
+            {
+                PWCHAR pData = (PWCHAR)((PUCHAR)pValueInfo->Name + pValueInfo->NameLength);
+                for (ULONG i = 0; i < pValueInfo->DataLength; i++)
+                {
+                    if (pData[i] == L'.')
+                    {
+                        for (ULONG j = i + 1; j < pValueInfo->DataLength; j++)
+                        {
+                            if (pData[j] == L'.')
+                            {
+                                strVerVal.Buffer = &pData[i] + 1;
+                                strVerVal.Length = strVerVal.MaximumLength = (USHORT)((j - i) * sizeof( WCHAR ));
+                                status = RtlUnicodeStringToInteger( &strVerVal, 10, pBuildNo );
+
+                                goto skip1;
+                            }
+                        }
+                    }
+                }
+
+            skip1:;
+            }
+
+            ExFreePoolWithTag( pValueInfo, BB_POOL_TAG );
+        }
+        else
+            status = STATUS_NO_MEMORY;
+
+        ZwClose( hKey );
+    }
+    else
+        DPRINT( "BlackBone: %s: ZwOpenKey failed with status 0x%X\n", __FUNCTION__, status );
+
+    return status;
+
+}
+
 
 /// <summary>
 /// Initialize dynamic data.
@@ -113,48 +182,65 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
 {
     NTSTATUS status = STATUS_SUCCESS;
     RTL_OSVERSIONINFOEXW verInfo = { 0 };
+    ULONG buildNo = 0;
 
     if (pData == NULL)
         return STATUS_INVALID_ADDRESS;
 
     RtlZeroMemory( pData, sizeof( DYNAMIC_DATA ) );
 
-    verInfo.dwOSVersionInfoSize = sizeof(verInfo);
+    verInfo.dwOSVersionInfoSize = sizeof( verInfo );
     status = RtlGetVersion( (PRTL_OSVERSIONINFOW)&verInfo );
 
     if (status == STATUS_SUCCESS)
     {
         ULONG ver_short = (verInfo.dwMajorVersion << 8) | (verInfo.dwMinorVersion << 4) | verInfo.wServicePackMajor;
-
         pData->ver = (WinVer)ver_short;
 
+        // Get kernel build number
+        status = BBGetBuildNO( &buildNo );
+
         // Validate current driver version
+        pData->correctBuild = TRUE;
     #if defined(_WIN7_)
         if (ver_short != WINVER_7 && ver_short != WINVER_7_SP1)
+        {
+            if(ver_short == WINVER_7_SP1 && buildNo != 18700)
+                pData->correctBuild = FALSE;
+
             return STATUS_NOT_SUPPORTED;
+        }
     #elif defined(_WIN8_)
         if (ver_short != WINVER_8)
             return STATUS_NOT_SUPPORTED;
     #elif defined (_WIN81_)
         if (ver_short != WINVER_81)
+        {
+            if (buildNo != 17328)
+                pData->correctBuild = FALSE;
+
             return STATUS_NOT_SUPPORTED;
+        }
     #elif defined (_WIN10_)
         if (ver_short != WINVER_10)
             return STATUS_NOT_SUPPORTED;
     #endif
 
-        DPRINT( "BlackBone: OS version %d.%d.%d.%d.%d - 0x%x\n",
-                verInfo.dwMajorVersion,
-                verInfo.dwMinorVersion,
-                verInfo.dwBuildNumber,
-                verInfo.wServicePackMajor,
-                verInfo.wServicePackMinor,
-                ver_short );
+        DPRINT( 
+            "BlackBone: OS version %d.%d.%d.%d.%d.%d - 0x%x\n",
+            verInfo.dwMajorVersion,
+            verInfo.dwMinorVersion,
+            verInfo.dwBuildNumber,
+            verInfo.wServicePackMajor,
+            verInfo.wServicePackMinor,
+            buildNo,
+            ver_short
+            );
 
         switch (ver_short)
         {
                 // Windows 7
-                // Windows 7 SP1
+                // Windows 7 SP1, build 18700
             case WINVER_7:
             case WINVER_7_SP1:
                 pData->KExecOpt         = 0x0D2;
@@ -166,13 +252,8 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtTermThdIndex   = 0x50;
                 pData->PrevMode         = 0x1F6;
                 pData->ExitStatus       = 0x380;
-                //pData->MiAllocPage    = 0x40A9C0;
-                pData->ExRemoveTable    = 0x32D404;
-                if (ver_short == WINVER_7_SP1)
-                {
-                    //pData->MiAllocPage = 0x410D70;
-                    pData->ExRemoveTable = 0x32E6B8;
-                }
+                pData->MiAllocPage      = (ver_short == WINVER_7_SP1) ? 0x410D70 : 0x40A9C0;
+                pData->ExRemoveTable    = (ver_short == WINVER_7_SP1) ? 0x330048 : 0x32D404;
                 break;
 
                 // Windows 8
@@ -186,11 +267,11 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtTermThdIndex   = 0x51;
                 pData->PrevMode         = 0x232;
                 pData->ExitStatus       = 0x450;
-                //pData->MiAllocPage    = 0x3AF374;
+                pData->MiAllocPage      = 0x3AF374;
                 pData->ExRemoveTable    = 0x487518;
                 break;
 
-                // Windows 8.1
+                // Windows 8.1, build 17328
             case WINVER_81:
                 pData->KExecOpt         = 0x1B7;
                 pData->Protection       = 0x67A;
@@ -200,8 +281,8 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtTermThdIndex   = 0x52;
                 pData->PrevMode         = 0x232;
                 pData->ExitStatus       = 0x6D8;
-                //pData->MiAllocPage    = 0x4BDDF4;
-                pData->ExRemoveTable    = 0x38E320;
+                pData->MiAllocPage      = 0x4BDDF4;
+                pData->ExRemoveTable    = 0x432A88; // 0x38E320;
                 break;
 
                 // Windows 10, technical preview, build 9841
@@ -214,7 +295,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtTermThdIndex   = 0x53;
                 pData->PrevMode         = 0x232;
                 pData->ExitStatus       = 0x6D8;
-                //pData->MiAllocPage    = 0x5191BC;
+                pData->MiAllocPage      = 0x5191BC;
                 pData->ExRemoveTable    = 0x419C2C;
                 break;
 
@@ -222,7 +303,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 break;
         }
 
-        return (pData->VadRoot != 0 ? status : STATUS_NOT_SUPPORTED);
+        return (pData->VadRoot != 0 ? status : STATUS_INVALID_KERNEL_INFO_VERSION);
     }
 
     return status;
