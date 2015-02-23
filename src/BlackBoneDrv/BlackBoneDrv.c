@@ -223,7 +223,12 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         }
     #elif defined (_WIN10_)
         if (ver_short != WINVER_10)
+        {
+            if (verInfo.dwBuildNumber != 9926)
+                pData->correctBuild = FALSE;
+            
             return STATUS_NOT_SUPPORTED;
+        }
     #endif
 
         DPRINT( 
@@ -281,22 +286,22 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtTermThdIndex   = 0x52;
                 pData->PrevMode         = 0x232;
                 pData->ExitStatus       = 0x6D8;
-                pData->MiAllocPage      = 0x4BDDF4;
+                pData->MiAllocPage      = 0;
                 pData->ExRemoveTable    = 0x432A88; // 0x38E320;
                 break;
 
-                // Windows 10, technical preview, build 9841
+                // Windows 10, technical preview, build 9926
             case WINVER_10:
                 pData->KExecOpt         = 0x1BF;
-                pData->Protection       = 0x692;
-                pData->ObjTable         = 0x410;
-                pData->VadRoot          = 0x5F0;
-                pData->NtCreateThdIndex = 0xB0;
+                pData->Protection       = 0x69A;
+                pData->ObjTable         = 0x418;
+                pData->VadRoot          = 0x5F8;
+                pData->NtCreateThdIndex = 0xB2;
                 pData->NtTermThdIndex   = 0x53;
                 pData->PrevMode         = 0x232;
-                pData->ExitStatus       = 0x6D8;
-                pData->MiAllocPage      = 0x5191BC;
-                pData->ExRemoveTable    = 0x419C2C;
+                pData->ExitStatus       = 0x6E0;
+                pData->MiAllocPage      = 0;
+                pData->ExRemoveTable    = 0x4645B0;
                 break;
 
             default:
