@@ -388,8 +388,9 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
     // Prevent highest bit extension.
     ptr_t addr = (size_t)DebugEv.u.Exception.ExceptionRecord.ExceptionAddress;
     ptr_t ip = 0, sp = 0;
-    _CONTEXT32 ctx32;
-    _CONTEXT64 ctx64;
+    bool use64 = !_core.native()->GetWow64Barrier().x86OS;
+    _CONTEXT32 ctx32 = { 0 };
+    _CONTEXT64 ctx64 = { 0 };
 
     Thread thd( DebugEv.dwThreadId, &_core );
 
@@ -400,10 +401,14 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
     // Use 32 bit context if available
     if (_memory.core().isWow64())
     {
-        thd.GetContext( ctx32, WOW64_CONTEXT_ALL, true );
+        thd.GetContext( ctx32, use64 ? WOW64_CONTEXT_ALL : CONTEXT_ALL, true );
         ip = ctx32.Eip;
         sp = ctx32.Esp;
     }
+
+    // X86 workaround
+    if (!use64)
+        ctx64.FromCtx32( ctx32 );
 
     // Detect hardware breakpoint
     DWORD index = 0;
@@ -425,14 +430,13 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
                 hook.onExecute.freeFn( context );
 
             // Reset breakpoint
-            //*(reinterpret_cast<uint64_t*>(&ctx64.Dr0) + index) = 0;
-            RESET_BIT( ctx64.Dr7, (2 * index) );
+            RESET_BIT( use64 ? ctx64.Dr7 : ctx32.Dr7, (2 * index) );
 
             _repatch[addr] = true;
 
-            ctx64.Dr6 = 0;                // reset flags
-            ctx64.EFlags |= 0x100;        // single step
-            thd.SetContext( ctx64, true );
+            use64 ? ctx64.Dr6 : ctx32.Dr6        = 0;           // reset flags
+            use64 ? ctx64.EFlags : ctx32.EFlags |= 0x100;       // single step
+            use64 ? thd.SetContext( ctx64, true ) : thd.SetContext( ctx32, true );
 
             // Raise exception upon return
             if (hook.flags & hf_returnHook)

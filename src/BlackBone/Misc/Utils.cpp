@@ -125,6 +125,8 @@ std::wstring Utils::GetExeDirectory()
     auto pFunc = reinterpret_cast<fnQueryFullProcessImageNameW>(DynImport::load( "QueryFullProcessImageNameW", L"kernel32.dll" ));
     if (pFunc != nullptr)
         pFunc( GetCurrentProcess(), 0, imgName, &len );
+    else
+        GetModuleFileName( NULL, imgName, len );
 
     return GetParent( imgName );
 }

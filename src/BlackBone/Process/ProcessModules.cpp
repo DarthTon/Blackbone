@@ -144,12 +144,24 @@ const ModuleData* ProcessModules::GetModule(
 /// <returns>Module data. nullptr if not found</returns>
 const ModuleData* ProcessModules::GetMainModule()
 {
-    _PEB64 peb;
+    if (_core.native()->GetWow64Barrier().x86OS)
+    {
+        _PEB32 peb = { 0 };
 
-    if (_proc.core().peb( &peb ) == 0)
-        return nullptr;
+        if (_proc.core().peb( &peb ) == 0)
+            return nullptr;
 
-    return GetModule( peb.ImageBaseAddress );
+        return GetModule( peb.ImageBaseAddress );
+    }
+    else
+    {
+        _PEB64 peb = { 0 };
+
+        if (_proc.core().peb( &peb ) == 0)
+            return nullptr;
+
+        return GetModule( peb.ImageBaseAddress );
+    }
 }
 
 /// <summary>

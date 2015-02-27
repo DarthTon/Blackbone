@@ -152,6 +152,8 @@ T* NtLdr::SetNode( T* ptr, void* pModule )
 /// <returns>true on success</returns>
 bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
 {
+    bool wxp = IsWindowsXPOrGreater() && !IsWindowsVistaOrGreater();
+
     void* pNode = _nodeMap.count( reinterpret_cast<HMODULE>(pModule) ) ? 
         _nodeMap[reinterpret_cast<HMODULE>(pModule)] : nullptr;
 
@@ -160,15 +162,19 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
         return false;
 
     // Manually add TLS table
-    if (_process.core().native()->GetWow64Barrier().type == wow_64_32 && pTls != nullptr)
+    if ((wxp || _process.core().native()->GetWow64Barrier().type == wow_64_32) && pTls != nullptr)
     {
-        ptr_t pteb64 = _process.remote().getWorker()->teb( static_cast<_TEB64*>(nullptr) );
+        ptr_t pTeb = 0;
+        if (wxp)
+            pTeb = _process.remote().getWorker()->teb( static_cast<_TEB32*>(nullptr) );
+        else
+            pTeb = _process.remote().getWorker()->teb( static_cast<_TEB64*>(nullptr) );
 
         auto tlsStore = _process.memory().Allocate( 0x1000, PAGE_READWRITE );
         tlsStore.Release();
 
         IMAGE_TLS_DIRECTORY remoteTls = { 0 };
-        _process.memory( ).Read( reinterpret_cast<ptr_t>(pTls), sizeof(remoteTls), &remoteTls );
+        _process.memory().Read( reinterpret_cast<ptr_t>(pTls), sizeof( remoteTls ), &remoteTls );
 
         auto size = remoteTls.EndAddressOfRawData - remoteTls.StartAddressOfRawData;
         std::unique_ptr<uint8_t[]> buf( new uint8_t[size]() );
@@ -178,7 +184,10 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
         tlsStore.Write( 0, tlsStore.ptr<size_t>() + 0x800 );
         tlsStore.Write( 0x800, size, buf.get() );
 
-        _process.memory().Write( pteb64 + FIELD_OFFSET( _TEB64, ThreadLocalStoragePointer ), tlsStore.ptr<DWORD64>() );
+        if (wxp)
+            _process.memory().Write( pTeb + FIELD_OFFSET( _TEB32, ThreadLocalStoragePointer ), tlsStore.ptr<DWORD32>() );
+        else
+            _process.memory().Write( pTeb + FIELD_OFFSET( _TEB64, ThreadLocalStoragePointer ), tlsStore.ptr<DWORD64>() );
 
         return true;
     }
@@ -196,7 +205,7 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
 
         _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     }
-    else
+    else 
         return false;
 
     return true;
@@ -1131,7 +1140,7 @@ ptr_t NtLdr::UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, size_t of
 {
     auto native = _process.core().native();
 
-    for (T entry = pListEntry.Flink; entry != head; native->ReadProcessMemoryT( entry, &entry, sizeof( entry ) ))
+    for (T entry = pListEntry.Flink; entry != 0 && entry != head; native->ReadProcessMemoryT( entry, &entry, sizeof( entry ) ))
     {
         _LDR_DATA_TABLE_ENTRY_BASE<T> modData = { 0 };
 

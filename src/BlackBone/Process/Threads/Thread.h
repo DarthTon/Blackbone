@@ -220,6 +220,12 @@ private:
     /// </summary>
     inline void ReleaseHandle() const { _handle = NULL; }
 
+    /// <summary>
+    /// GetThreadId support for XP
+    /// </summary>
+    /// <param name="hThread">Thread handle</param>
+    /// <returns>Thread ID</returns>
+    DWORD GetThreadIdT( HANDLE hThread );
 private:
     class ProcessCore* _core;           // Core routines
 

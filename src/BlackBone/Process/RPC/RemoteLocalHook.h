@@ -15,7 +15,8 @@ namespace blackbone
 struct HookCtx32
 {
     uint32_t codeSize;          // Size of saved code
-    uint8_t original_code[34];  // Original function code
+    uint8_t original_code[29];  // Original function code
+    uint8_t jmp_code[5];        // Jump instruction
 };
 
 struct HookCtx64

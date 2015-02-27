@@ -231,7 +231,7 @@ DWORD64 Wow64Local::LoadLibrary64( const wchar_t* path )
     _UNICODE_STRING_T<DWORD64> upath = {0};
 
     DWORD64 hModule     = 0;
-    DWORD64 pfnLdrLoad  = (DWORD64)GetProcAddress64( getNTDLL64(), "LdrLoadDll" );
+    DWORD64 pfnLdrLoad  = GetProcAddress64( getNTDLL64(), "LdrLoadDll" );
     upath.Length        = (WORD)wcslen( path ) * sizeof(wchar_t);
     upath.MaximumLength = (WORD)upath.Length;
     upath.Buffer        = (DWORD64)path;

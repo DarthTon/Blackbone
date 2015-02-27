@@ -11,10 +11,10 @@ void TestMMap()
     auto ldrDef = []( void* /*context*/, const ModuleData& modInfo )
     {
         //auto pProc = reinterpret_cast<Process*>(context);
-        if (modInfo.name == L"calc.exe")
+        if (modInfo.name == L"msvcr120.dll" || modInfo.name == L"msvcp120.dll" || modInfo.name == L"calc.exe")
             return Ldr_ModList | Ldr_HashTable;
 
-        return Ldr_None;
+        return Ldr_ModList;
     };
 
     std::wcout << L"Manual image mapping test\n";
@@ -69,5 +69,4 @@ void TestMMapFromMem()
     VirtualFree( buf, 0, MEM_RELEASE );
 
     thisProc.mmap().UnmapAllModules();
-
 }

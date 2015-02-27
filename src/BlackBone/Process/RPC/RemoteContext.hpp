@@ -14,8 +14,14 @@ namespace blackbone
 class RemoteContext
 {
 public:
-    BLACKBONE_API RemoteContext( class ProcessMemory& memory, Thread& thd, _CONTEXT64& ctx,
-                   ptr_t frame_ptr, BOOL x64, int wordSize )
+    BLACKBONE_API RemoteContext( 
+        ProcessMemory& memory,
+        Thread& thd,
+        _CONTEXT64& ctx,
+        ptr_t frame_ptr,
+        BOOL x64,
+        int wordSize
+        )
         : _memory( memory )
         , _thd( thd )
         , _ctx( ctx )

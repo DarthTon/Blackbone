@@ -5,7 +5,9 @@
 
 namespace blackbone
 {
-    
+
+#define CONTEXT_VAL_T(use64, ctx32, ctx64, val) use64 ? ctx64.val : ctx32.val
+
 Thread::Thread( DWORD id, ProcessCore* core, DWORD access /*= DEFAULT_ACCESS*/ )
     : _id( id )
     , _core( core )
@@ -16,8 +18,8 @@ Thread::Thread( DWORD id, ProcessCore* core, DWORD access /*= DEFAULT_ACCESS*/ )
 Thread::Thread( HANDLE handle, ProcessCore* core )
     : _handle( handle )
     , _core( core )
-    , _id( handle != NULL ? GetThreadId( handle ) : 0 )
 {
+    _id = handle != NULL ? GetThreadIdT( handle ) : 0;
 }
 
 Thread::Thread( const Thread& other )
@@ -62,8 +64,9 @@ bool Thread::Suspend()
     // Prevent deadlock
     if (_id == GetCurrentThreadId())
         return true;
-
-    if (_core->isWow64())
+    
+    // Target process is x86 and not running on x86 OS
+    if (_core->isWow64() && !_core->native()->GetWow64Barrier().x86OS)
         return (GET_IMPORT(Wow64SuspendThread)( _handle ) != -1);
     else
         return (SuspendThread( _handle ) != -1);
@@ -87,7 +90,10 @@ bool Thread::Resume()
 /// <returns>true if suspended</returns>
 bool Thread::Suspended()
 {
-    auto count = _core->isWow64() ? GET_IMPORT( Wow64SuspendThread )(_handle) : SuspendThread( _handle );
+    auto count = (_core->isWow64() && !_core->native()->GetWow64Barrier().x86OS) 
+        ? GET_IMPORT( Wow64SuspendThread )(_handle) 
+        : SuspendThread( _handle );
+
     ResumeThread( _handle );
     return count > 0;
 }
@@ -213,10 +219,13 @@ bool Thread::Join( int timeout /*= INFINITE*/ )
 /// <returns>Index of used breakpoint; -1 if failed</returns>
 int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
 {
-    _CONTEXT64 context;
+    _CONTEXT64 context64 = { 0 };
+    _CONTEXT32 context32 = { 0 };
+    bool use64 = !_core->native()->GetWow64Barrier().x86OS;
 
     // CONTEXT_DEBUG_REGISTERS can be operated without thread suspension
-    if (!GetContext( context, CONTEXT64_DEBUG_REGISTERS, true ))
+    bool res = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
+    if (!res)
         return -1;
 
     auto getFree = []( ptr_t regval )
@@ -234,22 +243,27 @@ int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
     };
 
     // Get free DR
-    int freeIdx = getFree( context.Dr7 );
+    int freeIdx = getFree( CONTEXT_VAL_T( use64, context32, context64, Dr7 ) );
 
     // If all 4 registers are occupied - error
     if (freeIdx < 0)
         return -1;
 
     // Enable corresponding HWBP and local BP flag
-    context.Dr7 |= (1 << (2 * freeIdx)) | ((int)type << (16 + 4 * freeIdx)) | ((int)length << (18 + 4 * freeIdx)) | 0x100;
-
-    *(&context.Dr0 + freeIdx) = addr;
+    if (use64)
+    {
+        context64.Dr7 = (1 << (2 * freeIdx)) | ((int)type << (16 + 4 * freeIdx)) | ((int)length << (18 + 4 * freeIdx)) | 0x100;
+        *(&context64.Dr0 + freeIdx) = addr;
+    }
+    else
+    {
+        context32.Dr7 = (1 << (2 * freeIdx)) | ((int)type << (16 + 4 * freeIdx)) | ((int)length << (18 + 4 * freeIdx)) | 0x100;
+        *(&context32.Dr0 + freeIdx) = (DWORD)addr;
+    }
 
     // Write values to registers
-    if (!SetContext( context, true ))
-        return -1;
-
-    return freeIdx;
+    res = use64 ? SetContext( context64, true ) : SetContext( context32, true );
+    return res ? freeIdx : -1;
 }
 
 /// <summary>
@@ -261,14 +275,20 @@ bool Thread::RemoveHWBP( int idx )
 {
     if (idx > 0 && idx < 4)
     {
-        _CONTEXT64 context;
+        _CONTEXT64 context64 = { 0 };
+        _CONTEXT32 context32 = { 0 };
+        bool use64 = !_core->native()->GetWow64Barrier().x86OS;
+        bool res = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
 
-        if (GetContext( context, CONTEXT64_DEBUG_REGISTERS ))
+        if (res)
         {
+            if (use64)
+                *(&context64.Dr0 + idx) = 0;
+            else
+                *(&context32.Dr0 + idx) = 0;
 
-            *(&context.Dr0 + idx) = 0;
-            RESET_BIT( context.Dr7, ( 2 * idx) );
-            return SetContext( context );
+            RESET_BIT( CONTEXT_VAL_T( use64, context64, context32, Dr7 ), (2 * idx) );
+            return use64 ? SetContext( context64 ) : SetContext( context32 );
         }
     }
 
@@ -282,18 +302,25 @@ bool Thread::RemoveHWBP( int idx )
 /// <returns>true on success</returns>
 bool Thread::RemoveHWBP( ptr_t ptr )
 {
-    _CONTEXT64 context;
-    
-    if (GetContext( context, CONTEXT64_DEBUG_REGISTERS ))
+    _CONTEXT64 context64 = { 0 };
+    _CONTEXT32 context32 = { 0 };
+    bool use64 = !_core->native()->GetWow64Barrier().x86OS;
+    bool res = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
+
+    if (res)
     {
         // Search breakpoint
         for (int i = 0; i < 4; i++)
         {
-            if ((&context.Dr0)[i] == ptr)
+            if ((&context64.Dr0)[i] == ptr || (&context32.Dr0)[i] == (DWORD)ptr)
             {
-                *(&context.Dr0 + i) = 0;
-                RESET_BIT( context.Dr7, ( 2 * i ) );
-                return SetContext( context );
+                if (use64)
+                    *(&context64.Dr0 + i) = 0;
+                else
+                    *(&context32.Dr0 + i) = 0;
+
+                RESET_BIT( CONTEXT_VAL_T( use64, context64, context32, Dr7 ), (2 * i) );
+                return use64 ? SetContext( context64 ) : SetContext( context32 );
             }
         }
     }
@@ -345,13 +372,38 @@ uint64_t Thread::execTime()
 /// <summary>
 /// Close handle
 /// </summary>
-BLACKBONE_API void Thread::Close()
+void Thread::Close()
 {
     if (_handle)
     {
         CloseHandle( _handle );
         _handle = NULL;
         _id = 0;
+    }
+}
+
+/// <summary>
+/// GetThreadId support for XP
+/// </summary>
+/// <param name="hThread">Thread handle</param>
+/// <returns>Thread ID</returns>
+DWORD Thread::GetThreadIdT( HANDLE hThread )
+{
+    static auto pGetThreadId = (decltype(&GetThreadId))GetProcAddress( GetModuleHandleW( L"kernel32.dll" ), "GetThreadId" );
+    if (pGetThreadId != nullptr)
+    {
+        return pGetThreadId( hThread );
+    }
+    // XP version
+    else
+    {
+        _THREAD_BASIC_INFORMATION_T<DWORD> tbi = { 0 };
+        ULONG bytes = 0;
+
+        if (NT_SUCCESS( GET_IMPORT( NtQueryInformationThread )(hThread, (THREADINFOCLASS)0, &tbi, sizeof( tbi ), &bytes) ))
+            return tbi.ClientID.UniqueThread;
+
+        return 0;
     }
 }
 

@@ -432,5 +432,8 @@
     <ClInclude Include="Process\RPC\RemoteLocalHook.h">
       <Filter>Process\Remote</Filter>
     </ClInclude>
+    <ClInclude Include="Include\WinXPSpecific.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

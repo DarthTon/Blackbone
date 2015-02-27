@@ -242,13 +242,11 @@ NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, C
 
         hThread = CreateRemoteThread( 
             _hProcess, NULL, 0, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
-            reinterpret_cast<LPVOID>(arg), flags, NULL
+            reinterpret_cast<LPVOID>(arg), win32Flags, NULL
             );
 
         status = LastNtStatus();
     }
-
-
 
     return status;
 }

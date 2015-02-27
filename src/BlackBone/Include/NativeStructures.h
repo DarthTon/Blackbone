@@ -505,6 +505,35 @@ namespace blackbone
         DWORD64 LastBranchFromRip;
         DWORD64 LastExceptionToRip;
         DWORD64 LastExceptionFromRip;
+
+        _CONTEXT_T<DWORD64>& FromCtx32( const _CONTEXT_T<DWORD>& ctx32 )
+        {
+            ContextFlags = ctx32.ContextFlags;
+            Dr0 = ctx32.Dr0;
+            Dr1 = ctx32.Dr1;
+            Dr2 = ctx32.Dr2;
+            Dr3 = ctx32.Dr3;
+            Dr6 = ctx32.Dr6;
+            Dr7 = ctx32.Dr7;
+            SegGs = static_cast<WORD>(ctx32.SegGs);
+            SegFs = static_cast<WORD>(ctx32.SegFs);
+            SegEs = static_cast<WORD>(ctx32.SegEs);
+            SegDs = static_cast<WORD>(ctx32.SegDs);
+            SegCs = static_cast<WORD>(ctx32.SegCs);
+            SegSs = static_cast<WORD>(ctx32.SegSs);
+            Rdi = ctx32.Edi;
+            Rsi = ctx32.Esi;
+            Rbx = ctx32.Ebx;
+            Rdx = ctx32.Edx;
+            Rcx = ctx32.Ecx;
+            Rax = ctx32.Eax;
+            Rbp = ctx32.Ebp;
+            Rip = ctx32.Eip;
+            Rsp = ctx32.Esp;
+            EFlags = ctx32.EFlags;
+
+            return *this;
+        }
     };
 
 
@@ -698,3 +727,7 @@ namespace blackbone
 // OS specific structures
 #include "Win7Specific.h"
 #include "Win8Specific.h"
+
+#ifdef XP_BUILD
+#include "WinXPSpecific.h"
+#endif
