@@ -126,7 +126,7 @@ std::wstring Utils::GetExeDirectory()
     if (pFunc != nullptr)
         pFunc( GetCurrentProcess(), 0, imgName, &len );
     else
-        GetModuleFileName( NULL, imgName, len );
+        GetModuleFileNameW( NULL, imgName, len );
 
     return GetParent( imgName );
 }

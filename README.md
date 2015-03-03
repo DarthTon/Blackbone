@@ -82,7 +82,7 @@ Blackbone
 - Change handle access rights
 - Remap process memory
 - Hiding allocated user-mode memory
-- User-mode dll injection
+- User-mode dll injection and manual mapping
 - Manual mapping of drivers
 
 ## License ##

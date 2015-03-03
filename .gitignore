@@ -30,6 +30,7 @@
 *.lastbuildstate
 ipch/
 obj/
+cmake/
 [Bb]in
 [Dd]ebug*/
 [Rr]elease*/

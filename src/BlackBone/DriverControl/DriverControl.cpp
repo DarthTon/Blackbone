@@ -42,8 +42,8 @@ NTSTATUS DriverControl::EnsureLoaded( const std::wstring& path /*= L"" */ )
         return STATUS_SUCCESS;
 
     // Try to open handle to existing driver
-    _hDriver = CreateFile( BLACKBONE_DEVICE_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_EXISTING, 0, NULL );
+    _hDriver = CreateFileW( BLACKBONE_DEVICE_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            NULL, OPEN_EXISTING, 0, NULL );
 
     if (_hDriver != INVALID_HANDLE_VALUE)
         return _loadStatus = STATUS_SUCCESS;
@@ -89,8 +89,8 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
         return LastNtStatus( status );
     }
 
-    _hDriver = CreateFile( BLACKBONE_DEVICE_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                           NULL, OPEN_EXISTING, 0, NULL );
+    _hDriver = CreateFileW( BLACKBONE_DEVICE_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            NULL, OPEN_EXISTING, 0, NULL );
 
     if (_hDriver == INVALID_HANDLE_VALUE)
     {
