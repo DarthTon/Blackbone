@@ -22,6 +22,17 @@ namespace blackbone
         SectionImageInformation
     };
 
+    enum POOL_TYPE
+    {
+        NonPagedPool,
+        PagedPool,
+        NonPagedPoolMustSucceed,
+        DontUseThisType,
+        NonPagedPoolCacheAligned,
+        PagedPoolCacheAligned,
+        NonPagedPoolCacheAlignedMustS
+    };
+
 // nonstandard extension used : nameless struct/union
 #pragma warning(disable : 4201)
 
@@ -385,6 +396,51 @@ namespace blackbone
         _SYSTEM_EXTENDED_THREAD_INFORMATION_T<T> Threads[1];
     };
 
+    template<typename T>
+    struct _SYSTEM_HANDLE_T
+    {
+        ULONG ProcessId;
+        BYTE ObjectTypeNumber;
+        BYTE Flags;
+        USHORT Handle;
+        T Object;
+        ACCESS_MASK GrantedAccess;
+    };
+
+    template<typename T>
+    struct _SYSTEM_HANDLE_INFORMATION_T
+    {
+        ULONG HandleCount;
+        _SYSTEM_HANDLE_T<T> Handles[1];
+    };
+
+    template<typename T>
+    struct _OBJECT_TYPE_INFORMATION_T
+    {
+        _UNICODE_STRING_T<T> Name;
+        ULONG TotalNumberOfObjects;
+        ULONG TotalNumberOfHandles;
+        ULONG TotalPagedPoolUsage;
+        ULONG TotalNonPagedPoolUsage;
+        ULONG TotalNamePoolUsage;
+        ULONG TotalHandleTableUsage;
+        ULONG HighWaterNumberOfObjects;
+        ULONG HighWaterNumberOfHandles;
+        ULONG HighWaterPagedPoolUsage;
+        ULONG HighWaterNonPagedPoolUsage;
+        ULONG HighWaterNamePoolUsage;
+        ULONG HighWaterHandleTableUsage;
+        ULONG InvalidAttributes;
+        GENERIC_MAPPING GenericMapping;
+        ULONG ValidAccess;
+        BOOLEAN SecurityRequired;
+        BOOLEAN MaintainHandleCount;
+        USHORT MaintainTypeList;
+        POOL_TYPE PoolType;
+        ULONG PagedPoolUsage;
+        ULONG NonPagedPoolUsage;
+    };
+
     struct _XSAVE_FORMAT64
     {
         WORD ControlWord;
@@ -630,69 +686,7 @@ namespace blackbone
     //
     // Api schema structures
     //
-    typedef struct _API_SET_VALUE_ENTRY
-    {
-        ULONG Flags;
-        ULONG NameOffset;
-        ULONG NameLength;
-        ULONG ValueOffset;
-        ULONG ValueLength;
-    } API_SET_VALUE_ENTRY, *PAPI_SET_VALUE_ENTRY;
-
-    typedef struct _API_SET_VALUE_ARRAY
-    {
-        ULONG Flags;
-        ULONG Count;
-        API_SET_VALUE_ENTRY Array[ANYSIZE_ARRAY];
-   } API_SET_VALUE_ARRAY, *PAPI_SET_VALUE_ARRAY;
-
-    typedef struct _API_SET_NAMESPACE_ENTRY
-    {
-        ULONG Flags;
-        ULONG NameOffset;
-        ULONG NameLength;
-        ULONG AliasOffset;
-        ULONG AliasLength;
-        ULONG DataOffset;   // API_SET_VALUE_ARRAY
-    } API_SET_NAMESPACE_ENTRY, *PAPI_SET_NAMESPACE_ENTRY;
-
-    typedef struct _API_SET_NAMESPACE_ARRAY
-    {
-        ULONG Version;
-        ULONG Size;
-        ULONG Flags;
-        ULONG Count;
-        API_SET_NAMESPACE_ENTRY Array[ANYSIZE_ARRAY];
-    } API_SET_NAMESPACE_ARRAY, *PAPI_SET_NAMESPACE_ARRAY;
-
-
-    typedef struct _API_SET_VALUE_ENTRY_V2
-    {
-        ULONG NameOffset;
-        ULONG NameLength;
-        ULONG ValueOffset;
-        ULONG ValueLength;
-    } API_SET_VALUE_ENTRY_V2, *PAPI_SET_VALUE_ENTRY_V2;
-
-    typedef struct _API_SET_VALUE_ARRAY_V2
-    {
-        ULONG Count;
-        API_SET_VALUE_ENTRY_V2 Array[ANYSIZE_ARRAY];
-    } API_SET_VALUE_ARRAY_V2, *PAPI_SET_VALUE_ARRAY_V2;
-
-    typedef struct _API_SET_NAMESPACE_ENTRY_V2
-    {
-        ULONG NameOffset;
-        ULONG NameLength;
-        ULONG DataOffset;   // API_SET_VALUE_ARRAY
-    } API_SET_NAMESPACE_ENTRY_V2, *PAPI_SET_NAMESPACE_ENTRY_V2;
-
-    typedef struct _API_SET_NAMESPACE_ARRAY_V2
-    {
-        ULONG Version;
-        ULONG Count;
-        API_SET_NAMESPACE_ENTRY_V2 Array[ANYSIZE_ARRAY];
-    } API_SET_NAMESPACE_ARRAY_V2, *PAPI_SET_NAMESPACE_ARRAY_V2;
+    
 
     typedef _PEB_T<DWORD, DWORD64, 34> _PEB32;
     typedef _PEB_T<DWORD64, DWORD, 30> _PEB64;
@@ -717,12 +711,22 @@ namespace blackbone
     typedef _SECTION_BASIC_INFORMATION_T<DWORD64>   _SECTION_BASIC_INFORMATION64;
     typedef _SECTION_BASIC_INFORMATION_T<DWORD_PTR>  SECTION_BASIC_INFORMATION_T;
 
+    typedef _SYSTEM_HANDLE_INFORMATION_T<DWORD>     _SYSTEM_HANDLE_INFORMATION32;
+    typedef _SYSTEM_HANDLE_INFORMATION_T<DWORD64>   _SYSTEM_HANDLE_INFORMATION64;
+    typedef _SYSTEM_HANDLE_INFORMATION_T<DWORD_PTR> SYSTEM_HANDLE_INFORMATION_T;
+
+    typedef _OBJECT_TYPE_INFORMATION_T<DWORD>       _OBJECT_TYPE_INFORMATION32;
+    typedef _OBJECT_TYPE_INFORMATION_T<DWORD64>     _OBJECT_TYPE_INFORMATION64;
+    typedef _OBJECT_TYPE_INFORMATION_T<DWORD_PTR>   OBJECT_TYPE_INFORMATION_T;
+
 #ifdef USE64
     typedef _PEB64 PEB_T;
 #else
     typedef _PEB32 PEB_T;
 #endif
 }
+
+#include "ApiSet.h"
 
 // OS specific structures
 #include "Win7Specific.h"

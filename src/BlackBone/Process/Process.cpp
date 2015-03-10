@@ -6,6 +6,8 @@
 
 namespace blackbone
 {
+#define SystemHandleInformation (SYSTEM_INFORMATION_CLASS)16
+#define ObjectNameInformation   (OBJECT_INFORMATION_CLASS)1
 
 Process::Process()
     : _core()
@@ -93,8 +95,11 @@ NTSTATUS Process::CreateAndAttach(
     if (!pStartup)
         pStartup = &si;
 
-    if (!CreateProcessW( path.c_str(), const_cast<LPWSTR>(cmdLine.c_str()), NULL, NULL, 
-                         FALSE, CREATE_SUSPENDED, NULL, currentDir, pStartup, &pi ))
+    if (!CreateProcessW(
+        path.c_str(), const_cast<LPWSTR>(cmdLine.c_str()), 
+        NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, 
+        currentDir, pStartup, &pi
+        ))
     {
         return LastNtStatus();
     } 
@@ -178,6 +183,127 @@ NTSTATUS Process::Terminate( uint32_t code /*= 0*/ )
     TerminateProcess( _core.handle(), code );
     return LastNtStatus();
 }
+
+/// <summary>
+/// Enumerate all open handles
+/// </summary>
+/// <param name="handles">Found handles</param>
+/// <returns>Status code</returns>
+NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
+{
+    ULONG bufSize = 0x10000;
+    uint8_t* buffer = (uint8_t*)VirtualAlloc( NULL, bufSize, MEM_COMMIT, PAGE_READWRITE );
+    ULONG returnLength = 0;
+
+    // Query handle list
+    NTSTATUS status = GET_IMPORT( NtQuerySystemInformation )(SystemHandleInformation, buffer, bufSize, &returnLength);
+    while (status == STATUS_INFO_LENGTH_MISMATCH)
+    {
+        bufSize *= 2;
+        VirtualFree( buffer, 0, MEM_RELEASE );
+        buffer = (uint8_t*)VirtualAlloc( NULL, bufSize, MEM_COMMIT, PAGE_READWRITE );
+
+        status = GET_IMPORT( NtQuerySystemInformation )(SystemHandleInformation, buffer, bufSize, &returnLength);
+    }
+
+    if (!NT_SUCCESS( status ))
+    {
+        VirtualFree( buffer, 0, MEM_RELEASE );
+        return status;
+    }
+
+    SYSTEM_HANDLE_INFORMATION_T* handleInfo = (SYSTEM_HANDLE_INFORMATION_T*)buffer;
+    for (ULONG i = 0; i < handleInfo->HandleCount; i++)
+    {
+        HandleInfo info;
+        HANDLE hLocal = NULL;
+        OBJECT_TYPE_INFORMATION_T* pTypeInfo = nullptr;
+        PVOID pNameInfo = nullptr;
+        UNICODE_STRING objectName = { 0 };
+        ULONG returnLength = 0;
+
+        // Filter process
+        if (handleInfo->Handles[i].ProcessId != _core._pid)
+            continue;
+
+        // Get local handle copy
+        status = GET_IMPORT( NtDuplicateObject )(_core._hProcess, (HANDLE)handleInfo->Handles[i].Handle, GetCurrentProcess(), &hLocal, 0, 0, DUPLICATE_SAME_ACCESS);
+        if (!NT_SUCCESS( status ))
+            continue;
+
+        // 
+        // Get type information
+        //
+        pTypeInfo = (OBJECT_TYPE_INFORMATION_T*)malloc( 0x1000 );
+        status = GET_IMPORT( NtQueryObject )(hLocal, ObjectTypeInformation, pTypeInfo, 0x1000, NULL);
+        if (!NT_SUCCESS( status ))
+        {
+            CloseHandle( hLocal );
+            continue;
+        }
+
+        //
+        // Obtain object name
+        //
+        pNameInfo = malloc( 0x1000 );
+        status = GET_IMPORT( NtQueryObject )(hLocal, ObjectNameInformation, pNameInfo, 0x1000, &returnLength);
+        if (!NT_SUCCESS( status ))
+        {
+            pNameInfo = realloc( pNameInfo, returnLength );
+            status = GET_IMPORT( NtQueryObject )(hLocal, ObjectNameInformation, pNameInfo, returnLength, NULL);
+            if (!NT_SUCCESS( status ))
+            {
+                free( pTypeInfo );
+                free( pNameInfo );
+                CloseHandle( hLocal );
+                continue;
+            }
+        }
+
+        objectName = *(PUNICODE_STRING)pNameInfo;
+
+        //
+        // Fill handle info structure
+        //
+        info.handle   = (HANDLE)handleInfo->Handles[i].Handle;
+        info.access   = handleInfo->Handles[i].GrantedAccess;
+        info.flags    = handleInfo->Handles[i].Flags;
+        info.pObject  = handleInfo->Handles[i].Object;
+
+        if (pTypeInfo->Name.Length)
+            info.typeName = (wchar_t*)pTypeInfo->Name.Buffer;
+
+        if (objectName.Length)
+            info.name = objectName.Buffer;
+
+        //
+        // Type-specific info
+        //
+        if (_wcsicmp( info.typeName.c_str(), L"Section" ) == 0)
+        {
+            SECTION_BASIC_INFORMATION_T secInfo = { 0 };
+
+            status = GET_IMPORT( NtQuerySection )(hLocal, SectionBasicInformation, &secInfo, sizeof( secInfo ), NULL);
+            if (NT_SUCCESS( status ))
+            {
+                info.section.reset( new SectionInfo() );
+
+                info.section->size = secInfo.Size.QuadPart;
+                info.section->attrib = secInfo.Attributes;
+            }
+        }
+
+        handles.emplace_back( info );
+
+        free( pTypeInfo );
+        free( pNameInfo );
+        CloseHandle( hLocal );
+    }
+
+    VirtualFree( buffer, 0, MEM_RELEASE );
+    return status;
+}
+
 
 /// <summary>
 /// Grant current process arbitrary privilege

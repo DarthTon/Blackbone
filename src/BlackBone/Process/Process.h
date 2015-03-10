@@ -18,6 +18,9 @@
 namespace blackbone
 {
 
+/// <summary>
+/// Process thread information
+/// </summary>
 struct ThreadInfo
 {
     uint32_t tid = 0;
@@ -25,6 +28,9 @@ struct ThreadInfo
     bool mainThread = false;
 };
 
+/// <summary>
+/// Process information
+/// </summary>
 struct ProcessInfo
 {
     uint32_t pid = 0;
@@ -37,6 +43,31 @@ struct ProcessInfo
     }
 };
 
+/// <summary>
+/// Section object information
+/// </summary>
+struct SectionInfo
+{
+    ptr_t size = 0;
+    uint32_t attrib = 0;
+};
+
+/// <summary>
+/// Process handle information
+/// </summary>
+struct HandleInfo
+{
+    HANDLE handle = nullptr;
+    uint32_t access = 0;
+    uint32_t flags = 0;
+    ptr_t pObject = 0;
+
+    std::wstring typeName;
+    std::wstring name;
+
+    // Object-specific info
+    std::shared_ptr<SectionInfo> section;
+};
 
 #define DEFAULT_ACCESS_P  PROCESS_QUERY_INFORMATION | \
                           PROCESS_VM_READ           | \
@@ -118,6 +149,13 @@ public:
     BLACKBONE_API NTSTATUS Terminate( uint32_t code = 0 );
 
     /// <summary>
+    /// Enumerate all open handles
+    /// </summary>
+    /// <param name="handles">Found handles</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS EnumHandles( std::vector<HandleInfo>& handles );
+
+    /// <summary>
     /// Search for process by executable name
     /// </summary>
     /// <param name="name">Process name. If empty - function will retrieve all existing processes</param>
@@ -162,7 +200,6 @@ private:
 
     Process(const Process&) = delete;
     Process& operator =(const Process&) = delete;
-
 private:
     ProcessCore     _core;          // Core routines and native subsystem
     ProcessModules  _modules;       // Module management

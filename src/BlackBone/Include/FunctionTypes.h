@@ -167,6 +167,18 @@ typedef NTSTATUS( NTAPI* fnNtSetInformationProcess )
         IN ULONG    ProcessInformationLength 
     );
 
+// NtDuplicateObject
+typedef NTSTATUS( NTAPI* fnNtDuplicateObject )
+    (
+        IN HANDLE SourceProcessHandle,
+        IN HANDLE SourceHandle,
+        IN HANDLE TargetProcessHandle,
+        IN PHANDLE TargetHandle,
+        IN ACCESS_MASK DesiredAccess,
+        IN ULONG Attributes,
+        IN ULONG Options
+    );
+
 // RtlRbRemoveNode
 typedef int (NTAPI* fnRtlRbRemoveNode)
     (

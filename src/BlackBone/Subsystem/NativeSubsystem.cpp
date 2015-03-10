@@ -49,6 +49,7 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
     DynImport::load( "NtQueryInformationProcess",  hNtdll );
     DynImport::load( "NtSetInformationProcess",    hNtdll );
     DynImport::load( "NtQueryInformationThread",   hNtdll );
+    DynImport::load( "NtDuplicateObject",          hNtdll );
     DynImport::load( "NtQueryObject",              hNtdll );  
     DynImport::load( "NtQuerySection",             hNtdll );
     DynImport::load( "RtlCreateActivationContext", hNtdll );

@@ -435,5 +435,8 @@
     <ClInclude Include="Include\WinXPSpecific.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="Include\ApiSet.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

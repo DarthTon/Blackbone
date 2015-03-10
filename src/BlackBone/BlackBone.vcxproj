@@ -638,6 +638,7 @@
     <ClInclude Include="Asm\LDasm.h" />
     <ClInclude Include="Config.h" />
     <ClInclude Include="DriverControl\DriverControl.h" />
+    <ClInclude Include="Include\ApiSet.h" />
     <ClInclude Include="Include\FunctionTypes.h" />
     <ClInclude Include="Include\Macro.h" />
     <ClInclude Include="Include\NativeStructures.h" />

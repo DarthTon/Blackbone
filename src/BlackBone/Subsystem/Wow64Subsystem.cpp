@@ -66,7 +66,11 @@ NTSTATUS NativeWow64::VirualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFre
 /// <returns>Status code</returns>
 NTSTATUS NativeWow64::VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 lpBuffer )
 {
-    return GET_IMPORT( NtWow64QueryVirtualMemory64 )( _hProcess, lpAddress, 0, lpBuffer, sizeof(MEMORY_BASIC_INFORMATION64), nullptr );
+    static ptr_t ntqvm = _local.GetProcAddress64( _local.getNTDLL64(), "NtQueryVirtualMemory" );
+    if (ntqvm == 0)
+        return STATUS_ORDINAL_NOT_FOUND;
+
+    return static_cast<NTSTATUS>(_local.X64Call( ntqvm, _hProcess, lpAddress, 0, lpBuffer, sizeof( MEMORY_BASIC_INFORMATION64 ), 0 ));
 }
 
 /// <summary>

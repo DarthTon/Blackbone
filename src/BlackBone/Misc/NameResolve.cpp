@@ -37,7 +37,12 @@ NameResolve& NameResolve::Instance()
 /// <returns></returns>
 bool NameResolve::Initialize()
 {
-    if (IsWindows8Point1OrGreater())
+    if (IsWindows10OrGreater())
+        return InitializeP< PAPI_SET_NAMESPACE_ARRAY_10, 
+                            PAPI_SET_NAMESPACE_ENTRY_10,
+                            PAPI_SET_VALUE_ARRAY_10,
+                            PAPI_SET_VALUE_ENTRY_10 >();
+    else if (IsWindows8Point1OrGreater())
         return InitializeP< PAPI_SET_NAMESPACE_ARRAY, 
                             PAPI_SET_NAMESPACE_ENTRY,
                             PAPI_SET_VALUE_ARRAY,
@@ -66,22 +71,19 @@ bool blackbone::NameResolve::InitializeP()
 
     for (DWORD i = 0; i < pSetMap->Count; i++)
     {
-        T2 pDescriptor = pSetMap->Array + i;
+        T2 pDescriptor = pSetMap->entry(i);
 
         std::vector<std::wstring> vhosts;
-
-        wchar_t apiName[MAX_PATH] = { 0 };
         wchar_t dllName[MAX_PATH] = { 0 };
 
-        memcpy( apiName, (uint8_t*)pSetMap + pDescriptor->NameOffset, pDescriptor->NameLength );
-        swprintf_s( dllName, MAX_PATH, L"API-%s.dll", apiName );
+        pSetMap->apiName( pDescriptor, dllName );
         std::transform( dllName, dllName + MAX_PATH, dllName, ::tolower );
 
-        T3 pHostData = reinterpret_cast<T3>(reinterpret_cast<uint8_t*>(pSetMap)+pDescriptor->DataOffset);
+        T3 pHostData = pSetMap->valArray( pDescriptor );
 
         for (DWORD j = 0; j < pHostData->Count; j++)
-        {
-            T4 pHost = pHostData->Array + j;
+        { 
+            T4 pHost = pHostData->entry( pSetMap, j );
             std::wstring hostName( reinterpret_cast<wchar_t*>(reinterpret_cast<uint8_t*>(pSetMap)+pHost->ValueOffset),
                                    pHost->ValueLength / sizeof(wchar_t) );
 
@@ -124,12 +126,13 @@ NTSTATUS NameResolve::ResolvePath(
 
     // 'ext-ms-' are resolved the same way 'api-ms-' are
     if (filename.find( L"ext-ms-" ) == 0)
-        filename.replace( 0, 3, L"api" );
+        filename.erase( 0, 4 );
 
     //
     // ApiSchema redirection
     //
-    auto iter = _apiSchema.find( filename );
+    auto iter = std::find_if( _apiSchema.begin(), _apiSchema.end(), [&filename]( const mapApiSchema::value_type& val ) { 
+        return filename.find( val.first.c_str() ) != filename.npos; } );
 
     if (iter != _apiSchema.end())
     {
