@@ -18,6 +18,15 @@ NTSTATUS BBSafeAllocateString( OUT PUNICODE_STRING result, IN USHORT size );
 /// <returns>Status code</returns>
 NTSTATUS BBSafeInitString( OUT PUNICODE_STRING result, IN PUNICODE_STRING source );
 
+/// <summary>
+/// Search for substring
+/// </summary>
+/// <param name="source">Source string</param>
+/// <param name="target">Target string</param>
+/// <param name="CaseInSensitive">Case insensitive search</param>
+/// <returns>Found position or -1 if not found</returns>
+LONG BBSafeSearchString( IN PUNICODE_STRING source, IN PUNICODE_STRING target, IN BOOLEAN CaseInSensitive );
+
 
 /// <summary>
 /// Get file name from full path

@@ -13,7 +13,12 @@
 #define TLS_VAL_T(hdr, ptr, val) (IMAGE64(hdr) ? ((PIMAGE_TLS_DIRECTORY64)ptr)->val : ((PIMAGE_TLS_DIRECTORY32)ptr)->val)
 #define CFG_DIR_VAL_T(hdr, dir, val) (IMAGE64(hdr) ? ((PIMAGE_LOAD_CONFIG_DIRECTORY64)dir)->val : ((PIMAGE_LOAD_CONFIG_DIRECTORY32)dir)->val)
 
-#if defined (_WIN81_) || defined (_WIN10_)
+#if defined (_WIN10_)
+typedef PAPI_SET_VALUE_ENTRY_10     PAPISET_VALUE_ENTRY;
+typedef PAPI_SET_VALUE_ARRAY_10     PAPISET_VALUE_ARRAY;
+typedef PAPI_SET_NAMESPACE_ENTRY_10 PAPISET_NAMESPACE_ENTRY;
+typedef PAPI_SET_NAMESPACE_ARRAY_10 PAPISET_NAMESPACE_ARRAY;
+#elif defined (_WIN81_)
 typedef PAPI_SET_VALUE_ENTRY     PAPISET_VALUE_ENTRY;
 typedef PAPI_SET_VALUE_ARRAY     PAPISET_VALUE_ARRAY;
 typedef PAPI_SET_NAMESPACE_ENTRY PAPISET_NAMESPACE_ENTRY;
@@ -839,49 +844,52 @@ NTSTATUS BBResolveApiSet(
     PPEB pPeb = PsGetProcessPeb( pProcess );
     PAPISET_NAMESPACE_ARRAY pApiSetMap = (PAPISET_NAMESPACE_ARRAY)(pPeb32 != NULL ? (PVOID)pPeb32->ApiSetMap : pPeb->ApiSetMap);
 
-    if (memcmp( name->Buffer, L"ext-ms-", 7 ) == 0)
-    {
-        name->Buffer[0] = L'a';
-        name->Buffer[1] = L'p';
-        name->Buffer[2] = L'i';
-    }
-
     // Invalid name
-    if (memcmp( name->Buffer, L"api-", 4 ) != 0)
-    {
+    if ( name == NULL || name->Length < 4 * sizeof(WCHAR) || name->Buffer == NULL ||
+        (memcmp( name->Buffer, L"api-", 4 ) != 0 && memcmp( name->Buffer, L"ext-", 4 ) != 0))
         return STATUS_NOT_FOUND;
-    }
 
     // Iterate api set map
     for (ULONG i = 0; i < pApiSetMap->Count; i++)
     {
-        PAPISET_NAMESPACE_ENTRY pDescriptor = pApiSetMap->Array + i;
+        PAPISET_NAMESPACE_ENTRY pDescriptor = NULL;
+        PAPISET_VALUE_ARRAY pHostArray = NULL;
         wchar_t apiNameBuf[255] = { 0 };
         UNICODE_STRING apiName = { 0 };
 
-        wcscpy_s( apiNameBuf, 255, L"api-" );
-        memcpy( apiNameBuf + 4, (PUCHAR)pApiSetMap + pDescriptor->NameOffset, pDescriptor->NameLength );
-        wcscat_s( apiNameBuf, 255, L".dll" );
+#ifdef _WIN10_
+        pDescriptor = (PAPISET_NAMESPACE_ENTRY)((PUCHAR)pApiSetMap + pApiSetMap->End + i * sizeof( API_SET_NAMESPACE_ENTRY_10 ));
+        pHostArray = (PAPISET_VALUE_ARRAY)((PUCHAR)pApiSetMap + pApiSetMap->Start + sizeof( API_SET_VALUE_ARRAY_10 ) * pDescriptor->Size);
 
+        memcpy( apiNameBuf, (PUCHAR)pApiSetMap + pHostArray->NameOffset, pHostArray->NameLength );
+#else
+        pDescriptor = pApiSetMap->Array + i;
+        memcpy( apiNameBuf, (PUCHAR)pApiSetMap + pDescriptor->NameOffset, pDescriptor->NameLength );
+#endif   
         RtlUnicodeStringInit( &apiName, apiNameBuf );
 
-        // Check if this is a target dll
-        if (RtlCompareUnicodeString( &apiName, name, TRUE ) == 0)
-        {
-            PAPISET_VALUE_ARRAY pHostData = (PAPISET_VALUE_ARRAY)((PUCHAR)pApiSetMap + pDescriptor->DataOffset);
-            PAPISET_VALUE_ENTRY pHost = pHostData->Array;
+        // Check if this is a target api
+        if (BBSafeSearchString( name, &apiName, TRUE ) >= 0)
+        {      
+            PAPISET_VALUE_ENTRY pHost = NULL;
             wchar_t apiHostNameBuf[255] = { 0 };
             UNICODE_STRING apiHostName = { 0 };
 
+#ifdef _WIN10_
+            pHost = (PAPISET_VALUE_ENTRY)((PUCHAR)pApiSetMap + pHostArray->DataOffset);
+#else
+            pHostArray = (PAPISET_VALUE_ARRAY)((PUCHAR)pApiSetMap + pDescriptor->DataOffset);
+            pHost = pHostArray->Array;
+#endif
             // Sanity check
-            if (pHostData->Count < 1)
+            if (pHostArray->Count < 1)
                 return STATUS_NOT_FOUND;
 
             memcpy( apiHostNameBuf, (PUCHAR)pApiSetMap + pHost->ValueOffset, pHost->ValueLength );
             RtlUnicodeStringInit( &apiHostName, apiHostNameBuf );
 
             // No base name redirection
-            if (pHostData->Count == 1 || baseImage == NULL || baseImage->Buffer[0] == 0)
+            if (pHostArray->Count == 1 || baseImage == NULL || baseImage->Buffer[0] == 0)
             {
                 BBSafeInitString( resolved, &apiHostName );
                 return STATUS_SUCCESS;
@@ -905,7 +913,7 @@ NTSTATUS BBResolveApiSet(
                     return STATUS_SUCCESS;
                 }
             }
-        }
+        }     
     }
 
     return status;
@@ -955,9 +963,6 @@ NTSTATUS BBResolveSxS(
     } STRIBG_BUF, *PSTRIBG_BUF;
 
     PSTRIBG_BUF pStringBuf = (PSTRIBG_BUF)pContext->userMem->buffer;
-
-    UNREFERENCED_PARAMETER( name );
-    UNREFERENCED_PARAMETER( resolved );
 
     RtlUnicodeStringInit( &ustrNtdll, L"ntdll.dll" );
 
@@ -1080,6 +1085,8 @@ NTSTATUS BBResolveImagePath(
         RtlUnicodeStringCat( &fullResolved, resolved );
         RtlFreeUnicodeString( resolved );
         RtlFreeUnicodeString( &pathLow );
+
+        //DPRINT( "BlackBone: %s: Resolved image '%wZ' to '%wZ' by ApiSetSchema\n", __FUNCTION__, path, fullResolved );
 
         *resolved = fullResolved;
         return STATUS_SUCCESS;

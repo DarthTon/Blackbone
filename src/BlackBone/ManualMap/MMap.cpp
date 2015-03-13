@@ -751,7 +751,8 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
         return STATUS_NOT_FOUND;
 #else
     bool safeseh = false;
-    _process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->peImage.imageSize(), safeseh );
+    if (!_process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->peImage.imageSize(), safeseh ))
+        return STATUS_UNSUCCESSFUL;
 
     return safeseh ? STATUS_SUCCESS : 
         MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );

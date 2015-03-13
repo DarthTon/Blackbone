@@ -173,6 +173,42 @@ typedef struct _HANDLE_TABLE
     // More fields here...
 } HANDLE_TABLE, *PHANDLE_TABLE;
 
+typedef struct _API_SET_VALUE_ENTRY_10
+{
+    ULONG Flags;
+    ULONG NameOffset;
+    ULONG NameLength;
+    ULONG ValueOffset;
+    ULONG ValueLength;
+} API_SET_VALUE_ENTRY_10, *PAPI_SET_VALUE_ENTRY_10;
+
+typedef struct _API_SET_VALUE_ARRAY_10
+{
+    ULONG Flags;
+    ULONG NameOffset;
+    ULONG Unk;
+    ULONG NameLength;
+    ULONG DataOffset;
+    ULONG Count;
+} API_SET_VALUE_ARRAY_10, *PAPI_SET_VALUE_ARRAY_10;
+
+typedef struct _API_SET_NAMESPACE_ENTRY_10
+{
+    ULONG Limit;
+    ULONG Size;
+} API_SET_NAMESPACE_ENTRY_10, *PAPI_SET_NAMESPACE_ENTRY_10;
+
+typedef struct _API_SET_NAMESPACE_ARRAY_10
+{
+    ULONG Version;
+    ULONG Size;
+    ULONG Flags;
+    ULONG Count;
+    ULONG Start;
+    ULONG End;
+    ULONG Unk[2];
+} API_SET_NAMESPACE_ARRAY_10, *PAPI_SET_NAMESPACE_ARRAY_10;
+
 #pragma warning(default : 4214 4201)
 
 #define GET_VAD_ROOT(Table) Table->BalancedRoot

@@ -837,7 +837,7 @@ bool NtLdr::ScanPatterns( )
         return false;
 
     // Win 10 and later
-    if (IsWindows10OrGreater())
+    if (IsWindows8Point1OrGreater())
     {
     #ifdef USE64
         // LdrpHandleTlsData
@@ -881,7 +881,7 @@ bool NtLdr::ScanPatterns( )
     #endif
     }
     // Win 8.1 and later
-    else if (IsWindows8Point1OrGreater())
+    /*else if (IsWindows8Point1OrGreater())
     {
     #ifdef USE64
         // LdrpHandleTlsData
@@ -910,9 +910,20 @@ bool NtLdr::ScanPatterns( )
         ps2.Search( pStart, scanSize, foundData );
 
         if (!foundData.empty())
+        {
             _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x18);
+            foundData.clear();
+        }
+
+        // LdrProtectMrdata
+        // 83 7D 08 00 8B 35    
+        PatternSearch ps3( "\x83\x7d\x08\x00\x8b\x35", 6 );
+        ps3.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+            _LdrProtectMrdata = static_cast<size_t>(foundData.front() - 0x12);
     #endif
-    }
+    }*/
     // Win 8
     else if (IsWindows8OrGreater())
     {
