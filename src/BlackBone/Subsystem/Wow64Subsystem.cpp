@@ -316,8 +316,8 @@ ptr_t NativeWow64::getPEB( _PEB64* ppeb )
     _PROCESS_BASIC_INFORMATION_T<DWORD64> info = { 0 };
     ULONG bytes = 0;
 
-    GET_IMPORT( NtWow64QueryInformationProcess64 )(_hProcess, ProcessBasicInformation, &info, sizeof(info), &bytes);
-    if (bytes > 0 && GET_IMPORT( NtWow64ReadVirtualMemory64 )(_hProcess, info.PebBaseAddress, ppeb, sizeof(_PEB64), 0) == STATUS_SUCCESS)
+    GET_IMPORT( NtWow64QueryInformationProcess64 )(_hProcess, ProcessBasicInformation, &info, sizeof( info ), &bytes);
+    if (bytes > 0 && GET_IMPORT( NtWow64ReadVirtualMemory64 )(_hProcess, info.PebBaseAddress, ppeb, sizeof( _PEB64 ), 0) == STATUS_SUCCESS)
         return info.PebBaseAddress;
 
     return 0;

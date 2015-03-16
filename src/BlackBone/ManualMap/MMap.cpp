@@ -669,13 +669,14 @@ bool MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
             // Failed to resolve import
             if (expData.procAddress == 0)
             {
-                // TODO: Add error code
+                LastNtStatus( STATUS_ORDINAL_NOT_FOUND );
+
                 if (importFn.importByOrd)
-                    BLACBONE_TRACE( L"ManualMap: Failed to get import #%d from image '%ls'. Status = 0x%x", 
-                                    importFn.importOrdinal, wstrDll.c_str(), LastNtStatus() );
+                    BLACBONE_TRACE( L"ManualMap: Failed to get import #%d from image '%ls'", 
+                                    importFn.importOrdinal, wstrDll.c_str() );
                 else
-                    BLACBONE_TRACE( L"ManualMap: Failed to get import '%s' from image '%ls'. Status = 0x%x",
-                                    importFn.importName.c_str(), wstrDll.c_str(), LastNtStatus() );
+                    BLACBONE_TRACE( L"ManualMap: Failed to get import '%ls' from image '%ls'",
+                                    Utils::AnsiToWstring(importFn.importName).c_str(), wstrDll.c_str() );
                 return false;
             }
 

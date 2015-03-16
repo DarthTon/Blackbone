@@ -33,9 +33,7 @@ public:
     template< typename... Args >
     DWORD64 X64Call( ptr_t func, Args... args )
     {
-
 #ifdef _M_IX86
-
         int argC = sizeof...(Args);
         int i = 0;
         std::vector<DWORD64> vargs{ ((DWORD64)args)... };
@@ -59,12 +57,12 @@ public:
 	    {
 		    mov    back_esp, esp
 		
-		    ;//align esp to 16
+		    ;// align esp to 16
 		    and    esp, 0xFFFFFFF0
 
 		    X64_Start();
 
-		    ;//fill first four arguments
+		    ;// fill first four arguments
 		    push   _rcx
 		    X64_Pop(_RCX); 
 		    push   _rdx
@@ -82,7 +80,7 @@ public:
 		    push   _argC
 		    X64_Pop(_RAX);
 
-		    ;//put rest of arguments on the stack
+		    ;// put rest of arguments on the stack
 		    test   eax, eax
 		    jz     _ls_e
             lea    edi, dword ptr[edi + 8 * eax - 8]
@@ -96,18 +94,18 @@ public:
 		    jmp    _ls
 		    _ls_e:
 
-		    ;//create stack space for spilling registers
+		    ;// create stack space for spilling registers
 		    sub    esp, 0x20
 		    call   _func
 
-		    ;//cleanup stack
+		    ;// cleanup stack
 		    push   _argC
 		    X64_Pop(_RCX);
             lea    esp, dword ptr[esp + 8 * ecx + 0x20]
 
 		    pop    edi
 
-		    //set return value
+		    // set return value
 		    X64_Push(_RAX);
             pop    _rax.dw[0]
 

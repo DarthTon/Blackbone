@@ -836,14 +836,14 @@ bool NtLdr::ScanPatterns( )
     if(pStart == nullptr)
         return false;
 
-    // Win 10 and later
+    // Win 8.1 and later
     if (IsWindows8Point1OrGreater())
     {
     #ifdef USE64
         // LdrpHandleTlsData
         // 44 8D 43 09 4C 8D 4C 24 38
-        PatternSearch ps2( "\x44\x8d\x43\x09\x4c\x8d\x4c\x24\x38" );
-        ps2.Search( pStart, scanSize, foundData );
+        PatternSearch ps( "\x44\x8d\x43\x09\x4c\x8d\x4c\x24\x38" );
+        ps.Search( pStart, scanSize, foundData );
 
         if (!foundData.empty())
             _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x43);
@@ -858,6 +858,21 @@ bool NtLdr::ScanPatterns( )
             _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
             _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x23);
             foundData.clear();
+        }
+        // Rescan using old pattern
+        else
+        {
+            // RtlInsertInvertedFunctionTable
+            // 8D 45 F4 89 55 F8 50 8D
+            PatternSearch ps12( "\x8d\x45\xf4\x89\x55\xf8\x50\x8d\x55\xfc" );
+            ps12.Search( pStart, scanSize, foundData );
+
+            if (!foundData.empty())
+            {
+                _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
+                _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x1D);
+                foundData.clear();
+            }
         }
 
         // LdrpHandleTlsData
@@ -880,50 +895,6 @@ bool NtLdr::ScanPatterns( )
             _LdrProtectMrdata = static_cast<size_t>(foundData.front() - 0x12);
     #endif
     }
-    // Win 8.1 and later
-    /*else if (IsWindows8Point1OrGreater())
-    {
-    #ifdef USE64
-        // LdrpHandleTlsData
-        // 44 8D 43 09 4C 8D 4C 24 38
-        PatternSearch ps2( "\x44\x8d\x43\x09\x4c\x8d\x4c\x24\x38" );
-        ps2.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x43);
-    #else
-        // RtlInsertInvertedFunctionTable
-        // 8D 45 F4 89 55 F8 50 8D
-        PatternSearch ps1( "\x8d\x45\xf4\x89\x55\xf8\x50\x8d\x55\xfc" );
-        ps1.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
-            _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front( ) + 0x1D);
-            foundData.clear();
-        }
-
-        // LdrpHandleTlsData
-        // 8D 45 A8 50 6A 09
-        PatternSearch ps2( "\x8d\x45\xa8\x50\x6a\x09" );
-        ps2.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x18);
-            foundData.clear();
-        }
-
-        // LdrProtectMrdata
-        // 83 7D 08 00 8B 35    
-        PatternSearch ps3( "\x83\x7d\x08\x00\x8b\x35", 6 );
-        ps3.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-            _LdrProtectMrdata = static_cast<size_t>(foundData.front() - 0x12);
-    #endif
-    }*/
     // Win 8
     else if (IsWindows8OrGreater())
     {
@@ -939,7 +910,7 @@ bool NtLdr::ScanPatterns( )
         // RtlInsertInvertedFunctionTable
         // 8B FF 55 8B EC 51 51 53 57 8B 7D 08 8D
         PatternSearch ps1( "\x8b\xff\x55\x8b\xec\x51\x51\x53\x57\x8b\x7d\x08\x8d" );
-        ps1.Search(pStart, scanSize, foundData );
+        ps1.Search( pStart, scanSize, foundData );
 
         if(!foundData.empty())
         {
@@ -953,11 +924,9 @@ bool NtLdr::ScanPatterns( )
         PatternSearch ps2( "\x8b\x45\x08\x89\x45\xa0" );
         ps2.Search( pStart, scanSize, foundData );
 
-        if(!foundData.empty())
-            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0xC);
-                 
+        if (!foundData.empty())
+            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0xC);             
     #endif
-
     }
     // Win 7
     else if(IsWindows7OrGreater())

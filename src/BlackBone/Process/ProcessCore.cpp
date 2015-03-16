@@ -2,6 +2,7 @@
 #include "ProcessCore.h"
 #include "../Misc/DynImport.h"
 #include "../Include/Macro.h"
+#include <VersionHelpers.h>
 
 namespace blackbone
 {
@@ -34,6 +35,10 @@ NTSTATUS ProcessCore::Open( DWORD pid, DWORD access )
 
     // Handle current process differently
     _hProcess = (pid == GetCurrentProcessId()) ? GetCurrentProcess() : OpenProcess( access, false, pid );
+
+    // Some routines in win10 does not support pseudo handle
+    if (IsWindows10OrGreater() && pid == GetCurrentProcessId())
+        _hProcess = OpenProcess( PROCESS_ALL_ACCESS, FALSE, pid );
 
     if (_hProcess != NULL)
     {
