@@ -41,7 +41,8 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, 
 {    
     AsmJitHelper a;
     uint64_t result = 0;
-    
+    auto& mods = _proc.modules();
+
 #ifdef USE64 
 
     // Add module to module table
@@ -152,7 +153,7 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, 
     if (!_pVEHCode.valid())
         return LastNtStatus();
 
-    // Resolve compiler incremental table address if any
+    // Resolve compiler incremental table address, if any
     void *pFunc = ResolveJmp( &VectoredHandler );
     size_t fnSize = static_cast<size_t>(SizeOfProc( pFunc ));
     size_t dataOfs = 0, code_ofs = 0, code_ofs2 = 0;;
@@ -184,11 +185,13 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, 
         }
     }
 
+    auto pDecode = mods.GetExport( mods.GetModule( L"ntdll.dll", Sections, mt ), "RtlDecodeSystemPointer" ).procAddress;
+
     // Write handler data into target process
-    if (_pVEHCode.Write( 0, fnSize, pFunc ) != STATUS_SUCCESS ||
-         _pVEHCode.Write( dataOfs, _proc.nativeLdr().LdrpInvertedFunctionTable() ) != STATUS_SUCCESS ||
-         _pVEHCode.Write( code_ofs, &DecodeSystemPointer ) != STATUS_SUCCESS ||
-         _pVEHCode.Write( code_ofs2, _proc.nativeLdr().LdrProtectMrdata() ) != STATUS_SUCCESS)
+    if ( !NT_SUCCESS( _pVEHCode.Write( 0, fnSize, pFunc ) ) ||
+         !NT_SUCCESS( _pVEHCode.Write( dataOfs, _proc.nativeLdr().LdrpInvertedFunctionTable() ) ) ||
+         !NT_SUCCESS( _pVEHCode.Write( code_ofs, static_cast<size_t>(pDecode) ) ) ||
+         !NT_SUCCESS( _pVEHCode.Write( code_ofs2, _proc.nativeLdr().LdrProtectMrdata() ) ))
     {
         _pVEHCode.Free();
         return LastNtStatus();
@@ -196,8 +199,7 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, 
 
 #endif
     // AddVectoredExceptionHandler(0, pHandler);
-    auto& mods = _proc.modules();
-    auto pAddHandler = mods.GetExport( mods.GetModule( L"ntdll.dll", LdrList, mt ), "RtlAddVectoredExceptionHandler" ).procAddress;
+    auto pAddHandler = mods.GetExport( mods.GetModule( L"ntdll.dll", Sections, mt ), "RtlAddVectoredExceptionHandler" ).procAddress;
     if (pAddHandler == 0)
         return STATUS_NOT_FOUND;
 
@@ -301,7 +303,7 @@ LONG CALLBACK VectoredHandler( PEXCEPTION_POINTERS ExceptionInfo )
 LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*ExceptionInfo*/ )
 {
     PEXCEPTION_REGISTRATION_RECORD pFs;
-    PRTL_INVERTED_FUNCTION_TABLE7 pTable;//= (PRTL_INVERTED_FUNCTION_TABLE7)0x77b27270;
+    PRTL_INVERTED_FUNCTION_TABLE7 pTable;// = (PRTL_INVERTED_FUNCTION_TABLE7)0x777dc2b0;
     PRTL_INVERTED_FUNCTION_TABLE_ENTRY pEntries;
     void( __stdcall* LdrProtectMrdata )(int a);
     PDWORD pDec, pStart;
@@ -309,6 +311,7 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
     DWORD tmp;
     PEB_T* peb;
     bool newHandler;
+    bool useNewTable;
 
     __asm
     {
@@ -329,13 +332,15 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
     verMajor = peb->OSMajorVersion;
     verMinor = peb->OSMinorVersion;
 
-    if (verMajor >= 6 && verMinor >= 2)
+    useNewTable = (verMajor >= 6 && verMinor >= 2) || verMajor >= 10;
+
+    if (useNewTable)
         pEntries = reinterpret_cast<decltype(pEntries)>(GET_FIELD_PTR( reinterpret_cast<PRTL_INVERTED_FUNCTION_TABLE8>(pTable), Entries ));
     else
         pEntries = reinterpret_cast<decltype(pEntries)>(GET_FIELD_PTR( pTable, Entries ));
 
 
-    //LdrProtectMrdata = (decltype(LdrProtectMrdata))0x77A64FB2;
+    //LdrProtectMrdata = (decltype(LdrProtectMrdata))0x777043aa;
     if(LdrProtectMrdata)
         LdrProtectMrdata( 0 );
 
@@ -355,9 +360,9 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
             {
                 newHandler = false;
 
-                // Win8 always has ntdll.dll as first image, so we can safely skip its handlers.
+                // Win8+ always has ntdll.dll as first image, so we can safely skip its handlers.
                 // Also ntdll.dll ExceptionDirectory isn't Encoded via RtlEncodeSystemPointer (it's plain address)
-                if (verMajor >= 6 && verMinor >= 2 && imageIndex == 0)
+                if (useNewTable && imageIndex == 0)
                     break;
 
                 //pStart = (DWORD*)DecodeSystemPointer( pEntries[imageIndex].ExceptionDirectory );
@@ -400,7 +405,7 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
 
     // Return control to SEH
     //return EXCEPTION_CONTINUE_SEARCH;
-     __asm
+    __asm
     {
         popad
         mov esp, ebp

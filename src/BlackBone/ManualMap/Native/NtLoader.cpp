@@ -4,6 +4,7 @@
 #include "../../Misc/Utils.h"
 #include "../../Include/Macro.h"
 #include "../../Misc/DynImport.h"
+#include "../../Misc/trace.hpp"
 
 #include "../contrib/VersionHelpers.h"
 
@@ -45,7 +46,7 @@ bool NtLdr::Init()
 
 /// <summary>
 /// Add module to some loader structures 
-/// (LdrpHashTable, LdrpModuleIndex( win8 only ), InMemoryOrderModuleList( win7 only ))
+/// (LdrpHashTable, LdrpModuleIndex( win8+ only ), InMemoryOrderModuleList( win7 only ))
 /// </summary>
 /// <param name="hMod">Module base address</param>
 /// <param name="ImageSize">Size of image</param>
@@ -226,6 +227,7 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
     
     AsmJitHelper a;
     uint64_t result = 0;
+    auto& memory = _process.memory();
 
     // Invalid addresses. Probably pattern scan has failed
     if (_RtlInsertInvertedFunctionTable == 0 || _LdrpInvertedFunctionTable == 0)
@@ -240,7 +242,7 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
     // Try to find module address in table. 
     // If found - no additional work is required.
     //
-    _process.memory().Read( _LdrpInvertedFunctionTable, sizeof(table), &table );
+    memory.Read( _LdrpInvertedFunctionTable, sizeof( table ), &table );
     for (DWORD i = 0; i < table.Count; i++)
         if(Entries[i].ImageBase == ModuleBase)
             return true;
@@ -258,7 +260,7 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
     a.GenEpilogue();
 
     _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-    _process.memory().Read( _LdrpInvertedFunctionTable, sizeof(table), &table );
+    memory.Read( _LdrpInvertedFunctionTable, sizeof( table ), &table );
 
     for(DWORD i = 0; i < table.Count; i++)
     {
@@ -275,8 +277,8 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
         //
         PIMAGE_RUNTIME_FUNCTION_ENTRY pImgEntry = nullptr;
 
-        // Allocate memory for 256 possible handlers
-        auto block = _process.memory().Allocate( sizeof( DWORD ) * 0x100, PAGE_READWRITE );
+        // Allocate memory for 512 possible handlers
+        auto block = memory.Allocate( sizeof( DWORD ) * 0x200, PAGE_READWRITE );
         block.Release();
         pImgEntry = block.ptr<decltype(pImgEntry)>();
 
@@ -290,9 +292,9 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
         // mrdata is read-only by default 
         // LdrProtectMrdata is used to make it writable when needed
         DWORD flOld = 0;
-        _process.memory().Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), PAGE_EXECUTE_READWRITE, &flOld );
-        auto status = _process.memory().Write( _LdrpInvertedFunctionTable + field_ofst, pEncoded );
-        _process.memory().Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), flOld, &flOld );
+        memory.Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), PAGE_EXECUTE_READWRITE, &flOld );
+        auto status = memory.Write( _LdrpInvertedFunctionTable + field_ofst, pEncoded );
+        memory.Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), flOld, &flOld );
 
         return NT_SUCCESS( status );
     }
@@ -301,7 +303,7 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
 }
 
 /// <summary>
-///  Initialize OS-specific module entry
+/// Initialize OS-specific module entry
 /// </summary>
 /// <param name="ModuleBase">Module base address.</param>
 /// <param name="ImageSize">Size of image.</param>
@@ -863,7 +865,7 @@ bool NtLdr::ScanPatterns( )
         else
         {
             // RtlInsertInvertedFunctionTable
-            // 8D 45 F4 89 55 F8 50 8D
+            // 8D 45 F4 89 55 F8 50 8D 55 FC
             PatternSearch ps12( "\x8d\x45\xf4\x89\x55\xf8\x50\x8d\x55\xfc" );
             ps12.Search( pStart, scanSize, foundData );
 
@@ -876,9 +878,9 @@ bool NtLdr::ScanPatterns( )
         }
 
         // LdrpHandleTlsData
-        // 8D 45 A8 50 6A 09
-        PatternSearch ps2( "\x8d\x45\xa8\x50\x6a\x09" );
-        ps2.Search( pStart, scanSize, foundData );
+        // 8D 45 ?? 50 6A 09 6A 01 8B C1
+        PatternSearch ps2( "\x8d\x45\xcc\x50\x6a\x09\x6a\x01\x8b\xc1" );
+        ps2.Search( 0xCC, pStart, scanSize, foundData );
 
         if (!foundData.empty())
         {
@@ -998,6 +1000,35 @@ bool NtLdr::ScanPatterns( )
     #endif
     }
 
+    //
+    // Report errors
+    // 
+#ifndef BLACBONE_NO_TRACE
+    if (_LdrpHashTable == 0)
+        BLACBONE_TRACE( "NativeLdr: LdrpHashTable not found" );
+    if (IsWindows8OrGreater() && _LdrpModuleIndexBase == 0)
+        BLACBONE_TRACE( "NativeLdr: LdrpModuleIndexBase not found" );
+    if (_LdrHeapBase == 0)
+        BLACBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
+    if (_LdrpHandleTlsData == 0)
+        BLACBONE_TRACE( "NativeLdr: LdrpHandleTlsData not found" );
+#ifdef USE64
+    if (IsWindows7OrGreater())
+    {
+        if (_LdrKernel32PatchAddress == 0)
+            BLACBONE_TRACE( "NativeLdr: LdrKernel32PatchAddress not found" );
+        if (_APC64PatchAddress == 0)
+            BLACBONE_TRACE( "NativeLdr: APC64PatchAddress not found" );
+    }
+#else
+    if (_LdrpInvertedFunctionTable == 0)
+        BLACBONE_TRACE( "NativeLdr: LdrpInvertedFunctionTable not found" );
+    if (_RtlInsertInvertedFunctionTable == 0)
+        BLACBONE_TRACE( "NativeLdr: RtlInsertInvertedFunctionTable not found" );
+#endif
+    if (IsWindows8Point1OrGreater() && _LdrProtectMrdata == 0)
+        BLACBONE_TRACE( "NativeLdr: LdrProtectMrdata not found" );
+#endif
     return true;
 }
 
