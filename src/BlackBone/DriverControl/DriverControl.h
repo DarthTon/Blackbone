@@ -2,14 +2,16 @@
 
 #include "../Include/Winheaders.h"
 #include "../Include/Types.h"
+#include "../Include/Macro.h"
 #include "../../BlackBoneDrv/BlackBoneDef.h"
 
 #include <string>
 #include <map>
 
+ENUM_OPS( KMmapFlags );
+
 namespace blackbone
 {
-
 // [Original ptr, size] <--> [Mapped ptr]
 typedef std::map < std::pair<ptr_t, uint32_t>, ptr_t > mapMemoryMap;
 

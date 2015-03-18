@@ -372,7 +372,7 @@ DWORD RemoteExec::CreateWorkerThread()
         a.ExitThreadWithStatus( (size_t)pExitThread, _userData.ptr<size_t>() );
 
         // Write code into process
-        LARGE_INTEGER liDelay = { 0 };
+        LARGE_INTEGER liDelay = { { 0 } };
         liDelay.QuadPart = -10 * 1000 * 5;
 
         _workerCode.Write( 0, liDelay );

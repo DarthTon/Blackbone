@@ -146,7 +146,7 @@ const ModuleData* ProcessModules::GetMainModule()
 {
     if (_core.native()->GetWow64Barrier().x86OS)
     {
-        _PEB32 peb = { 0 };
+        _PEB32 peb = { { { 0 } } };
 
         if (_proc.core().peb( &peb ) == 0)
             return nullptr;
@@ -155,7 +155,7 @@ const ModuleData* ProcessModules::GetMainModule()
     }
     else
     {
-        _PEB64 peb = { 0 };
+        _PEB64 peb = { { { 0 } } };
 
         if (_proc.core().peb( &peb ) == 0)
             return nullptr;
@@ -465,7 +465,7 @@ bool ProcessModules::Unload( const ModuleData* hMod )
     // Unload routine
     auto pUnload = GetExport( GetModule( L"ntdll.dll", LdrList, hMod->type ), "LdrUnloadDll" );
     if (pUnload.procAddress == 0)
-        return nullptr;
+        return false;
 
     // Special case for unloading 64 bit modules from WOW64 process
     if (_proc.core().isWow64() && hMod->type == mt_mod64)

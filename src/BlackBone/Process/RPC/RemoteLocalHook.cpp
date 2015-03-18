@@ -24,7 +24,7 @@ RemoteLocalHook::~RemoteLocalHook()
 
 NTSTATUS RemoteLocalHook::SetHook( ptr_t address, asmjit::Assembler& /*hook*/ )
 {
-    HookCtx ctx = { 0 };
+    HookCtx ctx = { { 0 } };
     HOOK_CTX_T( ctx_t, ctx );
     UNREFERENCED_PARAMETER( ctx_t );
 

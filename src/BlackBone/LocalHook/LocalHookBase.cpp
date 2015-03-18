@@ -138,13 +138,13 @@ LONG NTAPI DetourBase::VectoredHandler( PEXCEPTION_POINTERS excpt )
 {
     switch (excpt->ExceptionRecord->ExceptionCode)
     {
-        case EXCEPTION_BREAKPOINT:
+        case static_cast<DWORD>(EXCEPTION_BREAKPOINT):
             return Int3Handler( excpt );
 
-        case EXCEPTION_ACCESS_VIOLATION:
+        case static_cast<DWORD>(EXCEPTION_ACCESS_VIOLATION):
             return AVHandler( excpt );
 
-        case EXCEPTION_SINGLE_STEP:
+        case static_cast<DWORD>(EXCEPTION_SINGLE_STEP):
             return StepHandler( excpt );
 
         default:

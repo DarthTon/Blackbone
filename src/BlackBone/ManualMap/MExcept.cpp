@@ -305,13 +305,11 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
     PEXCEPTION_REGISTRATION_RECORD pFs;
     PRTL_INVERTED_FUNCTION_TABLE7 pTable;// = (PRTL_INVERTED_FUNCTION_TABLE7)0x777dc2b0;
     PRTL_INVERTED_FUNCTION_TABLE_ENTRY pEntries;
-    void( __stdcall* LdrProtectMrdata )(int a);
+    void( __stdcall* LdrProtectMrdata )(BOOL a);
     PDWORD pDec, pStart;
-    DWORD verMajor, verMinor;
-    DWORD tmp;
+    DWORD verMajor, verMinor, tmp;
     PEB_T* peb;
-    bool newHandler;
-    bool useNewTable;
+    bool newHandler, useNewTable;
 
     __asm
     {
@@ -342,7 +340,7 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
 
     //LdrProtectMrdata = (decltype(LdrProtectMrdata))0x777043aa;
     if(LdrProtectMrdata)
-        LdrProtectMrdata( 0 );
+        LdrProtectMrdata( FALSE );
 
     //
     // Add each handler to LdrpInvertedFunctionTable
@@ -401,7 +399,7 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
     }
 
     if(LdrProtectMrdata)
-        LdrProtectMrdata( 1 );
+        LdrProtectMrdata( TRUE );
 
     // Return control to SEH
     //return EXCEPTION_CONTINUE_SEARCH;

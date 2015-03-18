@@ -227,7 +227,7 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
             continue;
 
         // Get local handle copy
-        status = GET_IMPORT( NtDuplicateObject )(_core._hProcess, (HANDLE)handleInfo->Handles[i].Handle, GetCurrentProcess(), &hLocal, 0, 0, DUPLICATE_SAME_ACCESS);
+        status = GET_IMPORT( NtDuplicateObject )(_core._hProcess, reinterpret_cast<HANDLE>(handleInfo->Handles[i].Handle), GetCurrentProcess(), &hLocal, 0, 0, DUPLICATE_SAME_ACCESS);
         if (!NT_SUCCESS( status ))
             continue;
 
@@ -265,7 +265,7 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
         //
         // Fill handle info structure
         //
-        info.handle   = (HANDLE)handleInfo->Handles[i].Handle;
+        info.handle   = reinterpret_cast<HANDLE>(handleInfo->Handles[i].Handle);
         info.access   = handleInfo->Handles[i].GrantedAccess;
         info.flags    = handleInfo->Handles[i].Flags;
         info.pObject  = handleInfo->Handles[i].Object;
@@ -411,10 +411,7 @@ NTSTATUS Process::EnumByNameOrPID(
     for (auto pInfo = reinterpret_cast<_SYSTEM_PROCESS_INFORMATION_T<DWORD_PTR>*>(buffer);;)
     {
         //  Skip idle process, compare name or compare pid
-        if (pInfo->UniqueProcessId != 0 && (
-            name.empty() && pid == 0 ||
-            _wcsicmp( name.c_str(), (wchar_t*)pInfo->ImageName.Buffer ) == 0 ||
-            pid == pInfo->UniqueProcessId))
+        if (pInfo->UniqueProcessId != 0 && ((name.empty() && pid == 0) || _wcsicmp( name.c_str(), (wchar_t*)pInfo->ImageName.Buffer ) == 0 ||  pid == pInfo->UniqueProcessId))
         {
             ProcessInfo info;
 

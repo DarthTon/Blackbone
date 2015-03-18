@@ -42,8 +42,8 @@ public:
         DWORD64 _rdx = (i < argC) ? vargs[i++] : 0;
         DWORD64 _r8 = (i < argC) ? vargs[i++] : 0;
         DWORD64 _r9 = (i < argC) ? vargs[i++] : 0;
-        reg64 _rax, _r10;
-        _rax.v = _r10.v = 0;
+        reg64 _rax;
+        _rax.v = 0;
 
         DWORD64 restArgs = (i < argC) ? (DWORD64)&vargs[i] : 0;
 	
@@ -73,6 +73,8 @@ public:
             X64_Pop(_R9);
 	
             push   edi
+
+            ;// Preserve R10 for win10 WOW64 call
             X64_Push( _R10 )
 
             push   restArgs
@@ -98,15 +100,7 @@ public:
             ;// create stack space for spilling registers
             sub    esp, 0x20
 
-            ;// Preserve R10 for win10 WOW64 call
-            //X64_Push( _R10 )
-            //pop _r10.dw[0]
-
             call   _func
-
-            ;// restore R10
-            //push   _r10.v
-            //X64_Pop( _R10 )
 
             ;// cleanup stack
             push   _argC
@@ -160,68 +154,70 @@ public:
 
 	    __asm
 	    {
-		    ;//keep original esp in back_esp variable
-		    mov    back_esp, esp
+            ;//keep original esp in back_esp variable
+            mov    back_esp, esp
 		
-		    ;//align esp to 8, without aligned stack some syscalls may return errors !
-		    and    esp, 0xFFFFFFF8
+            ;//align esp to 8, without aligned stack some syscalls may return errors !
+            and    esp, 0xFFFFFFF8
 
-		    X64_Start();
+            X64_Start();
 
-		    ;//fill first four arguments
-		    push   _rcx
-		    X64_Pop(_RCX);
-		    push   _rdx
-		    X64_Pop(_RDX);
-		    push   _r8
-		    X64_Pop(_R8);
-		    push   _r9
-		    X64_Pop(_R9);
+            ;//fill first four arguments
+            push   _rcx
+            X64_Pop(_RCX);
+            push   _rdx
+            X64_Pop(_RDX);
+            push   _r8
+            X64_Pop(_R8);
+            push   _r9
+            X64_Pop(_R9);
 	
-		    push   edi
+            push   edi
+            X64_Push( _R10 )
 
-		    push   restArgs
-		    X64_Pop(_RDI);
+            push   restArgs
+            X64_Pop(_RDI);
 
-		    push   _argC
-		    X64_Pop(_RAX);
+            push   _argC
+            X64_Pop(_RAX);
 
-		    ;//put rest of arguments on the stack
-		    test   eax, eax
-		    jz     _ls_e
-		    lea    edi, dword ptr [edi + 8*eax - 8]
+            ;//put rest of arguments on the stack
+            test   eax, eax
+            jz     _ls_e
+            lea    edi, dword ptr [edi + 8*eax - 8]
 
-		    _ls:
-		    test   eax, eax
-		    jz     _ls_e
-		    push   dword ptr [edi]
-		    sub    edi, 8
-		    sub    eax, 1
-		    jmp    _ls
-		    _ls_e:
+            _ls:
+            test   eax, eax
+            jz     _ls_e
+            push   dword ptr [edi]
+            sub    edi, 8
+            sub    eax, 1
+            jmp    _ls
+            _ls_e:
 
-		    ;//create stack space for spilling registers
-		    sub    esp, 0x28    
+            ;//create stack space for spilling registers
+            sub    esp, 0x28    
 
             mov eax, idx
             push _rcx
             X64_Pop( _R10 );
             EMIT( 0x0F ) EMIT( 0x05 );  // syscall
 
-		    ;//cleanup stack
-		    push   _argC
-		    X64_Pop(_RCX);
-		    lea    esp, dword ptr [esp + 8*ecx + 0x20]
+            ;//cleanup stack
+            push   _argC
+            X64_Pop(_RCX);
+            lea    esp, dword ptr [esp + 8*ecx + 0x20]
 
-		    pop    edi
+            X64_Pop( _R10 )
+            pop    edi
 
-		    ;//set return value
-		    X64_Push(_RAX);
-		    pop    _rax.dw[0]
+            ;//set return value
+            X64_Push(_RAX);
+            pop    _rax.dw[0]
 
-		    X64_End();
+            X64_End();
 
-		    mov    esp, back_esp
+            mov    esp, back_esp
 	    }
 
 	    return _rax.v;

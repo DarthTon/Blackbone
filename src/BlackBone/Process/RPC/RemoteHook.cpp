@@ -90,7 +90,7 @@ bool RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const v
     if (!EnsureDebug())
         return false;
 
-    HookData data = { 0 };
+    HookData data = { { 0 } };
 
     // Store old byte
     data.oldByte = _memory.Read<uint8_t>( ptr );
@@ -295,19 +295,19 @@ DWORD RemoteHook::OnDebugEvent( const DEBUG_EVENT& DebugEv )
 {
     switch (DebugEv.u.Exception.ExceptionRecord.ExceptionCode)
     {
-    case EXCEPTION_BREAKPOINT:
-    case STATUS_WX86_BREAKPOINT:
+    case static_cast<DWORD>(EXCEPTION_BREAKPOINT):
+    case static_cast<DWORD>(STATUS_WX86_BREAKPOINT):
         return OnBreakpoint( DebugEv );
 
-    case EXCEPTION_SINGLE_STEP:
-    case STATUS_WX86_SINGLE_STEP:
+    case static_cast<DWORD>(EXCEPTION_SINGLE_STEP):
+    case static_cast<DWORD>(STATUS_WX86_SINGLE_STEP):
         return OnSinglestep( DebugEv );
 
-    case EXCEPTION_ACCESS_VIOLATION:
+    case static_cast<DWORD>(EXCEPTION_ACCESS_VIOLATION):
         return OnAccessViolation( DebugEv );
 
     default:
-        return (DWORD)DBG_EXCEPTION_NOT_HANDLED;
+        return static_cast<DWORD>(DBG_EXCEPTION_NOT_HANDLED);
     }
 }
 
@@ -561,7 +561,7 @@ DWORD RemoteHook::StackBacktrace( ptr_t ip, ptr_t sp, Thread& thd, std::vector<s
     // Get stack base
     if(_core.isWow64())
     {
-        _TEB32 teb32 = { 0 };
+        _TEB32 teb32 = { { 0 } };
         if (thd.teb( &teb32 ) == 0)
             return 0;
 
@@ -569,7 +569,7 @@ DWORD RemoteHook::StackBacktrace( ptr_t ip, ptr_t sp, Thread& thd, std::vector<s
     }
     else
     {
-        _TEB64 teb64 = { 0 };
+        _TEB64 teb64 = { { 0 } };
         if (thd.teb( &teb64 ) == 0)
             return 0;
 

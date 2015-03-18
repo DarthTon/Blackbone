@@ -158,7 +158,7 @@ blackbone::ptr_t RemoteMemory::TranslateAddress( ptr_t address, bool resolveFaul
 /// <returns>true on success</returns>
 NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
 {
-    static char* procNames[] = { "NtAllocateVirtualMemory", "NtFreeVirtualMemory", "NtMapViewOfSection", "NtUnmapViewOfSection" };
+    static const char* procNames[] = { "NtAllocateVirtualMemory", "NtFreeVirtualMemory", "NtMapViewOfSection", "NtUnmapViewOfSection" };
 
     uint8_t* pTranslated = nullptr;
     ptr_t pProc = 0;
@@ -212,7 +212,7 @@ bool RemoteMemory::RestoreHook( OperationType hkType )
 {
     uint8_t* pTranslated = nullptr;
     ptr_t pProc = 0;
-    static char* procNames[] = { "NtAllocateVirtualMemory", "NtFreeVirtualMemory", "NtMapViewOfSection", "NtUnmapViewOfSection" };
+    static const char* procNames[] = { "NtAllocateVirtualMemory", "NtFreeVirtualMemory", "NtMapViewOfSection", "NtUnmapViewOfSection" };
 
     // Not hooked
     if (!_hooked[hkType])

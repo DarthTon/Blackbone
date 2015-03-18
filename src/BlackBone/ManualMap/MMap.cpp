@@ -838,7 +838,7 @@ bool MMap::InitializeCookie( ImageContext* pImage )
         BLACBONE_TRACE( L"ManualMap: Performing security cookie initializtion for image '%ls'", pImage->FileName.c_str() );
 
         FILETIME systime = { 0 };
-        LARGE_INTEGER PerformanceCount = { 0 };
+        LARGE_INTEGER PerformanceCount = { { 0 } };
         uintptr_t cookie = 0;
 
         GetSystemTimeAsFileTime( &systime );

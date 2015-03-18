@@ -12,7 +12,7 @@ namespace blackbone
 Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
     : _hProcess( hProcess )
 {
-    SYSTEM_INFO info = { 0 };
+    SYSTEM_INFO info = { { 0 } };
     GetNativeSystemInfo( &info );
     _pageSize = info.dwPageSize;
 
@@ -440,7 +440,7 @@ size_t Native::EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool
 template<typename T>
 size_t Native::EnumModulesT( Native::listModules& result )
 {
-    typename _PEB_T2<T>::type peb = { 0 };
+    typename _PEB_T2<T>::type peb = { { { 0 } } };
     _PEB_LDR_DATA2<T> ldr = { 0 };
 
     result.clear();
@@ -453,7 +453,7 @@ size_t Native::EnumModulesT( Native::listModules& result )
         {
             ModuleData data;
             wchar_t localPath[512] = { 0 };
-            _LDR_DATA_TABLE_ENTRY_BASE<T> localdata = { 0 };
+            _LDR_DATA_TABLE_ENTRY_BASE<T> localdata = { { 0 } };
 
             ReadProcessMemoryT( head, &localdata, sizeof(localdata), 0 );
             ReadProcessMemoryT( localdata.FullDllName.Buffer, localPath, localdata.FullDllName.Length, 0 );

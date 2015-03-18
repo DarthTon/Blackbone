@@ -21,7 +21,7 @@ inline void DoTraceV<char>( const char* fmt, va_list va_args )
     OutputDebugStringA( buf );
 
 #ifdef CONSOLE_TRACE
-    printf( buf );
+    printf_s( buf );
 #endif
 }
 
@@ -34,7 +34,7 @@ inline void DoTraceV<wchar_t>( const wchar_t* fmt, va_list va_args )
     OutputDebugStringW( buf );
 
 #ifdef CONSOLE_TRACE
-    wprintf( buf );
+    wprintf_s( buf );
 #endif
 }
 

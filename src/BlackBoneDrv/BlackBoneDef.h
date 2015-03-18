@@ -1,7 +1,7 @@
 #pragma once
 
 #define BLACKBONE_DEVICE_NAME           L"BlackBone"
-#define BLACKBONE_DEVICE_FILE           L"\\\\.\\" ## BLACKBONE_DEVICE_NAME
+#define BLACKBONE_DEVICE_FILE           L"\\\\.\\" BLACKBONE_DEVICE_NAME
 
 #define FILE_DEVICE_BLACKBONE           0x00008005
 
@@ -426,12 +426,6 @@ typedef enum _MmapFlags
     KNoSxS           = 0x08000, // Do not apply SxS activation context
     KNoTLS           = 0x10000, // Skip TLS initialization and don't execute TLS callbacks
 } KMmapFlags;
-
-#ifdef __cplusplus
-#include "../Include/Macro.h"
-ENUM_OPS(KMmapFlags);
-#endif // __cplusplus
-
 
 /// <summary>
 /// Input for IOCTL_BLACKBONE_INJECT_DLL

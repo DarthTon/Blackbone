@@ -73,7 +73,7 @@ NTSTATUS ProcessCore::Open( HANDLE handle )
 NTSTATUS ProcessCore::Init()
 {
     // Detect x86 OS
-    SYSTEM_INFO info = { 0 };
+    SYSTEM_INFO info = { { 0 } };
     GetNativeSystemInfo( &info );
 
     if (info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)

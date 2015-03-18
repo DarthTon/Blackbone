@@ -20,7 +20,7 @@ public:
 #ifdef USE64
         disp_ofst = baseval;
 #else
-        UNREFERENCED_PARAMETER( baseval );
+        baseval = 0;
 #endif
     }
 

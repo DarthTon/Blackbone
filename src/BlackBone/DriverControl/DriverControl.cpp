@@ -2,7 +2,6 @@
 #include "../Misc/Utils.h"
 #include "../Misc/Trace.hpp"
 #include "../Misc/DynImport.h"
-#include "../Include/Macro.h"
 
 #include "VersionHelpers.h"
 
@@ -42,8 +41,12 @@ NTSTATUS DriverControl::EnsureLoaded( const std::wstring& path /*= L"" */ )
         return STATUS_SUCCESS;
 
     // Try to open handle to existing driver
-    _hDriver = CreateFileW( BLACKBONE_DEVICE_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                            NULL, OPEN_EXISTING, 0, NULL );
+    _hDriver = CreateFileW( 
+        BLACKBONE_DEVICE_FILE, 
+        GENERIC_READ | GENERIC_WRITE, 
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL, OPEN_EXISTING, 0, NULL
+        );
 
     if (_hDriver != INVALID_HANDLE_VALUE)
         return _loadStatus = STATUS_SUCCESS;
@@ -89,8 +92,12 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
         return LastNtStatus( status );
     }
 
-    _hDriver = CreateFileW( BLACKBONE_DEVICE_FILE, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                            NULL, OPEN_EXISTING, 0, NULL );
+    _hDriver = CreateFileW( 
+        BLACKBONE_DEVICE_FILE, 
+        GENERIC_READ | GENERIC_WRITE, 
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL, OPEN_EXISTING, 0, NULL
+        );
 
     if (_hDriver == INVALID_HANDLE_VALUE)
     {
@@ -98,7 +105,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
         return LastNtStatus();
     }
 
-    return STATUS_SUCCESS;
+    return status;
 }
 
 /// <summary>
@@ -613,7 +620,7 @@ NTSTATUS DriverControl::MmapDll(
 NTSTATUS DriverControl::MMapDriver( const std::wstring& path )
 {
     DWORD bytes = 0;
-    MMAP_DRIVER data = { 0 };
+    MMAP_DRIVER data = { { 0 } };
     UNICODE_STRING ustr = { 0 };
 
     // Not loaded

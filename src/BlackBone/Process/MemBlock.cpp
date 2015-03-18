@@ -21,11 +21,11 @@ MemBlock::MemBlock()
 /// <param name="own">true if caller will be responsible for block deallocation</param>
 MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own /*= true*/, bool physical /*= false*/ )
     : _ptr( ptr )
-    , _memory( mem )
     , _size( size )
     , _protection( prot )
     , _own( own )
     , _physical( physical )
+    , _memory( mem )
 {
 }
 
@@ -37,8 +37,8 @@ MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool
 /// <param name="own">true if caller will be responsible for block deallocation</param>
 MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, bool own /*= true*/ )
     : _ptr( ptr )
-    , _memory( mem )
     , _own( own )
+    , _memory( mem )
 {
     MEMORY_BASIC_INFORMATION64 mbi = { 0 };
     mem->Query( _ptr, &mbi );

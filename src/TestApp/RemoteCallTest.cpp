@@ -45,9 +45,16 @@ void TestRemoteCall()
             std::wcout << L"Found. Executing...\n";
             uint8_t buf[1024] = { 0 };
 
-            RemoteFunction<fnNtQueryVirtualMemory> pFN( explorer, (fnNtQueryVirtualMemory)pRemote.procAddress,
-                                                        INVALID_HANDLE_VALUE, (LPVOID)hMainMod->baseAddress,
-                                                        MemorySectionName, buf, sizeof(buf), nullptr );
+            RemoteFunction<fnNtQueryVirtualMemory> pFN(
+                explorer,
+                reinterpret_cast<fnNtQueryVirtualMemory>(pRemote.procAddress),
+                INVALID_HANDLE_VALUE,
+                reinterpret_cast<LPVOID>(hMainMod->baseAddress),
+                MemorySectionName,
+                reinterpret_cast<LPVOID>(buf),
+                static_cast<SIZE_T>(sizeof( buf )),
+                reinterpret_cast<PSIZE_T>(0)
+                );
 
             decltype(pFN)::ReturnType result;
 

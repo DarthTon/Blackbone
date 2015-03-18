@@ -147,7 +147,7 @@ private:
 
         this->_origSize = jmpToThunk->getCodeSize( );
 #else
-        jmpToThunk->jmp( (asmjit::Ptr)_buf );
+        jmpToThunk->jmp( (asmjit::Ptr)this->_buf );
         this->_origSize = jmpToThunk->getCodeSize();
 #endif
         

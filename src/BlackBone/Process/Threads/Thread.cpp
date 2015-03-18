@@ -9,23 +9,23 @@ namespace blackbone
 #define CONTEXT_VAL_T(use64, ctx32, ctx64, val) use64 ? ctx64.val : ctx32.val
 
 Thread::Thread( DWORD id, ProcessCore* core, DWORD access /*= DEFAULT_ACCESS*/ )
-    : _id( id )
-    , _core( core )
+    : _core( core )
+    , _id( id )
     , _handle( OpenThread( access , FALSE, id ) )
 {  
 }
 
 Thread::Thread( HANDLE handle, ProcessCore* core )
-    : _handle( handle )
-    , _core( core )
+    : _core( core )
+    , _handle( handle )
 {
     _id = handle != NULL ? GetThreadIdT( handle ) : 0;
 }
 
 Thread::Thread( const Thread& other )
-    : _handle( other._handle )
+    : _core( other._core )
     , _id( other._id )
-    , _core( other._core )
+    , _handle( other._handle )
 {
     other.ReleaseHandle();
 }
@@ -346,7 +346,7 @@ DWORD Thread::ExitCode() const
 /// <returns>Thread creation time</returns>
 uint64_t Thread::startTime()
 {
-    FILETIME times[4] = { 0 };
+    FILETIME times[4] = { { 0 } };
 
     if (GetThreadTimes( _handle, &times[0], &times[1], &times[2], &times[3] ))
         return (static_cast<uint64_t>(times[0].dwHighDateTime) << 32) | times[0].dwLowDateTime;
@@ -360,7 +360,7 @@ uint64_t Thread::startTime()
 /// <returns>Total execution time</returns>
 uint64_t Thread::execTime()
 {
-    FILETIME times[4] = { 0 };
+    FILETIME times[4] = { { 0 } };
 
     if (GetThreadTimes( _handle, &times[0], &times[1], &times[2], &times[3] ))
         return ((static_cast<uint64_t>(times[2].dwHighDateTime) << 32) | times[2].dwLowDateTime) 

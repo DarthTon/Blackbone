@@ -15,7 +15,7 @@ namespace blackbone
 template< typename Fn >
 class RemoteFuncBase
 {
-protected:
+public:
     typedef Fn type;    // Function pointer type
 
 protected:
@@ -79,7 +79,7 @@ protected:
             _process.remote().ExecInAnyThread( a->make(), a->getCodeSize(), result2, *contextThread );
 
         // Get function return value
-        _process.remote().GetCallResult<T>( result );
+        _process.remote().GetCallResult( result );
 
         return STATUS_SUCCESS;
     }
@@ -94,8 +94,8 @@ private:
 
 private:
     eCalligConvention _callConv;    // Calling convention
-    type              _pfn;         // Function pointer
     Process&          _process;     // Underlying process
+    type              _pfn;         // Function pointer
 };
 
 // Function arguments
@@ -113,9 +113,9 @@ public:
     // Get argument by index
     // Index is zero-based
     template<int pos>
-    auto getArg() -> decltype(std::get<pos>( _targs ))
+    decltype(std::get<pos>( std::tuple<Args...>() )) getArg()
     {
-        return std::get<pos>( _targs );
+        return std::get<pos>( this->_targs );
     }
 
     // Update any changes to arguments passed by reference or pointer
@@ -136,9 +136,9 @@ public:
 protected:
     template<typename... TArgs>
     FuncArguments( Process& proc, TArgs&&... args )
-        : _process( proc )
+        : _args( std::vector < AsmVariant > { static_cast<Args&&>(args)... } ) 
         , _targs( static_cast<Args&&>(args)... )
-        , _args( std::vector<AsmVariant>{ static_cast<Args&&>(args)... } ) { }
+        , _process( proc ) { }
 
 private:
     FuncArguments( const FuncArguments& ) = delete;
@@ -154,8 +154,8 @@ private:
 template< typename Fn >
 class RemoteFunction;
 
-#define DECLPFN(CALL_OPT, CALL_DEF, ...) \
-template<__VA_ARGS__ typename R, typename... Args > \
+#define DECLPFN(CALL_OPT, CALL_DEF) \
+template< typename R, typename... Args > \
 class RemoteFunction< R( CALL_OPT* )(Args...) > : public RemoteFuncBase<R( CALL_OPT* )(Args...)>, public FuncArguments<Args...> \
 { \
 public: \
@@ -163,14 +163,14 @@ public: \
     \
 public: \
     template<typename... TArgs> \
-    RemoteFunction( Process& proc, typename RemoteFuncBase::type ptr, TArgs&&... args ) \
-        : RemoteFuncBase( proc, ptr, CALL_DEF ) \
-        , FuncArguments( proc, static_cast<Args&&>(args)... ) { } \
+    RemoteFunction( Process& proc, typename RemoteFuncBase<R( CALL_OPT* )(Args...)>::type ptr, TArgs&&... args ) \
+        : RemoteFuncBase<R( CALL_OPT* )(Args...)>( proc, ptr, CALL_DEF ) \
+        , FuncArguments<Args...>( proc, static_cast<Args&&>(args)... ) { } \
         \
-    inline DWORD Call( ReturnType& result, Thread* contextThread = nullptr ) \
+    inline NTSTATUS Call( ReturnType& result, Thread* contextThread = nullptr ) \
     { \
-        NTSTATUS status = RemoteFuncBase::Call( result, getArgsRaw(), contextThread ); \
-        FuncArguments::updateArgs( ); \
+        NTSTATUS status = RemoteFuncBase<R( CALL_OPT* )(Args...)>::Call( result, FuncArguments<Args...>::getArgsRaw(), contextThread ); \
+        FuncArguments<Args...>::updateArgs( ); \
         return status; \
     } \
 }
@@ -181,8 +181,8 @@ public: \
 DECLPFN( __cdecl, cc_cdecl );
 
 // Under AMD64 these will be same declarations as __cdecl, so compilation will fail.
-#ifdef _M_IX86
-DECLPFN( __stdcall,  cc_stdcall );
+#ifdef USE32
+DECLPFN( __stdcall,  cc_stdcall  );
 DECLPFN( __thiscall, cc_thiscall );
 DECLPFN( __fastcall, cc_fastcall );
 #endif
@@ -193,7 +193,7 @@ class RemoteFunction< R( C::* )(Args...) > : public RemoteFuncBase<R( C::* )(con
 {
 public: 
     typedef typename std::conditional<std::is_same<R, void>::value, int, R>::type ReturnType;
-    typedef typename ReturnType( C::*type )(Args...);
+    typedef ReturnType( C::*type )(Args...);
 
 public: 
     RemoteFunction( Process& proc, type ptr )

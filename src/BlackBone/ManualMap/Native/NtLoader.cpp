@@ -1091,7 +1091,7 @@ bool NtLdr::Unlink( ptr_t baseAddress, const std::wstring& name, eModType type )
 template<typename T>
 ptr_t NtLdr::UnlinkFromLdr( ptr_t baseAddress, const std::wstring& name )
 {
-    typename _PEB_T2<T>::type peb = { 0 };
+    typename _PEB_T2<T>::type peb = { { { 0 } } };
     _PEB_LDR_DATA2<T> ldr = { 0 };
 
     auto native = _process.core().native();
@@ -1153,7 +1153,7 @@ ptr_t NtLdr::UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, size_t of
 
     for (T entry = pListEntry.Flink; entry != 0 && entry != head; native->ReadProcessMemoryT( entry, &entry, sizeof( entry ) ))
     {
-        _LDR_DATA_TABLE_ENTRY_BASE<T> modData = { 0 };
+        _LDR_DATA_TABLE_ENTRY_BASE<T> modData = { { 0 } };
 
         native->ReadProcessMemoryT( entry - ofst, &modData, sizeof(modData), 0 );
 

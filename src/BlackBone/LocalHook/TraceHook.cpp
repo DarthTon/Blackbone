@@ -395,7 +395,7 @@ bool TraceHook::RestorePtr( const HookContext& ctx, PEXCEPTION_POINTERS Exceptio
 /// <returns>Number of found frames</returns>
 size_t TraceHook::StackBacktrace( uintptr_t ip, uintptr_t sp, vecStackFrames& results, uintptr_t depth /*= 10 */ )
 {
-    SYSTEM_INFO sysinfo = { 0 };
+    SYSTEM_INFO sysinfo = { { 0 } };
     uintptr_t stack_base = (uintptr_t)((PNT_TIB)NtCurrentTeb())->StackBase;
 
     GetNativeSystemInfo( &sysinfo );

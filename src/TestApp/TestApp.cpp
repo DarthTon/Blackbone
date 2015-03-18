@@ -4,8 +4,8 @@
 */
 void TestPEB( Process& proc )
 {
-   _PEB32 peb32 = { 0 };
-   _PEB64 peb64 = { 0 };
+    _PEB32 peb32 = { { { 0 } } };
+    _PEB64 peb64 = { { { 0 } } };
 
     std::wcout << L"PEB info test\n";
 
@@ -24,8 +24,8 @@ void TestPEB( Process& proc )
 */
 void TestTEB( Process& proc )
 {
-    _TEB32 teb32 = { 0 };
-    _TEB64 teb64 = { 0 };
+    _TEB32 teb32 = { { 0 } };
+    _TEB64 teb64 = { { 0 } };
 
     std::wcout << L"TEB info test\n";
 
