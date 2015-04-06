@@ -108,7 +108,7 @@ public:
 
     // Get arguments. Either in variant form, or as declared type
     inline std::vector<AsmVariant>& getArgsRaw() const { return _args; }
-    inline std::tuple<Args...>& getArgs() const { return _targs; }
+    inline const std::tuple<Args...>& getArgs() const { return _targs; }
 
     // Get argument by index
     // Index is zero-based
@@ -189,7 +189,7 @@ DECLPFN( __fastcall, cc_fastcall );
 
 // Class member function
 template< class C, typename R, typename... Args >
-class RemoteFunction< R( C::* )(Args...) > : public RemoteFuncBase<R( C::* )(const C*, Args...)>, public FuncArguments<const C*, Args...>
+class RemoteFunction< R( C::* )(Args...) > : public RemoteFuncBase<R( C::* )(C*, Args...)>, public FuncArguments<C*, Args...>
 {
 public: 
     typedef typename std::conditional<std::is_same<R, void>::value, int, R>::type ReturnType;
@@ -200,14 +200,14 @@ public:
         : RemoteFuncBase( proc, ptr, cc_thiscall )
         , FuncArguments( proc ) { }
     
-    RemoteFunction( Process& proc, type ptr, const C* pClass, const Args&... args )
-        : RemoteFuncBase( proc, (typename RemoteFuncBase::type)ptr, cc_thiscall )
+    RemoteFunction( Process& proc, type ptr, C* pClass, Args&&... args )
+        : RemoteFuncBase( proc, reinterpret_cast<typename RemoteFuncBase::type>(ptr), cc_thiscall )
         , FuncArguments( proc, pClass, args... ) { }
         
-    inline DWORD Call( R& result, Thread* contextThread = nullptr ) 
+    inline NTSTATUS Call( R& result, Thread* contextThread = nullptr )
     {
-        NTSTATUS status = RemoteFuncBase::Call( result, getArgsRaw(), contextThread );
-        FuncArguments::updateArgs();
+        NTSTATUS status = RemoteFuncBase<R( C::* )(C*, Args...)>::Call( result, getArgsRaw(), contextThread );
+        FuncArguments<C*, Args...>::updateArgs();
         return status;
     } 
 };

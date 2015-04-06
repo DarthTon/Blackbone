@@ -512,7 +512,7 @@ static void vMemMgrInsertNode(VMemMgr* self, MemNode* node) {
   }
   else {
     // False tree root.
-    RbNode head = { 0 };
+    RbNode head = { { 0 } };
 
     // Grandparent & parent.
     RbNode* g = NULL;
@@ -590,7 +590,7 @@ static void vMemMgrInsertNode(VMemMgr* self, MemNode* node) {
 //! the `node` passed.
 static MemNode* vMemMgrRemoveNode(VMemMgr* self, MemNode* node) {
   // False tree root.
-  RbNode head = { 0 };
+  RbNode head = { { 0 } };
 
   // Helpers.
   RbNode* q = &head;

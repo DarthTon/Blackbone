@@ -716,13 +716,16 @@ NTSTATUS DriverControl::LoadDriver( const std::wstring& svcName, const std::wstr
 /// <returns>Status</returns>
 NTSTATUS DriverControl::UnloadDriver( const std::wstring& svcName )
 {
-    UNICODE_STRING Ustr;
+    UNICODE_STRING Ustr = { 0 };
 
     std::wstring regPath = L"\\registry\\machine\\SYSTEM\\CurrentControlSet\\Services\\" + svcName;
     GET_IMPORT( RtlInitUnicodeString )(&Ustr, regPath.c_str());
 
     // Remove previously loaded instance, if any
-    return GET_IMPORT( NtUnloadDriver )(&Ustr);
+    NTSTATUS status = GET_IMPORT( NtUnloadDriver )(&Ustr);
+    RegDeleteTreeW( HKEY_LOCAL_MACHINE, (L"SYSTEM\\CurrentControlSet\\Services\\" + svcName).c_str() );
+
+    return status;
 }
 
 /// <summary>
@@ -734,7 +737,7 @@ NTSTATUS DriverControl::UnloadDriver( const std::wstring& svcName )
 LSTATUS DriverControl::PrepareDriverRegEntry( const std::wstring& svcName, const std::wstring& path )
 {
     HKEY key1, key2;
-    BYTE dwType = 1;
+    DWORD dwType = 1;
     LSTATUS status = 0;
     WCHAR wszLocalPath[MAX_PATH] = { 0 };
 
@@ -751,8 +754,12 @@ LSTATUS DriverControl::PrepareDriverRegEntry( const std::wstring& svcName, const
         return status;
     }
 
-    status = RegSetValueExW( key2, L"ImagePath", 0, REG_SZ, reinterpret_cast<const BYTE*>(wszLocalPath),
-                             static_cast<DWORD>(sizeof( WCHAR )* (wcslen( wszLocalPath ) + 1)) );
+    status = RegSetValueExW(
+        key2, L"ImagePath", 0, REG_SZ, 
+        reinterpret_cast<const BYTE*>(wszLocalPath),
+        static_cast<DWORD>(sizeof( WCHAR )* (wcslen( wszLocalPath ) + 1))
+        );
+
     if (status)
     {
         RegCloseKey( key2 );
@@ -760,7 +767,7 @@ LSTATUS DriverControl::PrepareDriverRegEntry( const std::wstring& svcName, const
         return status;
     }
 
-    status = RegSetValueExW( key2, L"Type", 0, REG_DWORD, &dwType, sizeof( DWORD ) );
+    status = RegSetValueExW( key2, L"Type", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&dwType), sizeof( dwType ) );
     if (status)
     {
         RegCloseKey( key2 );
