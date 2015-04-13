@@ -204,31 +204,22 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         pData->correctBuild = TRUE;
     #if defined(_WIN7_)
         if (ver_short != WINVER_7 && ver_short != WINVER_7_SP1)
-        {
-            if(ver_short == WINVER_7_SP1 && buildNo != 18700)
-                pData->correctBuild = FALSE;
-
             return STATUS_NOT_SUPPORTED;
-        }
+        if(ver_short == WINVER_7_SP1 && buildNo != 18700)
+            pData->correctBuild = FALSE;
     #elif defined(_WIN8_)
         if (ver_short != WINVER_8)
             return STATUS_NOT_SUPPORTED;
     #elif defined (_WIN81_)
         if (ver_short != WINVER_81)
-        {
-            if (buildNo != 17328)
-                pData->correctBuild = FALSE;
-
             return STATUS_NOT_SUPPORTED;
-        }
+        if (buildNo != 17328)
+            pData->correctBuild = FALSE;
     #elif defined (_WIN10_)
-        if (ver_short != WINVER_10)
-        {
-            if (verInfo.dwBuildNumber != 9926)
-                pData->correctBuild = FALSE;
-            
+        if (ver_short != WINVER_10)           
             return STATUS_NOT_SUPPORTED;
-        }
+        if (verInfo.dwBuildNumber != 9926)
+            pData->correctBuild = FALSE;
     #endif
 
         DPRINT( 
