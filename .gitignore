@@ -4,7 +4,7 @@
 
 #Visual Studio files
 *.[Oo]bj
-#*.user
+*.user
 *.aps
 *.pch
 *.vspscc
@@ -76,5 +76,4 @@ packages/
 GeneratedFiles*/
 
 *.ggpk
-
-/VADPurge/export.h
+*.idb
