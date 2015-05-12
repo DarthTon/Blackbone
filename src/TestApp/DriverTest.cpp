@@ -33,7 +33,7 @@ void TestDriver()
 
         // Disable DEP
         status = Driver().DisableDEP( GetCurrentProcessId() );
-        GET_IMPORT( GetProcessDEPPolicy )(GetCurrentProcess(), &depFlags, &perm);
+        SAFE_CALL( GetProcessDEPPolicy, GetCurrentProcess(), &depFlags, &perm );
         if (!NT_SUCCESS( status ) || depFlags & PROCESS_DEP_ENABLE)
             std::cout << "TestDriver: IOCTL_BLACKBONE_DISABLE_DEP failed, status 0x" << std::hex << status << "\r\n";
         else

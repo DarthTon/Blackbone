@@ -108,9 +108,11 @@ NTSTATUS Native::VirualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType
 NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 lpBuffer )
 {
     LastNtStatus( STATUS_SUCCESS );
-    VirtualQueryEx( _hProcess, reinterpret_cast<LPCVOID>(lpAddress), 
-                    reinterpret_cast<PMEMORY_BASIC_INFORMATION>(lpBuffer), 
-                    sizeof(MEMORY_BASIC_INFORMATION) );
+    VirtualQueryEx(
+        _hProcess, reinterpret_cast<LPCVOID>(lpAddress),
+        reinterpret_cast<PMEMORY_BASIC_INFORMATION>(lpBuffer),
+        sizeof( MEMORY_BASIC_INFORMATION )
+        );
 
     return LastNtStatus();
 }
@@ -127,8 +129,10 @@ NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, MEMORY_INFORMATION_CLASS info
 
     LastNtStatus( STATUS_SUCCESS );
     
-    return GET_IMPORT( NtQueryVirtualMemory )( _hProcess, reinterpret_cast<LPVOID>(lpAddress), 
-                                               infoClass, lpBuffer, bufSize, &retLen );
+    return SAFE_NATIVE_CALL(
+        NtQueryVirtualMemory, _hProcess, reinterpret_cast<LPVOID>(lpAddress),
+        infoClass, lpBuffer, bufSize, &retLen
+        );
 }
 
 /// <summary>
@@ -192,7 +196,7 @@ NTSTATUS Native::WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer, siz
 NTSTATUS Native::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize )
 {
     ULONG length = 0;
-    return GET_IMPORT( NtQueryInformationProcess )(_hProcess, infoClass, lpBuffer, bufSize, &length);
+    return SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, infoClass, lpBuffer, bufSize, &length );
 }
 
 /// <summary>
@@ -204,7 +208,7 @@ NTSTATUS Native::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer,
 /// <returns>Status code</returns>
 NTSTATUS Native::SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize )
 {
-    return GET_IMPORT( NtSetInformationProcess )(_hProcess, infoClass, lpBuffer, bufSize);
+    return SAFE_NATIVE_CALL( NtSetInformationProcess, _hProcess, infoClass, lpBuffer, bufSize );
 }
 
 /// <summary>
@@ -281,7 +285,7 @@ NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     else
     {
         LastNtStatus( STATUS_SUCCESS );        
-        GET_IMPORT(Wow64GetThreadContext)( hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx) );
+        SAFE_CALL( Wow64GetThreadContext, hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx) );
         return LastNtStatus();
     }
 }
@@ -315,7 +319,7 @@ NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     else
     {
         LastNtStatus( STATUS_SUCCESS );
-        GET_IMPORT( Wow64SetThreadContext )(hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx));
+        SAFE_CALL( Wow64SetThreadContext, hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx));
         return LastNtStatus();
     }
 }
@@ -335,7 +339,7 @@ ptr_t Native::getPEB( _PEB32* ppeb )
     else
     {
         ptr_t ptr = 0;
-        if(GET_IMPORT( NtQueryInformationProcess )(_hProcess, ProcessWow64Information, &ptr, sizeof(ptr), NULL) == STATUS_SUCCESS)
+        if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, ProcessWow64Information, &ptr, (ULONG)sizeof( ptr ), nullptr ) ) && ppeb)
             ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(ptr), ppeb, sizeof(_PEB32), NULL );
 
         return ptr;
@@ -352,9 +356,8 @@ ptr_t Native::getPEB( _PEB64* ppeb )
     PROCESS_BASIC_INFORMATION pbi = { 0 };
     ULONG bytes = 0;
 
-    if (GET_IMPORT( NtQueryInformationProcess )( _hProcess, ProcessBasicInformation, &pbi, sizeof(pbi), &bytes ) == STATUS_SUCCESS)
-        if (ppeb)
-            ReadProcessMemory( _hProcess, pbi.PebBaseAddress, ppeb, sizeof(_PEB32), NULL );
+    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, ProcessBasicInformation, &pbi, (ULONG)sizeof( pbi ), &bytes ) ) && ppeb)
+        ReadProcessMemory( _hProcess, pbi.PebBaseAddress, ppeb, sizeof(_PEB32), NULL );
 
     return reinterpret_cast<ptr_t>(pbi.PebBaseAddress);
 }
@@ -377,9 +380,8 @@ ptr_t Native::getTEB( HANDLE hThread, _TEB32* pteb )
         _THREAD_BASIC_INFORMATION_T<DWORD64> tbi = { 0 };
         ULONG bytes = 0;
 
-        if (GET_IMPORT( NtQueryInformationThread )( hThread, (THREADINFOCLASS)0, &tbi, sizeof(tbi), &bytes ) == STATUS_SUCCESS)
-            if (pteb)
-                ReadProcessMemory( _hProcess, (const uint8_t*)tbi.TebBaseAddress + 0x2000, pteb, sizeof(_TEB32), NULL );
+        if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ) && pteb)
+            ReadProcessMemory( _hProcess, (const uint8_t*)tbi.TebBaseAddress + 0x2000, pteb, sizeof(_TEB32), NULL );
 
         return tbi.TebBaseAddress + 0x2000;
     }
@@ -396,9 +398,8 @@ ptr_t Native::getTEB( HANDLE hThread, _TEB64* pteb )
     _THREAD_BASIC_INFORMATION_T<DWORD64> tbi = { 0 };
     ULONG bytes = 0;
 
-    if (GET_IMPORT( NtQueryInformationThread )( hThread, (THREADINFOCLASS)0, &tbi, sizeof(tbi), &bytes ) == STATUS_SUCCESS)
-        if (pteb)
-            ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof(_TEB64), NULL );
+    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ) && pteb)
+        ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof(_TEB64), NULL );
 
     return tbi.TebBaseAddress;
 }

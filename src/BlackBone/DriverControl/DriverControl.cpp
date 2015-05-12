@@ -12,9 +12,13 @@ namespace blackbone
 
 DriverControl::DriverControl()
 {
-    DynImport::load( "NtLoadDriver", GetModuleHandleW( L"ntdll.dll" ) );
-    DynImport::load( "NtUnloadDriver", GetModuleHandleW( L"ntdll.dll" ) );
-    DynImport::load( "RtlDosPathNameToNtPathName_U", GetModuleHandleW( L"ntdll.dll" ) );   
+    HMODULE ntdll = GetModuleHandleW( L"ntdll.dll" );
+
+    DynImport::load( "NtLoadDriver", ntdll );
+    DynImport::load( "NtUnloadDriver", ntdll );
+    DynImport::load( "RtlDosPathNameToNtPathName_U", ntdll );
+    DynImport::load( "RtlInitUnicodeString", ntdll );
+    DynImport::load( "RtlFreeUnicodeString", ntdll );
 }
 
 
@@ -546,9 +550,9 @@ NTSTATUS DriverControl::MmapDll(
     UNICODE_STRING ustr = { 0 };
 
     // Convert path to native format
-    GET_IMPORT( RtlDosPathNameToNtPathName_U )(path.c_str(), &ustr, NULL, NULL);
+    SAFE_NATIVE_CALL( RtlDosPathNameToNtPathName_U, path.c_str(), &ustr, nullptr, nullptr );
     wcscpy_s( data.FullDllPath, ustr.Buffer );
-    GET_IMPORT( RtlFreeUnicodeString )(&ustr);
+    SAFE_CALL( RtlFreeUnicodeString, &ustr );
 
     wcscpy_s( data.initArg, initArg.c_str() );
 
@@ -628,9 +632,9 @@ NTSTATUS DriverControl::MMapDriver( const std::wstring& path )
         return STATUS_DEVICE_DOES_NOT_EXIST;
 
     // Convert path to native format
-    GET_IMPORT( RtlDosPathNameToNtPathName_U )(path.c_str(), &ustr, NULL, NULL);
+    SAFE_NATIVE_CALL( RtlDosPathNameToNtPathName_U, path.c_str(), &ustr, nullptr, nullptr);
     wcscpy_s( data.FullPath, ustr.Buffer );
-    GET_IMPORT( RtlFreeUnicodeString )(&ustr);
+    SAFE_CALL( RtlFreeUnicodeString, &ustr);
 
     if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_MAP_DRIVER, &data, sizeof( data ), nullptr, 0, &bytes, NULL ))
         return LastNtStatus();
@@ -703,9 +707,9 @@ NTSTATUS DriverControl::LoadDriver( const std::wstring& svcName, const std::wstr
         return LastNtStatus();
 
     std::wstring regPath = L"\\registry\\machine\\SYSTEM\\CurrentControlSet\\Services\\" + svcName;
-    GET_IMPORT( RtlInitUnicodeString )(&Ustr, regPath.c_str());
+    SAFE_CALL( RtlInitUnicodeString, &Ustr, regPath.c_str() );
 
-    return GET_IMPORT( NtLoadDriver )(&Ustr);
+    return SAFE_NATIVE_CALL( NtLoadDriver, &Ustr );
 }
 
 
@@ -719,10 +723,10 @@ NTSTATUS DriverControl::UnloadDriver( const std::wstring& svcName )
     UNICODE_STRING Ustr = { 0 };
 
     std::wstring regPath = L"\\registry\\machine\\SYSTEM\\CurrentControlSet\\Services\\" + svcName;
-    GET_IMPORT( RtlInitUnicodeString )(&Ustr, regPath.c_str());
+    SAFE_CALL( RtlInitUnicodeString, &Ustr, regPath.c_str() );
 
     // Remove previously loaded instance, if any
-    NTSTATUS status = GET_IMPORT( NtUnloadDriver )(&Ustr);
+    NTSTATUS status = SAFE_NATIVE_CALL( NtUnloadDriver, &Ustr );
     RegDeleteTreeW( HKEY_LOCAL_MACHINE, (L"SYSTEM\\CurrentControlSet\\Services\\" + svcName).c_str() );
 
     return status;

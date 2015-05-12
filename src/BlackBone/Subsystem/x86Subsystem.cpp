@@ -24,8 +24,11 @@ NTSTATUS x86Native::VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION6
 {
     MEMORY_BASIC_INFORMATION tmp = { 0 };
 
-    NTSTATUS status = GET_IMPORT( NtQueryVirtualMemory )( _hProcess, reinterpret_cast<PVOID>(lpAddress), 
-                                                          MemoryBasicInformation, &tmp, sizeof(tmp), nullptr);
+    NTSTATUS status = SAFE_NATIVE_CALL(
+        NtQueryVirtualMemory,
+        _hProcess, reinterpret_cast<PVOID>(lpAddress),
+        MemoryBasicInformation, &tmp, sizeof( tmp ), nullptr
+        );
     if (status != STATUS_SUCCESS)
         return status;
 
@@ -101,9 +104,8 @@ ptr_t x86Native::getPEB( _PEB32* ppeb )
     PROCESS_BASIC_INFORMATION pbi = { 0 };
     ULONG bytes = 0;
 
-    if (GET_IMPORT( NtQueryInformationProcess )(_hProcess, ProcessBasicInformation, &pbi, sizeof(pbi), &bytes) == STATUS_SUCCESS)
-        if (ppeb)
-            ReadProcessMemory( _hProcess, pbi.PebBaseAddress, ppeb, sizeof(_PEB32), NULL );
+    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, ProcessBasicInformation, &pbi, (ULONG)sizeof( pbi ), &bytes ) ) && ppeb)
+        ReadProcessMemory( _hProcess, pbi.PebBaseAddress, ppeb, sizeof(_PEB32), NULL );
 
     return reinterpret_cast<ptr_t>(pbi.PebBaseAddress);
 }
@@ -130,9 +132,8 @@ ptr_t x86Native::getTEB( HANDLE hThread, _TEB32* pteb )
     _THREAD_BASIC_INFORMATION_T<DWORD> tbi = { 0 };
     ULONG bytes = 0;
 
-    if (GET_IMPORT( NtQueryInformationThread )( hThread, (THREADINFOCLASS)0, &tbi, sizeof(tbi), &bytes ) == STATUS_SUCCESS)
-        if (pteb)
-            ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof(_TEB32), NULL );
+    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, sizeof( tbi ), &bytes ) ) && pteb)
+        ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof(_TEB32), NULL );
 
     return tbi.TebBaseAddress;
 }

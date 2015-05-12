@@ -103,7 +103,7 @@ NTSTATUS ProcessCore::Init()
         DWORD flags = 0;
         BOOL perm = 0;
 
-        if (GET_IMPORT( GetProcessDEPPolicy )(_hProcess, &flags, &perm))
+        if (SAFE_CALL( GetProcessDEPPolicy, _hProcess, &flags, &perm ))
             _dep = (flags & PROCESS_DEP_ENABLE) != 0;
     }
 

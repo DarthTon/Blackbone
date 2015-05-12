@@ -450,7 +450,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         obAttr.ObjectName = &ustr;
 
         // Open created event
-        status = GET_IMPORT( NtOpenEvent )( &_hWaitEvent, SYNCHRONIZE | EVENT_MODIFY_STATE, &obAttr );
+        status = SAFE_NATIVE_CALL( NtOpenEvent, &_hWaitEvent, SYNCHRONIZE | EVENT_MODIFY_STATE, &obAttr );
     }
 
     return status;

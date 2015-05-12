@@ -196,14 +196,14 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
     ULONG returnLength = 0;
 
     // Query handle list
-    NTSTATUS status = GET_IMPORT( NtQuerySystemInformation )(SystemHandleInformation, buffer, bufSize, &returnLength);
+    NTSTATUS status = SAFE_NATIVE_CALL( NtQuerySystemInformation, SystemHandleInformation, buffer, bufSize, &returnLength);
     while (status == STATUS_INFO_LENGTH_MISMATCH)
     {
         bufSize *= 2;
         VirtualFree( buffer, 0, MEM_RELEASE );
         buffer = (uint8_t*)VirtualAlloc( NULL, bufSize, MEM_COMMIT, PAGE_READWRITE );
 
-        status = GET_IMPORT( NtQuerySystemInformation )(SystemHandleInformation, buffer, bufSize, &returnLength);
+        status = SAFE_NATIVE_CALL( NtQuerySystemInformation, SystemHandleInformation, buffer, bufSize, &returnLength);
     }
 
     if (!NT_SUCCESS( status ))
@@ -227,7 +227,7 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
             continue;
 
         // Get local handle copy
-        status = GET_IMPORT( NtDuplicateObject )(_core._hProcess, reinterpret_cast<HANDLE>(handleInfo->Handles[i].Handle), GetCurrentProcess(), &hLocal, 0, 0, DUPLICATE_SAME_ACCESS);
+        status = SAFE_NATIVE_CALL( NtDuplicateObject, _core._hProcess, reinterpret_cast<HANDLE>(handleInfo->Handles[i].Handle), GetCurrentProcess(), &hLocal, 0, 0, DUPLICATE_SAME_ACCESS);
         if (!NT_SUCCESS( status ))
             continue;
 
@@ -235,7 +235,7 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
         // Get type information
         //
         pTypeInfo = (OBJECT_TYPE_INFORMATION_T*)malloc( 0x1000 );
-        status = GET_IMPORT( NtQueryObject )(hLocal, ObjectTypeInformation, pTypeInfo, 0x1000, NULL);
+        status = SAFE_NATIVE_CALL( NtQueryObject, hLocal, ObjectTypeInformation, pTypeInfo, 0x1000, nullptr );
         if (!NT_SUCCESS( status ))
         {
             CloseHandle( hLocal );
@@ -246,11 +246,11 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
         // Obtain object name
         //
         pNameInfo = malloc( 0x1000 );
-        status = GET_IMPORT( NtQueryObject )(hLocal, ObjectNameInformation, pNameInfo, 0x1000, &returnLength);
+        status = SAFE_NATIVE_CALL( NtQueryObject, hLocal, ObjectNameInformation, pNameInfo, 0x1000, &returnLength);
         if (!NT_SUCCESS( status ))
         {
             pNameInfo = realloc( pNameInfo, returnLength );
-            status = GET_IMPORT( NtQueryObject )(hLocal, ObjectNameInformation, pNameInfo, returnLength, NULL);
+            status = SAFE_NATIVE_CALL( NtQueryObject, hLocal, ObjectNameInformation, pNameInfo, returnLength, nullptr );
             if (!NT_SUCCESS( status ))
             {
                 free( pTypeInfo );
@@ -283,7 +283,7 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
         {
             SECTION_BASIC_INFORMATION_T secInfo = { 0 };
 
-            status = GET_IMPORT( NtQuerySection )(hLocal, SectionBasicInformation, &secInfo, sizeof( secInfo ), NULL);
+            status = SAFE_NATIVE_CALL( NtQuerySection, hLocal, SectionBasicInformation, &secInfo, (ULONG)sizeof( secInfo ), nullptr );
             if (NT_SUCCESS( status ))
             {
                 info.section.reset( new SectionInfo() );
@@ -394,12 +394,12 @@ NTSTATUS Process::EnumByNameOrPID(
     found.clear();
 
     // Query process info
-    NTSTATUS status = GET_IMPORT( NtQuerySystemInformation )((SYSTEM_INFORMATION_CLASS)57, buffer, bufSize, &returnLength);
+    NTSTATUS status = SAFE_NATIVE_CALL( NtQuerySystemInformation, (SYSTEM_INFORMATION_CLASS)57, buffer, bufSize, &returnLength );
     if (!NT_SUCCESS( status ))
     {
         bufSize = returnLength;
         buffer = (uint8_t*)VirtualAlloc( NULL, bufSize, MEM_COMMIT, PAGE_READWRITE );
-        status = GET_IMPORT( NtQuerySystemInformation )((SYSTEM_INFORMATION_CLASS)57, buffer, bufSize, &returnLength);
+        status = SAFE_NATIVE_CALL( NtQuerySystemInformation, (SYSTEM_INFORMATION_CLASS)57, buffer, bufSize, &returnLength );
         if (!NT_SUCCESS( status ))
         {
             VirtualFree( buffer, 0, MEM_RELEASE );

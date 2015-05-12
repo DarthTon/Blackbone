@@ -313,7 +313,7 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
     if (GET_IMPORT( RtlDosApplyFileIsolationRedirection_Ustr ) == nullptr)
         return STATUS_ORDINAL_NOT_FOUND;
 
-    GET_IMPORT( RtlInitUnicodeString )( &OriginalName, path.c_str()) ;
+    SAFE_CALL( RtlInitUnicodeString, &OriginalName, path.c_str() );
 
     DllName1.Buffer = wBuf;
     DllName1.Length = NULL;
@@ -324,9 +324,11 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
         ActivateActCtx( actx, &cookie );
 
     // SxS resolve
-    NTSTATUS status = GET_IMPORT( RtlDosApplyFileIsolationRedirection_Ustr )( TRUE, &OriginalName, NULL,
-                                                                              &DllName1, &DllName2, &pPath,
-                                                                              NULL, NULL, NULL );
+    NTSTATUS status = SAFE_NATIVE_CALL(
+        RtlDosApplyFileIsolationRedirection_Ustr, TRUE, &OriginalName, (PUNICODE_STRING)NULL,
+        &DllName1, &DllName2, &pPath,
+        nullptr, nullptr, nullptr
+        );
 
     if (cookie != 0 && actx != INVALID_HANDLE_VALUE)
         DeactivateActCtx( 0, cookie );
@@ -338,7 +340,7 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
     else
     {
         if (DllName2.Buffer)
-            GET_IMPORT( RtlFreeUnicodeString )( &DllName2 );
+            SAFE_CALL( RtlFreeUnicodeString, &DllName2);
     }
 
     return LastNtStatus( status );

@@ -67,7 +67,7 @@ bool Thread::Suspend()
     
     // Target process is x86 and not running on x86 OS
     if (_core->isWow64() && !_core->native()->GetWow64Barrier().x86OS)
-        return (GET_IMPORT(Wow64SuspendThread)( _handle ) != -1);
+        return (SAFE_CALL(Wow64SuspendThread, _handle ) != -1);
     else
         return (SuspendThread( _handle ) != -1);
 }
@@ -90,8 +90,8 @@ bool Thread::Resume()
 /// <returns>true if suspended</returns>
 bool Thread::Suspended()
 {
-    auto count = (_core->isWow64() && !_core->native()->GetWow64Barrier().x86OS) 
-        ? GET_IMPORT( Wow64SuspendThread )(_handle) 
+    auto count = (_core->isWow64() && !_core->native()->GetWow64Barrier().x86OS)
+        ? SAFE_CALL( Wow64SuspendThread, _handle )
         : SuspendThread( _handle );
 
     ResumeThread( _handle );
@@ -399,8 +399,8 @@ DWORD Thread::GetThreadIdT( HANDLE hThread )
     {
         _THREAD_BASIC_INFORMATION_T<DWORD> tbi = { 0 };
         ULONG bytes = 0;
-
-        if (NT_SUCCESS( GET_IMPORT( NtQueryInformationThread )(hThread, (THREADINFOCLASS)0, &tbi, sizeof( tbi ), &bytes) ))
+        
+        if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ))
             return tbi.ClientID.UniqueThread;
 
         return 0;

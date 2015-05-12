@@ -398,7 +398,7 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
             _process.memory().Write( GET_FIELD_PTR( pEntry, EntryPoint ), entryPoint );
 
             // Dll name and name hash
-            GET_IMPORT( RtlInitUnicodeString )( &strLocal, dllname.c_str() );
+            SAFE_CALL( RtlInitUnicodeString, &strLocal, dllname.c_str() );
             outHash = HashString( dllname );
 
             // Write into buffer
@@ -409,7 +409,7 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
             _process.memory().Write( GET_FIELD_PTR( pEntry, BaseDllName ), strLocal );
 
             // Dll full path
-            GET_IMPORT( RtlInitUnicodeString )( &strLocal, dllpath.c_str() );
+            SAFE_CALL( RtlInitUnicodeString, &strLocal, dllpath.c_str() );
             strLocal.Buffer = reinterpret_cast<PWSTR>(StringBuf.ptr<uint8_t*>( ) + 0x800);
             StringBuf.Write( 0x800, dllpath.length() * sizeof(wchar_t) + 2, dllpath.c_str() );
               
@@ -516,7 +516,7 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node(
         _process.memory().Write( GET_FIELD_PTR( pEntry, LoadCount ), -1 );
 
         // Dll name
-        GET_IMPORT( RtlInitUnicodeString )( &strLocal, dllname.c_str() );
+        SAFE_CALL( RtlInitUnicodeString, &strLocal, dllname.c_str() );
 
         // Name hash
         outHash = HashString( dllname );
@@ -529,7 +529,7 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node(
         _process.memory().Write( GET_FIELD_PTR( pEntry, BaseDllName ), strLocal );
 
         // Dll full path
-        GET_IMPORT( RtlInitUnicodeString )( &strLocal, dllpath.c_str() );
+        SAFE_CALL( RtlInitUnicodeString, &strLocal, dllpath.c_str() );
         strLocal.Buffer = reinterpret_cast<PWSTR>(StringBuf.ptr<uint8_t*>() + 0x800);
         StringBuf.Write( 0x800, dllpath.length() * sizeof(wchar_t) + 2, dllpath.c_str() );
 
@@ -699,13 +699,13 @@ ULONG NtLdr::HashString( const std::wstring& str )
     if (IsWindows8OrGreater())
     {
         UNICODE_STRING ustr;
-        GET_IMPORT( RtlInitUnicodeString )(&ustr, str.c_str( ));
-        GET_IMPORT( RtlHashUnicodeString )(&ustr, TRUE, 0, &hash);
+        SAFE_CALL( RtlInitUnicodeString, &ustr, str.c_str() );
+        SAFE_NATIVE_CALL( RtlHashUnicodeString, &ustr, (BOOLEAN)TRUE, 0, &hash );
     }
     else
     {
         for (auto& ch : str)
-            hash += 0x1003F * static_cast<unsigned short>(GET_IMPORT( RtlUpcaseUnicodeChar )(ch));
+            hash += 0x1003F * static_cast<unsigned short>(SAFE_CALL( RtlUpcaseUnicodeChar, ch ));
     }
 
     return hash;
@@ -723,7 +723,7 @@ bool NtLdr::FindLdrpHashTable( )
         reinterpret_cast<TEB_T*>(NtCurrentTeb())->ProcessEnvironmentBlock)->Ldr);
 
     LDR_DATA_TABLE_ENTRY_BASE_T *Ntdll = CONTAINING_RECORD( Ldr->InInitializationOrderModuleList.Flink,
-                                                             LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
+                                                            LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
 
     ULONG NtdllHashIndex = HashString( reinterpret_cast<wchar_t*>(Ntdll->BaseDllName.Buffer) ) & 0x1F;
 
@@ -1101,22 +1101,28 @@ ptr_t NtLdr::UnlinkFromLdr( ptr_t baseAddress, const std::wstring& name )
         ptr_t ldrEntry = 0;
 
         // InLoadOrderModuleList
-        ldrEntry |= UnlinkListEntry( ldr.InLoadOrderModuleList,
-                                     peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InLoadOrderModuleList ),
-                                     FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InLoadOrderLinks ),
-                                     baseAddress );
+        ldrEntry |= UnlinkListEntry(
+            ldr.InLoadOrderModuleList,
+            peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InLoadOrderModuleList ),
+            FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InLoadOrderLinks ),
+            baseAddress
+            );
 
         // InMemoryOrderModuleList
-        ldrEntry |= UnlinkListEntry( ldr.InMemoryOrderModuleList,
-                                     peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InMemoryOrderModuleList ),
-                                     FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InMemoryOrderLinks ),
-                                     baseAddress );
+        ldrEntry |= UnlinkListEntry(
+            ldr.InMemoryOrderModuleList,
+            peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InMemoryOrderModuleList ),
+            FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InMemoryOrderLinks ),
+            baseAddress
+            );
 
         // InInitializationOrderModuleList
-        ldrEntry |= UnlinkListEntry( ldr.InInitializationOrderModuleList,
-                                     peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InInitializationOrderModuleList ),
-                                     FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InInitializationOrderLinks ),
-                                     baseAddress );
+        ldrEntry |= UnlinkListEntry(
+            ldr.InInitializationOrderModuleList,
+            peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<T>, InInitializationOrderModuleList ),
+            FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<T>, InInitializationOrderLinks ),
+            baseAddress
+            );
 
         // Hash table
         if (ldrEntry == 0)
