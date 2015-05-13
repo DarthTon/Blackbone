@@ -21,14 +21,14 @@ public:
     // Hook type
     enum eHookType
     {
-        ht_int3 = 0,            // Default int 3 breakpoint
-        ht_hwbp,                // Hardware breakpoint
+        int3 = 0,           // Default int 3 breakpoint
+        hwbp                // Hardware breakpoint
     };
 
     enum eHookFlags
     {
-        hf_none = 0,            // No flags
-        hf_returnHook = 1,      // Hook function return
+        none = 0,           // No flags
+        returnHook = 1,     // Hook function return
     };
 
     // Hook callback prototype
@@ -78,7 +78,7 @@ public:
     /// <param name="newFn">Callback</param>
     /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API inline bool Apply( eHookType type, uint64_t ptr, fnCallback newFn, Thread* pThread = nullptr )
+    BLACKBONE_API inline NTSTATUS Apply( eHookType type, uint64_t ptr, fnCallback newFn, Thread* pThread = nullptr )
     {
         return ApplyP( type, ptr, newFn, nullptr, pThread );
     }
@@ -90,7 +90,7 @@ public:
     /// <param name="ptr">Hooked function address</param>
     /// <param name="newFn">Callback</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API inline bool AddReturnHook( uint64_t ptr, fnCallback newFn )
+    BLACKBONE_API inline NTSTATUS AddReturnHook( uint64_t ptr, fnCallback newFn )
     {
         return AddReturnHookP( ptr, newFn, nullptr );
     }
@@ -108,7 +108,7 @@ public:
     /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
     /// <returns>true on success</returns>
     template<typename C>
-    inline bool Apply( eHookType type, uint64_t ptr, void(C::* newFn)(RemoteContext& ctx), const C& classRef, Thread* pThread = nullptr )
+    inline NTSTATUS Apply( eHookType type, uint64_t ptr, void(C::* newFn)(RemoteContext& ctx), const C& classRef, Thread* pThread = nullptr )
     {
         return ApplyP( type, ptr, brutal_cast<fnCallback>(newFn), &classRef, pThread );
     }
@@ -122,7 +122,7 @@ public:
     /// <param name="classRef">Class reference.</param>
     /// <returns>true on success</returns>
     template<typename C>
-    inline bool AddReturnHook( uint64_t ptr, void(C::* newFn)(RemoteContext& ctx), const C& classRef )
+    inline NTSTATUS AddReturnHook( uint64_t ptr, void(C::* newFn)(RemoteContext& ctx), const C& classRef )
     {
         return AddReturnHookP( ptr, brutal_cast<fnCallback>(newFn), &classRef );
     }
@@ -150,7 +150,7 @@ private:
     /// <param name="pClass">Class reference.</param>
     /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass = nullptr, Thread* pThread = nullptr );
+    BLACKBONE_API NTSTATUS ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass = nullptr, Thread* pThread = nullptr );
 
     /// <summary>
     /// Hook function return
@@ -160,7 +160,7 @@ private:
     /// <param name="newFn">Callback</param>
     /// <param name="pClass">Class reference.</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool AddReturnHookP( uint64_t ptr, fnCallback newFn, const void* pClass = nullptr );
+    BLACKBONE_API NTSTATUS AddReturnHookP( uint64_t ptr, fnCallback newFn, const void* pClass = nullptr );
 
     /// <summary>
     /// Restore hooked function
@@ -173,7 +173,7 @@ private:
     /// Debug selected process
     /// </summary>
     /// <returns>true on success</returns>
-    bool EnsureDebug();
+    NTSTATUS EnsureDebug();
 
     /// <summary>
     /// Stop process debug
@@ -185,7 +185,7 @@ private:
     /// </summary>
     /// <param name="lpParam">RemoteHook pointer</param>
     /// <returns>Error code</returns>
-    static DWORD __stdcall EventThreadWrap(LPVOID lpParam);
+    static DWORD __stdcall EventThreadWrap( LPVOID lpParam );
 
     /// <summary>
     /// Debug thread
@@ -248,7 +248,8 @@ private:
     mapHook      _hooks;                // Hooked callbacks
     setAddresses _repatch;              // Pending repatch addresses
     mapAddress   _retHooks;             // Hooked return addresses
-
 };
+
+ENUM_OPS( RemoteHook::eHookFlags )
 
 }

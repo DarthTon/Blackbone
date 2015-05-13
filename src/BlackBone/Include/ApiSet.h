@@ -3,6 +3,9 @@
 #include "Winheaders.h"
 #include <stdio.h>
 
+//
+// Api schema structures
+//   
 
 //
 // Win 10

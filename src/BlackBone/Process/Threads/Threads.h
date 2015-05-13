@@ -49,7 +49,7 @@ public:
     BLACKBONE_API Thread* getMostExecuted();
 
     /// <summary>
-    /// Get least executed thread
+    /// Get random thread
     /// </summary>
     /// <returns>Pointer to thread object, nullptr if failed</returns>
     BLACKBONE_API Thread* getRandom();

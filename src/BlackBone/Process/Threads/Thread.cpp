@@ -6,8 +6,6 @@
 namespace blackbone
 {
 
-#define CONTEXT_VAL_T(use64, ctx32, ctx64, val) use64 ? ctx64.val : ctx32.val
-
 Thread::Thread( DWORD id, ProcessCore* core, DWORD access /*= DEFAULT_ACCESS*/ )
     : _core( core )
     , _id( id )
@@ -19,7 +17,7 @@ Thread::Thread( HANDLE handle, ProcessCore* core )
     : _core( core )
     , _handle( handle )
 {
-    _id = handle != NULL ? GetThreadIdT( handle ) : 0;
+    _id = (handle != NULL ? GetThreadIdT( handle ) : 0);
 }
 
 Thread::Thread( const Thread& other )
@@ -27,7 +25,7 @@ Thread::Thread( const Thread& other )
     , _id( other._id )
     , _handle( other._handle )
 {
-    other.ReleaseHandle();
+    other._owner = false;
 }
 
 Thread::~Thread()
@@ -160,8 +158,7 @@ bool Thread::SetContext( _CONTEXT32& ctx, bool dontSuspend /*= false */ )
 
     if (dontSuspend || Suspend())
     {
-        result = (_core->native()->SetThreadContextT( _handle, ctx ) == STATUS_SUCCESS);
-
+        result = NT_SUCCESS( _core->native()->SetThreadContextT( _handle, ctx ) );
         if (!dontSuspend)
             Resume();
     }
@@ -181,8 +178,7 @@ bool Thread::SetContext( _CONTEXT64& ctx, bool dontSuspend /*= false*/ )
 
     if(dontSuspend || Suspend())
     {
-        result = (_core->native()->SetThreadContextT( _handle, ctx ) == STATUS_SUCCESS);
-
+        result = NT_SUCCESS( _core->native()->SetThreadContextT( _handle, ctx ) );
         if(!dontSuspend)
             Resume();
     }
@@ -225,41 +221,28 @@ int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
 
     // CONTEXT_DEBUG_REGISTERS can be operated without thread suspension
     bool res = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
+    auto pDR7 = use64 ? reinterpret_cast<regDR7*>(&context64.Dr7) : reinterpret_cast<regDR7*>(&context32.Dr7);
     if (!res)
         return -1;
 
-    auto getFree = []( ptr_t regval )
-    {
-        if (!(regval & 1))
-            return 0;
-        else if (!(regval & 4))
-            return 1;
-        else if (!(regval & 16))
-            return 2;
-        else if (!(regval & 64))
-            return 3;
-
-        return -1;
-    };
-
     // Get free DR
-    int freeIdx = getFree( CONTEXT_VAL_T( use64, context32, context64, Dr7 ) );
+    int freeIdx = pDR7->getFreeIndex();
 
     // If all 4 registers are occupied - error
     if (freeIdx < 0)
+    {
+        LastNtStatus( STATUS_NO_MORE_ENTRIES );
         return -1;
+    }
 
     // Enable corresponding HWBP and local BP flag
-    if (use64)
-    {
-        context64.Dr7 = (1 << (2 * freeIdx)) | ((int)type << (16 + 4 * freeIdx)) | ((int)length << (18 + 4 * freeIdx)) | 0x100;
-        *(&context64.Dr0 + freeIdx) = addr;
-    }
-    else
-    {
-        context32.Dr7 = (1 << (2 * freeIdx)) | ((int)type << (16 + 4 * freeIdx)) | ((int)length << (18 + 4 * freeIdx)) | 0x100;
-        *(&context32.Dr0 + freeIdx) = (DWORD)addr;
-    }
+
+    pDR7->l_enable = 1;
+    pDR7->setLocal( freeIdx, 1 );
+    pDR7->setRW( freeIdx, static_cast<char>(type) );
+    pDR7->setLen( freeIdx, static_cast<char>(length) );
+
+    use64 ? *(&context64.Dr0 + freeIdx) = addr : *(&context32.Dr0 + freeIdx) = static_cast<DWORD>(addr);
 
     // Write values to registers
     res = use64 ? SetContext( context64, true ) : SetContext( context32, true );
@@ -273,26 +256,24 @@ int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
 /// <returns>true on success</returns>
 bool Thread::RemoveHWBP( int idx )
 {
-    if (idx > 0 && idx < 4)
-    {
-        _CONTEXT64 context64 = { 0 };
-        _CONTEXT32 context32 = { 0 };
-        bool use64 = !_core->native()->GetWow64Barrier().x86OS;
-        bool res = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
+    if (idx < 0 || idx > 4)
+        return false;
+   
+    _CONTEXT64 context64 = { 0 };
+    _CONTEXT32 context32 = { 0 };
+    bool use64 = !_core->native()->GetWow64Barrier().x86OS;
+    bool res = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
+    auto pDR7 = use64 ? reinterpret_cast<regDR7*>(&context64.Dr7) : reinterpret_cast<regDR7*>(&context32.Dr7);
+    if (!res)
+        return false;
+   
+    pDR7->setLocal( idx, 0 );
+    pDR7->setLen( idx, 0 );
+    pDR7->setRW( idx, 0 );
+    if (pDR7->empty())
+        pDR7->l_enable = 0;
 
-        if (res)
-        {
-            if (use64)
-                *(&context64.Dr0 + idx) = 0;
-            else
-                *(&context32.Dr0 + idx) = 0;
-
-            RESET_BIT( CONTEXT_VAL_T( use64, context64, context32, Dr7 ), (2 * idx) );
-            return use64 ? SetContext( context64 ) : SetContext( context32 );
-        }
-    }
-
-    return false;
+    return use64 ? SetContext( context64 ) : SetContext( context32 );
 }
 
 /// <summary>
@@ -306,22 +287,25 @@ bool Thread::RemoveHWBP( ptr_t ptr )
     _CONTEXT32 context32 = { 0 };
     bool use64 = !_core->native()->GetWow64Barrier().x86OS;
     bool res = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
+    auto pDR7 = use64 ? reinterpret_cast<regDR7*>(&context64.Dr7) : reinterpret_cast<regDR7*>(&context32.Dr7);
 
-    if (res)
+    if (!res)
+        return false;
+
+    // Search for breakpoint
+    for (int i = 0; i < 4; i++)
     {
-        // Search breakpoint
-        for (int i = 0; i < 4; i++)
+        if ((&context64.Dr0)[i] == ptr || (&context32.Dr0)[i] == static_cast<DWORD>(ptr))
         {
-            if ((&context64.Dr0)[i] == ptr || (&context32.Dr0)[i] == (DWORD)ptr)
-            {
-                if (use64)
-                    *(&context64.Dr0 + i) = 0;
-                else
-                    *(&context32.Dr0 + i) = 0;
+            use64 ? *(&context64.Dr0 + i) = 0 : *(&context32.Dr0 + i) = 0;
 
-                RESET_BIT( CONTEXT_VAL_T( use64, context64, context32, Dr7 ), (2 * i) );
-                return use64 ? SetContext( context64 ) : SetContext( context32 );
-            }
+            pDR7->setLocal( i, 0 );
+            pDR7->setLen( i, 0 );
+            pDR7->setRW( i, 0 );
+            if (pDR7->empty())
+                pDR7->l_enable = 0;
+
+            return use64 ? SetContext( context64 ) : SetContext( context32 );
         }
     }
 
@@ -374,7 +358,7 @@ uint64_t Thread::execTime()
 /// </summary>
 void Thread::Close()
 {
-    if (_handle)
+    if (_owner && _handle)
     {
         CloseHandle( _handle );
         _handle = NULL;

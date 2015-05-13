@@ -120,6 +120,7 @@ public:
     BLACKBONE_API size_t EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree = false );
 
     BLACKBONE_API inline class ProcessCore& core() { return _core; }
+    BLACKBONE_API inline class Process* process()  { return _process; }
 
 private:
     ProcessMemory( const ProcessMemory& ) = delete;

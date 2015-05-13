@@ -1,6 +1,5 @@
 #include "RemoteHook.h"
-#include "../ProcessMemory.h"
-#include "../ProcessCore.h"
+#include "../Process.h"
 
 #include <algorithm>
 
@@ -26,7 +25,7 @@ RemoteHook::~RemoteHook()
 /// Debug selected process
 /// </summary>
 /// <returns>true on success</returns>
-bool RemoteHook::EnsureDebug()
+NTSTATUS RemoteHook::EnsureDebug()
 {
     // Close previous debug object
     if (_debugPID != 0 && _debugPID != _core.pid())
@@ -36,7 +35,7 @@ bool RemoteHook::EnsureDebug()
     // Already debugging
     else if (_debugPID == _core.pid())
     {
-        return true;
+        return STATUS_SUCCESS;
     }
 
     //
@@ -46,20 +45,21 @@ bool RemoteHook::EnsureDebug()
 
     // Can't debug x64 process from x32 one.
     if (_core.native()->GetWow64Barrier().type == wow_32_64)
-        return false;
+        return STATUS_OBJECT_TYPE_MISMATCH;
 
     // Already under debugger
     CheckRemoteDebuggerPresent( _core.handle(), &isDebugged );
     if (isDebugged == TRUE)
-        return false;
+        return STATUS_ALREADY_REGISTERED;
+
+    // Event thread already exists
+    if (_hEventThd != NULL)
+        return STATUS_TOO_MANY_THREADS;
 
     // Create debug event thread
-    if (_hEventThd != NULL)
-        return false;
-
     _hEventThd = CreateThread( NULL, 0, &RemoteHook::EventThreadWrap, this, 0, NULL );
 
-    return (_hEventThd != NULL);
+    return (_hEventThd != NULL) ? STATUS_SUCCESS : LastNtStatus();
 }
 
 /// <summary>
@@ -84,11 +84,21 @@ void RemoteHook::EndDebug()
 /// <param name="newFn">Callback</param>
 /// <param name="pClass">Class reference.</param>
 /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
-/// <returns>true on success</returns>
-bool RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass /*= nullptr*/, Thread* pThread /*= nullptr*/ )
+/// <returns>Status code</returns>
+NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass /*= nullptr*/, Thread* pThread /*= nullptr*/ )
 {
-    if (!EnsureDebug())
-        return false;
+    NTSTATUS status = EnsureDebug();
+    if (!NT_SUCCESS( status ))
+        return status;
+
+    // Wait for debug event thread
+    DWORD exitCode = 0;
+    GetExitCodeThread( _hEventThd, &exitCode );
+    while (!_active && exitCode == STILL_ACTIVE)
+    {
+        Sleep( 10 );
+        GetExitCodeThread( _hEventThd, &exitCode );
+    }
 
     HookData data = { { 0 } };
 
@@ -100,22 +110,19 @@ bool RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const v
     data.threadID = (pThread != nullptr) ? pThread->id() : 0;
     
     // Set HWBP
-    if(type == ht_hwbp)
+    if(type == hwbp)
     {
         // Set for single thread
         if (pThread != nullptr)
         {
             data.hwbp_idx = pThread->AddHWBP( ptr, hwbp_execute, hwbp_1 );
-
             if (data.hwbp_idx == -1)
-                return false;
+                return STATUS_NO_MORE_ENTRIES;
         }
         // Set for all threads
         else
         {
-            ProcessThreads thds( _core );
-            auto& threads = thds.getAll();
-            
+            auto& threads = _memory.process()->threads().getAll();     
             for (auto& thread : threads)
                 thread.AddHWBP( ptr, hwbp_execute, hwbp_1 );
         }
@@ -123,14 +130,19 @@ bool RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const v
     // Write int3
     else
     {
-        if (_memory.Write<uint8_t>( ptr, 0xCC ) != STATUS_SUCCESS)
-            return false;
+        DWORD flOld = 0;
+        _memory.Protect( ptr, sizeof( uint8_t ), PAGE_EXECUTE_READWRITE, &flOld );
+        status = _memory.Write<uint8_t>( ptr, 0xCC );
+        _memory.Protect( ptr, sizeof( uint8_t ), flOld, nullptr );
+
+        if (!NT_SUCCESS( status ))
+            return status;
     }
 
     // Store hooked address
     _hooks.emplace( std::make_pair( ptr, data ) );
 
-    return true;
+    return STATUS_SUCCESS;
 }
 
 /// <summary>
@@ -140,8 +152,8 @@ bool RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const v
 /// <param name="ptr">Hooked function address</param>
 /// <param name="newFn">Callback</param>
 /// <param name="pClass">Class reference.</param>
-/// <returns>true on success</returns>
-bool RemoteHook::AddReturnHookP( uint64_t ptr, fnCallback newFn, const void* pClass /*= nullptr */ )
+/// <returns>Status code</returns>
+NTSTATUS RemoteHook::AddReturnHookP( uint64_t ptr, fnCallback newFn, const void* pClass /*= nullptr */ )
 {
     if(_hooks.count(ptr))
     {
@@ -150,12 +162,12 @@ bool RemoteHook::AddReturnHookP( uint64_t ptr, fnCallback newFn, const void* pCl
         // Add return callback
         hook.onReturn.freeFn = newFn;
         hook.onReturn.classFn.classPtr = pClass;
-        hook.flags = static_cast<eHookFlags>(hook.flags | hf_returnHook);
+        hook.flags |= returnHook;
 
-        return true;
+        return STATUS_SUCCESS;
     }
 
-    return false;
+    return STATUS_NOT_FOUND;
 }
 
 /// <summary>
@@ -182,18 +194,15 @@ void RemoteHook::Remove( uint64_t ptr )
 void RemoteHook::Restore( const HookData &hook, uint64_t ptr )
 {
     // Remove HWBP
-    if (hook.type == ht_hwbp)
+    if (hook.type == hwbp)
     {       
         if (hook.threadID != 0)
         {
-            Thread thd( hook.threadID, &_core );
-            thd.RemoveHWBP( hook.hwbp_idx );
+            Thread( hook.threadID, &_core ).RemoveHWBP( hook.hwbp_idx );
         }   
         else
         {
-            ProcessThreads thds( _core );
-            auto& threads = thds.getAll();
-
+            auto& threads = _memory.process()->threads().getAll();
             for (auto& thread : threads)
                 thread.RemoveHWBP( ptr );
         }
@@ -201,7 +210,10 @@ void RemoteHook::Restore( const HookData &hook, uint64_t ptr )
     // Restore original byte
     else
     {
+        DWORD flOld = 0;
+        _memory.Protect( ptr, sizeof( uint8_t ), PAGE_EXECUTE_READWRITE, &flOld );
         _memory.Write( ptr, hook.oldByte );
+        _memory.Protect( ptr, sizeof( uint8_t ), flOld, nullptr );
     }
 }
 
@@ -209,7 +221,7 @@ void RemoteHook::Restore( const HookData &hook, uint64_t ptr )
 /// Wrapper for debug event thread
 /// </summary>
 /// <param name="lpParam">RemoteHook pointer</param>
-/// <returns>Error code</returns>
+/// <returns>Status code</returns>
 DWORD RemoteHook::EventThreadWrap( LPVOID lpParam )
 {
     if (lpParam)
@@ -231,11 +243,10 @@ DWORD RemoteHook::EventThread()
     DebugSetProcessKillOnExit( FALSE );
 
     _debugPID = _core.pid();
-    _active   = true;
 
     // Determine if target is Wow64
     _x64Target = !_core.native()->GetWow64Barrier().targetWow64;
-    _wordSize = (_x64Target) ? sizeof(int64_t) : sizeof(int32_t);
+    _wordSize = _x64Target ? sizeof( int64_t ) : sizeof( int32_t );
 
     // 
     // Reset debug flag in PEB
@@ -243,6 +254,8 @@ DWORD RemoteHook::EventThread()
     _memory.Write( _core.peb() + FIELD_OFFSET( _PEB64, BeingDebugged ), uint8_t( 0 ) );
     if (!_x64Target)
         _memory.Write( _core.peb() + FIELD_OFFSET( _PEB32, BeingDebugged ), uint8_t( 0 ) );
+
+    _active = true;
 
     // Process debug events
     while (_active)
@@ -262,7 +275,7 @@ DWORD RemoteHook::EventThread()
                 // Add HWBP to created thread
             case CREATE_THREAD_DEBUG_EVENT:
                 for(auto& hook : _hooks)
-                    if (hook.second.type == ht_hwbp && hook.second.threadID == 0)
+                    if (hook.second.type == hwbp && hook.second.threadID == 0)
                     {
                         Thread th( DebugEv.u.CreateThread.hThread, &_core );
                         th.AddHWBP( hook.first, hwbp_execute, hwbp_1 );
@@ -356,17 +369,20 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
             hook.onExecute.freeFn( context );
 
         // Resume execution
+        DWORD flOld = 0;
+        _memory.Protect( addr, sizeof( hook.oldByte ), PAGE_EXECUTE_READWRITE, &flOld );
         _memory.Write( addr, hook.oldByte );
-      
+        _memory.Protect( addr, sizeof( hook.oldByte ), flOld, nullptr );
+
         _repatch[addr] = true;
         
         // Single-step failed instruction
-        ctx64.Rip -= sizeof(uint8_t);
+        ctx64.Rip -= sizeof( uint8_t );
         ctx64.EFlags |= 0x100;
         thd.SetContext( ctx64, true );
 
         // Raise exceptions upon return
-        if(hook.flags & hf_returnHook)
+        if(hook.flags & returnHook)
         {
             auto newReturn = context.hookReturn();
             _retHooks.emplace( std::make_pair( newReturn, addr ) );
@@ -412,41 +428,37 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
 
     // Detect hardware breakpoint
     DWORD index = 0;
-    if (_BitScanForward( &index, LODWORD( ctx64.Dr6 ) ) != 0 && index < 4)
+    if (_BitScanForward( &index, LODWORD( ctx64.Dr6 ) ) != 0 && index < 4 && (_hooks.count( addr )))
     {
-        if (_hooks.count( addr ))
+        // Get stack frame pointer
+        std::vector<std::pair<ptr_t, ptr_t>> results;
+        StackBacktrace( ip, sp, thd, results, 1 );
+
+        RemoteContext context( _memory, thd, ctx64, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
+
+        // Execute user callback
+        auto hook = _hooks[addr];
+        if (hook.onExecute.classFn.classPtr && hook.onExecute.classFn.ptr != nullptr)
+            hook.onExecute.classFn.ptr( hook.onExecute.classFn.classPtr, context );
+        else if (hook.onExecute.freeFn != nullptr)
+            hook.onExecute.freeFn( context );
+
+        auto andVal = ~(1ll << (2 * index));
+        use64 ? ctx64.Dr7 &= andVal : ctx32.Dr7 &= andVal;      // Reset breakpoint
+        use64 ? ctx64.Dr6 = 0 : ctx32.Dr6 = 0;                  // Reset flags
+        use64 ? ctx64.EFlags |= 0x100 : ctx32.EFlags |= 100;    // Single step
+        use64 ? thd.SetContext( ctx64, true ) : thd.SetContext( ctx32, true );
+
+        _repatch[addr] = true;
+
+        // Raise exception upon return
+        if (hook.flags & returnHook)
         {
-            // Get stack frame pointer
-            std::vector<std::pair<ptr_t, ptr_t>> results;
-            StackBacktrace( ip, sp, thd, results, 1 );
-
-            RemoteContext context( _memory, thd, ctx64, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
-
-            // Execute user callback
-            auto hook = _hooks[addr];
-            if (hook.onExecute.classFn.classPtr && hook.onExecute.classFn.ptr != nullptr)
-                hook.onExecute.classFn.ptr( hook.onExecute.classFn.classPtr, context );
-            else if (hook.onExecute.freeFn != nullptr)
-                hook.onExecute.freeFn( context );
-
-            // Reset breakpoint
-            RESET_BIT( use64 ? ctx64.Dr7 : ctx32.Dr7, (2 * index) );
-
-            _repatch[addr] = true;
-
-            use64 ? ctx64.Dr6 : ctx32.Dr6        = 0;           // reset flags
-            use64 ? ctx64.EFlags : ctx32.EFlags |= 0x100;       // single step
-            use64 ? thd.SetContext( ctx64, true ) : thd.SetContext( ctx32, true );
-
-            // Raise exception upon return
-            if (hook.flags & hf_returnHook)
-            {
-                auto newReturn = context.hookReturn();
-                _retHooks.emplace( std::make_pair( newReturn, addr ) );
-            }
-
-            return DBG_CONTINUE;
+            auto newReturn = context.hookReturn();
+            _retHooks.emplace( std::make_pair( newReturn, addr ) );
         }
+
+        return DBG_CONTINUE;
     }
 
     // Restore pending hooks
@@ -456,10 +468,18 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
         {
             auto& hook = _hooks[place.first];
 
-            if (hook.type == ht_hwbp)
+            if (hook.type == hwbp)
+            {
                 thd.AddHWBP( place.first, hwbp_execute, hwbp_1 );
-            else if (hook.type == ht_int3)
+            }
+            else if (hook.type == int3)
+            {
+                DWORD flOld = 0;
+                _memory.Protect( addr, sizeof( hook.oldByte ), PAGE_EXECUTE_READWRITE, &flOld );
                 _memory.Write( place.first, uint8_t( 0xCC ) );
+                _memory.Protect( addr, sizeof( hook.oldByte ), flOld, nullptr );
+            }
+
 
             place.second = false;
         }
@@ -513,7 +533,7 @@ DWORD RemoteHook::OnAccessViolation( const DEBUG_EVENT& DebugEv )
         // Execute user callback
         auto hook = _hooks[_retHooks[addr]];
 
-        if(hook.flags & hf_returnHook)
+        if(hook.flags & returnHook)
         {
             if (hook.onReturn.classFn.classPtr && hook.onReturn.classFn.ptr != nullptr)
                 hook.onReturn.classFn.ptr( hook.onExecute.classFn.classPtr, context );

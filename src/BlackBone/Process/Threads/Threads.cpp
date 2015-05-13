@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <random>
+#include <algorithm>
 
 namespace blackbone
 {
@@ -24,7 +25,7 @@ ProcessThreads::~ProcessThreads()
 /// <param name="arg">Thread argument.</param>
 /// <param name="flags">Thread creation flags</param>
 /// <returns>New thread object</returns>
-Thread ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg, CreateThreadFlags flags /*= 0*/ )
+Thread ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg, enum CreateThreadFlags flags /*= NoThreadFlags*/ )
 {
     HANDLE hThd = NULL;
     if (!NT_SUCCESS( _core.native()->CreateRemoteThreadT( hThd, threadProc, arg, flags, THREAD_ALL_ACCESS ) ))
@@ -47,7 +48,7 @@ Thread ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg, CreateThreadFlags
 /// <returns>Threads collection</returns>
 std::vector<Thread>& ProcessThreads::getAll( bool dontUpdate /*= false*/ )
 {
-    if (dontUpdate)
+    if (!_threads.empty() && dontUpdate)
         return _threads;
 
     HANDLE hThreadSnapshot = CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 );
@@ -170,9 +171,10 @@ Thread* ProcessThreads::getRandom()
 /// <returns>Pointer to thread object, nullptr if failed</returns>
 Thread* ProcessThreads::get( DWORD id )
 {
-    for(auto& thd : getAll())
-        if (thd.id() == id)
-            return &thd;
+    getAll();
+    auto iter = std::find_if( _threads.begin(), _threads.end(), [id]( const Thread& item ) { return item.id() == id; } );
+    if (iter != _threads.end())
+        return &*iter;
 
     return nullptr;
 }

@@ -39,6 +39,53 @@ enum HWBPLength
 
 
 /// <summary>
+/// DR7 register bitfield
+/// </summary>
+struct regDR7
+{
+    //
+    // Local/global enabled index
+    //
+    int l0 : 1;
+    int g0 : 1;
+    int l1 : 1;
+    int g1 : 1;
+    int l2 : 1;
+    int g2 : 1;
+    int l3 : 1;
+    int g3 : 1;
+
+    int l_enable : 1;       // Local breakpoints, obsolete for P6+
+    int g_enable : 1;       // Global breakpoints, obsolete for P6+
+    int one : 1;            // Reserved
+    int rtm : 1;            // Restricted transactional memory
+    int ice : 1;            // ICE debugger
+    int gd  : 1;            // General detect table
+    int tr1 : 1;            // Trace 1
+    int tr2 : 1;            // Trace2
+
+    //
+    // Breakpoint type/length
+    //
+    int rw0  : 1;
+    int len0 : 1;
+    int rw1  : 1;
+    int len1 : 1;
+    int rw2  : 1;
+    int len2 : 1;
+    int rw3  : 1;
+    int len3 : 1;
+
+    inline void setLocal( int idx, int val ) { idx == 0 ? l0   = val : (idx == 1 ? l1   = val : (idx == 2 ? l2   = val : l3   = val)); }
+    inline void setRW   ( int idx, int val ) { idx == 0 ? rw0  = val : (idx == 1 ? rw1  = val : (idx == 2 ? rw2  = val : rw3  = val)); }
+    inline void setLen  ( int idx, int val ) { idx == 0 ? len0 = val : (idx == 1 ? len1 = val : (idx == 2 ? len2 = val : len3 = val)); }
+
+    inline bool empty() const { return (l0 | l1 | l2 | l3) ? false : true; }
+    inline int  getFreeIndex() const { return !l0 ? 0 : (!l1 ? 1 : (!l2 ? 2 : (!l3 ? 3 : -1))); }
+};
+
+
+/// <summary>
 /// Thread management
 /// </summary>
 class Thread
@@ -178,7 +225,7 @@ public:
     /// <param name="type">Breakpoint type(read/write/execute)</param>
     /// <param name="length">Number of bytes to include into breakpoint</param>
     /// <returns>Index of used breakpoint; -1 if failed</returns>
-    int BLACKBONE_API AddHWBP( ptr_t addr, HWBPType type, HWBPLength length );
+    BLACKBONE_API int AddHWBP( ptr_t addr, HWBPType type, HWBPLength length );
 
     /// <summary>
     /// Remove existing hardware breakpoint
@@ -208,29 +255,25 @@ public:
         _handle = other._handle;
 
         // Transfer handle ownership
-        other.ReleaseHandle();
+        other._owner = false;
 
         return *this;
     }
 
 private:
-
-    /// <summary>
-    /// Release thread handle
-    /// </summary>
-    inline void ReleaseHandle() const { _handle = NULL; }
-
     /// <summary>
     /// GetThreadId support for XP
     /// </summary>
     /// <param name="hThread">Thread handle</param>
     /// <returns>Thread ID</returns>
     DWORD GetThreadIdT( HANDLE hThread );
+
 private:
     class ProcessCore* _core;           // Core routines
 
     DWORD _id = 0;                      // Thread ID
-    mutable HANDLE _handle = NULL;      // Thread handle
+    HANDLE _handle = NULL;              // Thread handle
+    mutable bool _owner = true;         // Class owns a handle
 };
 
 }

@@ -683,10 +683,6 @@ namespace blackbone
         ULONG SizeOfTable;
     } RTL_INVERTED_FUNCTION_TABLE_ENTRY, *PRTL_INVERTED_FUNCTION_TABLE_ENTRY;
 
-    //
-    // Api schema structures
-    //
-    
 
     typedef _PEB_T<DWORD, DWORD64, 34> _PEB32;
     typedef _PEB_T<DWORD64, DWORD, 30> _PEB64;
