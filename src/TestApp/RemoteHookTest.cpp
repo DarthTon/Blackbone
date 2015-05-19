@@ -64,7 +64,7 @@ void TestRemoteHook()
             std::wcout << L"Found. Hooking...\n";
 
             // Hook and wait some time.
-            if (hclass.procTaskMgr.hooks().Apply( RemoteHook::ht_hwbp, pHookFn.procAddress, &HookClass::HookFn, hclass ))
+            if (hclass.procTaskMgr.hooks().Apply( RemoteHook::hwbp, pHookFn.procAddress, &HookClass::HookFn, hclass ))
             {
                 std::wcout << L"Hooked successfully. Try to terminate TestApp.exe from taskmgr now.\n";
                 Sleep( 20000 );
