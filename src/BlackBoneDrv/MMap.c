@@ -1000,17 +1000,18 @@ NTSTATUS BBResolveSxS(
         RtlInitEmptyUnicodeString( &pStringBuf->name2, NULL, 0 );
     }
 
-    // RtlDosApplyFileIsolationRedirection_Ustr
-    status = BBCallRoutine(
-        FALSE, pContext, pQueryName, 9,
-        (PVOID)TRUE, &pStringBuf->origName, NULL,
-        &pStringBuf->name1, &pStringBuf->name2, &pStringBuf->pResolved,
-        NULL, NULL, NULL
-        );
 
     // Prevent some unpredictable shit
     __try
     {
+        // RtlDosApplyFileIsolationRedirection_Ustr
+        status = BBCallRoutine(
+            FALSE, pContext, pQueryName, 9,
+            (PVOID)TRUE, &pStringBuf->origName, NULL,
+            &pStringBuf->name1, &pStringBuf->name2, &pStringBuf->pResolved,
+            NULL, NULL, NULL
+            );
+
         if (NT_SUCCESS( status ) && NT_SUCCESS( pContext->userMem->status ))
         {
             if (wow64)
