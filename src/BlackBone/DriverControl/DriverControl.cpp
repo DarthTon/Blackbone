@@ -105,8 +105,9 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
 
     if (_hDriver == INVALID_HANDLE_VALUE)
     {
+        status = LastNtStatus();
         BLACBONE_TRACE( L"Failed to open driver handle. Status 0x%X", status );
-        return LastNtStatus();
+        return status;
     }
 
     return status;
