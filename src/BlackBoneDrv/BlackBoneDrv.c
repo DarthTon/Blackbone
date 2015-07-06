@@ -205,7 +205,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
     #if defined(_WIN7_)
         if (ver_short != WINVER_7 && ver_short != WINVER_7_SP1)
             return STATUS_NOT_SUPPORTED;
-        if(ver_short == WINVER_7_SP1 && buildNo != 18700)
+        if(ver_short == WINVER_7_SP1 && buildNo != 18798)
             pData->correctBuild = FALSE;
     #elif defined(_WIN8_)
         if (ver_short != WINVER_8)
@@ -236,7 +236,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         switch (ver_short)
         {
                 // Windows 7
-                // Windows 7 SP1, build 18700
+                // Windows 7 SP1, build 18798
             case WINVER_7:
             case WINVER_7_SP1:
                 pData->KExecOpt         = 0x0D2;
@@ -248,8 +248,8 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->NtTermThdIndex   = 0x50;
                 pData->PrevMode         = 0x1F6;
                 pData->ExitStatus       = 0x380;
-                pData->MiAllocPage      = (ver_short == WINVER_7_SP1) ? 0x410D70 : 0x40A9C0;
-                pData->ExRemoveTable    = (ver_short == WINVER_7_SP1) ? 0x330048 : 0x32D404;
+                pData->MiAllocPage      = (ver_short == WINVER_7_SP1) ? 0 : 0;
+                pData->ExRemoveTable    = (ver_short == WINVER_7_SP1) ? 0x32A870 : 0x32D404;
                 break;
 
                 // Windows 8

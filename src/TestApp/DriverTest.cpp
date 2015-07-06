@@ -52,9 +52,26 @@ void TestDriver()
         // Grant explorer.exe handle full access
         status = Driver().PromoteHandle( GetCurrentProcessId(), proc.core().handle(), PROCESS_ALL_ACCESS );
         if (!NT_SUCCESS( status ))
+        {
             std::cout << "TestDriver: IOCTL_BLACKBONE_GRANT_ACCESS failed, status 0x" << std::hex << status << "\r\n";
+        }
         else
-            std::cout << "TestDriver: IOCTL_BLACKBONE_GRANT_ACCESS succeeded\r\n";
+        {
+            PUBLIC_OBJECT_BASIC_INFORMATION info = { 0 };
+            ULONG size = 0;
+            status = SAFE_CALL( NtQueryObject, proc.core().handle(), ObjectBasicInformation, &info, sizeof( info ), &size );
+            if (!NT_SUCCESS( status ))
+            {
+                std::cout << "TestDriver: IOCTL_BLACKBONE_GRANT_ACCESS failed, status 0x" << std::hex << status << "\r\n";
+            }
+            else
+            {
+                if (info.GrantedAccess == PROCESS_ALL_ACCESS)
+                    std::cout << "TestDriver: IOCTL_BLACKBONE_GRANT_ACCESS succeeded\r\n";
+                else
+                    std::cout << "TestDriver: IOCTL_BLACKBONE_GRANT_ACCESS failed, status 0x" << std::hex << STATUS_UNSUCCESSFUL << "\r\n";
+            }
+        }
 
         // Read explorer.exe PE header
         status = Driver().ReadMem( proc.pid(), address, size, buf );
@@ -84,6 +101,13 @@ void TestDriver()
             std::cout << "TestDriver: IOCTL_BLACKBONE_PROTECT_MEMORY succeeded\r\n";
             proc.memory().Protect( address, 0x1000, PAGE_READONLY );
         }
+
+        // Unlink handle table
+        status = Driver().UnlinkHandleTable( proc.pid() );
+        if (!NT_SUCCESS( status ))
+            std::cout << "TestDriver: IOCTL_BLACKBONE_UNLINK_HTABLE failed, status 0x" << std::hex << status << "\r\n";
+        else
+            std::cout << "TestDriver: IOCTL_BLACKBONE_UNLINK_HTABLE succeeded\r\n";
     }
     else
         std::cout << "TestDriver: Failed to load driver. Status 0x" << std::hex << LastNtStatus() << "\r\n";
