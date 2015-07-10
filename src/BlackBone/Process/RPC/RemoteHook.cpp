@@ -646,6 +646,7 @@ void RemoteHook::reset()
     for (auto& hook : _hooks)
         Restore( hook.second, hook.first );
 
+    _hooks.clear();
     EndDebug();
 }
 
