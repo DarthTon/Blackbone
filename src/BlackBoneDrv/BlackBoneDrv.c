@@ -91,7 +91,7 @@ VOID BBUnload( IN PDRIVER_OBJECT DriverObject )
     PsSetCreateProcessNotifyRoutine( BBProcessNotify, TRUE );
 
     // Cleanup physical regions
-    BBCleanupProcessPhysList();
+    //BBCleanupProcessPhysList();
 
     // Cleanup process mapping info
     BBCleanupProcessTable();
