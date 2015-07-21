@@ -7,15 +7,51 @@ void* DetourBase::_vecHandler = nullptr;
 
 DetourBase::DetourBase()
 {
-    _buf = (uint8_t*)VirtualAlloc( nullptr, 0x1000, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
-    _origCode = _buf + 0x100;
-    _newCode = _buf + 0x200;
 }
 
 DetourBase::~DetourBase()
 {
     VirtualFree( _buf, 0, MEM_RELEASE );
 }
+
+/// <summary>
+/// Allocate detour buffer as close to target as possible
+/// </summary>
+/// <param name="nearest">Target address</param>
+/// <returns>true on success</returns>
+bool DetourBase::AllocateBuffer( uint8_t* nearest )
+{
+    if (_buf != nullptr)
+        return true;
+
+    MEMORY_BASIC_INFORMATION mbi = { 0 };
+    for (SIZE_T addr = (SIZE_T)nearest; addr > (SIZE_T)nearest - 0x80000000; addr = (SIZE_T)mbi.BaseAddress - 1)
+    {
+        if (!VirtualQuery( (LPCVOID)addr, &mbi, sizeof( mbi ) ))
+            break;
+
+        if (mbi.State == MEM_FREE)
+        {
+            _buf = (uint8_t*)VirtualAlloc(
+                (uint8_t*)mbi.BaseAddress + mbi.RegionSize - 0x1000, 0x1000,
+                MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE
+                );
+
+            if (_buf)
+                break;
+        }
+    }
+
+    // If allocating a memory page failed, allocate first suitable
+    if (_buf == nullptr)
+        _buf = (uint8_t*)VirtualAlloc( nullptr, 0x1000, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+
+    _origCode = _buf + 0x100;
+    _newCode  = _buf + 0x200;
+
+    return _buf != nullptr;
+}
+
 
 /// <summary>
 /// Temporarily disable hook
@@ -98,14 +134,26 @@ void DetourBase::CopyOldCode( uint8_t* ptr )
         // if instruction has relative offset, calculate new offset 
         if (ld.flags & F_RELATIVE)
         {
+            int32_t diff = 0;
+            const size_t ofst = (ld.disp_offset != 0 ? ld.disp_offset : ld.imm_offset);
+            const size_t sz = ld.disp_size != 0 ? ld.disp_size : ld.imm_size;
+
+            memcpy( &diff, src + ofst, sz );
+
         #ifdef USE64
             // exit if jump is greater then 2GB
-            if (_abs64( (uintptr_t)(src + *((int*)(old + ld.opcd_size))) - (uintptr_t)old ) > INT_MAX)
+            if (_abs64( src + len + diff - old ) > INT_MAX)
+            {
                 break;
+            }
             else
-                *(uint32_t*)(old + ld.opcd_size) += (uint32_t)(src - old);
+            {
+                diff += static_cast<int32_t>(src - old);
+                memcpy( old + ofst, &diff, sz );
+            }
         #else
-            *(uintptr_t*)(old + ld.opcd_size) += src - old;
+            diff += src - old;
+            memcpy( old + ofst, &diff, sz );
         #endif
         }
 

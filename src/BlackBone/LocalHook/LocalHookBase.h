@@ -56,6 +56,13 @@ public:
 protected:
 
     /// <summary>
+    /// Allocate detour buffer as close to target as possible
+    /// </summary>
+    /// <param name="nearest">Target address</param>
+    /// <returns>true on success</returns>
+    BLACKBONE_API bool AllocateBuffer( uint8_t* nearest );
+
+    /// <summary>
     /// Temporarily disable hook
     /// </summary>
     /// <returns>true on success</returns>

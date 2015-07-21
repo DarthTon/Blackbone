@@ -51,6 +51,9 @@ public:
         this->_callOriginal = this->_original = ptr;
         this->_callback = hkPtr;
 
+        if (!AllocateBuffer( reinterpret_cast<uint8_t*>(ptr) ))
+            return false;
+
         switch (this->_type)
         {
             case HookType::Inline:
@@ -170,8 +173,11 @@ private:
         auto codeSize = jmpToThunk->relocCode( this->_newCode );
 
         DWORD flOld = 0;
-        VirtualProtect( this->_original, codeSize, PAGE_EXECUTE_READWRITE, &flOld );
+        if (!VirtualProtect( this->_original, codeSize, PAGE_EXECUTE_READWRITE, &flOld ))
+            return false;
+
         memcpy( this->_original, this->_newCode, codeSize );
+
         VirtualProtect( this->_original, codeSize, flOld, &flOld );
     
         return (this->_hooked = codeSize != 0);
