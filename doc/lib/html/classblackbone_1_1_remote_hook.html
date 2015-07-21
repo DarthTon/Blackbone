@@ -121,12 +121,12 @@ Classes</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-types"></a>
 Public Types</h2></td></tr>
-<tr class="memitem:ab8433f2e263778d5b3b2b4a41b2a1f2c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab8433f2e263778d5b3b2b4a41b2a1f2c"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><b>eHookType</b> { <b>ht_int3</b> = 0, 
-<b>ht_hwbp</b>
+<tr class="memitem:ab8433f2e263778d5b3b2b4a41b2a1f2c"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab8433f2e263778d5b3b2b4a41b2a1f2c"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><b>eHookType</b> { <b>int3</b> = 0, 
+<b>hwbp</b>
  }</td></tr>
 <tr class="separator:ab8433f2e263778d5b3b2b4a41b2a1f2c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a33a8ebd1d671b2518862f339d2ae5f2d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a33a8ebd1d671b2518862f339d2ae5f2d"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><b>eHookFlags</b> { <b>hf_none</b> = 0, 
-<b>hf_returnHook</b> = 1
+<tr class="memitem:a33a8ebd1d671b2518862f339d2ae5f2d"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a33a8ebd1d671b2518862f339d2ae5f2d"></a>enum &#160;</td><td class="memItemRight" valign="bottom"><b>eHookFlags</b> { <b>none</b> = 0, 
+<b>returnHook</b> = 1
  }</td></tr>
 <tr class="separator:a33a8ebd1d671b2518862f339d2ae5f2d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1032acd786f7013e8abf5877ea28ab21"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1032acd786f7013e8abf5877ea28ab21"></a>
@@ -153,12 +153,12 @@ typedef&#160;</td><td class="memItemRight" valign="bottom"><b>void</b> (__thisca
 <tr class="memitem:ad74aec942e5fd440c889f740e083ae5a"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ad74aec942e5fd440c889f740e083ae5a"></a>
 BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>RemoteHook</b> (class <a class="el" href="classblackbone_1_1_process_memory.html">ProcessMemory</a> &amp;memory)</td></tr>
 <tr class="separator:ad74aec942e5fd440c889f740e083ae5a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a232ef90458faaa52820b9e4bfe8d4381"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_remote_hook.html#a232ef90458faaa52820b9e4bfe8d4381">Apply</a> (eHookType type, uint64_t ptr, fnCallback newFn, <a class="el" href="classblackbone_1_1_thread.html">Thread</a> *pThread=nullptr)</td></tr>
-<tr class="memdesc:a232ef90458faaa52820b9e4bfe8d4381"><td class="mdescLeft">&#160;</td><td class="mdescRight">Hook specified address  <a href="#a232ef90458faaa52820b9e4bfe8d4381">More...</a><br /></td></tr>
-<tr class="separator:a232ef90458faaa52820b9e4bfe8d4381"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab2722b83751a6d9046743c1be8681f5f"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_remote_hook.html#ab2722b83751a6d9046743c1be8681f5f">AddReturnHook</a> (uint64_t ptr, fnCallback newFn)</td></tr>
-<tr class="memdesc:ab2722b83751a6d9046743c1be8681f5f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Hook function return This hook will only work if function is hooked normally  <a href="#ab2722b83751a6d9046743c1be8681f5f">More...</a><br /></td></tr>
-<tr class="separator:ab2722b83751a6d9046743c1be8681f5f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a832f5cfe16febed149df7a91e8284929"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_remote_hook.html#a832f5cfe16febed149df7a91e8284929">Apply</a> (eHookType type, uint64_t ptr, fnCallback newFn, <a class="el" href="classblackbone_1_1_thread.html">Thread</a> *pThread=nullptr)</td></tr>
+<tr class="memdesc:a832f5cfe16febed149df7a91e8284929"><td class="mdescLeft">&#160;</td><td class="mdescRight">Hook specified address  <a href="#a832f5cfe16febed149df7a91e8284929">More...</a><br /></td></tr>
+<tr class="separator:a832f5cfe16febed149df7a91e8284929"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6f12e9fb2e24e9bb75a07a39d37f7bc5"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_remote_hook.html#a6f12e9fb2e24e9bb75a07a39d37f7bc5">AddReturnHook</a> (uint64_t ptr, fnCallback newFn)</td></tr>
+<tr class="memdesc:a6f12e9fb2e24e9bb75a07a39d37f7bc5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Hook function return This hook will only work if function is hooked normally  <a href="#a6f12e9fb2e24e9bb75a07a39d37f7bc5">More...</a><br /></td></tr>
+<tr class="separator:a6f12e9fb2e24e9bb75a07a39d37f7bc5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa64cc8f1def2acdc0a8c7c5d659f89ac"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_remote_hook.html#aa64cc8f1def2acdc0a8c7c5d659f89ac">Remove</a> (uint64_t ptr)</td></tr>
 <tr class="memdesc:aa64cc8f1def2acdc0a8c7c5d659f89ac"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remove existing hook  <a href="#aa64cc8f1def2acdc0a8c7c5d659f89ac">More...</a><br /></td></tr>
 <tr class="separator:aa64cc8f1def2acdc0a8c7c5d659f89ac"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -167,7 +167,7 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>RemoteHook</
 <tr class="separator:a66bf43d8c48bda09965a2eafee7c6dfc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a class="anchor" id="ab2722b83751a6d9046743c1be8681f5f"></a>
+<a class="anchor" id="a6f12e9fb2e24e9bb75a07a39d37f7bc5"></a>
 <div class="memitem">
 <div class="memproto">
 <table class="mlabels">
@@ -175,7 +175,7 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>RemoteHook</
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">BLACKBONE_API bool blackbone::RemoteHook::AddReturnHook </td>
+          <td class="memname">BLACKBONE_API NTSTATUS blackbone::RemoteHook::AddReturnHook </td>
           <td>(</td>
           <td class="paramtype">uint64_t&#160;</td>
           <td class="paramname"><em>ptr</em>, </td>
@@ -211,7 +211,7 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>RemoteHook</
 
 </div>
 </div>
-<a class="anchor" id="a232ef90458faaa52820b9e4bfe8d4381"></a>
+<a class="anchor" id="a832f5cfe16febed149df7a91e8284929"></a>
 <div class="memitem">
 <div class="memproto">
 <table class="mlabels">
@@ -219,7 +219,7 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>RemoteHook</
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">BLACKBONE_API bool blackbone::RemoteHook::Apply </td>
+          <td class="memname">BLACKBONE_API NTSTATUS blackbone::RemoteHook::Apply </td>
           <td>(</td>
           <td class="paramtype">eHookType&#160;</td>
           <td class="paramname"><em>type</em>, </td>
@@ -311,8 +311,8 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>RemoteHook</
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/RPC/<a class="el" href="_remote_hook_8h_source.html">RemoteHook.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/RPC/RemoteHook.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/RPC/<a class="el" href="_remote_hook_8h_source.html">RemoteHook.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/RPC/RemoteHook.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -320,7 +320,7 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>RemoteHook</
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_remote_hook.html">RemoteHook</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

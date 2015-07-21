@@ -2,6 +2,7 @@ var searchData=
 [
   ['pagesize',['pageSize',['../classblackbone_1_1_native.html#aaf75d49ff0a856901fbedea2102fcbd5',1,'blackbone::Native']]],
   ['parse',['Parse',['../classblackbone_1_1pe_1_1_p_e_image.html#a971cd3b6bffb8c59e452499363a84116',1,'blackbone::pe::PEImage']]],
+  ['path',['path',['../classblackbone_1_1pe_1_1_p_e_image.html#ada2ff635e8fcccf194a647edd7e4b78f',1,'blackbone::pe::PEImage']]],
   ['peb',['peb',['../classblackbone_1_1_process_core.html#af972d20590026e51877c3c8eae3d36c9',1,'blackbone::ProcessCore::peb(_PEB32 *ppeb)'],['../classblackbone_1_1_process_core.html#abca44d6d882d52046657a92236943c3f',1,'blackbone::ProcessCore::peb(_PEB64 *ppeb)'],['../classblackbone_1_1_process_core.html#a878ee4d9697e12c846400c79690cb36c',1,'blackbone::ProcessCore::peb()']]],
   ['pid',['pid',['../classblackbone_1_1_process.html#ab03f8adf7990d93e97ead0df100240bb',1,'blackbone::Process::pid()'],['../classblackbone_1_1_process_core.html#a17e8303ebbda2d5cbecce7ab5884bbb4',1,'blackbone::ProcessCore::pid()']]],
   ['probesxsredirect',['ProbeSxSRedirect',['../classblackbone_1_1_name_resolve.html#a05eb52151b3cd1b8a98017f406451906',1,'blackbone::NameResolve']]],

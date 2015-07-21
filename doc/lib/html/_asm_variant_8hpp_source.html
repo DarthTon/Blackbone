@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.8"/>
-<title>BlackBone: C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Asm/AsmVariant.hpp Source File</title>
+<title>BlackBone: C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Asm/AsmVariant.hpp Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -187,7 +187,7 @@ $(document).ready(function(){initNavTree('_asm_variant_8hpp_source.html','');});
 <div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;            , imm_float_val( _imm_fpu )</div>
 <div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;            , new_imm_val( 0 ) { }</div>
 <div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;</div>
-<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;        BLACKBONE_API AsmVariant( asmjit::host::GpReg _reg )</div>
+<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;        BLACKBONE_API AsmVariant( asmjit::GpReg _reg )</div>
 <div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;            : type( reg )</div>
 <div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;            , size( <span class="keyword">sizeof</span>(<span class="keywordtype">size_t</span>) )</div>
 <div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;            , reg_val( _reg )</div>
@@ -195,22 +195,22 @@ $(document).ready(function(){initNavTree('_asm_variant_8hpp_source.html','');});
 <div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;            , new_imm_val( 0 ) { }</div>
 <div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;</div>
 <div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;        <span class="comment">// Stack variable</span></div>
-<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;        BLACKBONE_API AsmVariant( asmjit::host::Mem _mem )</div>
+<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;        BLACKBONE_API AsmVariant( asmjit::Mem _mem )</div>
 <div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;            : type( mem )</div>
 <div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;            , size( <span class="keyword">sizeof</span>(<span class="keywordtype">size_t</span>) )</div>
 <div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;            , mem_val( _mem )</div>
 <div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;            , imm_double_val( -1.0 ) { }</div>
 <div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;</div>
 <div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160;        <span class="comment">// Pointer to stack address</span></div>
-<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;        BLACKBONE_API AsmVariant( asmjit::host::Mem* _mem )</div>
+<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;        BLACKBONE_API AsmVariant( asmjit::Mem* _mem )</div>
 <div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160;            : type( mem_ptr )</div>
 <div class="line"><a name="l00104"></a><span class="lineno">  104</span>&#160;            , size( <span class="keyword">sizeof</span>(<span class="keywordtype">size_t</span>) )</div>
 <div class="line"><a name="l00105"></a><span class="lineno">  105</span>&#160;            , mem_val( *_mem )</div>
 <div class="line"><a name="l00106"></a><span class="lineno">  106</span>&#160;            , imm_double_val( -1.0 )</div>
 <div class="line"><a name="l00107"></a><span class="lineno">  107</span>&#160;            , new_imm_val( 0 ) { }</div>
 <div class="line"><a name="l00108"></a><span class="lineno">  108</span>&#160;</div>
-<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160;        BLACKBONE_API AsmVariant( <span class="keyword">const</span> asmjit::host::Mem* _mem )</div>
-<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160;            : AsmVariant( const_cast&lt;asmjit::host::Mem*&gt;(_mem) ) { }</div>
+<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160;        BLACKBONE_API AsmVariant( <span class="keyword">const</span> asmjit::Mem* _mem )</div>
+<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160;            : AsmVariant( const_cast&lt;asmjit::Mem*&gt;(_mem) ) { }</div>
 <div class="line"><a name="l00111"></a><span class="lineno">  111</span>&#160;</div>
 <div class="line"><a name="l00112"></a><span class="lineno">  112</span>&#160;        <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</div>
 <div class="line"><a name="l00113"></a><span class="lineno">  113</span>&#160;        AsmVariant( T* ptr )</div>
@@ -300,8 +300,8 @@ $(document).ready(function(){initNavTree('_asm_variant_8hpp_source.html','');});
 <div class="line"><a name="l00207"></a><span class="lineno">  207</span>&#160;        eType         type;             <span class="comment">// Variable type</span></div>
 <div class="line"><a name="l00208"></a><span class="lineno">  208</span>&#160;        <span class="keywordtype">size_t</span>        size;             <span class="comment">// Variable size</span></div>
 <div class="line"><a name="l00209"></a><span class="lineno">  209</span>&#160;</div>
-<div class="line"><a name="l00210"></a><span class="lineno">  210</span>&#160;        asmjit::host::GpReg reg_val;          <span class="comment">// General purpose register</span></div>
-<div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160;        asmjit::host::Mem   mem_val;          <span class="comment">// Memory pointer</span></div>
+<div class="line"><a name="l00210"></a><span class="lineno">  210</span>&#160;        asmjit::GpReg reg_val;          <span class="comment">// General purpose register</span></div>
+<div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160;        asmjit::Mem   mem_val;          <span class="comment">// Memory pointer</span></div>
 <div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160;</div>
 <div class="line"><a name="l00213"></a><span class="lineno">  213</span>&#160;        <span class="comment">// Immediate values</span></div>
 <div class="line"><a name="l00214"></a><span class="lineno">  214</span>&#160;        <span class="keyword">union</span></div>
@@ -330,8 +330,8 @@ $(document).ready(function(){initNavTree('_asm_variant_8hpp_source.html','');});
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><a class="el" href="dir_aa9befc4bdfa617079e96718d920d9d2.html">Visual Studio 2013</a></li><li class="navelem"><a class="el" href="dir_9749fe1d1039c274ca5f4a0137bd5805.html">Projects</a></li><li class="navelem"><a class="el" href="dir_87d371cc6a3e9a1e307775a876c8e949.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_2dd5b37e3ce8f08186c1d7d6a8b43f79.html">src</a></li><li class="navelem"><a class="el" href="dir_c12349095ba230d0c7acc796e8f40ecd.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_f990e8a9658162c32ca42ba03f11ed76.html">Asm</a></li><li class="navelem"><b>AsmVariant.hpp</b></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:47 for BlackBone by
+    <li class="navelem"><a class="el" href="dir_3d9ef8cac7bf1be0f1e18672d28fd269.html">visual studio 2013</a></li><li class="navelem"><a class="el" href="dir_5401094cee307be7b33997a47da28669.html">projects</a></li><li class="navelem"><a class="el" href="dir_0d6d72948ced51bdfd5fc8cf7033b913.html">blackbone</a></li><li class="navelem"><a class="el" href="dir_84cd6de3d65226a2f8718fdae009bf30.html">src</a></li><li class="navelem"><a class="el" href="dir_4dc82cc14ae072731c8b0e8bbd4f10c1.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_1e8052e19ffdd71c736d050c96b1892a.html">Asm</a></li><li class="navelem"><b>AsmVariant.hpp</b></li>
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:40 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

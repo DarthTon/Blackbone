@@ -19,11 +19,12 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 ".html",
-"classblackbone_1_1_name_resolve.html#aeda51338d6e76f0ead5ce3d045da018da8f8f6db44fa08004df01f2a1c836bdb4",
-"classblackbone_1_1_thread.html#ae11f811fef4cc3c6eb041568fa268762",
-"structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d64_01_4.html#ab3764c3f7562f147bde5e6be8e42a01e",
-"structblackbone_1_1___r_t_l___r_b___t_r_e_e.html#a0df5b28e55fd7df0e92ca1474a268480",
-"structblackbone_1_1_path_node.html#a86265d382d562da8b0358e8afe332ea9"
+"classblackbone_1_1_mem_block.html#a6931bb04ea029652cb9b26cce70d3b52",
+"classblackbone_1_1_remote_memory.html#a7eaef106af729489f4ad2c95274db35c",
+"struct___a_p_i___s_e_t___v_a_l_u_e___e_n_t_r_y___v2.html#a309b4d6d61a8906a51be7e2d1787a252",
+"structblackbone_1_1___p_e_b___t.html#a112fbb618a771d8ed739d62209933c96",
+"structblackbone_1_1___t_e_b___t.html#addbf7e2c9640262527e1d44598ea4889",
+"structblackbone_1_1reg_d_r7.html#a5be04f08903bd9954e371d85d9a38724"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

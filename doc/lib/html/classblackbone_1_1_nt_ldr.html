@@ -140,6 +140,9 @@ BLACKBONE_API size_t&#160;</td><td class="memItemRight" valign="bottom"><b>LdrKe
 <tr class="memitem:a27d513a04bff568e2f55d325671ce134"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a27d513a04bff568e2f55d325671ce134"></a>
 BLACKBONE_API size_t&#160;</td><td class="memItemRight" valign="bottom"><b>APC64PatchAddress</b> () const </td></tr>
 <tr class="separator:a27d513a04bff568e2f55d325671ce134"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afb81833a433b5faabeb9605c80a36100"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="afb81833a433b5faabeb9605c80a36100"></a>
+BLACKBONE_API size_t&#160;</td><td class="memItemRight" valign="bottom"><b>LdrProtectMrdata</b> () const </td></tr>
+<tr class="separator:afb81833a433b5faabeb9605c80a36100"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Function Documentation</h2>
 <a class="anchor" id="a595f2d5b3d1492ea06b3f159939936f0"></a>
@@ -221,6 +224,7 @@ BLACKBONE_API size_t&#160;</td><td class="memItemRight" valign="bottom"><b>APC64
 </div><div class="memdoc">
 
 <p>Add module to some loader structures (LdrpHashTable, LdrpModuleIndex( win8 only ), InMemoryOrderModuleList( win7 only )) </p>
+<p>Add module to some loader structures (LdrpHashTable, LdrpModuleIndex( win8+ only ), InMemoryOrderModuleList( win7 only )) </p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">hMod</td><td>Module base address</td></tr>
@@ -339,8 +343,8 @@ BLACKBONE_API size_t&#160;</td><td class="memItemRight" valign="bottom"><b>APC64
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/ManualMap/Native/<a class="el" href="_nt_loader_8h_source.html">NtLoader.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/ManualMap/Native/NtLoader.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/ManualMap/Native/<a class="el" href="_nt_loader_8h_source.html">NtLoader.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/ManualMap/Native/NtLoader.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -348,7 +352,7 @@ BLACKBONE_API size_t&#160;</td><td class="memItemRight" valign="bottom"><b>APC64
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_nt_ldr.html">NtLdr</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

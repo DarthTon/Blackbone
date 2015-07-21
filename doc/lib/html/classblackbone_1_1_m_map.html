@@ -133,9 +133,9 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MMap</b> (cl
 <tr class="memitem:ac32ee99111f95b472fb95834657f0ac7"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API const <a class="el" href="structblackbone_1_1_module_data.html">ModuleData</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_map.html#ac32ee99111f95b472fb95834657f0ac7">MapImage</a> (const std::wstring &amp;path, eLoadFlags flags=NoFlags, LdrCallback ldrCallback=nullptr, void *ldrContext=nullptr)</td></tr>
 <tr class="memdesc:ac32ee99111f95b472fb95834657f0ac7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Manually map PE image into underlying target process  <a href="#ac32ee99111f95b472fb95834657f0ac7">More...</a><br /></td></tr>
 <tr class="separator:ac32ee99111f95b472fb95834657f0ac7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5454130bc294fe50ecd63a881ef7917e"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API const <a class="el" href="structblackbone_1_1_module_data.html">ModuleData</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_map.html#a5454130bc294fe50ecd63a881ef7917e">MapImage</a> (void *buffer, size_t size, bool asImage=false, eLoadFlags flags=NoFlags, LdrCallback ldrCallback=nullptr, void *ldrContext=nullptr)</td></tr>
-<tr class="memdesc:a5454130bc294fe50ecd63a881ef7917e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Manually map PE image into underlying target process  <a href="#a5454130bc294fe50ecd63a881ef7917e">More...</a><br /></td></tr>
-<tr class="separator:a5454130bc294fe50ecd63a881ef7917e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7e174dafc63f10d89ab96f51b849fc89"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API const <a class="el" href="structblackbone_1_1_module_data.html">ModuleData</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_map.html#a7e174dafc63f10d89ab96f51b849fc89">MapImage</a> (size_t size, void *buffer, bool asImage=false, eLoadFlags flags=NoFlags, LdrCallback ldrCallback=nullptr, void *ldrContext=nullptr)</td></tr>
+<tr class="memdesc:a7e174dafc63f10d89ab96f51b849fc89"><td class="mdescLeft">&#160;</td><td class="mdescRight">Manually map PE image into underlying target process  <a href="#a7e174dafc63f10d89ab96f51b849fc89">More...</a><br /></td></tr>
+<tr class="separator:a7e174dafc63f10d89ab96f51b849fc89"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab2c907908d1db59db079d4d2bfe4dc13"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_map.html#ab2c907908d1db59db079d4d2bfe4dc13">UnmapAllModules</a> ()</td></tr>
 <tr class="memdesc:ab2c907908d1db59db079d4d2bfe4dc13"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unmap all manually mapped modules  <a href="#ab2c907908d1db59db079d4d2bfe4dc13">More...</a><br /></td></tr>
 <tr class="separator:ab2c907908d1db59db079d4d2bfe4dc13"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -159,12 +159,12 @@ static BLACKBONE_API size_t&#160;</td><td class="memItemRight" valign="bottom"><
 <tr class="memitem:a7c4a25f3ba08be0f02188acdfef933f7 inherit pro_methods_classblackbone_1_1_m_except"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7c4a25f3ba08be0f02188acdfef933f7"></a>
 BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> (class <a class="el" href="classblackbone_1_1_process.html">Process</a> &amp;proc)</td></tr>
 <tr class="separator:a7c4a25f3ba08be0f02188acdfef933f7 inherit pro_methods_classblackbone_1_1_m_except"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0c96ba19d4a173fdfac38f012adc4457 inherit pro_methods_classblackbone_1_1_m_except"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_except.html#a0c96ba19d4a173fdfac38f012adc4457">CreateVEH</a> (size_t pTargetBase, size_t imageSize, eModType mt=mt_default)</td></tr>
-<tr class="memdesc:a0c96ba19d4a173fdfac38f012adc4457 inherit pro_methods_classblackbone_1_1_m_except"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inject VEH wrapper into process Used to enable execution of SEH handlers out of image  <a href="#a0c96ba19d4a173fdfac38f012adc4457">More...</a><br /></td></tr>
-<tr class="separator:a0c96ba19d4a173fdfac38f012adc4457 inherit pro_methods_classblackbone_1_1_m_except"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5eb68badd0870990cb592946dd2848fb inherit pro_methods_classblackbone_1_1_m_except"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_except.html#a5eb68badd0870990cb592946dd2848fb">RemoveVEH</a> ()</td></tr>
-<tr class="memdesc:a5eb68badd0870990cb592946dd2848fb inherit pro_methods_classblackbone_1_1_m_except"><td class="mdescLeft">&#160;</td><td class="mdescRight">Removes VEH from target process  <a href="#a5eb68badd0870990cb592946dd2848fb">More...</a><br /></td></tr>
-<tr class="separator:a5eb68badd0870990cb592946dd2848fb inherit pro_methods_classblackbone_1_1_m_except"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a04078066ff12003a28758705d67156b4 inherit pro_methods_classblackbone_1_1_m_except"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_except.html#a04078066ff12003a28758705d67156b4">CreateVEH</a> (size_t pTargetBase, size_t imageSize, eModType mt, bool partial)</td></tr>
+<tr class="memdesc:a04078066ff12003a28758705d67156b4 inherit pro_methods_classblackbone_1_1_m_except"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inject VEH wrapper into process Used to enable execution of SEH handlers out of image  <a href="#a04078066ff12003a28758705d67156b4">More...</a><br /></td></tr>
+<tr class="separator:a04078066ff12003a28758705d67156b4 inherit pro_methods_classblackbone_1_1_m_except"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2aca07f204a9d581938632bcad73a46c inherit pro_methods_classblackbone_1_1_m_except"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_except.html#a2aca07f204a9d581938632bcad73a46c">RemoveVEH</a> (bool partial)</td></tr>
+<tr class="memdesc:a2aca07f204a9d581938632bcad73a46c inherit pro_methods_classblackbone_1_1_m_except"><td class="mdescLeft">&#160;</td><td class="mdescRight">Removes VEH from target process  <a href="#a2aca07f204a9d581938632bcad73a46c">More...</a><br /></td></tr>
+<tr class="separator:a2aca07f204a9d581938632bcad73a46c inherit pro_methods_classblackbone_1_1_m_except"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Manual image mapper </p>
@@ -237,21 +237,21 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> 
 
 </div>
 </div>
-<a class="anchor" id="a5454130bc294fe50ecd63a881ef7917e"></a>
+<a class="anchor" id="a7e174dafc63f10d89ab96f51b849fc89"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
           <td class="memname">const <a class="el" href="structblackbone_1_1_module_data.html">ModuleData</a> * blackbone::MMap::MapImage </td>
           <td>(</td>
-          <td class="paramtype">void *&#160;</td>
-          <td class="paramname"><em>buffer</em>, </td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>size</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">size_t&#160;</td>
-          <td class="paramname"><em>size</em>, </td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>buffer</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -345,8 +345,8 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> 
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/ManualMap/<a class="el" href="_m_map_8h_source.html">MMap.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/ManualMap/MMap.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/ManualMap/<a class="el" href="_m_map_8h_source.html">MMap.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/ManualMap/MMap.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -354,7 +354,7 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> 
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_m_map.html">MMap</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

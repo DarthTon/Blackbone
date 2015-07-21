@@ -126,6 +126,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:abf87d365ae9b2e5885665a668b20576e"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process.html#abf87d365ae9b2e5885665a668b20576e">Detach</a> ()</td></tr>
 <tr class="memdesc:abf87d365ae9b2e5885665a668b20576e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Detach form current process, if any  <a href="#abf87d365ae9b2e5885665a668b20576e">More...</a><br /></td></tr>
 <tr class="separator:abf87d365ae9b2e5885665a668b20576e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae49262eb62340d28ba14ee159c41e6b4"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process.html#ae49262eb62340d28ba14ee159c41e6b4">EnsureInit</a> ()</td></tr>
+<tr class="memdesc:ae49262eb62340d28ba14ee159c41e6b4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Ensure LdrInitializeProcess gets called  <a href="#ae49262eb62340d28ba14ee159c41e6b4">More...</a><br /></td></tr>
+<tr class="separator:ae49262eb62340d28ba14ee159c41e6b4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab03f8adf7990d93e97ead0df100240bb"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API DWORD&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process.html#ab03f8adf7990d93e97ead0df100240bb">pid</a> () const </td></tr>
 <tr class="memdesc:ab03f8adf7990d93e97ead0df100240bb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get process ID  <a href="#ab03f8adf7990d93e97ead0df100240bb">More...</a><br /></td></tr>
 <tr class="separator:ab03f8adf7990d93e97ead0df100240bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -135,6 +138,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:aa88302540ec03756cc1cf0b05d8f8697"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process.html#aa88302540ec03756cc1cf0b05d8f8697">Terminate</a> (uint32_t code=0)</td></tr>
 <tr class="memdesc:aa88302540ec03756cc1cf0b05d8f8697"><td class="mdescLeft">&#160;</td><td class="mdescRight">Terminate process  <a href="#aa88302540ec03756cc1cf0b05d8f8697">More...</a><br /></td></tr>
 <tr class="separator:aa88302540ec03756cc1cf0b05d8f8697"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad76b22c8cce3836570f362eca438ac29"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process.html#ad76b22c8cce3836570f362eca438ac29">EnumHandles</a> (std::vector&lt; <a class="el" href="structblackbone_1_1_handle_info.html">HandleInfo</a> &gt; &amp;handles)</td></tr>
+<tr class="memdesc:ad76b22c8cce3836570f362eca438ac29"><td class="mdescLeft">&#160;</td><td class="mdescRight">Enumerate all open handles  <a href="#ad76b22c8cce3836570f362eca438ac29">More...</a><br /></td></tr>
+<tr class="separator:ad76b22c8cce3836570f362eca438ac29"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a84108ee52229cb268f0d6e45e73b3a53"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a84108ee52229cb268f0d6e45e73b3a53"></a>
 BLACKBONE_API <a class="el" href="classblackbone_1_1_process_core.html">ProcessCore</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>core</b> ()</td></tr>
 <tr class="separator:a84108ee52229cb268f0d6e45e73b3a53"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -150,6 +156,9 @@ BLACKBONE_API <a class="el" href="classblackbone_1_1_process_threads.html">Proce
 <tr class="memitem:af535237c444ff38ba0960b645f40ab19"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af535237c444ff38ba0960b645f40ab19"></a>
 BLACKBONE_API <a class="el" href="classblackbone_1_1_remote_hook.html">RemoteHook</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>hooks</b> ()</td></tr>
 <tr class="separator:af535237c444ff38ba0960b645f40ab19"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac28a8804ae658923a18a04f9989ac508"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ac28a8804ae658923a18a04f9989ac508"></a>
+BLACKBONE_API <a class="el" href="classblackbone_1_1_remote_local_hook.html">RemoteLocalHook</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>localHooks</b> ()</td></tr>
+<tr class="separator:ac28a8804ae658923a18a04f9989ac508"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a513e3f9730ff3dec4e9395d1992c8da0"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a513e3f9730ff3dec4e9395d1992c8da0"></a>
 BLACKBONE_API <a class="el" href="classblackbone_1_1_remote_exec.html">RemoteExec</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>remote</b> ()</td></tr>
 <tr class="separator:a513e3f9730ff3dec4e9395d1992c8da0"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -313,6 +322,24 @@ Static Public Member Functions</h2></td></tr>
 
 </div>
 </div>
+<a class="anchor" id="ae49262eb62340d28ba14ee159c41e6b4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">NTSTATUS blackbone::Process::EnsureInit </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Ensure LdrInitializeProcess gets called </p>
+<dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="aa1a0f997a4f014b760be8088006c5d37"></a>
 <div class="memitem">
 <div class="memproto">
@@ -414,6 +441,31 @@ Static Public Member Functions</h2></td></tr>
 
 </div>
 </div>
+<a class="anchor" id="ad76b22c8cce3836570f362eca438ac29"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">NTSTATUS blackbone::Process::EnumHandles </td>
+          <td>(</td>
+          <td class="paramtype">std::vector&lt; <a class="el" href="structblackbone_1_1_handle_info.html">HandleInfo</a> &gt; &amp;&#160;</td>
+          <td class="paramname"><em>handles</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Enumerate all open handles </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">handles</td><td>Found handles</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="ab03f8adf7990d93e97ead0df100240bb"></a>
 <div class="memitem">
 <div class="memproto">
@@ -485,8 +537,8 @@ Static Public Member Functions</h2></td></tr>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/<a class="el" href="_process_8h_source.html">Process.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/Process.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/<a class="el" href="_process_8h_source.html">Process.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/Process.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -494,7 +546,7 @@ Static Public Member Functions</h2></td></tr>
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_process.html">Process</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

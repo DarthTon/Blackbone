@@ -118,7 +118,7 @@ $(document).ready(function(){initNavTree('classblackbone_1_1pe_1_1_p_e_image.htm
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aa2f19f88585aa00e07f89cb56d09f1ab"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#aa2f19f88585aa00e07f89cb56d09f1ab">Load</a> (const std::wstring &amp;path, bool skipActx=false)</td></tr>
+<tr class="memitem:aa2f19f88585aa00e07f89cb56d09f1ab"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#aa2f19f88585aa00e07f89cb56d09f1ab">Load</a> (const std::wstring &amp;<a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#ada2ff635e8fcccf194a647edd7e4b78f">path</a>, bool skipActx=false)</td></tr>
 <tr class="memdesc:aa2f19f88585aa00e07f89cb56d09f1ab"><td class="mdescLeft">&#160;</td><td class="mdescRight">Load image from file  <a href="#aa2f19f88585aa00e07f89cb56d09f1ab">More...</a><br /></td></tr>
 <tr class="separator:aa2f19f88585aa00e07f89cb56d09f1ab"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a984e52820ef50bfc703d771e19234416"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#a984e52820ef50bfc703d771e19234416">Load</a> (void *pData, size_t size, bool plainData=true)</td></tr>
@@ -133,9 +133,9 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:aa15ef004be53859b765e65c557671339"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API mapImports &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#aa15ef004be53859b765e65c557671339">GetImports</a> (bool useDelayed=false)</td></tr>
 <tr class="memdesc:aa15ef004be53859b765e65c557671339"><td class="mdescLeft">&#160;</td><td class="mdescRight">Processes image imports  <a href="#aa15ef004be53859b765e65c557671339">More...</a><br /></td></tr>
 <tr class="separator:aa15ef004be53859b765e65c557671339"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac598a151f2cd4589c4fe00501ce66bea"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#ac598a151f2cd4589c4fe00501ce66bea">GetExports</a> (listExports &amp;exports)</td></tr>
-<tr class="memdesc:ac598a151f2cd4589c4fe00501ce66bea"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieve all exported functions with names  <a href="#ac598a151f2cd4589c4fe00501ce66bea">More...</a><br /></td></tr>
-<tr class="separator:ac598a151f2cd4589c4fe00501ce66bea"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac5a05ee4eef1bd61d0b32fd32aceeb5c"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#ac5a05ee4eef1bd61d0b32fd32aceeb5c">GetExports</a> (vecExports &amp;exports)</td></tr>
+<tr class="memdesc:ac5a05ee4eef1bd61d0b32fd32aceeb5c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieve all exported functions with names  <a href="#ac5a05ee4eef1bd61d0b32fd32aceeb5c">More...</a><br /></td></tr>
+<tr class="separator:ac5a05ee4eef1bd61d0b32fd32aceeb5c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad3b134ea0a24477b7b8f6af9575de530"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#ad3b134ea0a24477b7b8f6af9575de530">GetTLSCallbacks</a> (module_t targetBase, std::vector&lt; ptr_t &gt; &amp;result) const </td></tr>
 <tr class="memdesc:ad3b134ea0a24477b7b8f6af9575de530"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieve image TLS callbacks Callbacks are rebased for target image  <a href="#ad3b134ea0a24477b7b8f6af9575de530">More...</a><br /></td></tr>
 <tr class="separator:ad3b134ea0a24477b7b8f6af9575de530"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -148,6 +148,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a1007f2e74aff5ad19c564a55025a26d5"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API size_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#a1007f2e74aff5ad19c564a55025a26d5">ResolveRVAToVA</a> (size_t Rva, bool keepRelative=false) const </td></tr>
 <tr class="memdesc:a1007f2e74aff5ad19c564a55025a26d5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Resolve virtual memory address to physical file offset  <a href="#a1007f2e74aff5ad19c564a55025a26d5">More...</a><br /></td></tr>
 <tr class="separator:a1007f2e74aff5ad19c564a55025a26d5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ada2ff635e8fcccf194a647edd7e4b78f"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API const std::wstring &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#ada2ff635e8fcccf194a647edd7e4b78f">path</a> () const </td></tr>
+<tr class="memdesc:ada2ff635e8fcccf194a647edd7e4b78f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get image path  <a href="#ada2ff635e8fcccf194a647edd7e4b78f">More...</a><br /></td></tr>
+<tr class="separator:ada2ff635e8fcccf194a647edd7e4b78f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae4c094cb70701bd1e9b84e8958798f9d"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API std::wstring&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#ae4c094cb70701bd1e9b84e8958798f9d">name</a> () const </td></tr>
+<tr class="memdesc:ae4c094cb70701bd1e9b84e8958798f9d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get image name  <a href="#ae4c094cb70701bd1e9b84e8958798f9d">More...</a><br /></td></tr>
+<tr class="separator:ae4c094cb70701bd1e9b84e8958798f9d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a96885e6cb08b443346c8e489573fa103"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API void *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html#a96885e6cb08b443346c8e489573fa103">base</a> () const </td></tr>
 <tr class="memdesc:a96885e6cb08b443346c8e489573fa103"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get image load address  <a href="#a96885e6cb08b443346c8e489573fa103">More...</a><br /></td></tr>
 <tr class="separator:a96885e6cb08b443346c8e489573fa103"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -343,14 +349,14 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a class="anchor" id="ac598a151f2cd4589c4fe00501ce66bea"></a>
+<a class="anchor" id="ac5a05ee4eef1bd61d0b32fd32aceeb5c"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
           <td class="memname">BLACKBONE_API void blackbone::pe::PEImage::GetExports </td>
           <td>(</td>
-          <td class="paramtype">listExports &amp;&#160;</td>
+          <td class="paramtype">vecExports &amp;&#160;</td>
           <td class="paramname"><em>exports</em></td><td>)</td>
           <td></td>
         </tr>
@@ -741,6 +747,32 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
+<a class="anchor" id="ae4c094cb70701bd1e9b84e8958798f9d"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">BLACKBONE_API std::wstring blackbone::pe::PEImage::name </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Get image name </p>
+<dl class="section return"><dt>Returns</dt><dd>Image name</dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="aa54808bb39e0dc651d3e7ff30be23cf6"></a>
 <div class="memitem">
 <div class="memproto">
@@ -783,6 +815,32 @@ Public Member Functions</h2></td></tr>
 
 <p>Parses PE image </p>
 <dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="ada2ff635e8fcccf194a647edd7e4b78f"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">BLACKBONE_API const std::wstring&amp; blackbone::pe::PEImage::path </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Get image path </p>
+<dl class="section return"><dt>Returns</dt><dd>Image path</dd></dl>
 
 </div>
 </div>
@@ -892,8 +950,8 @@ Public Member Functions</h2></td></tr>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/PE/<a class="el" href="_p_e_image_8h_source.html">PEImage.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/PE/PEImage.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/PE/<a class="el" href="_p_e_image_8h_source.html">PEImage.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/PE/PEImage.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -901,7 +959,7 @@ Public Member Functions</h2></td></tr>
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><b>pe</b></li><li class="navelem"><a class="el" href="classblackbone_1_1pe_1_1_p_e_image.html">PEImage</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:50 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

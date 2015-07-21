@@ -12,6 +12,7 @@ var classblackbone_1_1_mem_block =
     [ "ptr", "classblackbone_1_1_mem_block.html#a858fab4ecac5fdf97f380edb93ea8951", null ],
     [ "Read", "classblackbone_1_1_mem_block.html#a4247ce6efbc453165e6fc41d584cf932", null ],
     [ "Read", "classblackbone_1_1_mem_block.html#ad00b0a31ef1218bb18ad8e0246cf3d16", null ],
+    [ "Read", "classblackbone_1_1_mem_block.html#a16afacfb14adcf9ace589baeff96cd9b", null ],
     [ "Realloc", "classblackbone_1_1_mem_block.html#a6b943c4d2000f4bd5dcaff445d549533", null ],
     [ "Release", "classblackbone_1_1_mem_block.html#a3fffbac3409c4a50fc461b5dd9a6d33e", null ],
     [ "Reset", "classblackbone_1_1_mem_block.html#a05ff5f65fde58e9d89bcb8c18fc7c66a", null ],

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.8"/>
-<title>BlackBone: C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Asm/AsmHelperBase.h Source File</title>
+<title>BlackBone: C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Asm/AsmHelperBase.h Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -183,17 +183,18 @@ $(document).ready(function(){initNavTree('_asm_helper_base_8h_source.html','');}
 <div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;            _assembler.db( 0xCB );    <span class="comment">// retf</span></div>
 <div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;        }</div>
 <div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;</div>
-<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;        BLACKBONE_API <span class="keyword">inline</span> asmjit::host::Assembler* operator -&gt;() { <span class="keywordflow">return</span> &amp;_assembler; }</div>
-<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;</div>
-<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;    <span class="keyword">private</span>:</div>
-<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;        AsmHelperBase( <span class="keyword">const</span> AsmHelperBase&amp; ) = <span class="keyword">delete</span>;</div>
-<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;        AsmHelperBase&amp; operator =(<span class="keyword">const</span> AsmHelperBase&amp;) = <span class="keyword">delete</span>;</div>
-<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;</div>
-<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;    <span class="keyword">protected</span>:</div>
-<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;        asmjit::JitRuntime _runtime;</div>
-<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;        asmjit::host::Assembler _assembler;</div>
-<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;    };</div>
-<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;}</div>
+<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;        BLACKBONE_API <span class="keyword">inline</span> asmjit::X86Assembler* assembler() { <span class="keywordflow">return</span> &amp;_assembler; }</div>
+<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;        BLACKBONE_API <span class="keyword">inline</span> asmjit::X86Assembler* operator -&gt;() { <span class="keywordflow">return</span> &amp;_assembler; }</div>
+<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;</div>
+<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;    <span class="keyword">private</span>:</div>
+<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;        AsmHelperBase( <span class="keyword">const</span> AsmHelperBase&amp; ) = <span class="keyword">delete</span>;</div>
+<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;        AsmHelperBase&amp; operator =(<span class="keyword">const</span> AsmHelperBase&amp;) = <span class="keyword">delete</span>;</div>
+<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;</div>
+<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;    <span class="keyword">protected</span>:</div>
+<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;        asmjit::JitRuntime _runtime;</div>
+<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;        asmjit::X86Assembler _assembler;</div>
+<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;    };</div>
+<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;}</div>
 <div class="ttc" id="classblackbone_1_1_asm_helper_base_html_af9a4c51c6bbe88f4d74020cc833f7ddd"><div class="ttname"><a href="classblackbone_1_1_asm_helper_base.html#af9a4c51c6bbe88f4d74020cc833f7ddd">blackbone::AsmHelperBase::SwitchTo64</a></div><div class="ttdeci">BLACKBONE_API void SwitchTo64()</div><div class="ttdoc">Switch processor into x64 mode (long mode) </div><div class="ttdef"><b>Definition:</b> AsmHelperBase.h:78</div></div>
 <div class="ttc" id="classblackbone_1_1_asm_variant_html"><div class="ttname"><a href="classblackbone_1_1_asm_variant.html">blackbone::AsmVariant</a></div><div class="ttdoc">General purpose assembly variable </div><div class="ttdef"><b>Definition:</b> AsmVariant.hpp:16</div></div>
 <div class="ttc" id="classblackbone_1_1_asm_helper_base_html"><div class="ttname"><a href="classblackbone_1_1_asm_helper_base.html">blackbone::AsmHelperBase</a></div><div class="ttdoc">Assembly generation helper </div><div class="ttdef"><b>Definition:</b> AsmHelperBase.h:48</div></div>
@@ -204,8 +205,8 @@ $(document).ready(function(){initNavTree('_asm_helper_base_8h_source.html','');}
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><a class="el" href="dir_aa9befc4bdfa617079e96718d920d9d2.html">Visual Studio 2013</a></li><li class="navelem"><a class="el" href="dir_9749fe1d1039c274ca5f4a0137bd5805.html">Projects</a></li><li class="navelem"><a class="el" href="dir_87d371cc6a3e9a1e307775a876c8e949.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_2dd5b37e3ce8f08186c1d7d6a8b43f79.html">src</a></li><li class="navelem"><a class="el" href="dir_c12349095ba230d0c7acc796e8f40ecd.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_f990e8a9658162c32ca42ba03f11ed76.html">Asm</a></li><li class="navelem"><b>AsmHelperBase.h</b></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:47 for BlackBone by
+    <li class="navelem"><a class="el" href="dir_3d9ef8cac7bf1be0f1e18672d28fd269.html">visual studio 2013</a></li><li class="navelem"><a class="el" href="dir_5401094cee307be7b33997a47da28669.html">projects</a></li><li class="navelem"><a class="el" href="dir_0d6d72948ced51bdfd5fc8cf7033b913.html">blackbone</a></li><li class="navelem"><a class="el" href="dir_84cd6de3d65226a2f8718fdae009bf30.html">src</a></li><li class="navelem"><a class="el" href="dir_4dc82cc14ae072731c8b0e8bbd4f10c1.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_1e8052e19ffdd71c736d050c96b1892a.html">Asm</a></li><li class="navelem"><b>AsmHelperBase.h</b></li>
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:40 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

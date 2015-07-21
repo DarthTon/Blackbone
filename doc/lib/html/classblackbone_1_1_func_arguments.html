@@ -117,13 +117,14 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a1fde8b2d009b8a55569e6f50c7ba42a7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a1fde8b2d009b8a55569e6f50c7ba42a7"></a>
 std::vector&lt; <a class="el" href="classblackbone_1_1_asm_variant.html">AsmVariant</a> &gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>getArgsRaw</b> () const </td></tr>
 <tr class="separator:a1fde8b2d009b8a55569e6f50c7ba42a7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6dc5dc0df156a03fa6b53ef971bcc680"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a6dc5dc0df156a03fa6b53ef971bcc680"></a>
-std::tuple&lt; Args...&gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>getArgs</b> () const </td></tr>
-<tr class="separator:a6dc5dc0df156a03fa6b53ef971bcc680"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab8737ff5f9123e221d05f61daa78920f"><td class="memTemplParams" colspan="2"><a class="anchor" id="ab8737ff5f9123e221d05f61daa78920f"></a>
+<tr class="memitem:ae1442967af597bd625bff74f5313bc47"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ae1442967af597bd625bff74f5313bc47"></a>
+const std::tuple&lt; Args...&gt; &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>getArgs</b> () const </td></tr>
+<tr class="separator:ae1442967af597bd625bff74f5313bc47"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a94bba683035eae2b13dd16c6270d5cb2"><td class="memTemplParams" colspan="2"><a class="anchor" id="a94bba683035eae2b13dd16c6270d5cb2"></a>
 template&lt;int pos&gt; </td></tr>
-<tr class="memitem:ab8737ff5f9123e221d05f61daa78920f"><td class="memTemplItemLeft" align="right" valign="top">auto&#160;</td><td class="memTemplItemRight" valign="bottom"><b>getArg</b> () -&gt; decltype(std::get&lt; pos &gt;(_targs))</td></tr>
-<tr class="separator:ab8737ff5f9123e221d05f61daa78920f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a94bba683035eae2b13dd16c6270d5cb2"><td class="memTemplItemLeft" align="right" valign="top">decltype(std::get&lt; pos &gt;<br class="typebreak" />
+(std::tuple&lt; Args...&gt;()))&#160;</td><td class="memTemplItemRight" valign="bottom"><b>getArg</b> ()</td></tr>
+<tr class="separator:a94bba683035eae2b13dd16c6270d5cb2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a48f53d69339f389690cacd7b1d536ab4"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a48f53d69339f389690cacd7b1d536ab4"></a>
 void&#160;</td><td class="memItemRight" valign="bottom"><b>updateArgs</b> () const </td></tr>
 <tr class="separator:a48f53d69339f389690cacd7b1d536ab4"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -139,7 +140,7 @@ template&lt;typename... TArgs&gt; </td></tr>
 <tr class="separator:a87ee698c8f8213bf607984e097b91e83"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this class was generated from the following file:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/RPC/<a class="el" href="_remote_function_8hpp_source.html">RemoteFunction.hpp</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/RPC/<a class="el" href="_remote_function_8hpp_source.html">RemoteFunction.hpp</a></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -147,7 +148,7 @@ template&lt;typename... TArgs&gt; </td></tr>
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_func_arguments.html">FuncArguments</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:41 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

@@ -118,7 +118,7 @@ $(document).ready(function(){initNavTree('classblackbone_1_1_process_modules.htm
   <tr><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html#a5ead6804ecb932593440c92011abe70f">GetModule</a>(const std::wstring &amp;name, eModSeachType search=LdrList, eModType type=mt_default)</td><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a></td><td class="entry"></td></tr>
   <tr class="even"><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html#a0e0614bc0a8551d877e5232ce34cee73">GetModule</a>(std::wstring &amp;name, eModSeachType search=LdrList, eModType type=mt_default, const wchar_t *baseModule=L&quot;&quot;)</td><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a></td><td class="entry"></td></tr>
   <tr><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html#a2839b4b1f0d1ab17d5db0d811b426c7f">GetModule</a>(module_t modBase, eModSeachType search=LdrList, eModType type=mt_default)</td><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a></td><td class="entry"></td></tr>
-  <tr class="even"><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html#ab15f5c09be289c75786a70ca16a25f9d">Inject</a>(const std::wstring &amp;path)</td><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html#a0b05c2fb11bf6bb277af7e80491b5569">Inject</a>(const std::wstring &amp;path, NTSTATUS *pStatus=nullptr)</td><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a></td><td class="entry"></td></tr>
   <tr bgcolor="#f0f0f0"><td class="entry"><b>mapModules</b> typedef (defined in <a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a>)</td><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a></td><td class="entry"></td></tr>
   <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>ProcessModules</b>(class Process &amp;proc) (defined in <a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a>)</td><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a></td><td class="entry"></td></tr>
   <tr><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html#a7c31810c1279fc66dc0a1d15285ea668">RemoveManualModule</a>(const std::wstring &amp;filename, eModType mt)</td><td class="entry"><a class="el" href="classblackbone_1_1_process_modules.html">blackbone::ProcessModules</a></td><td class="entry"></td></tr>
@@ -132,7 +132,7 @@ $(document).ready(function(){initNavTree('classblackbone_1_1_process_modules.htm
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

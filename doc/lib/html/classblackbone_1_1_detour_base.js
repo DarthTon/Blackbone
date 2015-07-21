@@ -2,6 +2,7 @@ var classblackbone_1_1_detour_base =
 [
     [ "DetourBase", "classblackbone_1_1_detour_base.html#ad9e9e88a2b37de39f40f620cf1f32e55", null ],
     [ "~DetourBase", "classblackbone_1_1_detour_base.html#a08c80b4067e4e42e97d2795b9316b595", null ],
+    [ "AllocateBuffer", "classblackbone_1_1_detour_base.html#a2886b08617abb0c715ba0ddcff35c846", null ],
     [ "CopyOldCode", "classblackbone_1_1_detour_base.html#a4732e4866bba98f971ed7e5c1054f1a1", null ],
     [ "DisableHook", "classblackbone_1_1_detour_base.html#a5bb087a3e3d408fcfac3c9f89371094f", null ],
     [ "EnableHook", "classblackbone_1_1_detour_base.html#a9420a71d31f0385af890d1b2c767f26f", null ],

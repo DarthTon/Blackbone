@@ -147,9 +147,9 @@ ProcessModules::mapModules &amp;&#160;</td><td class="memItemRight" valign="bott
 <tr class="memitem:aed49e1970cc4b699b7cac35c3557d4f1"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API <a class="el" href="structblackbone_1_1export_data.html">exportData</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process_modules.html#aed49e1970cc4b699b7cac35c3557d4f1">GetExport</a> (const <a class="el" href="structblackbone_1_1_module_data.html">ModuleData</a> *hMod, const char *name_ord, const wchar_t *baseModule=L&quot;&quot;)</td></tr>
 <tr class="memdesc:aed49e1970cc4b699b7cac35c3557d4f1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get export address. Forwarded exports will be automatically resolved if forward module is present  <a href="#aed49e1970cc4b699b7cac35c3557d4f1">More...</a><br /></td></tr>
 <tr class="separator:aed49e1970cc4b699b7cac35c3557d4f1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab15f5c09be289c75786a70ca16a25f9d"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API const <a class="el" href="structblackbone_1_1_module_data.html">ModuleData</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process_modules.html#ab15f5c09be289c75786a70ca16a25f9d">Inject</a> (const std::wstring &amp;path)</td></tr>
-<tr class="memdesc:ab15f5c09be289c75786a70ca16a25f9d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inject image into target process  <a href="#ab15f5c09be289c75786a70ca16a25f9d">More...</a><br /></td></tr>
-<tr class="separator:ab15f5c09be289c75786a70ca16a25f9d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0b05c2fb11bf6bb277af7e80491b5569"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API const <a class="el" href="structblackbone_1_1_module_data.html">ModuleData</a> *&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process_modules.html#a0b05c2fb11bf6bb277af7e80491b5569">Inject</a> (const std::wstring &amp;path, NTSTATUS *pStatus=nullptr)</td></tr>
+<tr class="memdesc:a0b05c2fb11bf6bb277af7e80491b5569"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inject image into target process  <a href="#a0b05c2fb11bf6bb277af7e80491b5569">More...</a><br /></td></tr>
+<tr class="separator:a0b05c2fb11bf6bb277af7e80491b5569"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae26c7c163cea5defef511db685bae397"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process_modules.html#ae26c7c163cea5defef511db685bae397">Unload</a> (const <a class="el" href="structblackbone_1_1_module_data.html">ModuleData</a> *hMod)</td></tr>
 <tr class="memdesc:ae26c7c163cea5defef511db685bae397"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unload specific module from target process. Can't be used to unload manually mapped modules  <a href="#ae26c7c163cea5defef511db685bae397">More...</a><br /></td></tr>
 <tr class="separator:ae26c7c163cea5defef511db685bae397"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -466,7 +466,7 @@ ProcessModules::mapModules &amp;&#160;</td><td class="memItemRight" valign="bott
 
 </div>
 </div>
-<a class="anchor" id="ab15f5c09be289c75786a70ca16a25f9d"></a>
+<a class="anchor" id="a0b05c2fb11bf6bb277af7e80491b5569"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -474,8 +474,18 @@ ProcessModules::mapModules &amp;&#160;</td><td class="memItemRight" valign="bott
           <td class="memname">const <a class="el" href="structblackbone_1_1_module_data.html">ModuleData</a> * blackbone::ProcessModules::Inject </td>
           <td>(</td>
           <td class="paramtype">const std::wstring &amp;&#160;</td>
-          <td class="paramname"><em>path</em></td><td>)</td>
+          <td class="paramname"><em>path</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
           <td></td>
+          <td class="paramtype">NTSTATUS *&#160;</td>
+          <td class="paramname"><em>pStatus</em> = <code>nullptr</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -484,6 +494,7 @@ ProcessModules::mapModules &amp;&#160;</td><td class="memItemRight" valign="bott
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">path</td><td>Full-qualified image path</td></tr>
+    <tr><td class="paramname">pStatus</td><td>Injection status code</td></tr>
   </table>
   </dd>
 </dl>
@@ -619,8 +630,8 @@ ProcessModules::mapModules &amp;&#160;</td><td class="memItemRight" valign="bott
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/<a class="el" href="_process_modules_8h_source.html">ProcessModules.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/ProcessModules.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/<a class="el" href="_process_modules_8h_source.html">ProcessModules.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/ProcessModules.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -628,7 +639,7 @@ ProcessModules::mapModules &amp;&#160;</td><td class="memItemRight" valign="bott
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_process_modules.html">ProcessModules</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

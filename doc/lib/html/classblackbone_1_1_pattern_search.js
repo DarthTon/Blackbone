@@ -1,6 +1,7 @@
 var classblackbone_1_1_pattern_search =
 [
     [ "PatternSearch", "classblackbone_1_1_pattern_search.html#a09d102fa79e4223e0f03becc0b2cd59b", null ],
+    [ "PatternSearch", "classblackbone_1_1_pattern_search.html#a5cf2642ad2bd7fe67d354940329ff140", null ],
     [ "PatternSearch", "classblackbone_1_1_pattern_search.html#abd48c79cc6a4a7a3de1104fe0b88e16f", null ],
     [ "PatternSearch", "classblackbone_1_1_pattern_search.html#ab261a4d7096f43dae43a4f4b099168b9", null ],
     [ "PatternSearch", "classblackbone_1_1_pattern_search.html#a7b00a83908b4e859ba240fa986881527", null ],

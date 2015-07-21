@@ -1,5 +1,6 @@
 var structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d64_01_4 =
 [
+    [ "FromCtx32", "structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d64_01_4.html#a3b21429fb9ca6534e6812d130a33c578", null ],
     [ "ContextFlags", "structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d64_01_4.html#a41f0747ac99b5c0e229ecdfeef73a91c", null ],
     [ "DebugControl", "structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d64_01_4.html#ac07e08e0693af6e4aca29336f3f2dfb6", null ],
     [ "Dr0", "structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d64_01_4.html#a89fef495c10983d6cc30074b097b66c0", null ],

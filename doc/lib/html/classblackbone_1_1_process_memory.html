@@ -147,6 +147,10 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>ProcessMemor
 <tr class="memitem:aa1edde08dce64331a6f03f0a7615598e"><td class="memTemplItemLeft" align="right" valign="top">T&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process_memory.html#aa1edde08dce64331a6f03f0a7615598e">Read</a> (ptr_t dwAddress)</td></tr>
 <tr class="memdesc:aa1edde08dce64331a6f03f0a7615598e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read data  <a href="#aa1edde08dce64331a6f03f0a7615598e">More...</a><br /></td></tr>
 <tr class="separator:aa1edde08dce64331a6f03f0a7615598e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a53a10b3344a7e286ca835457bf21a37c"><td class="memTemplParams" colspan="2">template&lt;class T &gt; </td></tr>
+<tr class="memitem:a53a10b3344a7e286ca835457bf21a37c"><td class="memTemplItemLeft" align="right" valign="top">NTSTATUS&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process_memory.html#a53a10b3344a7e286ca835457bf21a37c">Read</a> (ptr_t dwAddress, T &amp;result)</td></tr>
+<tr class="memdesc:a53a10b3344a7e286ca835457bf21a37c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read data  <a href="#a53a10b3344a7e286ca835457bf21a37c">More...</a><br /></td></tr>
+<tr class="separator:a53a10b3344a7e286ca835457bf21a37c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6bac403b4e849e0360b378d963d789b9"><td class="memTemplParams" colspan="2">template&lt;class T &gt; </td></tr>
 <tr class="memitem:a6bac403b4e849e0360b378d963d789b9"><td class="memTemplItemLeft" align="right" valign="top">NTSTATUS&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_process_memory.html#a6bac403b4e849e0360b378d963d789b9">Write</a> (ptr_t dwAddress, const T &amp;data)</td></tr>
 <tr class="memdesc:a6bac403b4e849e0360b378d963d789b9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write data  <a href="#a6bac403b4e849e0360b378d963d789b9">More...</a><br /></td></tr>
@@ -157,6 +161,9 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>ProcessMemor
 <tr class="memitem:adf292d685f2ffc1203936b343a20d6a5"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="adf292d685f2ffc1203936b343a20d6a5"></a>
 BLACKBONE_API class <a class="el" href="classblackbone_1_1_process_core.html">ProcessCore</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><b>core</b> ()</td></tr>
 <tr class="separator:adf292d685f2ffc1203936b343a20d6a5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a00212eb5f89728852b553de802b14bf8"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a00212eb5f89728852b553de802b14bf8"></a>
+BLACKBONE_API class <a class="el" href="classblackbone_1_1_process.html">Process</a> *&#160;</td><td class="memItemRight" valign="bottom"><b>process</b> ()</td></tr>
+<tr class="separator:a00212eb5f89728852b553de802b14bf8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_classblackbone_1_1_remote_memory"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_classblackbone_1_1_remote_memory')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="classblackbone_1_1_remote_memory.html">blackbone::RemoteMemory</a></td></tr>
 <tr class="memitem:a880fb9d1e53bf3f080062acd7ccce2c6 inherit pub_methods_classblackbone_1_1_remote_memory"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a880fb9d1e53bf3f080062acd7ccce2c6"></a>
 BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>RemoteMemory</b> (class <a class="el" href="classblackbone_1_1_process.html">Process</a> *process)</td></tr>
@@ -490,6 +497,52 @@ template&lt;class T &gt; </div>
 
 </div>
 </div>
+<a class="anchor" id="a53a10b3344a7e286ca835457bf21a37c"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;class T &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">NTSTATUS blackbone::ProcessMemory::Read </td>
+          <td>(</td>
+          <td class="paramtype">ptr_t&#160;</td>
+          <td class="paramname"><em>dwAddress</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">T &amp;&#160;</td>
+          <td class="paramname"><em>result</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Read data </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">dwAddress</td><td>Address to read from</td></tr>
+    <tr><td class="paramname">result</td><td>Read data</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="aa33279aea6b149831f71b7c3d46f846b"></a>
 <div class="memitem">
 <div class="memproto">
@@ -580,8 +633,8 @@ template&lt;class T &gt; </div>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/<a class="el" href="_process_memory_8h_source.html">ProcessMemory.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/ProcessMemory.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/<a class="el" href="_process_memory_8h_source.html">ProcessMemory.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/ProcessMemory.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -589,7 +642,7 @@ template&lt;class T &gt; </div>
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_process_memory.html">ProcessMemory</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

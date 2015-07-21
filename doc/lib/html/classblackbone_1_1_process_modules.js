@@ -11,7 +11,7 @@ var classblackbone_1_1_process_modules =
     [ "GetModule", "classblackbone_1_1_process_modules.html#a5ead6804ecb932593440c92011abe70f", null ],
     [ "GetModule", "classblackbone_1_1_process_modules.html#a0e0614bc0a8551d877e5232ce34cee73", null ],
     [ "GetModule", "classblackbone_1_1_process_modules.html#a2839b4b1f0d1ab17d5db0d811b426c7f", null ],
-    [ "Inject", "classblackbone_1_1_process_modules.html#ab15f5c09be289c75786a70ca16a25f9d", null ],
+    [ "Inject", "classblackbone_1_1_process_modules.html#a0b05c2fb11bf6bb277af7e80491b5569", null ],
     [ "RemoveManualModule", "classblackbone_1_1_process_modules.html#a7c31810c1279fc66dc0a1d15285ea668", null ],
     [ "reset", "classblackbone_1_1_process_modules.html#a962cbb86717004381302e5f03c295577", null ],
     [ "Unlink", "classblackbone_1_1_process_modules.html#a8ddd618443eb38b0f143b99a6ff19958", null ],

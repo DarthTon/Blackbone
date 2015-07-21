@@ -139,6 +139,10 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:ad00b0a31ef1218bb18ad8e0246cf3d16"><td class="memTemplItemLeft" align="right" valign="top">T&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_mem_block.html#ad00b0a31ef1218bb18ad8e0246cf3d16">Read</a> (size_t offset, const T &amp;def_val)</td></tr>
 <tr class="memdesc:ad00b0a31ef1218bb18ad8e0246cf3d16"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read data  <a href="#ad00b0a31ef1218bb18ad8e0246cf3d16">More...</a><br /></td></tr>
 <tr class="separator:ad00b0a31ef1218bb18ad8e0246cf3d16"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a16afacfb14adcf9ace589baeff96cd9b"><td class="memTemplParams" colspan="2">template&lt;class T &gt; </td></tr>
+<tr class="memitem:a16afacfb14adcf9ace589baeff96cd9b"><td class="memTemplItemLeft" align="right" valign="top">NTSTATUS&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_mem_block.html#a16afacfb14adcf9ace589baeff96cd9b">Read</a> (size_t offset, T &amp;val)</td></tr>
+<tr class="memdesc:a16afacfb14adcf9ace589baeff96cd9b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Read data  <a href="#a16afacfb14adcf9ace589baeff96cd9b">More...</a><br /></td></tr>
+<tr class="separator:a16afacfb14adcf9ace589baeff96cd9b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a439f1490d23fa7e638891fd22284b61f"><td class="memTemplParams" colspan="2">template&lt;class T &gt; </td></tr>
 <tr class="memitem:a439f1490d23fa7e638891fd22284b61f"><td class="memTemplItemLeft" align="right" valign="top">NTSTATUS&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_mem_block.html#a439f1490d23fa7e638891fd22284b61f">Write</a> (size_t offset, const T &amp;data)</td></tr>
 <tr class="memdesc:a439f1490d23fa7e638891fd22284b61f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Write data  <a href="#a439f1490d23fa7e638891fd22284b61f">More...</a><br /></td></tr>
@@ -601,6 +605,52 @@ template&lt;class T &gt; </div>
 
 </div>
 </div>
+<a class="anchor" id="a16afacfb14adcf9ace589baeff96cd9b"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;class T &gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">NTSTATUS blackbone::MemBlock::Read </td>
+          <td>(</td>
+          <td class="paramtype">size_t&#160;</td>
+          <td class="paramname"><em>offset</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">T &amp;&#160;</td>
+          <td class="paramname"><em>val</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Read data </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">offset</td><td>Data offset in block</td></tr>
+    <tr><td class="paramname">def_val</td><td>Read data</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="a6b943c4d2000f4bd5dcaff445d549533"></a>
 <div class="memitem">
 <div class="memproto">
@@ -802,8 +852,8 @@ template&lt;class T &gt; </div>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/<a class="el" href="_mem_block_8h_source.html">MemBlock.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/MemBlock.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/<a class="el" href="_mem_block_8h_source.html">MemBlock.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/MemBlock.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -811,7 +861,7 @@ template&lt;class T &gt; </div>
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_mem_block.html">MemBlock</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

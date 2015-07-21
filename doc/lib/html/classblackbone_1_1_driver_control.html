@@ -159,18 +159,30 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a0b952361b3f269ec354eb0cdab355110"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_driver_control.html#a0b952361b3f269ec354eb0cdab355110">UnmapMemoryRegion</a> (DWORD pid, ptr_t base, uint32_t size)</td></tr>
 <tr class="memdesc:a0b952361b3f269ec354eb0cdab355110"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unmap single memory region If unmapped region size is smaller than the size specified during map, function will return info about 2 regions that emerged after unmap  <a href="#a0b952361b3f269ec354eb0cdab355110">More...</a><br /></td></tr>
 <tr class="separator:a0b952361b3f269ec354eb0cdab355110"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5e75ec5f0befc7a87edac89f74c29d42"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_driver_control.html#a5e75ec5f0befc7a87edac89f74c29d42">InjectDll</a> (DWORD pid, const std::wstring &amp;path, InjectType itype, uint32_t initRVA=0, const std::wstring &amp;initArg=L&quot;&quot;, bool wait=true)</td></tr>
-<tr class="memdesc:a5e75ec5f0befc7a87edac89f74c29d42"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inject DLL into arbitrary process  <a href="#a5e75ec5f0befc7a87edac89f74c29d42">More...</a><br /></td></tr>
-<tr class="separator:a5e75ec5f0befc7a87edac89f74c29d42"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a16c594d347a62f6cbc3395e8e04382b6"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_driver_control.html#a16c594d347a62f6cbc3395e8e04382b6">InjectDll</a> (DWORD pid, const std::wstring &amp;path, InjectType itype, uint32_t initRVA=0, const std::wstring &amp;initArg=L&quot;&quot;, bool unlink=false, bool erasePE=false, bool wait=true)</td></tr>
+<tr class="memdesc:a16c594d347a62f6cbc3395e8e04382b6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inject DLL into arbitrary process  <a href="#a16c594d347a62f6cbc3395e8e04382b6">More...</a><br /></td></tr>
+<tr class="separator:a16c594d347a62f6cbc3395e8e04382b6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af3c210a08b288340889d7ab1de5b0238"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_driver_control.html#af3c210a08b288340889d7ab1de5b0238">MmapDll</a> (DWORD pid, const std::wstring &amp;path, KMmapFlags flags, uint32_t initRVA=0, const std::wstring &amp;initArg=L&quot;&quot;)</td></tr>
+<tr class="memdesc:af3c210a08b288340889d7ab1de5b0238"><td class="mdescLeft">&#160;</td><td class="mdescRight">Manually map PE image  <a href="#af3c210a08b288340889d7ab1de5b0238">More...</a><br /></td></tr>
+<tr class="separator:af3c210a08b288340889d7ab1de5b0238"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ade71deb9b406174b35deddf2efc245e3"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_driver_control.html#ade71deb9b406174b35deddf2efc245e3">MmapDll</a> (DWORD pid, void *address, uint32_t size, bool asImage, KMmapFlags flags, uint32_t initRVA=0, const std::wstring &amp;initArg=L&quot;&quot;)</td></tr>
+<tr class="memdesc:ade71deb9b406174b35deddf2efc245e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Manually map PE image  <a href="#ade71deb9b406174b35deddf2efc245e3">More...</a><br /></td></tr>
+<tr class="separator:ade71deb9b406174b35deddf2efc245e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aad03482499a75b0d4e81f311535c9925"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_driver_control.html#aad03482499a75b0d4e81f311535c9925">MMapDriver</a> (const std::wstring &amp;path)</td></tr>
 <tr class="memdesc:aad03482499a75b0d4e81f311535c9925"><td class="mdescLeft">&#160;</td><td class="mdescRight">Manually map another system driver into system space  <a href="#aad03482499a75b0d4e81f311535c9925">More...</a><br /></td></tr>
 <tr class="separator:aad03482499a75b0d4e81f311535c9925"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a90e2303217d961cb6885fae7ef5d7645"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_driver_control.html#a90e2303217d961cb6885fae7ef5d7645">ConcealVAD</a> (DWORD pid, ptr_t base, uint32_t size)</td></tr>
 <tr class="memdesc:a90e2303217d961cb6885fae7ef5d7645"><td class="mdescLeft">&#160;</td><td class="mdescRight">Make VAD region appear as PAGE_NO_ACESS to NtQueryVirtualMemory  <a href="#a90e2303217d961cb6885fae7ef5d7645">More...</a><br /></td></tr>
 <tr class="separator:a90e2303217d961cb6885fae7ef5d7645"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0b5c52b7373a5808bade5f5a1aae5ede"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_driver_control.html#a0b5c52b7373a5808bade5f5a1aae5ede">UnlinkHandleTable</a> (DWORD pid)</td></tr>
+<tr class="memdesc:a0b5c52b7373a5808bade5f5a1aae5ede"><td class="mdescLeft">&#160;</td><td class="mdescRight">Unlink process handle table from HandleListHead  <a href="#a0b5c52b7373a5808bade5f5a1aae5ede">More...</a><br /></td></tr>
+<tr class="separator:a0b5c52b7373a5808bade5f5a1aae5ede"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aaa031ab8df9d32652b93cd5c34d47d72"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_driver_control.html#aaa031ab8df9d32652b93cd5c34d47d72">loaded</a> () const </td></tr>
 <tr class="memdesc:aaa031ab8df9d32652b93cd5c34d47d72"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if driver is loaded  <a href="#aaa031ab8df9d32652b93cd5c34d47d72">More...</a><br /></td></tr>
 <tr class="separator:aaa031ab8df9d32652b93cd5c34d47d72"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af7003adb9ff68e8a276f77040ea2a934"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="af7003adb9ff68e8a276f77040ea2a934"></a>
+BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><b>status</b> () const </td></tr>
+<tr class="separator:af7003adb9ff68e8a276f77040ea2a934"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
@@ -386,7 +398,7 @@ static BLACKBONE_API <br class="typebreak" />
 
 </div>
 </div>
-<a class="anchor" id="a5e75ec5f0befc7a87edac89f74c29d42"></a>
+<a class="anchor" id="a16c594d347a62f6cbc3395e8e04382b6"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -424,6 +436,18 @@ static BLACKBONE_API <br class="typebreak" />
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>unlink</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>erasePE</em> = <code>false</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
           <td class="paramname"><em>wait</em> = <code>true</code>&#160;</td>
         </tr>
         <tr>
@@ -442,6 +466,22 @@ static BLACKBONE_API <br class="typebreak" />
     <tr><td class="paramname">itype</td><td>Injection type</td></tr>
     <tr><td class="paramname">initRVA</td><td>Init routine RVA</td></tr>
     <tr><td class="paramname">initArg</td><td>Init routine argument</td></tr>
+    <tr><td class="paramname">unlink</td><td>Unlink module after injection</td></tr>
+    <tr><td class="paramname">erasePE</td><td>Erase PE headers after injection</td></tr>
+    <tr><td class="paramname">wait</td><td>Wait for injection</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">pid</td><td>Target PID</td></tr>
+    <tr><td class="paramname">path</td><td>Full qualified dll path</td></tr>
+    <tr><td class="paramname">itype</td><td>Injection type</td></tr>
+    <tr><td class="paramname">initRVA</td><td>Init routine RVA</td></tr>
+    <tr><td class="paramname">initArg</td><td>Init routine argument</td></tr>
+    <tr><td class="paramname">unlink</td><td>Unlink module after injection</td></tr>
+    <tr><td class="paramname">erasePE</td><td>Erase PE headers after injection</td></tr>
     <tr><td class="paramname">wait</td><td>Wait for injection</td></tr>
   </table>
   </dd>
@@ -569,6 +609,134 @@ static BLACKBONE_API <br class="typebreak" />
     <tr><td class="paramname">base</td><td>Region base address</td></tr>
     <tr><td class="paramname">size</td><td>Region size</td></tr>
     <tr><td class="paramname">result</td><td>Mapped region info</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="af3c210a08b288340889d7ab1de5b0238"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">NTSTATUS blackbone::DriverControl::MmapDll </td>
+          <td>(</td>
+          <td class="paramtype">DWORD&#160;</td>
+          <td class="paramname"><em>pid</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::wstring &amp;&#160;</td>
+          <td class="paramname"><em>path</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">KMmapFlags&#160;</td>
+          <td class="paramname"><em>flags</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>initRVA</em> = <code>0</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::wstring &amp;&#160;</td>
+          <td class="paramname"><em>initArg</em> = <code>L&quot;&quot;</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Manually map PE image </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">pid</td><td>Target PID</td></tr>
+    <tr><td class="paramname">path</td><td>Full qualified image path</td></tr>
+    <tr><td class="paramname">flags</td><td>Mapping flags</td></tr>
+    <tr><td class="paramname">initRVA</td><td>Init routine RVA</td></tr>
+    <tr><td class="paramname">initArg</td><td>Init routine argument</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="ade71deb9b406174b35deddf2efc245e3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">NTSTATUS blackbone::DriverControl::MmapDll </td>
+          <td>(</td>
+          <td class="paramtype">DWORD&#160;</td>
+          <td class="paramname"><em>pid</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">void *&#160;</td>
+          <td class="paramname"><em>address</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>size</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>asImage</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">KMmapFlags&#160;</td>
+          <td class="paramname"><em>flags</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">uint32_t&#160;</td>
+          <td class="paramname"><em>initRVA</em> = <code>0</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::wstring &amp;&#160;</td>
+          <td class="paramname"><em>initArg</em> = <code>L&quot;&quot;</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Manually map PE image </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">pid</td><td>Target PID</td></tr>
+    <tr><td class="paramname">address</td><td>Memory location of the image to map</td></tr>
+    <tr><td class="paramname">size</td><td>Image size</td></tr>
+    <tr><td class="paramname">asImage</td><td>Memory chunk has image layout</td></tr>
+    <tr><td class="paramname">flags</td><td>Mapping flags</td></tr>
+    <tr><td class="paramname">initRVA</td><td>Init routine RVA</td></tr>
+    <tr><td class="paramname">initArg</td><td>Init routine argument</td></tr>
   </table>
   </dd>
 </dl>
@@ -805,6 +973,31 @@ static BLACKBONE_API <br class="typebreak" />
 
 </div>
 </div>
+<a class="anchor" id="a0b5c52b7373a5808bade5f5a1aae5ede"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">NTSTATUS blackbone::DriverControl::UnlinkHandleTable </td>
+          <td>(</td>
+          <td class="paramtype">DWORD&#160;</td>
+          <td class="paramname"><em>pid</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Unlink process handle table from HandleListHead </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">pid</td><td>Target process ID</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="a5125fc2b03078dd4cf3b6781b27ee933"></a>
 <div class="memitem">
 <div class="memproto">
@@ -943,8 +1136,8 @@ static BLACKBONE_API <br class="typebreak" />
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/DriverControl/<a class="el" href="_driver_control_8h_source.html">DriverControl.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/DriverControl/DriverControl.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/DriverControl/<a class="el" href="_driver_control_8h_source.html">DriverControl.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/DriverControl/DriverControl.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -952,7 +1145,7 @@ static BLACKBONE_API <br class="typebreak" />
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_driver_control.html">DriverControl</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:48 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:41 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

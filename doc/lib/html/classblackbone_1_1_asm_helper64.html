@@ -153,10 +153,14 @@ virtual void&#160;</td><td class="memItemRight" valign="bottom"><b>ExitThreadWit
 <tr class="memitem:af9a4c51c6bbe88f4d74020cc833f7ddd inherit pub_methods_classblackbone_1_1_asm_helper_base"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_asm_helper_base.html#af9a4c51c6bbe88f4d74020cc833f7ddd">SwitchTo64</a> ()</td></tr>
 <tr class="memdesc:af9a4c51c6bbe88f4d74020cc833f7ddd inherit pub_methods_classblackbone_1_1_asm_helper_base"><td class="mdescLeft">&#160;</td><td class="mdescRight">Switch processor into x64 mode (long mode)  <a href="#af9a4c51c6bbe88f4d74020cc833f7ddd">More...</a><br /></td></tr>
 <tr class="separator:af9a4c51c6bbe88f4d74020cc833f7ddd inherit pub_methods_classblackbone_1_1_asm_helper_base"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa9bae511aec85b4e774118383a4fb1e2 inherit pub_methods_classblackbone_1_1_asm_helper_base"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="aa9bae511aec85b4e774118383a4fb1e2"></a>
+<tr class="memitem:a5226bac0eb65b07e109722c52f3c3196 inherit pub_methods_classblackbone_1_1_asm_helper_base"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a5226bac0eb65b07e109722c52f3c3196"></a>
 BLACKBONE_API <br class="typebreak" />
-asmjit::host::Assembler *&#160;</td><td class="memItemRight" valign="bottom"><b>operator-&gt;</b> ()</td></tr>
-<tr class="separator:aa9bae511aec85b4e774118383a4fb1e2 inherit pub_methods_classblackbone_1_1_asm_helper_base"><td class="memSeparator" colspan="2">&#160;</td></tr>
+asmjit::X86Assembler *&#160;</td><td class="memItemRight" valign="bottom"><b>assembler</b> ()</td></tr>
+<tr class="separator:a5226bac0eb65b07e109722c52f3c3196 inherit pub_methods_classblackbone_1_1_asm_helper_base"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab1ce7412306eaa94fa7ea0a7f59e853e inherit pub_methods_classblackbone_1_1_asm_helper_base"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="ab1ce7412306eaa94fa7ea0a7f59e853e"></a>
+BLACKBONE_API <br class="typebreak" />
+asmjit::X86Assembler *&#160;</td><td class="memItemRight" valign="bottom"><b>operator-&gt;</b> ()</td></tr>
+<tr class="separator:ab1ce7412306eaa94fa7ea0a7f59e853e inherit pub_methods_classblackbone_1_1_asm_helper_base"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="inherited"></a>
 Additional Inherited Members</h2></td></tr>
@@ -164,9 +168,9 @@ Additional Inherited Members</h2></td></tr>
 <tr class="memitem:a479f53a02ad1c45d9c72d5392fb56ecc inherit pro_attribs_classblackbone_1_1_asm_helper_base"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a479f53a02ad1c45d9c72d5392fb56ecc"></a>
 asmjit::JitRuntime&#160;</td><td class="memItemRight" valign="bottom"><b>_runtime</b></td></tr>
 <tr class="separator:a479f53a02ad1c45d9c72d5392fb56ecc inherit pro_attribs_classblackbone_1_1_asm_helper_base"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a35f71d365a308ba2aa48e0b113358d30 inherit pro_attribs_classblackbone_1_1_asm_helper_base"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a35f71d365a308ba2aa48e0b113358d30"></a>
-asmjit::host::Assembler&#160;</td><td class="memItemRight" valign="bottom"><b>_assembler</b></td></tr>
-<tr class="separator:a35f71d365a308ba2aa48e0b113358d30 inherit pro_attribs_classblackbone_1_1_asm_helper_base"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a64eb20302b726ae0121cf38e1c7a135a inherit pro_attribs_classblackbone_1_1_asm_helper_base"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a64eb20302b726ae0121cf38e1c7a135a"></a>
+asmjit::X86Assembler&#160;</td><td class="memItemRight" valign="bottom"><b>_assembler</b></td></tr>
+<tr class="separator:a64eb20302b726ae0121cf38e1c7a135a inherit pro_attribs_classblackbone_1_1_asm_helper_base"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Function Documentation</h2>
 <a class="anchor" id="a97d6144fc6dd79e45a513e78868c5f52"></a>
@@ -471,8 +475,8 @@ asmjit::host::Assembler&#160;</td><td class="memItemRight" valign="bottom"><b>_a
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Asm/<a class="el" href="_asm_helper64_8h_source.html">AsmHelper64.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Asm/AsmHelper64.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Asm/<a class="el" href="_asm_helper64_8h_source.html">AsmHelper64.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Asm/AsmHelper64.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -480,7 +484,7 @@ asmjit::host::Assembler&#160;</td><td class="memItemRight" valign="bottom"><b>_a
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_asm_helper64.html">AsmHelper64</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:48 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:41 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

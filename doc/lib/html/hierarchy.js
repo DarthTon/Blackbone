@@ -1,20 +1,26 @@
 var hierarchy =
 [
     [ "blackbone::_ACTCTXW_T< T >", "structblackbone_1_1___a_c_t_c_t_x_w___t.html", null ],
-    [ "blackbone::_API_SET_NAMESPACE_ARRAY", "structblackbone_1_1___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___a_r_r_a_y.html", null ],
-    [ "blackbone::_API_SET_NAMESPACE_ARRAY_V2", "structblackbone_1_1___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___a_r_r_a_y___v2.html", null ],
-    [ "blackbone::_API_SET_NAMESPACE_ENTRY", "structblackbone_1_1___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___e_n_t_r_y.html", null ],
-    [ "blackbone::_API_SET_NAMESPACE_ENTRY_V2", "structblackbone_1_1___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___e_n_t_r_y___v2.html", null ],
-    [ "blackbone::_API_SET_VALUE_ARRAY", "structblackbone_1_1___a_p_i___s_e_t___v_a_l_u_e___a_r_r_a_y.html", null ],
-    [ "blackbone::_API_SET_VALUE_ARRAY_V2", "structblackbone_1_1___a_p_i___s_e_t___v_a_l_u_e___a_r_r_a_y___v2.html", null ],
-    [ "blackbone::_API_SET_VALUE_ENTRY", "structblackbone_1_1___a_p_i___s_e_t___v_a_l_u_e___e_n_t_r_y.html", null ],
-    [ "blackbone::_API_SET_VALUE_ENTRY_V2", "structblackbone_1_1___a_p_i___s_e_t___v_a_l_u_e___e_n_t_r_y___v2.html", null ],
+    [ "_API_SET_NAMESPACE_ARRAY", "struct___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___a_r_r_a_y.html", null ],
+    [ "_API_SET_NAMESPACE_ARRAY_10", "struct___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___a_r_r_a_y__10.html", null ],
+    [ "_API_SET_NAMESPACE_ARRAY_V2", "struct___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___a_r_r_a_y___v2.html", null ],
+    [ "_API_SET_NAMESPACE_ENTRY", "struct___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___e_n_t_r_y.html", null ],
+    [ "_API_SET_NAMESPACE_ENTRY_10", "struct___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___e_n_t_r_y__10.html", null ],
+    [ "_API_SET_NAMESPACE_ENTRY_V2", "struct___a_p_i___s_e_t___n_a_m_e_s_p_a_c_e___e_n_t_r_y___v2.html", null ],
+    [ "_API_SET_VALUE_ARRAY", "struct___a_p_i___s_e_t___v_a_l_u_e___a_r_r_a_y.html", null ],
+    [ "_API_SET_VALUE_ARRAY_10", "struct___a_p_i___s_e_t___v_a_l_u_e___a_r_r_a_y__10.html", null ],
+    [ "_API_SET_VALUE_ARRAY_V2", "struct___a_p_i___s_e_t___v_a_l_u_e___a_r_r_a_y___v2.html", null ],
+    [ "_API_SET_VALUE_ENTRY", "struct___a_p_i___s_e_t___v_a_l_u_e___e_n_t_r_y.html", null ],
+    [ "_API_SET_VALUE_ENTRY_10", "struct___a_p_i___s_e_t___v_a_l_u_e___e_n_t_r_y__10.html", null ],
+    [ "_API_SET_VALUE_ENTRY_V2", "struct___a_p_i___s_e_t___v_a_l_u_e___e_n_t_r_y___v2.html", null ],
     [ "blackbone::RemoteHook::HookData::callback::_classFn", "structblackbone_1_1_remote_hook_1_1_hook_data_1_1callback_1_1__class_fn.html", null ],
     [ "blackbone::_CLIENT_ID_T< T >", "structblackbone_1_1___c_l_i_e_n_t___i_d___t.html", null ],
     [ "blackbone::_CONTEXT_T< T >", "structblackbone_1_1___c_o_n_t_e_x_t___t.html", null ],
     [ "blackbone::_CONTEXT_T< DWORD >", "structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d_01_4.html", null ],
     [ "blackbone::_CONTEXT_T< DWORD64 >", "structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d64_01_4.html", null ],
+    [ "blackbone::_EXCEPTION_REGISTRATION_RECORD", "structblackbone_1_1___e_x_c_e_p_t_i_o_n___r_e_g_i_s_t_r_a_t_i_o_n___r_e_c_o_r_d.html", null ],
     [ "blackbone::_GDI_TEB_BATCH_T< T >", "structblackbone_1_1___g_d_i___t_e_b___b_a_t_c_h___t.html", null ],
+    [ "blackbone::_IMAGE_DELAYLOAD_DESCRIPTOR", "structblackbone_1_1___i_m_a_g_e___d_e_l_a_y_l_o_a_d___d_e_s_c_r_i_p_t_o_r.html", null ],
     [ "_ldasm_data", "struct__ldasm__data.html", null ],
     [ "blackbone::_LDR_DATA_TABLE_ENTRY_BASE< T >", "structblackbone_1_1___l_d_r___d_a_t_a___t_a_b_l_e___e_n_t_r_y___b_a_s_e.html", [
       [ "blackbone::_LDR_DATA_TABLE_ENTRY_W7", "structblackbone_1_1___l_d_r___d_a_t_a___t_a_b_l_e___e_n_t_r_y___w7.html", null ],
@@ -23,6 +29,7 @@ var hierarchy =
     [ "blackbone::_LDR_DDAG_NODE", "structblackbone_1_1___l_d_r___d_d_a_g___n_o_d_e.html", null ],
     [ "blackbone::_LIST_ENTRY_T< T >", "structblackbone_1_1___l_i_s_t___e_n_t_r_y___t.html", null ],
     [ "blackbone::_NT_TIB_T< T >", "structblackbone_1_1___n_t___t_i_b___t.html", null ],
+    [ "blackbone::_OBJECT_TYPE_INFORMATION_T< T >", "structblackbone_1_1___o_b_j_e_c_t___t_y_p_e___i_n_f_o_r_m_a_t_i_o_n___t.html", null ],
     [ "blackbone::_PEB_LDR_DATA2< T >", "structblackbone_1_1___p_e_b___l_d_r___d_a_t_a2.html", null ],
     [ "blackbone::_PEB_T< T, NGF, A >", "structblackbone_1_1___p_e_b___t.html", null ],
     [ "blackbone::_PEB_T2< T >", "structblackbone_1_1___p_e_b___t2.html", null ],
@@ -35,6 +42,8 @@ var hierarchy =
     [ "blackbone::_RTL_RB_TREE", "structblackbone_1_1___r_t_l___r_b___t_r_e_e.html", null ],
     [ "blackbone::_SECTION_BASIC_INFORMATION_T< T >", "structblackbone_1_1___s_e_c_t_i_o_n___b_a_s_i_c___i_n_f_o_r_m_a_t_i_o_n___t.html", null ],
     [ "blackbone::_SYSTEM_EXTENDED_THREAD_INFORMATION_T< T >", "structblackbone_1_1___s_y_s_t_e_m___e_x_t_e_n_d_e_d___t_h_r_e_a_d___i_n_f_o_r_m_a_t_i_o_n___t.html", null ],
+    [ "blackbone::_SYSTEM_HANDLE_INFORMATION_T< T >", "structblackbone_1_1___s_y_s_t_e_m___h_a_n_d_l_e___i_n_f_o_r_m_a_t_i_o_n___t.html", null ],
+    [ "blackbone::_SYSTEM_HANDLE_T< T >", "structblackbone_1_1___s_y_s_t_e_m___h_a_n_d_l_e___t.html", null ],
     [ "blackbone::_SYSTEM_PROCESS_INFORMATION_T< T >", "structblackbone_1_1___s_y_s_t_e_m___p_r_o_c_e_s_s___i_n_f_o_r_m_a_t_i_o_n___t.html", null ],
     [ "blackbone::_SYSTEM_THREAD_INFORMATION_T< T >", "structblackbone_1_1___s_y_s_t_e_m___t_h_r_e_a_d___i_n_f_o_r_m_a_t_i_o_n___t.html", null ],
     [ "blackbone::_TEB_T< T >", "structblackbone_1_1___t_e_b___t.html", null ],
@@ -59,15 +68,21 @@ var hierarchy =
     ] ],
     [ "blackbone::DriverControl", "classblackbone_1_1_driver_control.html", null ],
     [ "blackbone::DynImport", "classblackbone_1_1_dyn_import.html", null ],
+    [ "blackbone::ExceptionModule", "structblackbone_1_1_exception_module.html", null ],
     [ "blackbone::exportData", "structblackbone_1_1export_data.html", null ],
+    [ "blackbone::pe::ExportData", "structblackbone_1_1pe_1_1_export_data.html", null ],
     [ "blackbone::FuncArguments< Args >", "classblackbone_1_1_func_arguments.html", null ],
-    [ "blackbone::FuncArguments< const C *, Args...>", "classblackbone_1_1_func_arguments.html", [
+    [ "blackbone::FuncArguments< C *, Args...>", "classblackbone_1_1_func_arguments.html", [
       [ "blackbone::RemoteFunction< R(C::*)(Args...) >", "classblackbone_1_1_remote_function_3_01_r_07_c_1_1_5_08_07_args_8_8_8_08_01_4.html", null ]
     ] ],
+    [ "blackbone::HandleInfo", "structblackbone_1_1_handle_info.html", null ],
     [ "std::hash< struct pair< wstring, blackbone::eModType > >", "structstd_1_1hash_3_01struct_01pair_3_01wstring_00_01blackbone_1_1e_mod_type_01_4_01_4.html", null ],
     [ "blackbone::HookContext", "structblackbone_1_1_hook_context.html", null ],
-    [ "blackbone::RemoteHook::HookData", "structblackbone_1_1_remote_hook_1_1_hook_data.html", null ],
+    [ "blackbone::HookCtx", "unionblackbone_1_1_hook_ctx.html", null ],
+    [ "blackbone::HookCtx32", "structblackbone_1_1_hook_ctx32.html", null ],
+    [ "blackbone::HookCtx64", "structblackbone_1_1_hook_ctx64.html", null ],
     [ "blackbone::RemoteMemory::HookData", "structblackbone_1_1_remote_memory_1_1_hook_data.html", null ],
+    [ "blackbone::RemoteHook::HookData", "structblackbone_1_1_remote_hook_1_1_hook_data.html", null ],
     [ "blackbone::HookHandler< Fn, C >", "structblackbone_1_1_hook_handler.html", [
       [ "blackbone::Detour< Fn, C >", "classblackbone_1_1_detour.html", [
         [ "blackbone::VTableDetour< Fn, C >", "classblackbone_1_1_v_table_detour.html", null ]
@@ -82,6 +97,7 @@ var hierarchy =
       [ "blackbone::MMap", "classblackbone_1_1_m_map.html", null ]
     ] ],
     [ "blackbone::ModuleData", "structblackbone_1_1_module_data.html", null ],
+    [ "blackbone::ModuleTable", "structblackbone_1_1_module_table.html", null ],
     [ "blackbone::NameResolve", "classblackbone_1_1_name_resolve.html", null ],
     [ "blackbone::Native", "classblackbone_1_1_native.html", [
       [ "blackbone::NativeWow64", "classblackbone_1_1_native_wow64.html", null ],
@@ -100,23 +116,29 @@ var hierarchy =
     [ "blackbone::ProcessModules", "classblackbone_1_1_process_modules.html", null ],
     [ "blackbone::ProcessThreads", "classblackbone_1_1_process_threads.html", null ],
     [ "blackbone::reg64", "unionblackbone_1_1reg64.html", null ],
+    [ "blackbone::regDR7", "structblackbone_1_1reg_d_r7.html", null ],
     [ "blackbone::pe::RelocData", "structblackbone_1_1pe_1_1_reloc_data.html", null ],
     [ "blackbone::RemoteContext", "classblackbone_1_1_remote_context.html", null ],
     [ "blackbone::RemoteExec", "classblackbone_1_1_remote_exec.html", null ],
     [ "blackbone::RemoteFuncBase< Fn >", "classblackbone_1_1_remote_func_base.html", null ],
-    [ "blackbone::RemoteFuncBase< R(C::*)(const C *, Args...)>", "classblackbone_1_1_remote_func_base.html", [
+    [ "blackbone::RemoteFuncBase< R(C::*)(C *, Args...)>", "classblackbone_1_1_remote_func_base.html", [
       [ "blackbone::RemoteFunction< R(C::*)(Args...) >", "classblackbone_1_1_remote_function_3_01_r_07_c_1_1_5_08_07_args_8_8_8_08_01_4.html", null ]
     ] ],
     [ "blackbone::RemoteFunction< Fn >", "singletonblackbone_1_1_remote_function.html", null ],
     [ "blackbone::RemoteHook", "classblackbone_1_1_remote_hook.html", null ],
+    [ "blackbone::RemoteLocalHook", "classblackbone_1_1_remote_local_hook.html", null ],
     [ "blackbone::RemoteMemory", "classblackbone_1_1_remote_memory.html", [
       [ "blackbone::ProcessMemory", "classblackbone_1_1_process_memory.html", null ]
     ] ],
+    [ "blackbone::SectionInfo", "structblackbone_1_1_section_info.html", null ],
     [ "blackbone::Thread", "classblackbone_1_1_thread.html", null ],
     [ "blackbone::ThreadInfo", "structblackbone_1_1_thread_info.html", null ],
+    [ "ThunkData", "struct_thunk_data.html", null ],
     [ "blackbone::TraceHook", "classblackbone_1_1_trace_hook.html", null ],
     [ "blackbone::Utils", "classblackbone_1_1_utils.html", null ],
     [ "blackbone::VM_COUNTERS", "structblackbone_1_1_v_m___c_o_u_n_t_e_r_s.html", null ],
+    [ "Win32Thunk< fn, C >", "singleton_win32_thunk.html", null ],
+    [ "Win32Thunk< R(__stdcall *)(Args...), C >", "class_win32_thunk_3_01_r_07____stdcall_01_5_08_07_args_8_8_8_08_00_01_c_01_4.html", null ],
     [ "blackbone::Wow64Barrier", "structblackbone_1_1_wow64_barrier.html", null ],
     [ "blackbone::Wow64Local", "classblackbone_1_1_wow64_local.html", null ]
 ];

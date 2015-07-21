@@ -9,5 +9,6 @@ var classblackbone_1_1_nt_ldr =
     [ "InsertInvertedFunctionTable", "classblackbone_1_1_nt_ldr.html#a6c00965c0ad9df2208f396a5139e22be", null ],
     [ "LdrKernel32PatchAddress", "classblackbone_1_1_nt_ldr.html#a595d7592a5724155093eebfc34d820b0", null ],
     [ "LdrpInvertedFunctionTable", "classblackbone_1_1_nt_ldr.html#ac9b855eccc34bb358619f5b003733ebd", null ],
+    [ "LdrProtectMrdata", "classblackbone_1_1_nt_ldr.html#afb81833a433b5faabeb9605c80a36100", null ],
     [ "Unlink", "classblackbone_1_1_nt_ldr.html#a8ea3f453056b6b2fec728ef16fefee59", null ]
 ];

@@ -3,7 +3,7 @@ var classblackbone_1_1_native =
     [ "listModules", "classblackbone_1_1_native.html#a0799dfdc89c478c64e12049689b1b02e", null ],
     [ "Native", "classblackbone_1_1_native.html#a6ec7d3cccec6a1a84db2738bfd46f8fa", null ],
     [ "~Native", "classblackbone_1_1_native.html#acd5f2951f341cc4f0fca216b823eda09", null ],
-    [ "CreateRemoteThreadT", "classblackbone_1_1_native.html#a1289dbadd0f7a06bc46585128a1c8475", null ],
+    [ "CreateRemoteThreadT", "classblackbone_1_1_native.html#a405f822c8bc116ecb3cc37d1fd465b15", null ],
     [ "EnumModules", "classblackbone_1_1_native.html#a4fb48a33f65eb32f235602fe00331e7c", null ],
     [ "EnumRegions", "classblackbone_1_1_native.html#af8205f7a2a3c388856e004fa59c19e36", null ],
     [ "getPEB", "classblackbone_1_1_native.html#aeb34b95e03805ee807983a818a9572db", null ],

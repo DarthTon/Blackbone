@@ -125,6 +125,9 @@ Static Public Member Functions</h2></td></tr>
 <tr class="memitem:ae49f5033cdf89168bbc1123277d04987"><td class="memItemLeft" align="right" valign="top">static BLACKBONE_API std::string&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_utils.html#ae49f5033cdf89168bbc1123277d04987">WstringToAnsi</a> (const std::wstring &amp;input, DWORD locale=CP_ACP)</td></tr>
 <tr class="memdesc:ae49f5033cdf89168bbc1123277d04987"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert wide char string to ANSI one  <a href="#ae49f5033cdf89168bbc1123277d04987">More...</a><br /></td></tr>
 <tr class="separator:ae49f5033cdf89168bbc1123277d04987"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9d877820e0c80f93d9836b0108a2c1a5"><td class="memItemLeft" align="right" valign="top">static BLACKBONE_API std::wstring&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_utils.html#a9d877820e0c80f93d9836b0108a2c1a5">FormatString</a> (const wchar_t *fmt,...)</td></tr>
+<tr class="memdesc:a9d877820e0c80f93d9836b0108a2c1a5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Format string  <a href="#a9d877820e0c80f93d9836b0108a2c1a5">More...</a><br /></td></tr>
+<tr class="separator:a9d877820e0c80f93d9836b0108a2c1a5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a990e1ab3abe7ec42613bb307a4481f0f"><td class="memItemLeft" align="right" valign="top">static BLACKBONE_API std::wstring&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_utils.html#a990e1ab3abe7ec42613bb307a4481f0f">StripPath</a> (const std::wstring &amp;path)</td></tr>
 <tr class="memdesc:a990e1ab3abe7ec42613bb307a4481f0f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get filename from full-qualified path  <a href="#a990e1ab3abe7ec42613bb307a4481f0f">More...</a><br /></td></tr>
 <tr class="separator:a990e1ab3abe7ec42613bb307a4481f0f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -222,6 +225,50 @@ Static Public Member Functions</h2></td></tr>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>true if exists</dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="a9d877820e0c80f93d9836b0108a2c1a5"></a>
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::wstring blackbone::Utils::FormatString </td>
+          <td>(</td>
+          <td class="paramtype">const wchar_t *&#160;</td>
+          <td class="paramname"><em>fmt</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">&#160;</td>
+          <td class="paramname"><em>...</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Format string </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">fmt</td><td>Format specifier</td></tr>
+  </table>
+  </dd>
+</dl>
+<p>Arguments</p>
+<dl class="section return"><dt>Returns</dt><dd>Formatted string</dd></dl>
 
 </div>
 </div>
@@ -534,8 +581,8 @@ Static Public Member Functions</h2></td></tr>
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Misc/<a class="el" href="_utils_8h_source.html">Utils.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Misc/Utils.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Misc/<a class="el" href="_utils_8h_source.html">Utils.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Misc/Utils.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -543,7 +590,7 @@ Static Public Member Functions</h2></td></tr>
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_utils.html">Utils</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

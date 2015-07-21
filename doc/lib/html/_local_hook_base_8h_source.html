@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.8"/>
-<title>BlackBone: C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/LocalHook/LocalHookBase.h Source File</title>
+<title>BlackBone: C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/LocalHook/LocalHookBase.h Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -122,9 +122,9 @@ $(document).ready(function(){initNavTree('_local_hook_base_8h_source.html','');}
 <div class="line"><a name="l00016"></a><span class="lineno">   16</span>&#160;{</div>
 <div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;<span class="keyword">enum</span> e</div>
 <div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160;{</div>
-<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;    HookFirst,</div>
-<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;    HookLast,</div>
-<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;    NoOriginal,</div>
+<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;    HookFirst,      <span class="comment">// Hook called before original function</span></div>
+<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;    HookLast,       <span class="comment">// Hook called after original function</span></div>
+<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;    NoOriginal,     <span class="comment">// Original function doesn&#39;t get called</span></div>
 <div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;};</div>
 <div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;}</div>
 <div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160;</div>
@@ -146,8 +146,8 @@ $(document).ready(function(){initNavTree('_local_hook_base_8h_source.html','');}
 <div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160;{</div>
 <div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160;    <span class="keyword">enum</span> e</div>
 <div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;    {</div>
-<div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160;        UseNew,</div>
-<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;        UseOriginal</div>
+<div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160;        UseNew,         <span class="comment">// Return value returned by hook</span></div>
+<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;        UseOriginal     <span class="comment">// Return original function value</span></div>
 <div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;    };</div>
 <div class="line"><a name="l00046"></a><span class="lineno">   46</span>&#160;}</div>
 <div class="line"><a name="l00047"></a><span class="lineno">   47</span>&#160;</div>
@@ -161,63 +161,66 @@ $(document).ready(function(){initNavTree('_local_hook_base_8h_source.html','');}
 <div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;</div>
 <div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;<span class="keyword">protected</span>:</div>
 <div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;</div>
-<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_detour_base.html#a5bb087a3e3d408fcfac3c9f89371094f">DisableHook</a>();</div>
-<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;</div>
-<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_detour_base.html#a9420a71d31f0385af890d1b2c767f26f">EnableHook</a>();</div>
-<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;</div>
-<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_detour_base.html#a8dc2cca19d3487eb787ae2348c563b74">ToggleHBP</a>( <span class="keywordtype">int</span> index, <span class="keywordtype">bool</span> enable );</div>
-<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;</div>
-<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;    BLACKBONE_API <span class="keywordtype">void</span> <a class="code" href="classblackbone_1_1_detour_base.html#a4732e4866bba98f971ed7e5c1054f1a1">CopyOldCode</a>( uint8_t* Ptr );</div>
-<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;</div>
-<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;    BLACKBONE_API <span class="keyword">static</span> LONG NTAPI <a class="code" href="classblackbone_1_1_detour_base.html#a041371b47c52facd6d509bb144bdd524">VectoredHandler</a> ( PEXCEPTION_POINTERS excpt );</div>
-<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;    BLACKBONE_API <span class="keyword">static</span> LONG NTAPI <a class="code" href="classblackbone_1_1_detour_base.html#ac11158e9064128378be0db6a44d0ec13">Int3Handler</a>     ( PEXCEPTION_POINTERS excpt );</div>
-<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;    BLACKBONE_API <span class="keyword">static</span> LONG NTAPI <a class="code" href="classblackbone_1_1_detour_base.html#a5a6e0a8ab3a8cddab7036a66a5c28bc2">AVHandler</a>       ( PEXCEPTION_POINTERS excpt );</div>
-<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;    BLACKBONE_API <span class="keyword">static</span> LONG NTAPI <a class="code" href="classblackbone_1_1_detour_base.html#abf96391989c360835b4cd42bb49b797b">StepHandler</a>     ( PEXCEPTION_POINTERS excpt );</div>
-<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;</div>
-<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;<span class="keyword">protected</span>:</div>
-<div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;    <span class="keywordtype">bool</span> _hooked = <span class="keyword">false</span>;               <span class="comment">// Hook is installed</span></div>
-<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;</div>
-<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;    <span class="keywordtype">void</span>* _callback = <span class="keyword">nullptr</span>;          <span class="comment">// User supplied hook function</span></div>
-<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;    <span class="keywordtype">void</span>* _callbackClass = <span class="keyword">nullptr</span>;     <span class="comment">// Class pointer for user hook</span></div>
-<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;    <span class="keywordtype">void</span>* _original = <span class="keyword">nullptr</span>;          <span class="comment">// Original function address</span></div>
-<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;    <span class="keywordtype">void</span>* _internalHandler = <span class="keyword">nullptr</span>;   <span class="comment">// Pointer to hook handler</span></div>
-<div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160;    <span class="keywordtype">void</span>* _callOriginal = <span class="keyword">nullptr</span>;      <span class="comment">// Pointer to original function </span></div>
-<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;    </div>
-<div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160;    mapIdx   _hwbpIdx;                  <span class="comment">// Thread HWBP index</span></div>
-<div class="line"><a name="l00104"></a><span class="lineno">  104</span>&#160;    <span class="keywordtype">size_t</span>   _origSize = 0;             <span class="comment">// Original code size</span></div>
-<div class="line"><a name="l00105"></a><span class="lineno">  105</span>&#160;    uint8_t* _buf = <span class="keyword">nullptr</span>;            <span class="comment">// Trampoline buffer</span></div>
-<div class="line"><a name="l00106"></a><span class="lineno">  106</span>&#160;    uint8_t* _origCode = <span class="keyword">nullptr</span>;       <span class="comment">// Original function bytes</span></div>
-<div class="line"><a name="l00107"></a><span class="lineno">  107</span>&#160;    uint8_t* _newCode = <span class="keyword">nullptr</span>;        <span class="comment">// Trampoline bytes</span></div>
-<div class="line"><a name="l00108"></a><span class="lineno">  108</span>&#160;    </div>
-<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160;    HookType::e _type = HookType::Inline;</div>
-<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160;    CallOrder::e _order = CallOrder::HookFirst;</div>
-<div class="line"><a name="l00111"></a><span class="lineno">  111</span>&#160;    ReturnMethod::e _retType = ReturnMethod::UseOriginal;</div>
-<div class="line"><a name="l00112"></a><span class="lineno">  112</span>&#160;</div>
-<div class="line"><a name="l00113"></a><span class="lineno">  113</span>&#160;    <span class="comment">// Global hook instances relationship</span></div>
-<div class="line"><a name="l00114"></a><span class="lineno">  114</span>&#160;    BLACKBONE_API <span class="keyword">static</span> std::unordered_map&lt;void*, DetourBase*&gt; _breakpoints;</div>
-<div class="line"><a name="l00115"></a><span class="lineno">  115</span>&#160;</div>
-<div class="line"><a name="l00116"></a><span class="lineno">  116</span>&#160;    <span class="comment">// Exception handler</span></div>
-<div class="line"><a name="l00117"></a><span class="lineno">  117</span>&#160;    BLACKBONE_API <span class="keyword">static</span> <span class="keywordtype">void</span>* _vecHandler;</div>
-<div class="line"><a name="l00118"></a><span class="lineno">  118</span>&#160;};</div>
+<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_detour_base.html#a2886b08617abb0c715ba0ddcff35c846">AllocateBuffer</a>( uint8_t* nearest );</div>
+<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;</div>
+<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_detour_base.html#a5bb087a3e3d408fcfac3c9f89371094f">DisableHook</a>();</div>
+<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160;</div>
+<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_detour_base.html#a9420a71d31f0385af890d1b2c767f26f">EnableHook</a>();</div>
+<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;</div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_detour_base.html#a8dc2cca19d3487eb787ae2348c563b74">ToggleHBP</a>( <span class="keywordtype">int</span> index, <span class="keywordtype">bool</span> enable );</div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;</div>
+<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;    BLACKBONE_API <span class="keywordtype">void</span> <a class="code" href="classblackbone_1_1_detour_base.html#a4732e4866bba98f971ed7e5c1054f1a1">CopyOldCode</a>( uint8_t* Ptr );</div>
+<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;</div>
+<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;    BLACKBONE_API <span class="keyword">static</span> LONG NTAPI <a class="code" href="classblackbone_1_1_detour_base.html#a041371b47c52facd6d509bb144bdd524">VectoredHandler</a> ( PEXCEPTION_POINTERS excpt );</div>
+<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;    BLACKBONE_API <span class="keyword">static</span> LONG NTAPI <a class="code" href="classblackbone_1_1_detour_base.html#ac11158e9064128378be0db6a44d0ec13">Int3Handler</a>     ( PEXCEPTION_POINTERS excpt );</div>
+<div class="line"><a name="l00098"></a><span class="lineno">   98</span>&#160;    BLACKBONE_API <span class="keyword">static</span> LONG NTAPI <a class="code" href="classblackbone_1_1_detour_base.html#a5a6e0a8ab3a8cddab7036a66a5c28bc2">AVHandler</a>       ( PEXCEPTION_POINTERS excpt );</div>
+<div class="line"><a name="l00099"></a><span class="lineno">   99</span>&#160;    BLACKBONE_API <span class="keyword">static</span> LONG NTAPI <a class="code" href="classblackbone_1_1_detour_base.html#abf96391989c360835b4cd42bb49b797b">StepHandler</a>     ( PEXCEPTION_POINTERS excpt );</div>
+<div class="line"><a name="l00100"></a><span class="lineno">  100</span>&#160;</div>
+<div class="line"><a name="l00101"></a><span class="lineno">  101</span>&#160;<span class="keyword">protected</span>:</div>
+<div class="line"><a name="l00102"></a><span class="lineno">  102</span>&#160;    <span class="keywordtype">bool</span> _hooked = <span class="keyword">false</span>;               <span class="comment">// Hook is installed</span></div>
+<div class="line"><a name="l00103"></a><span class="lineno">  103</span>&#160;</div>
+<div class="line"><a name="l00104"></a><span class="lineno">  104</span>&#160;    <span class="keywordtype">void</span>* _callback = <span class="keyword">nullptr</span>;          <span class="comment">// User supplied hook function</span></div>
+<div class="line"><a name="l00105"></a><span class="lineno">  105</span>&#160;    <span class="keywordtype">void</span>* _callbackClass = <span class="keyword">nullptr</span>;     <span class="comment">// Class pointer for user hook</span></div>
+<div class="line"><a name="l00106"></a><span class="lineno">  106</span>&#160;    <span class="keywordtype">void</span>* _original = <span class="keyword">nullptr</span>;          <span class="comment">// Original function address</span></div>
+<div class="line"><a name="l00107"></a><span class="lineno">  107</span>&#160;    <span class="keywordtype">void</span>* _internalHandler = <span class="keyword">nullptr</span>;   <span class="comment">// Pointer to hook handler</span></div>
+<div class="line"><a name="l00108"></a><span class="lineno">  108</span>&#160;    <span class="keywordtype">void</span>* _callOriginal = <span class="keyword">nullptr</span>;      <span class="comment">// Pointer to original function </span></div>
+<div class="line"><a name="l00109"></a><span class="lineno">  109</span>&#160;    </div>
+<div class="line"><a name="l00110"></a><span class="lineno">  110</span>&#160;    mapIdx   _hwbpIdx;                  <span class="comment">// Thread HWBP index</span></div>
+<div class="line"><a name="l00111"></a><span class="lineno">  111</span>&#160;    <span class="keywordtype">size_t</span>   _origSize = 0;             <span class="comment">// Original code size</span></div>
+<div class="line"><a name="l00112"></a><span class="lineno">  112</span>&#160;    uint8_t* _buf = <span class="keyword">nullptr</span>;            <span class="comment">// Trampoline buffer</span></div>
+<div class="line"><a name="l00113"></a><span class="lineno">  113</span>&#160;    uint8_t* _origCode = <span class="keyword">nullptr</span>;       <span class="comment">// Original function bytes</span></div>
+<div class="line"><a name="l00114"></a><span class="lineno">  114</span>&#160;    uint8_t* _newCode = <span class="keyword">nullptr</span>;        <span class="comment">// Trampoline bytes</span></div>
+<div class="line"><a name="l00115"></a><span class="lineno">  115</span>&#160;    </div>
+<div class="line"><a name="l00116"></a><span class="lineno">  116</span>&#160;    HookType::e _type = HookType::Inline;</div>
+<div class="line"><a name="l00117"></a><span class="lineno">  117</span>&#160;    CallOrder::e _order = CallOrder::HookFirst;</div>
+<div class="line"><a name="l00118"></a><span class="lineno">  118</span>&#160;    ReturnMethod::e _retType = ReturnMethod::UseOriginal;</div>
 <div class="line"><a name="l00119"></a><span class="lineno">  119</span>&#160;</div>
-<div class="line"><a name="l00120"></a><span class="lineno">  120</span>&#160;}</div>
-<div class="ttc" id="classblackbone_1_1_detour_base_html_ac11158e9064128378be0db6a44d0ec13"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#ac11158e9064128378be0db6a44d0ec13">blackbone::DetourBase::Int3Handler</a></div><div class="ttdeci">static BLACKBONE_API LONG NTAPI Int3Handler(PEXCEPTION_POINTERS excpt)</div><div class="ttdoc">Int3 exception handler </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:160</div></div>
+<div class="line"><a name="l00120"></a><span class="lineno">  120</span>&#160;    <span class="comment">// Global hook instances relationship</span></div>
+<div class="line"><a name="l00121"></a><span class="lineno">  121</span>&#160;    BLACKBONE_API <span class="keyword">static</span> std::unordered_map&lt;void*, DetourBase*&gt; _breakpoints;</div>
+<div class="line"><a name="l00122"></a><span class="lineno">  122</span>&#160;</div>
+<div class="line"><a name="l00123"></a><span class="lineno">  123</span>&#160;    <span class="comment">// Exception handler</span></div>
+<div class="line"><a name="l00124"></a><span class="lineno">  124</span>&#160;    BLACKBONE_API <span class="keyword">static</span> <span class="keywordtype">void</span>* _vecHandler;</div>
+<div class="line"><a name="l00125"></a><span class="lineno">  125</span>&#160;};</div>
+<div class="line"><a name="l00126"></a><span class="lineno">  126</span>&#160;</div>
+<div class="line"><a name="l00127"></a><span class="lineno">  127</span>&#160;}</div>
+<div class="ttc" id="classblackbone_1_1_detour_base_html_ac11158e9064128378be0db6a44d0ec13"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#ac11158e9064128378be0db6a44d0ec13">blackbone::DetourBase::Int3Handler</a></div><div class="ttdeci">static BLACKBONE_API LONG NTAPI Int3Handler(PEXCEPTION_POINTERS excpt)</div><div class="ttdoc">Int3 exception handler </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:208</div></div>
 <div class="ttc" id="classblackbone_1_1_detour_base_html"><div class="ttname"><a href="classblackbone_1_1_detour_base.html">blackbone::DetourBase</a></div><div class="ttdef"><b>Definition:</b> LocalHookBase.h:48</div></div>
-<div class="ttc" id="classblackbone_1_1_detour_base_html_abf96391989c360835b4cd42bb49b797b"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#abf96391989c360835b4cd42bb49b797b">blackbone::DetourBase::StepHandler</a></div><div class="ttdeci">static BLACKBONE_API LONG NTAPI StepHandler(PEXCEPTION_POINTERS excpt)</div><div class="ttdoc">Single step exception handler </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:190</div></div>
-<div class="ttc" id="classblackbone_1_1_detour_base_html_a9420a71d31f0385af890d1b2c767f26f"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a9420a71d31f0385af890d1b2c767f26f">blackbone::DetourBase::EnableHook</a></div><div class="ttdeci">BLACKBONE_API bool EnableHook()</div><div class="ttdoc">Enable disabled hook </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:38</div></div>
-<div class="ttc" id="classblackbone_1_1_detour_base_html_a5a6e0a8ab3a8cddab7036a66a5c28bc2"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a5a6e0a8ab3a8cddab7036a66a5c28bc2">blackbone::DetourBase::AVHandler</a></div><div class="ttdeci">static BLACKBONE_API LONG NTAPI AVHandler(PEXCEPTION_POINTERS excpt)</div><div class="ttdoc">Access violation handler </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:180</div></div>
-<div class="ttc" id="classblackbone_1_1_detour_base_html_a8dc2cca19d3487eb787ae2348c563b74"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a8dc2cca19d3487eb787ae2348c563b74">blackbone::DetourBase::ToggleHBP</a></div><div class="ttdeci">BLACKBONE_API bool ToggleHBP(int index, bool enable)</div><div class="ttdoc">Toggle hardware breakpoint for current thread </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:54</div></div>
-<div class="ttc" id="classblackbone_1_1_detour_base_html_a041371b47c52facd6d509bb144bdd524"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a041371b47c52facd6d509bb144bdd524">blackbone::DetourBase::VectoredHandler</a></div><div class="ttdeci">static BLACKBONE_API LONG NTAPI VectoredHandler(PEXCEPTION_POINTERS excpt)</div><div class="ttdoc">Exception handlers </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:137</div></div>
-<div class="ttc" id="classblackbone_1_1_detour_base_html_a4732e4866bba98f971ed7e5c1054f1a1"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a4732e4866bba98f971ed7e5c1054f1a1">blackbone::DetourBase::CopyOldCode</a></div><div class="ttdeci">BLACKBONE_API void CopyOldCode(uint8_t *Ptr)</div><div class="ttdoc">Copy original function bytes </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:74</div></div>
+<div class="ttc" id="classblackbone_1_1_detour_base_html_abf96391989c360835b4cd42bb49b797b"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#abf96391989c360835b4cd42bb49b797b">blackbone::DetourBase::StepHandler</a></div><div class="ttdeci">static BLACKBONE_API LONG NTAPI StepHandler(PEXCEPTION_POINTERS excpt)</div><div class="ttdoc">Single step exception handler </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:238</div></div>
+<div class="ttc" id="classblackbone_1_1_detour_base_html_a9420a71d31f0385af890d1b2c767f26f"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a9420a71d31f0385af890d1b2c767f26f">blackbone::DetourBase::EnableHook</a></div><div class="ttdeci">BLACKBONE_API bool EnableHook()</div><div class="ttdoc">Enable disabled hook </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:74</div></div>
+<div class="ttc" id="classblackbone_1_1_detour_base_html_a5a6e0a8ab3a8cddab7036a66a5c28bc2"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a5a6e0a8ab3a8cddab7036a66a5c28bc2">blackbone::DetourBase::AVHandler</a></div><div class="ttdeci">static BLACKBONE_API LONG NTAPI AVHandler(PEXCEPTION_POINTERS excpt)</div><div class="ttdoc">Access violation handler </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:228</div></div>
+<div class="ttc" id="classblackbone_1_1_detour_base_html_a8dc2cca19d3487eb787ae2348c563b74"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a8dc2cca19d3487eb787ae2348c563b74">blackbone::DetourBase::ToggleHBP</a></div><div class="ttdeci">BLACKBONE_API bool ToggleHBP(int index, bool enable)</div><div class="ttdoc">Toggle hardware breakpoint for current thread </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:90</div></div>
+<div class="ttc" id="classblackbone_1_1_detour_base_html_a041371b47c52facd6d509bb144bdd524"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a041371b47c52facd6d509bb144bdd524">blackbone::DetourBase::VectoredHandler</a></div><div class="ttdeci">static BLACKBONE_API LONG NTAPI VectoredHandler(PEXCEPTION_POINTERS excpt)</div><div class="ttdoc">Exception handlers </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:185</div></div>
+<div class="ttc" id="classblackbone_1_1_detour_base_html_a2886b08617abb0c715ba0ddcff35c846"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a2886b08617abb0c715ba0ddcff35c846">blackbone::DetourBase::AllocateBuffer</a></div><div class="ttdeci">BLACKBONE_API bool AllocateBuffer(uint8_t *nearest)</div><div class="ttdoc">Allocate detour buffer as close to target as possible </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:22</div></div>
+<div class="ttc" id="classblackbone_1_1_detour_base_html_a4732e4866bba98f971ed7e5c1054f1a1"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a4732e4866bba98f971ed7e5c1054f1a1">blackbone::DetourBase::CopyOldCode</a></div><div class="ttdeci">BLACKBONE_API void CopyOldCode(uint8_t *Ptr)</div><div class="ttdoc">Copy original function bytes </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:110</div></div>
 <div class="ttc" id="namespaceblackbone_html"><div class="ttname"><a href="namespaceblackbone.html">blackbone</a></div><div class="ttdef"><b>Definition:</b> AsmHelper32.cpp:6</div></div>
-<div class="ttc" id="classblackbone_1_1_detour_base_html_a5bb087a3e3d408fcfac3c9f89371094f"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a5bb087a3e3d408fcfac3c9f89371094f">blackbone::DetourBase::DisableHook</a></div><div class="ttdeci">BLACKBONE_API bool DisableHook()</div><div class="ttdoc">Temporarily disable hook </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:24</div></div>
+<div class="ttc" id="classblackbone_1_1_detour_base_html_a5bb087a3e3d408fcfac3c9f89371094f"><div class="ttname"><a href="classblackbone_1_1_detour_base.html#a5bb087a3e3d408fcfac3c9f89371094f">blackbone::DetourBase::DisableHook</a></div><div class="ttdeci">BLACKBONE_API bool DisableHook()</div><div class="ttdoc">Temporarily disable hook </div><div class="ttdef"><b>Definition:</b> LocalHookBase.cpp:60</div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><a class="el" href="dir_aa9befc4bdfa617079e96718d920d9d2.html">Visual Studio 2013</a></li><li class="navelem"><a class="el" href="dir_9749fe1d1039c274ca5f4a0137bd5805.html">Projects</a></li><li class="navelem"><a class="el" href="dir_87d371cc6a3e9a1e307775a876c8e949.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_2dd5b37e3ce8f08186c1d7d6a8b43f79.html">src</a></li><li class="navelem"><a class="el" href="dir_c12349095ba230d0c7acc796e8f40ecd.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_51b41b0184186fe5425dc7f7777f7f77.html">LocalHook</a></li><li class="navelem"><b>LocalHookBase.h</b></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:47 for BlackBone by
+    <li class="navelem"><a class="el" href="dir_3d9ef8cac7bf1be0f1e18672d28fd269.html">visual studio 2013</a></li><li class="navelem"><a class="el" href="dir_5401094cee307be7b33997a47da28669.html">projects</a></li><li class="navelem"><a class="el" href="dir_0d6d72948ced51bdfd5fc8cf7033b913.html">blackbone</a></li><li class="navelem"><a class="el" href="dir_84cd6de3d65226a2f8718fdae009bf30.html">src</a></li><li class="navelem"><a class="el" href="dir_4dc82cc14ae072731c8b0e8bbd4f10c1.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_f4d91a33c3e9178930fa0961c9e775ff.html">LocalHook</a></li><li class="navelem"><b>LocalHookBase.h</b></li>
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:40 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

@@ -5,6 +5,7 @@ var searchData=
   ['terminateworker',['TerminateWorker',['../classblackbone_1_1_remote_exec.html#af984dcbcb3c603c76634101c822faf0d',1,'blackbone::RemoteExec']]],
   ['thread',['Thread',['../classblackbone_1_1_thread.html',1,'blackbone']]],
   ['threadinfo',['ThreadInfo',['../structblackbone_1_1_thread_info.html',1,'blackbone']]],
+  ['thunkdata',['ThunkData',['../struct_thunk_data.html',1,'']]],
   ['togglehbp',['ToggleHBP',['../classblackbone_1_1_detour_base.html#a8dc2cca19d3487eb787ae2348c563b74',1,'blackbone::DetourBase']]],
   ['tolower',['ToLower',['../classblackbone_1_1_utils.html#a7025c0b9f717285c51d22fc4e9e905dc',1,'blackbone::Utils']]],
   ['tracehook',['TraceHook',['../classblackbone_1_1_trace_hook.html',1,'blackbone']]],

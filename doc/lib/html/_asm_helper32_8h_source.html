@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.8"/>
-<title>BlackBone: C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Asm/AsmHelper32.h Source File</title>
+<title>BlackBone: C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Asm/AsmHelper32.h Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -125,37 +125,39 @@ $(document).ready(function(){initNavTree('_asm_helper32_8h_source.html','');});
 <div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;</div>
 <div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160;    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code" href="classblackbone_1_1_asm_helper32.html#ab1ed50150992b0312745c087ea7136a9">ExitThreadWithStatus</a>( <span class="keywordtype">size_t</span> pExitThread, <span class="keywordtype">size_t</span> resultPtr );</div>
 <div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;</div>
-<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code" href="classblackbone_1_1_asm_helper32.html#ae9794692a3f492d6c22eb52d4c317340">SaveRetValAndSignalEvent</a>( <span class="keywordtype">size_t</span> pSetEvent, </div>
-<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;                                           <span class="keywordtype">size_t</span> ResultPtr, </div>
-<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;                                           <span class="keywordtype">size_t</span> EventPtr, </div>
-<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;                                           <span class="keywordtype">size_t</span> errPtr, </div>
-<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;                                           eReturnType rtype = rt_int32 );</div>
-<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;</div>
-<div class="line"><a name="l00063"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_helper32.html#ae32831794aa0c3a4111e82192ebf73a2">   63</a></span>&#160;    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code" href="classblackbone_1_1_asm_helper32.html#ae32831794aa0c3a4111e82192ebf73a2">EnableX64CallStack</a>( <span class="keywordtype">bool</span> ) { }</div>
-<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;</div>
-<div class="line"><a name="l00068"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_helper32.html#a7b857a8021aaedb168849c27e4f61a3a">   68</a></span>&#160;    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code" href="classblackbone_1_1_asm_helper32.html#a7b857a8021aaedb168849c27e4f61a3a">SetTebPtr</a>()</div>
-<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;    {</div>
-<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160;        <span class="comment">// mov edx, fs:[0x18]   </span></div>
-<div class="line"><a name="l00071"></a><span class="lineno">   71</span>&#160;        _assembler.mov( asmjit::host::edx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );</div>
-<div class="line"><a name="l00072"></a><span class="lineno">   72</span>&#160;    }</div>
-<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160;</div>
-<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;<span class="keyword">private</span>:</div>
-<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;    AsmHelper32( <span class="keyword">const</span> AsmHelper32&amp; ) = <span class="keyword">delete</span>;</div>
-<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;    AsmHelper32&amp; operator = (<span class="keyword">const</span> AsmHelper32&amp;) = <span class="keyword">delete</span>;</div>
-<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;</div>
-<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;    <span class="keywordtype">void</span> PushArg( <span class="keyword">const</span> <a class="code" href="classblackbone_1_1_asm_variant.html">AsmVariant</a>&amp; arg, eArgType regidx = at_stack );</div>
-<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;</div>
-<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;    <span class="keyword">template</span>&lt;<span class="keyword">typename</span> _Type&gt;</div>
-<div class="line"><a name="l00091"></a><span class="lineno">   91</span>&#160;    <span class="keywordtype">void</span> PushArgp( _Type arg, eArgType index );</div>
-<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;};</div>
-<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;</div>
-<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;}</div>
+<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code" href="classblackbone_1_1_asm_helper32.html#ae9794692a3f492d6c22eb52d4c317340">SaveRetValAndSignalEvent</a>( </div>
+<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;        <span class="keywordtype">size_t</span> pSetEvent, </div>
+<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;        <span class="keywordtype">size_t</span> ResultPtr,</div>
+<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;        <span class="keywordtype">size_t</span> EventPtr,</div>
+<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;        <span class="keywordtype">size_t</span> errPtr,</div>
+<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;        eReturnType rtype = rt_int32</div>
+<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;        );</div>
+<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;</div>
+<div class="line"><a name="l00065"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_helper32.html#ae32831794aa0c3a4111e82192ebf73a2">   65</a></span>&#160;    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code" href="classblackbone_1_1_asm_helper32.html#ae32831794aa0c3a4111e82192ebf73a2">EnableX64CallStack</a>( <span class="keywordtype">bool</span> ) { }</div>
+<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;</div>
+<div class="line"><a name="l00070"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_helper32.html#a7b857a8021aaedb168849c27e4f61a3a">   70</a></span>&#160;    <span class="keyword">virtual</span> <span class="keywordtype">void</span> <a class="code" href="classblackbone_1_1_asm_helper32.html#a7b857a8021aaedb168849c27e4f61a3a">SetTebPtr</a>()</div>
+<div class="line"><a name="l00071"></a><span class="lineno">   71</span>&#160;    {</div>
+<div class="line"><a name="l00072"></a><span class="lineno">   72</span>&#160;        <span class="comment">// mov edx, fs:[0x18]   </span></div>
+<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160;        _assembler.mov( asmjit::host::edx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );</div>
+<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;    }</div>
+<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;</div>
+<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;<span class="keyword">private</span>:</div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;    AsmHelper32( <span class="keyword">const</span> AsmHelper32&amp; ) = <span class="keyword">delete</span>;</div>
+<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;    AsmHelper32&amp; operator = (<span class="keyword">const</span> AsmHelper32&amp;) = <span class="keyword">delete</span>;</div>
+<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;</div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;    <span class="keywordtype">void</span> PushArg( <span class="keyword">const</span> <a class="code" href="classblackbone_1_1_asm_variant.html">AsmVariant</a>&amp; arg, eArgType regidx = at_stack );</div>
+<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;</div>
+<div class="line"><a name="l00092"></a><span class="lineno">   92</span>&#160;    <span class="keyword">template</span>&lt;<span class="keyword">typename</span> _Type&gt;</div>
+<div class="line"><a name="l00093"></a><span class="lineno">   93</span>&#160;    <span class="keywordtype">void</span> PushArgp( _Type arg, eArgType index );</div>
+<div class="line"><a name="l00094"></a><span class="lineno">   94</span>&#160;};</div>
 <div class="line"><a name="l00095"></a><span class="lineno">   95</span>&#160;</div>
-<div class="ttc" id="classblackbone_1_1_asm_helper32_html_a7b857a8021aaedb168849c27e4f61a3a"><div class="ttname"><a href="classblackbone_1_1_asm_helper32.html#a7b857a8021aaedb168849c27e4f61a3a">blackbone::AsmHelper32::SetTebPtr</a></div><div class="ttdeci">virtual void SetTebPtr()</div><div class="ttdoc">Move TEB pointer into edx </div><div class="ttdef"><b>Definition:</b> AsmHelper32.h:68</div></div>
+<div class="line"><a name="l00096"></a><span class="lineno">   96</span>&#160;}</div>
+<div class="line"><a name="l00097"></a><span class="lineno">   97</span>&#160;</div>
+<div class="ttc" id="classblackbone_1_1_asm_helper32_html_a7b857a8021aaedb168849c27e4f61a3a"><div class="ttname"><a href="classblackbone_1_1_asm_helper32.html#a7b857a8021aaedb168849c27e4f61a3a">blackbone::AsmHelper32::SetTebPtr</a></div><div class="ttdeci">virtual void SetTebPtr()</div><div class="ttdoc">Move TEB pointer into edx </div><div class="ttdef"><b>Definition:</b> AsmHelper32.h:70</div></div>
 <div class="ttc" id="classblackbone_1_1_asm_helper32_html_ae739f02ee0b2ad4d796eca6ebbd244fc"><div class="ttname"><a href="classblackbone_1_1_asm_helper32.html#ae739f02ee0b2ad4d796eca6ebbd244fc">blackbone::AsmHelper32::GenEpilogue</a></div><div class="ttdeci">virtual void GenEpilogue(bool switchMode=false, int retSize=4)</div><div class="ttdoc">Generate function epilogue code </div><div class="ttdef"><b>Definition:</b> AsmHelper32.cpp:39</div></div>
 <div class="ttc" id="classblackbone_1_1_asm_helper32_html_a3e07ea12c209ee359fa14433f5ae0e4e"><div class="ttname"><a href="classblackbone_1_1_asm_helper32.html#a3e07ea12c209ee359fa14433f5ae0e4e">blackbone::AsmHelper32::GenPrologue</a></div><div class="ttdeci">virtual void GenPrologue(bool switchMode=false)</div><div class="ttdoc">Generate function prologue code </div><div class="ttdef"><b>Definition:</b> AsmHelper32.cpp:21</div></div>
 <div class="ttc" id="classblackbone_1_1_asm_helper32_html_a27ad7ba9dd6e4ddf96c830d7b3795954"><div class="ttname"><a href="classblackbone_1_1_asm_helper32.html#a27ad7ba9dd6e4ddf96c830d7b3795954">blackbone::AsmHelper32::GenCall</a></div><div class="ttdeci">virtual void GenCall(const AsmVariant &amp;pFN, const std::vector&lt; AsmVariant &gt; &amp;args, eCalligConvention cc=cc_stdcall)</div><div class="ttdoc">Generate function call </div><div class="ttdef"><b>Definition:</b> AsmHelper32.cpp:63</div></div>
-<div class="ttc" id="classblackbone_1_1_asm_helper32_html_ae32831794aa0c3a4111e82192ebf73a2"><div class="ttname"><a href="classblackbone_1_1_asm_helper32.html#ae32831794aa0c3a4111e82192ebf73a2">blackbone::AsmHelper32::EnableX64CallStack</a></div><div class="ttdeci">virtual void EnableX64CallStack(bool)</div><div class="ttdoc">Does nothing under x86 </div><div class="ttdef"><b>Definition:</b> AsmHelper32.h:63</div></div>
+<div class="ttc" id="classblackbone_1_1_asm_helper32_html_ae32831794aa0c3a4111e82192ebf73a2"><div class="ttname"><a href="classblackbone_1_1_asm_helper32.html#ae32831794aa0c3a4111e82192ebf73a2">blackbone::AsmHelper32::EnableX64CallStack</a></div><div class="ttdeci">virtual void EnableX64CallStack(bool)</div><div class="ttdoc">Does nothing under x86 </div><div class="ttdef"><b>Definition:</b> AsmHelper32.h:65</div></div>
 <div class="ttc" id="classblackbone_1_1_asm_variant_html"><div class="ttname"><a href="classblackbone_1_1_asm_variant.html">blackbone::AsmVariant</a></div><div class="ttdoc">General purpose assembly variable </div><div class="ttdef"><b>Definition:</b> AsmVariant.hpp:16</div></div>
 <div class="ttc" id="classblackbone_1_1_asm_helper32_html_ab1ed50150992b0312745c087ea7136a9"><div class="ttname"><a href="classblackbone_1_1_asm_helper32.html#ab1ed50150992b0312745c087ea7136a9">blackbone::AsmHelper32::ExitThreadWithStatus</a></div><div class="ttdeci">virtual void ExitThreadWithStatus(size_t pExitThread, size_t resultPtr)</div><div class="ttdoc">Save eax value and terminate current thread </div><div class="ttdef"><b>Definition:</b> AsmHelper32.cpp:125</div></div>
 <div class="ttc" id="classblackbone_1_1_asm_helper32_html"><div class="ttname"><a href="classblackbone_1_1_asm_helper32.html">blackbone::AsmHelper32</a></div><div class="ttdoc">32 bit assembler helper </div><div class="ttdef"><b>Definition:</b> AsmHelper32.h:11</div></div>
@@ -167,8 +169,8 @@ $(document).ready(function(){initNavTree('_asm_helper32_8h_source.html','');});
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><a class="el" href="dir_aa9befc4bdfa617079e96718d920d9d2.html">Visual Studio 2013</a></li><li class="navelem"><a class="el" href="dir_9749fe1d1039c274ca5f4a0137bd5805.html">Projects</a></li><li class="navelem"><a class="el" href="dir_87d371cc6a3e9a1e307775a876c8e949.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_2dd5b37e3ce8f08186c1d7d6a8b43f79.html">src</a></li><li class="navelem"><a class="el" href="dir_c12349095ba230d0c7acc796e8f40ecd.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_f990e8a9658162c32ca42ba03f11ed76.html">Asm</a></li><li class="navelem"><b>AsmHelper32.h</b></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:47 for BlackBone by
+    <li class="navelem"><a class="el" href="dir_3d9ef8cac7bf1be0f1e18672d28fd269.html">visual studio 2013</a></li><li class="navelem"><a class="el" href="dir_5401094cee307be7b33997a47da28669.html">projects</a></li><li class="navelem"><a class="el" href="dir_0d6d72948ced51bdfd5fc8cf7033b913.html">blackbone</a></li><li class="navelem"><a class="el" href="dir_84cd6de3d65226a2f8718fdae009bf30.html">src</a></li><li class="navelem"><a class="el" href="dir_4dc82cc14ae072731c8b0e8bbd4f10c1.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_1e8052e19ffdd71c736d050c96b1892a.html">Asm</a></li><li class="navelem"><b>AsmHelper32.h</b></li>
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:40 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

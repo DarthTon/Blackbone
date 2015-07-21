@@ -3,6 +3,7 @@ var searchData=
   ['pagecontext',['PageContext',['../structblackbone_1_1_remote_memory_1_1_page_context.html',1,'blackbone::RemoteMemory']]],
   ['pagesize',['pageSize',['../classblackbone_1_1_native.html#aaf75d49ff0a856901fbedea2102fcbd5',1,'blackbone::Native']]],
   ['parse',['Parse',['../classblackbone_1_1pe_1_1_p_e_image.html#a971cd3b6bffb8c59e452499363a84116',1,'blackbone::pe::PEImage']]],
+  ['path',['path',['../classblackbone_1_1pe_1_1_p_e_image.html#ada2ff635e8fcccf194a647edd7e4b78f',1,'blackbone::pe::PEImage']]],
   ['pathnode',['PathNode',['../structblackbone_1_1_path_node.html',1,'blackbone']]],
   ['patternsearch',['PatternSearch',['../classblackbone_1_1_pattern_search.html',1,'blackbone']]],
   ['peb',['peb',['../classblackbone_1_1_process_core.html#af972d20590026e51877c3c8eae3d36c9',1,'blackbone::ProcessCore::peb(_PEB32 *ppeb)'],['../classblackbone_1_1_process_core.html#abca44d6d882d52046657a92236943c3f',1,'blackbone::ProcessCore::peb(_PEB64 *ppeb)'],['../classblackbone_1_1_process_core.html#a878ee4d9697e12c846400c79690cb36c',1,'blackbone::ProcessCore::peb()']]],

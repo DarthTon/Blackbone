@@ -152,9 +152,9 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>NativeWow64<
 <tr class="memitem:a2d2a9e232883fe7f5bc05285507776ca"><td class="memItemLeft" align="right" valign="top">virtual NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_native_wow64.html#a2d2a9e232883fe7f5bc05285507776ca">SetProcessInfoT</a> (PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize)</td></tr>
 <tr class="memdesc:a2d2a9e232883fe7f5bc05285507776ca"><td class="mdescLeft">&#160;</td><td class="mdescRight">Call NtSetInformationProcess for underlying process  <a href="#a2d2a9e232883fe7f5bc05285507776ca">More...</a><br /></td></tr>
 <tr class="separator:a2d2a9e232883fe7f5bc05285507776ca"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a75f14788475809b790964fd22127de24"><td class="memItemLeft" align="right" valign="top">virtual NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_native_wow64.html#a75f14788475809b790964fd22127de24">CreateRemoteThreadT</a> (HANDLE &amp;hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags)</td></tr>
-<tr class="memdesc:a75f14788475809b790964fd22127de24"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates new thread in the remote process  <a href="#a75f14788475809b790964fd22127de24">More...</a><br /></td></tr>
-<tr class="separator:a75f14788475809b790964fd22127de24"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5f97c6a031fe6e7f8bba3db9f0db5b68"><td class="memItemLeft" align="right" valign="top">virtual NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_native_wow64.html#a5f97c6a031fe6e7f8bba3db9f0db5b68">CreateRemoteThreadT</a> (HANDLE &amp;hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access=THREAD_ALL_ACCESS)</td></tr>
+<tr class="memdesc:a5f97c6a031fe6e7f8bba3db9f0db5b68"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates new thread in the remote process  <a href="#a5f97c6a031fe6e7f8bba3db9f0db5b68">More...</a><br /></td></tr>
+<tr class="separator:a5f97c6a031fe6e7f8bba3db9f0db5b68"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a482a65c31ed3bf594b5bb5808c7a18bd"><td class="memItemLeft" align="right" valign="top">virtual NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_native_wow64.html#a482a65c31ed3bf594b5bb5808c7a18bd">GetThreadContextT</a> (HANDLE hThread, <a class="el" href="structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d64_01_4.html">_CONTEXT64</a> &amp;ctx)</td></tr>
 <tr class="memdesc:a482a65c31ed3bf594b5bb5808c7a18bd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get native thread context  <a href="#a482a65c31ed3bf594b5bb5808c7a18bd">More...</a><br /></td></tr>
 <tr class="separator:a482a65c31ed3bf594b5bb5808c7a18bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -220,7 +220,7 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
 <tr class="separator:ab76b23a45e1243f784d0f6ea1978443a inherit pro_attribs_classblackbone_1_1_native"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a class="anchor" id="a75f14788475809b790964fd22127de24"></a>
+<a class="anchor" id="a5f97c6a031fe6e7f8bba3db9f0db5b68"></a>
 <div class="memitem">
 <div class="memproto">
 <table class="mlabels">
@@ -249,7 +249,13 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">CreateThreadFlags&#160;</td>
-          <td class="paramname"><em>flags</em>&#160;</td>
+          <td class="paramname"><em>flags</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">DWORD&#160;</td>
+          <td class="paramname"><em>access</em> = <code>THREAD_ALL_ACCESS</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -276,7 +282,7 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
 
-<p>Reimplemented from <a class="el" href="classblackbone_1_1_native.html#a1289dbadd0f7a06bc46585128a1c8475">blackbone::Native</a>.</p>
+<p>Reimplemented from <a class="el" href="classblackbone_1_1_native.html#a405f822c8bc116ecb3cc37d1fd465b15">blackbone::Native</a>.</p>
 
 </div>
 </div>
@@ -1129,8 +1135,8 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Subsystem/<a class="el" href="_wow64_subsystem_8h_source.html">Wow64Subsystem.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Subsystem/Wow64Subsystem.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Subsystem/<a class="el" href="_wow64_subsystem_8h_source.html">Wow64Subsystem.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Subsystem/Wow64Subsystem.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -1138,7 +1144,7 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_native_wow64.html">NativeWow64</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

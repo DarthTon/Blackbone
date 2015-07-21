@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.8"/>
-<title>BlackBone: C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Asm/AsmStack.hpp Source File</title>
+<title>BlackBone: C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Asm/AsmStack.hpp Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -119,74 +119,76 @@ $(document).ready(function(){initNavTree('_asm_stack_8hpp_source.html','');});
 <div class="line"><a name="l00013"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_stack_allocator.html">   13</a></span>&#160;<span class="keyword">class </span><a class="code" href="classblackbone_1_1_asm_stack_allocator.html">AsmStackAllocator</a></div>
 <div class="line"><a name="l00014"></a><span class="lineno">   14</span>&#160;{</div>
 <div class="line"><a name="l00015"></a><span class="lineno">   15</span>&#160;<span class="keyword">public</span>:</div>
-<div class="line"><a name="l00016"></a><span class="lineno">   16</span>&#160;    BLACKBONE_API <a class="code" href="classblackbone_1_1_asm_stack_allocator.html">AsmStackAllocator</a>( intptr_t baseval = 0x28 )</div>
-<div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;        : disp_ofst( <span class="keyword">sizeof</span>(<span class="keywordtype">size_t</span>) )</div>
-<div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160;    {</div>
-<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;<span class="preprocessor">#ifdef USE64</span></div>
-<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;        disp_ofst = baseval;</div>
-<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;        UNREFERENCED_PARAMETER( baseval );</div>
-<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160;    }</div>
-<div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160;</div>
-<div class="line"><a name="l00031"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_stack_allocator.html#aec31a99dcd41c2c5ec9d8b88d5b32731">   31</a></span>&#160;    BLACKBONE_API asmjit::host::Mem <a class="code" href="classblackbone_1_1_asm_stack_allocator.html#aec31a99dcd41c2c5ec9d8b88d5b32731">AllocVar</a>( intptr_t size )</div>
-<div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160;    {</div>
-<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;        <span class="comment">// Align on word length</span></div>
-<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;        size = Align( size, <span class="keyword">sizeof</span>(<span class="keywordtype">size_t</span>) );</div>
-<div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160;</div>
-<div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;<span class="preprocessor">#ifdef USE64</span></div>
-<div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;        <span class="keyword">auto</span> val = asmjit::host::Mem( asmjit::host::zsp, static_cast&lt;int32_t&gt;(disp_ofst), static_cast&lt;int32_t&gt;(size) );</div>
-<div class="line"><a name="l00038"></a><span class="lineno">   38</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00039"></a><span class="lineno">   39</span>&#160;        <span class="keyword">auto</span> val = asmjit::host::Mem( asmjit::host::zbp, -disp_ofst - size, size );</div>
-<div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160;        disp_ofst += size;</div>
-<div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;        <span class="keywordflow">return</span> val;</div>
-<div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160;    }</div>
-<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;</div>
-<div class="line"><a name="l00052"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_stack_allocator.html#a8480bc67ad18a20a33692854ae7d171a">   52</a></span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_asm_stack_allocator.html#a8480bc67ad18a20a33692854ae7d171a">AllocArray</a>( asmjit::host::Mem arr[], <span class="keywordtype">int</span> count, intptr_t size )</div>
-<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;    {</div>
-<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; count; i++)</div>
-<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;        {</div>
-<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;<span class="preprocessor">#ifdef USE64</span></div>
-<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;            arr[i] = asmjit::host::Mem( asmjit::host::zsp, static_cast&lt;int32_t&gt;(disp_ofst), static_cast&lt;int32_t&gt;(size) );</div>
-<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;<span class="preprocessor">#else</span></div>
-<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;            arr[i] = asmjit::host::Mem( asmjit::host::zbp, -disp_ofst - size, size );</div>
-<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;<span class="preprocessor">#endif</span></div>
-<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;            disp_ofst += size;</div>
-<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;        }</div>
-<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;</div>
-<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
-<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;    }</div>
-<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;</div>
-<div class="line"><a name="l00071"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_stack_allocator.html#a3186b81dfbc9c7b293326d2652cf49e2">   71</a></span>&#160;    BLACKBONE_API <span class="keyword">inline</span> intptr_t <a class="code" href="classblackbone_1_1_asm_stack_allocator.html#a3186b81dfbc9c7b293326d2652cf49e2">getTotalSize</a>()<span class="keyword"> const </span>{ <span class="keywordflow">return</span> disp_ofst; };</div>
-<div class="line"><a name="l00072"></a><span class="lineno">   72</span>&#160;</div>
-<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160;<span class="keyword">private</span>:</div>
-<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;    intptr_t disp_ofst;     <span class="comment">// Next variable stack offset</span></div>
-<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;};</div>
-<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;</div>
-<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;<span class="comment">//</span></div>
-<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;<span class="comment">//  Helpers</span></div>
+<div class="line"><a name="l00016"></a><span class="lineno">   16</span>&#160;    BLACKBONE_API <a class="code" href="classblackbone_1_1_asm_stack_allocator.html">AsmStackAllocator</a>( asmjit::X86Assembler* pAsm, intptr_t baseval = 0x28 )</div>
+<div class="line"><a name="l00017"></a><span class="lineno">   17</span>&#160;        : _pAsm( pAsm )</div>
+<div class="line"><a name="l00018"></a><span class="lineno">   18</span>&#160;        , disp_ofst( <span class="keyword">sizeof</span>(<span class="keywordtype">size_t</span>) )</div>
+<div class="line"><a name="l00019"></a><span class="lineno">   19</span>&#160;    {</div>
+<div class="line"><a name="l00020"></a><span class="lineno">   20</span>&#160;<span class="preprocessor">#ifdef USE64</span></div>
+<div class="line"><a name="l00021"></a><span class="lineno">   21</span>&#160;        disp_ofst = baseval;</div>
+<div class="line"><a name="l00022"></a><span class="lineno">   22</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00023"></a><span class="lineno">   23</span>&#160;        baseval = 0;</div>
+<div class="line"><a name="l00024"></a><span class="lineno">   24</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00025"></a><span class="lineno">   25</span>&#160;    }</div>
+<div class="line"><a name="l00026"></a><span class="lineno">   26</span>&#160;</div>
+<div class="line"><a name="l00032"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_stack_allocator.html#ab86c8da341691d21b5dff8b7773238da">   32</a></span>&#160;    BLACKBONE_API asmjit::Mem <a class="code" href="classblackbone_1_1_asm_stack_allocator.html#ab86c8da341691d21b5dff8b7773238da">AllocVar</a>( intptr_t size )</div>
+<div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;    {</div>
+<div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;        <span class="comment">// Align on word length</span></div>
+<div class="line"><a name="l00035"></a><span class="lineno">   35</span>&#160;        size = Align( size, <span class="keyword">sizeof</span>(<span class="keywordtype">size_t</span>) );</div>
+<div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;</div>
+<div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;<span class="preprocessor">#ifdef USE64</span></div>
+<div class="line"><a name="l00038"></a><span class="lineno">   38</span>&#160;        <span class="keyword">auto</span> val = asmjit::Mem( _pAsm-&gt;zsp, static_cast&lt;int32_t&gt;(disp_ofst), static_cast&lt;int32_t&gt;(size) );</div>
+<div class="line"><a name="l00039"></a><span class="lineno">   39</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00040"></a><span class="lineno">   40</span>&#160;        <span class="keyword">auto</span> val = asmjit::Mem( _pAsm-&gt;zbp, -disp_ofst - size, size );</div>
+<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;        disp_ofst += size;</div>
+<div class="line"><a name="l00043"></a><span class="lineno">   43</span>&#160;        <span class="keywordflow">return</span> val;</div>
+<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;    }</div>
+<div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;</div>
+<div class="line"><a name="l00053"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_stack_allocator.html#a2bc1696e16fc74916817c46b8cde2aed">   53</a></span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_asm_stack_allocator.html#a2bc1696e16fc74916817c46b8cde2aed">AllocArray</a>( asmjit::Mem arr[], <span class="keywordtype">int</span> count, intptr_t size )</div>
+<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;    {</div>
+<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;        <span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; count; i++)</div>
+<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;        {</div>
+<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;<span class="preprocessor">#ifdef USE64</span></div>
+<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;            arr[i] = asmjit::Mem( _pAsm-&gt;zsp, static_cast&lt;int32_t&gt;(disp_ofst), static_cast&lt;int32_t&gt;(size) );</div>
+<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;<span class="preprocessor">#else</span></div>
+<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;            arr[i] = asmjit::Mem( _pAsm-&gt;zbp, -disp_ofst - size, size );</div>
+<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;<span class="preprocessor">#endif</span></div>
+<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;            disp_ofst += size;</div>
+<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;        }</div>
+<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;</div>
+<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;        <span class="keywordflow">return</span> <span class="keyword">true</span>;</div>
+<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;    }</div>
+<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;</div>
+<div class="line"><a name="l00072"></a><span class="lineno"><a class="line" href="classblackbone_1_1_asm_stack_allocator.html#a3186b81dfbc9c7b293326d2652cf49e2">   72</a></span>&#160;    BLACKBONE_API <span class="keyword">inline</span> intptr_t <a class="code" href="classblackbone_1_1_asm_stack_allocator.html#a3186b81dfbc9c7b293326d2652cf49e2">getTotalSize</a>()<span class="keyword"> const </span>{ <span class="keywordflow">return</span> disp_ofst; };</div>
+<div class="line"><a name="l00073"></a><span class="lineno">   73</span>&#160;</div>
+<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;<span class="keyword">private</span>:</div>
+<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;    asmjit::X86Assembler* _pAsm;    <span class="comment">// Underlying assembler</span></div>
+<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;    intptr_t disp_ofst;             <span class="comment">// Next variable stack offset</span></div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;};</div>
+<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;</div>
 <div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;<span class="comment">//</span></div>
-<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;<span class="preprocessor">#define ALLOC_STACK_VAR(worker, name, type) asmjit::host::Mem name( worker.AllocVar( sizeof(type) ) );</span></div>
-<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;<span class="preprocessor">#define ALLOC_STACK_VAR_S(worker, name, size) asmjit::host::Mem name( worker.AllocVar( size ) );</span></div>
-<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;</div>
-<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;<span class="preprocessor">#define ALLOC_STACK_ARRAY(worker, name, type, count) \</span></div>
-<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;<span class="preprocessor">    asmjit::host::Mem name[count]; \</span></div>
-<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;<span class="preprocessor">    worker.AllocArray( name, count, sizeof(type) );</span></div>
-<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;</div>
-<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;}</div>
+<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;<span class="comment">//  Helpers</span></div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;<span class="comment">//</span></div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;<span class="preprocessor">#define ALLOC_STACK_VAR(worker, name, type) asmjit::Mem name( worker.AllocVar( sizeof(type) ) );</span></div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;<span class="preprocessor">#define ALLOC_STACK_VAR_S(worker, name, size) asmjit::Mem name( worker.AllocVar( size ) );</span></div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;</div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;<span class="preprocessor">#define ALLOC_STACK_ARRAY(worker, name, type, count) \</span></div>
+<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;<span class="preprocessor">    asmjit::Mem name[count]; \</span></div>
+<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;<span class="preprocessor">    worker.AllocArray( name, count, sizeof(type) );</span></div>
+<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;</div>
+<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;}</div>
+<div class="ttc" id="classblackbone_1_1_asm_stack_allocator_html_ab86c8da341691d21b5dff8b7773238da"><div class="ttname"><a href="classblackbone_1_1_asm_stack_allocator.html#ab86c8da341691d21b5dff8b7773238da">blackbone::AsmStackAllocator::AllocVar</a></div><div class="ttdeci">BLACKBONE_API asmjit::Mem AllocVar(intptr_t size)</div><div class="ttdoc">Allocate stack variable </div><div class="ttdef"><b>Definition:</b> AsmStack.hpp:32</div></div>
 <div class="ttc" id="classblackbone_1_1_asm_stack_allocator_html"><div class="ttname"><a href="classblackbone_1_1_asm_stack_allocator.html">blackbone::AsmStackAllocator</a></div><div class="ttdef"><b>Definition:</b> AsmStack.hpp:13</div></div>
-<div class="ttc" id="classblackbone_1_1_asm_stack_allocator_html_aec31a99dcd41c2c5ec9d8b88d5b32731"><div class="ttname"><a href="classblackbone_1_1_asm_stack_allocator.html#aec31a99dcd41c2c5ec9d8b88d5b32731">blackbone::AsmStackAllocator::AllocVar</a></div><div class="ttdeci">BLACKBONE_API asmjit::host::Mem AllocVar(intptr_t size)</div><div class="ttdoc">Allocate stack variable </div><div class="ttdef"><b>Definition:</b> AsmStack.hpp:31</div></div>
-<div class="ttc" id="classblackbone_1_1_asm_stack_allocator_html_a8480bc67ad18a20a33692854ae7d171a"><div class="ttname"><a href="classblackbone_1_1_asm_stack_allocator.html#a8480bc67ad18a20a33692854ae7d171a">blackbone::AsmStackAllocator::AllocArray</a></div><div class="ttdeci">BLACKBONE_API bool AllocArray(asmjit::host::Mem arr[], int count, intptr_t size)</div><div class="ttdoc">Allocate array of stack variables </div><div class="ttdef"><b>Definition:</b> AsmStack.hpp:52</div></div>
-<div class="ttc" id="classblackbone_1_1_asm_stack_allocator_html_a3186b81dfbc9c7b293326d2652cf49e2"><div class="ttname"><a href="classblackbone_1_1_asm_stack_allocator.html#a3186b81dfbc9c7b293326d2652cf49e2">blackbone::AsmStackAllocator::getTotalSize</a></div><div class="ttdeci">BLACKBONE_API intptr_t getTotalSize() const </div><div class="ttdoc">Get total size of all stack variables </div><div class="ttdef"><b>Definition:</b> AsmStack.hpp:71</div></div>
+<div class="ttc" id="classblackbone_1_1_asm_stack_allocator_html_a2bc1696e16fc74916817c46b8cde2aed"><div class="ttname"><a href="classblackbone_1_1_asm_stack_allocator.html#a2bc1696e16fc74916817c46b8cde2aed">blackbone::AsmStackAllocator::AllocArray</a></div><div class="ttdeci">BLACKBONE_API bool AllocArray(asmjit::Mem arr[], int count, intptr_t size)</div><div class="ttdoc">Allocate array of stack variables </div><div class="ttdef"><b>Definition:</b> AsmStack.hpp:53</div></div>
+<div class="ttc" id="classblackbone_1_1_asm_stack_allocator_html_a3186b81dfbc9c7b293326d2652cf49e2"><div class="ttname"><a href="classblackbone_1_1_asm_stack_allocator.html#a3186b81dfbc9c7b293326d2652cf49e2">blackbone::AsmStackAllocator::getTotalSize</a></div><div class="ttdeci">BLACKBONE_API intptr_t getTotalSize() const </div><div class="ttdoc">Get total size of all stack variables </div><div class="ttdef"><b>Definition:</b> AsmStack.hpp:72</div></div>
 <div class="ttc" id="namespaceblackbone_html"><div class="ttname"><a href="namespaceblackbone.html">blackbone</a></div><div class="ttdef"><b>Definition:</b> AsmHelper32.cpp:6</div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><a class="el" href="dir_aa9befc4bdfa617079e96718d920d9d2.html">Visual Studio 2013</a></li><li class="navelem"><a class="el" href="dir_9749fe1d1039c274ca5f4a0137bd5805.html">Projects</a></li><li class="navelem"><a class="el" href="dir_87d371cc6a3e9a1e307775a876c8e949.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_2dd5b37e3ce8f08186c1d7d6a8b43f79.html">src</a></li><li class="navelem"><a class="el" href="dir_c12349095ba230d0c7acc796e8f40ecd.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_f990e8a9658162c32ca42ba03f11ed76.html">Asm</a></li><li class="navelem"><b>AsmStack.hpp</b></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:47 for BlackBone by
+    <li class="navelem"><a class="el" href="dir_3d9ef8cac7bf1be0f1e18672d28fd269.html">visual studio 2013</a></li><li class="navelem"><a class="el" href="dir_5401094cee307be7b33997a47da28669.html">projects</a></li><li class="navelem"><a class="el" href="dir_0d6d72948ced51bdfd5fc8cf7033b913.html">blackbone</a></li><li class="navelem"><a class="el" href="dir_84cd6de3d65226a2f8718fdae009bf30.html">src</a></li><li class="navelem"><a class="el" href="dir_4dc82cc14ae072731c8b0e8bbd4f10c1.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_1e8052e19ffdd71c736d050c96b1892a.html">Asm</a></li><li class="navelem"><b>AsmStack.hpp</b></li>
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:40 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

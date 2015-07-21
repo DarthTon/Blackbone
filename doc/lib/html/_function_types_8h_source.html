@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.8"/>
-<title>BlackBone: C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Include/FunctionTypes.h Source File</title>
+<title>BlackBone: C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Include/FunctionTypes.h Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -273,126 +273,138 @@ $(document).ready(function(){initNavTree('_function_types_8h_source.html','');})
 <div class="line"><a name="l00167"></a><span class="lineno">  167</span>&#160;        IN ULONG    ProcessInformationLength </div>
 <div class="line"><a name="l00168"></a><span class="lineno">  168</span>&#160;    );</div>
 <div class="line"><a name="l00169"></a><span class="lineno">  169</span>&#160;</div>
-<div class="line"><a name="l00170"></a><span class="lineno">  170</span>&#160;<span class="comment">// RtlRbRemoveNode</span></div>
-<div class="line"><a name="l00171"></a><span class="lineno">  171</span>&#160;<span class="keyword">typedef</span> int (NTAPI* fnRtlRbRemoveNode)</div>
+<div class="line"><a name="l00170"></a><span class="lineno">  170</span>&#160;<span class="comment">// NtDuplicateObject</span></div>
+<div class="line"><a name="l00171"></a><span class="lineno">  171</span>&#160;<span class="keyword">typedef</span> NTSTATUS( NTAPI* fnNtDuplicateObject )</div>
 <div class="line"><a name="l00172"></a><span class="lineno">  172</span>&#160;    (</div>
-<div class="line"><a name="l00173"></a><span class="lineno">  173</span>&#160;        PRTL_RB_TREE        Tree,</div>
-<div class="line"><a name="l00174"></a><span class="lineno">  174</span>&#160;        PRTL_BALANCED_NODE  Node</div>
-<div class="line"><a name="l00175"></a><span class="lineno">  175</span>&#160;    );</div>
-<div class="line"><a name="l00176"></a><span class="lineno">  176</span>&#160;</div>
-<div class="line"><a name="l00177"></a><span class="lineno">  177</span>&#160;<span class="comment">// RtlUpcaseUnicodeChar</span></div>
-<div class="line"><a name="l00178"></a><span class="lineno">  178</span>&#160;<span class="keyword">typedef</span> WCHAR( NTAPI *fnRtlUpcaseUnicodeChar )</div>
-<div class="line"><a name="l00179"></a><span class="lineno">  179</span>&#160;    (</div>
-<div class="line"><a name="l00180"></a><span class="lineno">  180</span>&#160;        WCHAR chr</div>
-<div class="line"><a name="l00181"></a><span class="lineno">  181</span>&#160;    );</div>
-<div class="line"><a name="l00182"></a><span class="lineno">  182</span>&#160;</div>
-<div class="line"><a name="l00183"></a><span class="lineno">  183</span>&#160;<span class="comment">// RtlEncodeSystemPointer</span></div>
-<div class="line"><a name="l00184"></a><span class="lineno">  184</span>&#160;<span class="keyword">typedef</span> PVOID( NTAPI *fnRtlEncodeSystemPointer )</div>
-<div class="line"><a name="l00185"></a><span class="lineno">  185</span>&#160;    (</div>
-<div class="line"><a name="l00186"></a><span class="lineno">  186</span>&#160;        IN PVOID Pointer</div>
+<div class="line"><a name="l00173"></a><span class="lineno">  173</span>&#160;        IN HANDLE SourceProcessHandle,</div>
+<div class="line"><a name="l00174"></a><span class="lineno">  174</span>&#160;        IN HANDLE SourceHandle,</div>
+<div class="line"><a name="l00175"></a><span class="lineno">  175</span>&#160;        IN HANDLE TargetProcessHandle,</div>
+<div class="line"><a name="l00176"></a><span class="lineno">  176</span>&#160;        IN PHANDLE TargetHandle,</div>
+<div class="line"><a name="l00177"></a><span class="lineno">  177</span>&#160;        IN ACCESS_MASK DesiredAccess,</div>
+<div class="line"><a name="l00178"></a><span class="lineno">  178</span>&#160;        IN ULONG Attributes,</div>
+<div class="line"><a name="l00179"></a><span class="lineno">  179</span>&#160;        IN ULONG Options</div>
+<div class="line"><a name="l00180"></a><span class="lineno">  180</span>&#160;    );</div>
+<div class="line"><a name="l00181"></a><span class="lineno">  181</span>&#160;</div>
+<div class="line"><a name="l00182"></a><span class="lineno">  182</span>&#160;<span class="comment">// RtlRbRemoveNode</span></div>
+<div class="line"><a name="l00183"></a><span class="lineno">  183</span>&#160;<span class="keyword">typedef</span> int (NTAPI* fnRtlRbRemoveNode)</div>
+<div class="line"><a name="l00184"></a><span class="lineno">  184</span>&#160;    (</div>
+<div class="line"><a name="l00185"></a><span class="lineno">  185</span>&#160;        PRTL_RB_TREE        Tree,</div>
+<div class="line"><a name="l00186"></a><span class="lineno">  186</span>&#160;        PRTL_BALANCED_NODE  Node</div>
 <div class="line"><a name="l00187"></a><span class="lineno">  187</span>&#160;    );</div>
 <div class="line"><a name="l00188"></a><span class="lineno">  188</span>&#160;</div>
-<div class="line"><a name="l00189"></a><span class="lineno">  189</span>&#160;<span class="comment">// NtLoadDriver</span></div>
-<div class="line"><a name="l00190"></a><span class="lineno">  190</span>&#160;<span class="keyword">typedef</span> NTSTATUS( NTAPI* fnNtLoadDriver )</div>
+<div class="line"><a name="l00189"></a><span class="lineno">  189</span>&#160;<span class="comment">// RtlUpcaseUnicodeChar</span></div>
+<div class="line"><a name="l00190"></a><span class="lineno">  190</span>&#160;<span class="keyword">typedef</span> WCHAR( NTAPI *fnRtlUpcaseUnicodeChar )</div>
 <div class="line"><a name="l00191"></a><span class="lineno">  191</span>&#160;    (</div>
-<div class="line"><a name="l00192"></a><span class="lineno">  192</span>&#160;        IN PUNICODE_STRING path</div>
+<div class="line"><a name="l00192"></a><span class="lineno">  192</span>&#160;        WCHAR chr</div>
 <div class="line"><a name="l00193"></a><span class="lineno">  193</span>&#160;    );</div>
 <div class="line"><a name="l00194"></a><span class="lineno">  194</span>&#160;</div>
-<div class="line"><a name="l00195"></a><span class="lineno">  195</span>&#160;<span class="comment">// NtUnloadDriver</span></div>
-<div class="line"><a name="l00196"></a><span class="lineno">  196</span>&#160;<span class="keyword">typedef</span> NTSTATUS( NTAPI* fnNtUnloadDriver )</div>
+<div class="line"><a name="l00195"></a><span class="lineno">  195</span>&#160;<span class="comment">// RtlEncodeSystemPointer</span></div>
+<div class="line"><a name="l00196"></a><span class="lineno">  196</span>&#160;<span class="keyword">typedef</span> PVOID( NTAPI *fnRtlEncodeSystemPointer )</div>
 <div class="line"><a name="l00197"></a><span class="lineno">  197</span>&#160;    (</div>
-<div class="line"><a name="l00198"></a><span class="lineno">  198</span>&#160;        IN PUNICODE_STRING path</div>
+<div class="line"><a name="l00198"></a><span class="lineno">  198</span>&#160;        IN PVOID Pointer</div>
 <div class="line"><a name="l00199"></a><span class="lineno">  199</span>&#160;    );</div>
 <div class="line"><a name="l00200"></a><span class="lineno">  200</span>&#160;</div>
-<div class="line"><a name="l00201"></a><span class="lineno">  201</span>&#160;<span class="comment">// NtQuerySection</span></div>
-<div class="line"><a name="l00202"></a><span class="lineno">  202</span>&#160;<span class="keyword">typedef</span> DWORD( NTAPI* fnNtQuerySection )</div>
+<div class="line"><a name="l00201"></a><span class="lineno">  201</span>&#160;<span class="comment">// NtLoadDriver</span></div>
+<div class="line"><a name="l00202"></a><span class="lineno">  202</span>&#160;<span class="keyword">typedef</span> NTSTATUS( NTAPI* fnNtLoadDriver )</div>
 <div class="line"><a name="l00203"></a><span class="lineno">  203</span>&#160;    (</div>
-<div class="line"><a name="l00204"></a><span class="lineno">  204</span>&#160;        HANDLE hSection,</div>
-<div class="line"><a name="l00205"></a><span class="lineno">  205</span>&#160;        SECTION_INFORMATION_CLASS InfoClass, </div>
-<div class="line"><a name="l00206"></a><span class="lineno">  206</span>&#160;        PVOID Buffer, </div>
-<div class="line"><a name="l00207"></a><span class="lineno">  207</span>&#160;        ULONG BufferSize, </div>
-<div class="line"><a name="l00208"></a><span class="lineno">  208</span>&#160;        PULONG ReturnLength</div>
-<div class="line"><a name="l00209"></a><span class="lineno">  209</span>&#160;    );</div>
-<div class="line"><a name="l00210"></a><span class="lineno">  210</span>&#160;</div>
-<div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160;<span class="comment">// RtlCreateActivationContext</span></div>
-<div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160;<span class="keyword">typedef</span> NTSTATUS( NTAPI *fnRtlCreateActivationContext )</div>
-<div class="line"><a name="l00213"></a><span class="lineno">  213</span>&#160;    (</div>
-<div class="line"><a name="l00214"></a><span class="lineno">  214</span>&#160;        IN ULONG    Flags,</div>
-<div class="line"><a name="l00215"></a><span class="lineno">  215</span>&#160;        IN PACTCTXW ActivationContextData,</div>
-<div class="line"><a name="l00216"></a><span class="lineno">  216</span>&#160;        IN ULONG    ExtraBytes,</div>
-<div class="line"><a name="l00217"></a><span class="lineno">  217</span>&#160;        IN PVOID    NotificationRoutine,</div>
-<div class="line"><a name="l00218"></a><span class="lineno">  218</span>&#160;        IN PVOID    NotificationContext,</div>
-<div class="line"><a name="l00219"></a><span class="lineno">  219</span>&#160;        OUT PVOID*  ActCtx</div>
-<div class="line"><a name="l00220"></a><span class="lineno">  220</span>&#160;    );</div>
-<div class="line"><a name="l00221"></a><span class="lineno">  221</span>&#160;</div>
-<div class="line"><a name="l00222"></a><span class="lineno">  222</span>&#160;<span class="comment">// RtlInitUnicodeString</span></div>
-<div class="line"><a name="l00223"></a><span class="lineno">  223</span>&#160;<span class="keyword">typedef</span> decltype(&amp;RtlInitUnicodeString) fnRtlInitUnicodeString;</div>
-<div class="line"><a name="l00224"></a><span class="lineno">  224</span>&#160;</div>
-<div class="line"><a name="l00225"></a><span class="lineno">  225</span>&#160;<span class="comment">// RtlFreeUnicodeString</span></div>
-<div class="line"><a name="l00226"></a><span class="lineno">  226</span>&#160;typedef decltype(&amp;RtlFreeUnicodeString) fnRtlFreeUnicodeString;</div>
-<div class="line"><a name="l00227"></a><span class="lineno">  227</span>&#160;</div>
-<div class="line"><a name="l00228"></a><span class="lineno">  228</span>&#160;<span class="comment">// NtQuerySystemInformation</span></div>
-<div class="line"><a name="l00229"></a><span class="lineno">  229</span>&#160;typedef decltype(&amp;NtQuerySystemInformation) fnNtQuerySystemInformation;</div>
-<div class="line"><a name="l00230"></a><span class="lineno">  230</span>&#160;</div>
-<div class="line"><a name="l00231"></a><span class="lineno">  231</span>&#160;<span class="comment">// NtQueryInformationProcess</span></div>
-<div class="line"><a name="l00232"></a><span class="lineno">  232</span>&#160;typedef decltype(&amp;NtQueryInformationProcess) fnNtQueryInformationProcess;</div>
+<div class="line"><a name="l00204"></a><span class="lineno">  204</span>&#160;        IN PUNICODE_STRING path</div>
+<div class="line"><a name="l00205"></a><span class="lineno">  205</span>&#160;    );</div>
+<div class="line"><a name="l00206"></a><span class="lineno">  206</span>&#160;</div>
+<div class="line"><a name="l00207"></a><span class="lineno">  207</span>&#160;<span class="comment">// NtUnloadDriver</span></div>
+<div class="line"><a name="l00208"></a><span class="lineno">  208</span>&#160;<span class="keyword">typedef</span> NTSTATUS( NTAPI* fnNtUnloadDriver )</div>
+<div class="line"><a name="l00209"></a><span class="lineno">  209</span>&#160;    (</div>
+<div class="line"><a name="l00210"></a><span class="lineno">  210</span>&#160;        IN PUNICODE_STRING path</div>
+<div class="line"><a name="l00211"></a><span class="lineno">  211</span>&#160;    );</div>
+<div class="line"><a name="l00212"></a><span class="lineno">  212</span>&#160;</div>
+<div class="line"><a name="l00213"></a><span class="lineno">  213</span>&#160;<span class="comment">// NtQuerySection</span></div>
+<div class="line"><a name="l00214"></a><span class="lineno">  214</span>&#160;<span class="keyword">typedef</span> DWORD( NTAPI* fnNtQuerySection )</div>
+<div class="line"><a name="l00215"></a><span class="lineno">  215</span>&#160;    (</div>
+<div class="line"><a name="l00216"></a><span class="lineno">  216</span>&#160;        HANDLE hSection,</div>
+<div class="line"><a name="l00217"></a><span class="lineno">  217</span>&#160;        SECTION_INFORMATION_CLASS InfoClass, </div>
+<div class="line"><a name="l00218"></a><span class="lineno">  218</span>&#160;        PVOID Buffer, </div>
+<div class="line"><a name="l00219"></a><span class="lineno">  219</span>&#160;        ULONG BufferSize, </div>
+<div class="line"><a name="l00220"></a><span class="lineno">  220</span>&#160;        PULONG ReturnLength</div>
+<div class="line"><a name="l00221"></a><span class="lineno">  221</span>&#160;    );</div>
+<div class="line"><a name="l00222"></a><span class="lineno">  222</span>&#160;</div>
+<div class="line"><a name="l00223"></a><span class="lineno">  223</span>&#160;<span class="comment">// RtlCreateActivationContext</span></div>
+<div class="line"><a name="l00224"></a><span class="lineno">  224</span>&#160;<span class="keyword">typedef</span> NTSTATUS( NTAPI *fnRtlCreateActivationContext )</div>
+<div class="line"><a name="l00225"></a><span class="lineno">  225</span>&#160;    (</div>
+<div class="line"><a name="l00226"></a><span class="lineno">  226</span>&#160;        IN ULONG    Flags,</div>
+<div class="line"><a name="l00227"></a><span class="lineno">  227</span>&#160;        IN PACTCTXW ActivationContextData,</div>
+<div class="line"><a name="l00228"></a><span class="lineno">  228</span>&#160;        IN ULONG    ExtraBytes,</div>
+<div class="line"><a name="l00229"></a><span class="lineno">  229</span>&#160;        IN PVOID    NotificationRoutine,</div>
+<div class="line"><a name="l00230"></a><span class="lineno">  230</span>&#160;        IN PVOID    NotificationContext,</div>
+<div class="line"><a name="l00231"></a><span class="lineno">  231</span>&#160;        OUT PVOID*  ActCtx</div>
+<div class="line"><a name="l00232"></a><span class="lineno">  232</span>&#160;    );</div>
 <div class="line"><a name="l00233"></a><span class="lineno">  233</span>&#160;</div>
-<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;<span class="comment">// NtQueryInformationThread</span></div>
-<div class="line"><a name="l00235"></a><span class="lineno">  235</span>&#160;typedef decltype(&amp;NtQueryInformationThread) fnNtQueryInformationThread;</div>
+<div class="line"><a name="l00234"></a><span class="lineno">  234</span>&#160;<span class="comment">// RtlInitUnicodeString</span></div>
+<div class="line"><a name="l00235"></a><span class="lineno">  235</span>&#160;<span class="keyword">typedef</span> decltype(&amp;RtlInitUnicodeString) fnRtlInitUnicodeString;</div>
 <div class="line"><a name="l00236"></a><span class="lineno">  236</span>&#160;</div>
-<div class="line"><a name="l00237"></a><span class="lineno">  237</span>&#160;<span class="comment">// NtQueryObject</span></div>
-<div class="line"><a name="l00238"></a><span class="lineno">  238</span>&#160;typedef decltype(&amp;NtQueryObject) fnNtQueryObject;</div>
+<div class="line"><a name="l00237"></a><span class="lineno">  237</span>&#160;<span class="comment">// RtlFreeUnicodeString</span></div>
+<div class="line"><a name="l00238"></a><span class="lineno">  238</span>&#160;typedef decltype(&amp;RtlFreeUnicodeString) fnRtlFreeUnicodeString;</div>
 <div class="line"><a name="l00239"></a><span class="lineno">  239</span>&#160;</div>
-<div class="line"><a name="l00240"></a><span class="lineno">  240</span>&#160;<span class="comment">//</span></div>
-<div class="line"><a name="l00241"></a><span class="lineno">  241</span>&#160;<span class="comment">// GCC compatibility</span></div>
-<div class="line"><a name="l00242"></a><span class="lineno">  242</span>&#160;<span class="comment">//</span></div>
-<div class="line"><a name="l00243"></a><span class="lineno">  243</span>&#160;</div>
-<div class="line"><a name="l00244"></a><span class="lineno">  244</span>&#160;<span class="comment">// Wow64GetThreadContext</span></div>
-<div class="line"><a name="l00245"></a><span class="lineno">  245</span>&#160;typedef BOOL( __stdcall* fnWow64GetThreadContext )</div>
-<div class="line"><a name="l00246"></a><span class="lineno">  246</span>&#160;    (</div>
-<div class="line"><a name="l00247"></a><span class="lineno">  247</span>&#160;        HANDLE hThread,</div>
-<div class="line"><a name="l00248"></a><span class="lineno">  248</span>&#160;        PWOW64_CONTEXT lpContext</div>
-<div class="line"><a name="l00249"></a><span class="lineno">  249</span>&#160;    );</div>
-<div class="line"><a name="l00250"></a><span class="lineno">  250</span>&#160;</div>
-<div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160;<span class="comment">// Wow64SetThreadContext</span></div>
-<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;typedef BOOL( __stdcall* fnWow64SetThreadContext )</div>
-<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;    (</div>
-<div class="line"><a name="l00254"></a><span class="lineno">  254</span>&#160;        HANDLE hThread,</div>
-<div class="line"><a name="l00255"></a><span class="lineno">  255</span>&#160;        const WOW64_CONTEXT *lpContext</div>
-<div class="line"><a name="l00256"></a><span class="lineno">  256</span>&#160;    );</div>
-<div class="line"><a name="l00257"></a><span class="lineno">  257</span>&#160;</div>
-<div class="line"><a name="l00258"></a><span class="lineno">  258</span>&#160;<span class="comment">// Wow64SuspendThread</span></div>
-<div class="line"><a name="l00259"></a><span class="lineno">  259</span>&#160;typedef DWORD( __stdcall* fnWow64SuspendThread )</div>
-<div class="line"><a name="l00260"></a><span class="lineno">  260</span>&#160;    (</div>
-<div class="line"><a name="l00261"></a><span class="lineno">  261</span>&#160;        HANDLE hThread</div>
-<div class="line"><a name="l00262"></a><span class="lineno">  262</span>&#160;    );</div>
-<div class="line"><a name="l00263"></a><span class="lineno">  263</span>&#160;</div>
-<div class="line"><a name="l00264"></a><span class="lineno">  264</span>&#160;<span class="comment">// GetProcessDEPPolicy</span></div>
-<div class="line"><a name="l00265"></a><span class="lineno">  265</span>&#160;typedef BOOL( __stdcall* fnGetProcessDEPPolicy )</div>
-<div class="line"><a name="l00266"></a><span class="lineno">  266</span>&#160;    (</div>
-<div class="line"><a name="l00267"></a><span class="lineno">  267</span>&#160;        HANDLE  hProcess,</div>
-<div class="line"><a name="l00268"></a><span class="lineno">  268</span>&#160;        LPDWORD lpFlags,</div>
-<div class="line"><a name="l00269"></a><span class="lineno">  269</span>&#160;        PBOOL   lpPermanent</div>
-<div class="line"><a name="l00270"></a><span class="lineno">  270</span>&#160;    );</div>
-<div class="line"><a name="l00271"></a><span class="lineno">  271</span>&#160;</div>
-<div class="line"><a name="l00272"></a><span class="lineno">  272</span>&#160;<span class="comment">// QueryFullProcessImageNameW</span></div>
-<div class="line"><a name="l00273"></a><span class="lineno">  273</span>&#160;typedef BOOL( __stdcall* fnQueryFullProcessImageNameW)</div>
-<div class="line"><a name="l00274"></a><span class="lineno">  274</span>&#160;    (</div>
-<div class="line"><a name="l00275"></a><span class="lineno">  275</span>&#160;        HANDLE hProcess,</div>
-<div class="line"><a name="l00276"></a><span class="lineno">  276</span>&#160;        DWORD  dwFlags,</div>
-<div class="line"><a name="l00277"></a><span class="lineno">  277</span>&#160;        PWSTR  lpExeName,</div>
-<div class="line"><a name="l00278"></a><span class="lineno">  278</span>&#160;        PDWORD lpdwSize</div>
-<div class="line"><a name="l00279"></a><span class="lineno">  279</span>&#160;    );</div>
-<div class="line"><a name="l00280"></a><span class="lineno">  280</span>&#160;</div>
-<div class="line"><a name="l00281"></a><span class="lineno">  281</span>&#160;}</div>
+<div class="line"><a name="l00240"></a><span class="lineno">  240</span>&#160;<span class="comment">// NtQuerySystemInformation</span></div>
+<div class="line"><a name="l00241"></a><span class="lineno">  241</span>&#160;typedef decltype(&amp;NtQuerySystemInformation) fnNtQuerySystemInformation;</div>
+<div class="line"><a name="l00242"></a><span class="lineno">  242</span>&#160;</div>
+<div class="line"><a name="l00243"></a><span class="lineno">  243</span>&#160;<span class="comment">// NtQueryInformationProcess</span></div>
+<div class="line"><a name="l00244"></a><span class="lineno">  244</span>&#160;typedef decltype(&amp;NtQueryInformationProcess) fnNtQueryInformationProcess;</div>
+<div class="line"><a name="l00245"></a><span class="lineno">  245</span>&#160;</div>
+<div class="line"><a name="l00246"></a><span class="lineno">  246</span>&#160;<span class="comment">// NtQueryInformationThread</span></div>
+<div class="line"><a name="l00247"></a><span class="lineno">  247</span>&#160;typedef decltype(&amp;NtQueryInformationThread) fnNtQueryInformationThread;</div>
+<div class="line"><a name="l00248"></a><span class="lineno">  248</span>&#160;</div>
+<div class="line"><a name="l00249"></a><span class="lineno">  249</span>&#160;<span class="comment">// NtQueryObject</span></div>
+<div class="line"><a name="l00250"></a><span class="lineno">  250</span>&#160;typedef decltype(&amp;NtQueryObject) fnNtQueryObject;</div>
+<div class="line"><a name="l00251"></a><span class="lineno">  251</span>&#160;</div>
+<div class="line"><a name="l00252"></a><span class="lineno">  252</span>&#160;<span class="comment">//</span></div>
+<div class="line"><a name="l00253"></a><span class="lineno">  253</span>&#160;<span class="comment">// GCC compatibility</span></div>
+<div class="line"><a name="l00254"></a><span class="lineno">  254</span>&#160;<span class="comment">//</span></div>
+<div class="line"><a name="l00255"></a><span class="lineno">  255</span>&#160;</div>
+<div class="line"><a name="l00256"></a><span class="lineno">  256</span>&#160;<span class="comment">// Wow64GetThreadContext</span></div>
+<div class="line"><a name="l00257"></a><span class="lineno">  257</span>&#160;typedef BOOL( __stdcall* fnWow64GetThreadContext )</div>
+<div class="line"><a name="l00258"></a><span class="lineno">  258</span>&#160;    (</div>
+<div class="line"><a name="l00259"></a><span class="lineno">  259</span>&#160;        HANDLE hThread,</div>
+<div class="line"><a name="l00260"></a><span class="lineno">  260</span>&#160;        PWOW64_CONTEXT lpContext</div>
+<div class="line"><a name="l00261"></a><span class="lineno">  261</span>&#160;    );</div>
+<div class="line"><a name="l00262"></a><span class="lineno">  262</span>&#160;</div>
+<div class="line"><a name="l00263"></a><span class="lineno">  263</span>&#160;<span class="comment">// Wow64SetThreadContext</span></div>
+<div class="line"><a name="l00264"></a><span class="lineno">  264</span>&#160;typedef BOOL( __stdcall* fnWow64SetThreadContext )</div>
+<div class="line"><a name="l00265"></a><span class="lineno">  265</span>&#160;    (</div>
+<div class="line"><a name="l00266"></a><span class="lineno">  266</span>&#160;        HANDLE hThread,</div>
+<div class="line"><a name="l00267"></a><span class="lineno">  267</span>&#160;        const WOW64_CONTEXT *lpContext</div>
+<div class="line"><a name="l00268"></a><span class="lineno">  268</span>&#160;    );</div>
+<div class="line"><a name="l00269"></a><span class="lineno">  269</span>&#160;</div>
+<div class="line"><a name="l00270"></a><span class="lineno">  270</span>&#160;<span class="comment">// Wow64SuspendThread</span></div>
+<div class="line"><a name="l00271"></a><span class="lineno">  271</span>&#160;typedef DWORD( __stdcall* fnWow64SuspendThread )</div>
+<div class="line"><a name="l00272"></a><span class="lineno">  272</span>&#160;    (</div>
+<div class="line"><a name="l00273"></a><span class="lineno">  273</span>&#160;        HANDLE hThread</div>
+<div class="line"><a name="l00274"></a><span class="lineno">  274</span>&#160;    );</div>
+<div class="line"><a name="l00275"></a><span class="lineno">  275</span>&#160;</div>
+<div class="line"><a name="l00276"></a><span class="lineno">  276</span>&#160;<span class="comment">// GetProcessDEPPolicy</span></div>
+<div class="line"><a name="l00277"></a><span class="lineno">  277</span>&#160;typedef BOOL( __stdcall* fnGetProcessDEPPolicy )</div>
+<div class="line"><a name="l00278"></a><span class="lineno">  278</span>&#160;    (</div>
+<div class="line"><a name="l00279"></a><span class="lineno">  279</span>&#160;        HANDLE  hProcess,</div>
+<div class="line"><a name="l00280"></a><span class="lineno">  280</span>&#160;        LPDWORD lpFlags,</div>
+<div class="line"><a name="l00281"></a><span class="lineno">  281</span>&#160;        PBOOL   lpPermanent</div>
+<div class="line"><a name="l00282"></a><span class="lineno">  282</span>&#160;    );</div>
+<div class="line"><a name="l00283"></a><span class="lineno">  283</span>&#160;</div>
+<div class="line"><a name="l00284"></a><span class="lineno">  284</span>&#160;<span class="comment">// QueryFullProcessImageNameW</span></div>
+<div class="line"><a name="l00285"></a><span class="lineno">  285</span>&#160;typedef BOOL( __stdcall* fnQueryFullProcessImageNameW)</div>
+<div class="line"><a name="l00286"></a><span class="lineno">  286</span>&#160;    (</div>
+<div class="line"><a name="l00287"></a><span class="lineno">  287</span>&#160;        HANDLE hProcess,</div>
+<div class="line"><a name="l00288"></a><span class="lineno">  288</span>&#160;        DWORD  dwFlags,</div>
+<div class="line"><a name="l00289"></a><span class="lineno">  289</span>&#160;        PWSTR  lpExeName,</div>
+<div class="line"><a name="l00290"></a><span class="lineno">  290</span>&#160;        PDWORD lpdwSize</div>
+<div class="line"><a name="l00291"></a><span class="lineno">  291</span>&#160;    );</div>
+<div class="line"><a name="l00292"></a><span class="lineno">  292</span>&#160;</div>
+<div class="line"><a name="l00293"></a><span class="lineno">  293</span>&#160;}</div>
 <div class="ttc" id="namespaceblackbone_html"><div class="ttname"><a href="namespaceblackbone.html">blackbone</a></div><div class="ttdef"><b>Definition:</b> AsmHelper32.cpp:6</div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><a class="el" href="dir_aa9befc4bdfa617079e96718d920d9d2.html">Visual Studio 2013</a></li><li class="navelem"><a class="el" href="dir_9749fe1d1039c274ca5f4a0137bd5805.html">Projects</a></li><li class="navelem"><a class="el" href="dir_87d371cc6a3e9a1e307775a876c8e949.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_2dd5b37e3ce8f08186c1d7d6a8b43f79.html">src</a></li><li class="navelem"><a class="el" href="dir_c12349095ba230d0c7acc796e8f40ecd.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_19165c3bfbe81eb09b96ce8b49d2e60e.html">Include</a></li><li class="navelem"><b>FunctionTypes.h</b></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:47 for BlackBone by
+    <li class="navelem"><a class="el" href="dir_3d9ef8cac7bf1be0f1e18672d28fd269.html">visual studio 2013</a></li><li class="navelem"><a class="el" href="dir_5401094cee307be7b33997a47da28669.html">projects</a></li><li class="navelem"><a class="el" href="dir_0d6d72948ced51bdfd5fc8cf7033b913.html">blackbone</a></li><li class="navelem"><a class="el" href="dir_84cd6de3d65226a2f8718fdae009bf30.html">src</a></li><li class="navelem"><a class="el" href="dir_4dc82cc14ae072731c8b0e8bbd4f10c1.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_f2699b0f292c5ddf92db14b1eaadab0c.html">Include</a></li><li class="navelem"><b>FunctionTypes.h</b></li>
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:40 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

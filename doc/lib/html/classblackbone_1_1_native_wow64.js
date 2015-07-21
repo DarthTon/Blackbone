@@ -2,7 +2,7 @@ var classblackbone_1_1_native_wow64 =
 [
     [ "NativeWow64", "classblackbone_1_1_native_wow64.html#af81c2567debc3993b31199b698b8271c", null ],
     [ "~NativeWow64", "classblackbone_1_1_native_wow64.html#aa7350d4a1154f65ca9d6ec0c64e9b762", null ],
-    [ "CreateRemoteThreadT", "classblackbone_1_1_native_wow64.html#a75f14788475809b790964fd22127de24", null ],
+    [ "CreateRemoteThreadT", "classblackbone_1_1_native_wow64.html#a5f97c6a031fe6e7f8bba3db9f0db5b68", null ],
     [ "getPEB", "classblackbone_1_1_native_wow64.html#accf3965edd05977ad5c1876f6d28268a", null ],
     [ "getPEB", "classblackbone_1_1_native_wow64.html#af33e34710a5f63336229130f928264fc", null ],
     [ "getTEB", "classblackbone_1_1_native_wow64.html#ae6dae7bec3fb2465c95542cf53c50244", null ],

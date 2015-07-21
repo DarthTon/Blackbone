@@ -157,6 +157,9 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>Thread</b> (
 <tr class="memitem:a6413795d744c130dc809aacdfeb79f59"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#a6413795d744c130dc809aacdfeb79f59">Resume</a> ()</td></tr>
 <tr class="memdesc:a6413795d744c130dc809aacdfeb79f59"><td class="mdescLeft">&#160;</td><td class="mdescRight">Resumes thread.  <a href="#a6413795d744c130dc809aacdfeb79f59">More...</a><br /></td></tr>
 <tr class="separator:a6413795d744c130dc809aacdfeb79f59"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a93eae6391661208428c0666daf384feb"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#a93eae6391661208428c0666daf384feb">Suspended</a> ()</td></tr>
+<tr class="memdesc:a93eae6391661208428c0666daf384feb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if thread is suspended  <a href="#a93eae6391661208428c0666daf384feb">More...</a><br /></td></tr>
+<tr class="separator:a93eae6391661208428c0666daf384feb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7aaaa3b756073bef8f3cf60a48135f6f"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#a7aaaa3b756073bef8f3cf60a48135f6f">GetContext</a> (<a class="el" href="structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d_01_4.html">_CONTEXT32</a> &amp;ctx, DWORD flags=CONTEXT_ALL, bool dontSuspend=false)</td></tr>
 <tr class="memdesc:a7aaaa3b756073bef8f3cf60a48135f6f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get WOW64 thread context  <a href="#a7aaaa3b756073bef8f3cf60a48135f6f">More...</a><br /></td></tr>
 <tr class="separator:a7aaaa3b756073bef8f3cf60a48135f6f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -178,7 +181,7 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>Thread</b> (
 <tr class="memitem:af1354482f36ad2aaa14268cde2d07531"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API DWORD&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#af1354482f36ad2aaa14268cde2d07531">ExitCode</a> () const </td></tr>
 <tr class="memdesc:af1354482f36ad2aaa14268cde2d07531"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get thread exit code  <a href="#af1354482f36ad2aaa14268cde2d07531">More...</a><br /></td></tr>
 <tr class="separator:af1354482f36ad2aaa14268cde2d07531"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2febb3778bc35fcb75ee662f9fb7ff26"><td class="memItemLeft" align="right" valign="top">int BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#a2febb3778bc35fcb75ee662f9fb7ff26">AddHWBP</a> (ptr_t addr, HWBPType type, HWBPLength length)</td></tr>
+<tr class="memitem:a2febb3778bc35fcb75ee662f9fb7ff26"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API int&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#a2febb3778bc35fcb75ee662f9fb7ff26">AddHWBP</a> (ptr_t addr, HWBPType type, HWBPLength length)</td></tr>
 <tr class="memdesc:a2febb3778bc35fcb75ee662f9fb7ff26"><td class="mdescLeft">&#160;</td><td class="mdescRight">Add hardware breakpoint to thread  <a href="#a2febb3778bc35fcb75ee662f9fb7ff26">More...</a><br /></td></tr>
 <tr class="separator:a2febb3778bc35fcb75ee662f9fb7ff26"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9387b654fa0d75697964dac86a53d294"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#a9387b654fa0d75697964dac86a53d294">RemoveHWBP</a> (int idx)</td></tr>
@@ -187,9 +190,9 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>Thread</b> (
 <tr class="memitem:ab5c63c7e96d5382cbe35b86c8f36f8a1"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#ab5c63c7e96d5382cbe35b86c8f36f8a1">RemoveHWBP</a> (ptr_t ptr)</td></tr>
 <tr class="memdesc:ab5c63c7e96d5382cbe35b86c8f36f8a1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Remove existing hardware breakpoint  <a href="#ab5c63c7e96d5382cbe35b86c8f36f8a1">More...</a><br /></td></tr>
 <tr class="separator:ab5c63c7e96d5382cbe35b86c8f36f8a1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a518e8309b0d1e4bbb0bb48e62a083c2f"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#a518e8309b0d1e4bbb0bb48e62a083c2f">Close</a> ()</td></tr>
-<tr class="memdesc:a518e8309b0d1e4bbb0bb48e62a083c2f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Close handle  <a href="#a518e8309b0d1e4bbb0bb48e62a083c2f">More...</a><br /></td></tr>
-<tr class="separator:a518e8309b0d1e4bbb0bb48e62a083c2f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5b1a14f279326924b1c743425adb530f"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_thread.html#a5b1a14f279326924b1c743425adb530f">Close</a> ()</td></tr>
+<tr class="memdesc:a5b1a14f279326924b1c743425adb530f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Close handle  <a href="#a5b1a14f279326924b1c743425adb530f">More...</a><br /></td></tr>
+<tr class="separator:a5b1a14f279326924b1c743425adb530f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a41e36c37d36bdf3d0e466c7ec70baa23"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a41e36c37d36bdf3d0e466c7ec70baa23"></a>
 BLACKBONE_API bool&#160;</td><td class="memItemRight" valign="bottom"><b>operator==</b> (const <a class="el" href="classblackbone_1_1_thread.html">Thread</a> &amp;other)</td></tr>
 <tr class="separator:a41e36c37d36bdf3d0e466c7ec70baa23"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -243,12 +246,12 @@ BLACKBONE_API <a class="el" href="classblackbone_1_1_thread.html">Thread</a> &am
 
 </div>
 </div>
-<a class="anchor" id="a518e8309b0d1e4bbb0bb48e62a083c2f"></a>
+<a class="anchor" id="a5b1a14f279326924b1c743425adb530f"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">BLACKBONE_API void blackbone::Thread::Close </td>
+          <td class="memname">void blackbone::Thread::Close </td>
           <td>(</td>
           <td class="paramname"></td><td>)</td>
           <td></td>
@@ -635,6 +638,24 @@ BLACKBONE_API <a class="el" href="classblackbone_1_1_thread.html">Thread</a> &am
 
 </div>
 </div>
+<a class="anchor" id="a93eae6391661208428c0666daf384feb"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool blackbone::Thread::Suspended </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Check if thread is suspended </p>
+<dl class="section return"><dt>Returns</dt><dd>true if suspended</dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="a0c63255a3924db363107a840f7a0de20"></a>
 <div class="memitem">
 <div class="memproto">
@@ -763,8 +784,8 @@ BLACKBONE_API <a class="el" href="classblackbone_1_1_thread.html">Thread</a> &am
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/Threads/<a class="el" href="_thread_8h_source.html">Thread.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Process/Threads/Thread.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/Threads/<a class="el" href="_thread_8h_source.html">Thread.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Process/Threads/Thread.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -772,7 +793,7 @@ BLACKBONE_API <a class="el" href="classblackbone_1_1_thread.html">Thread</a> &am
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_thread.html">Thread</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

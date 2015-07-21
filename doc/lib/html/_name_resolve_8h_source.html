@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.8"/>
-<title>BlackBone: C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Misc/NameResolve.h Source File</title>
+<title>BlackBone: C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Misc/NameResolve.h Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -137,44 +137,46 @@ $(document).ready(function(){initNavTree('_name_resolve_8h_source.html','');});
 <div class="line"><a name="l00031"></a><span class="lineno">   31</span>&#160;</div>
 <div class="line"><a name="l00036"></a><span class="lineno">   36</span>&#160;    BLACKBONE_API <span class="keywordtype">bool</span> <a class="code" href="classblackbone_1_1_name_resolve.html#a0bc5c553573edaca0f5022924c09db53">Initialize</a>();</div>
 <div class="line"><a name="l00037"></a><span class="lineno">   37</span>&#160;</div>
-<div class="line"><a name="l00048"></a><span class="lineno">   48</span>&#160;    BLACKBONE_API NTSTATUS <a class="code" href="classblackbone_1_1_name_resolve.html#a70ab2bf31d8dbe0a6a7b694ab9908c84">ResolvePath</a>( std::wstring&amp; path,</div>
-<div class="line"><a name="l00049"></a><span class="lineno">   49</span>&#160;                                        <span class="keyword">const</span> std::wstring&amp; baseName, </div>
-<div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160;                                        <span class="keyword">const</span> std::wstring&amp; searchDir,</div>
-<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;                                        eResolveFlag flags,</div>
-<div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160;                                        DWORD procID, </div>
-<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;                                        HANDLE actx = INVALID_HANDLE_VALUE );</div>
-<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;</div>
-<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;    BLACKBONE_API NTSTATUS <a class="code" href="classblackbone_1_1_name_resolve.html#a05eb52151b3cd1b8a98017f406451906">ProbeSxSRedirect</a>( std::wstring&amp; path, HANDLE actx = INVALID_HANDLE_VALUE );</div>
-<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;</div>
-<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;<span class="keyword">private</span>:</div>
-<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;    <span class="comment">// Ensure singleton</span></div>
-<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;    <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>();</div>
-<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;    <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>( <span class="keyword">const</span> <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>&amp; ) = <span class="keyword">delete</span>;</div>
-<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;    <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>&amp; operator =( <span class="keyword">const</span> <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>&amp; ) = <span class="keyword">delete</span>;</div>
-<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;</div>
-<div class="line"><a name="l00074"></a><span class="lineno">   74</span>&#160;    std::wstring GetProcessDirectory( DWORD pid );</div>
-<div class="line"><a name="l00075"></a><span class="lineno">   75</span>&#160;</div>
-<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;    <span class="keyword">template</span>&lt;<span class="keyword">typename</span> T1, <span class="keyword">typename</span> T2, <span class="keyword">typename</span> T3, <span class="keyword">typename</span> T4&gt;</div>
-<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;    <span class="keywordtype">bool</span> InitializeP();</div>
-<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;</div>
-<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;<span class="keyword">private</span>:</div>
-<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;    mapApiSchema _apiSchema;    <span class="comment">// Api schema table</span></div>
-<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;};</div>
-<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;</div>
-<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;</div>
-<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;}</div>
+<div class="line"><a name="l00048"></a><span class="lineno">   48</span>&#160;    BLACKBONE_API NTSTATUS <a class="code" href="classblackbone_1_1_name_resolve.html#a70ab2bf31d8dbe0a6a7b694ab9908c84">ResolvePath</a>( </div>
+<div class="line"><a name="l00049"></a><span class="lineno">   49</span>&#160;        std::wstring&amp; path,</div>
+<div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160;        <span class="keyword">const</span> std::wstring&amp; baseName,</div>
+<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;        <span class="keyword">const</span> std::wstring&amp; searchDir,</div>
+<div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160;        eResolveFlag flags,</div>
+<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;        DWORD procID,</div>
+<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;        HANDLE actx = INVALID_HANDLE_VALUE</div>
+<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;        );</div>
+<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;</div>
+<div class="line"><a name="l00063"></a><span class="lineno">   63</span>&#160;    BLACKBONE_API NTSTATUS <a class="code" href="classblackbone_1_1_name_resolve.html#a05eb52151b3cd1b8a98017f406451906">ProbeSxSRedirect</a>( std::wstring&amp; path, HANDLE actx = INVALID_HANDLE_VALUE );</div>
+<div class="line"><a name="l00064"></a><span class="lineno">   64</span>&#160;</div>
+<div class="line"><a name="l00065"></a><span class="lineno">   65</span>&#160;<span class="keyword">private</span>:</div>
+<div class="line"><a name="l00066"></a><span class="lineno">   66</span>&#160;    <span class="comment">// Ensure singleton</span></div>
+<div class="line"><a name="l00067"></a><span class="lineno">   67</span>&#160;    <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>();</div>
+<div class="line"><a name="l00068"></a><span class="lineno">   68</span>&#160;    <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>( <span class="keyword">const</span> <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>&amp; ) = <span class="keyword">delete</span>;</div>
+<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;    <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>&amp; operator =( <span class="keyword">const</span> <a class="code" href="classblackbone_1_1_name_resolve.html">NameResolve</a>&amp; ) = <span class="keyword">delete</span>;</div>
+<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160;</div>
+<div class="line"><a name="l00076"></a><span class="lineno">   76</span>&#160;    std::wstring GetProcessDirectory( DWORD pid );</div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;</div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;    <span class="keyword">template</span>&lt;<span class="keyword">typename</span> T1, <span class="keyword">typename</span> T2, <span class="keyword">typename</span> T3, <span class="keyword">typename</span> T4&gt;</div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;    <span class="keywordtype">bool</span> InitializeP();</div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;</div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;<span class="keyword">private</span>:</div>
+<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;    mapApiSchema _apiSchema;    <span class="comment">// Api schema table</span></div>
+<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;};</div>
+<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;</div>
+<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;</div>
+<div class="line"><a name="l00090"></a><span class="lineno">   90</span>&#160;}</div>
 <div class="ttc" id="classblackbone_1_1_name_resolve_html_a0bc5c553573edaca0f5022924c09db53"><div class="ttname"><a href="classblackbone_1_1_name_resolve.html#a0bc5c553573edaca0f5022924c09db53">blackbone::NameResolve::Initialize</a></div><div class="ttdeci">BLACKBONE_API bool Initialize()</div><div class="ttdoc">Initialize api set map </div><div class="ttdef"><b>Definition:</b> NameResolve.cpp:38</div></div>
 <div class="ttc" id="classblackbone_1_1_name_resolve_html"><div class="ttname"><a href="classblackbone_1_1_name_resolve.html">blackbone::NameResolve</a></div><div class="ttdef"><b>Definition:</b> NameResolve.h:13</div></div>
-<div class="ttc" id="classblackbone_1_1_name_resolve_html_a05eb52151b3cd1b8a98017f406451906"><div class="ttname"><a href="classblackbone_1_1_name_resolve.html#a05eb52151b3cd1b8a98017f406451906">blackbone::NameResolve::ProbeSxSRedirect</a></div><div class="ttdeci">BLACKBONE_API NTSTATUS ProbeSxSRedirect(std::wstring &amp;path, HANDLE actx=INVALID_HANDLE_VALUE)</div><div class="ttdoc">Try SxS redirection </div><div class="ttdef"><b>Definition:</b> NameResolve.cpp:296</div></div>
+<div class="ttc" id="classblackbone_1_1_name_resolve_html_a05eb52151b3cd1b8a98017f406451906"><div class="ttname"><a href="classblackbone_1_1_name_resolve.html#a05eb52151b3cd1b8a98017f406451906">blackbone::NameResolve::ProbeSxSRedirect</a></div><div class="ttdeci">BLACKBONE_API NTSTATUS ProbeSxSRedirect(std::wstring &amp;path, HANDLE actx=INVALID_HANDLE_VALUE)</div><div class="ttdoc">Try SxS redirection </div><div class="ttdef"><b>Definition:</b> NameResolve.cpp:303</div></div>
 <div class="ttc" id="namespaceblackbone_html"><div class="ttname"><a href="namespaceblackbone.html">blackbone</a></div><div class="ttdef"><b>Definition:</b> AsmHelper32.cpp:6</div></div>
-<div class="ttc" id="classblackbone_1_1_name_resolve_html_a70ab2bf31d8dbe0a6a7b694ab9908c84"><div class="ttname"><a href="classblackbone_1_1_name_resolve.html#a70ab2bf31d8dbe0a6a7b694ab9908c84">blackbone::NameResolve::ResolvePath</a></div><div class="ttdeci">BLACKBONE_API NTSTATUS ResolvePath(std::wstring &amp;path, const std::wstring &amp;baseName, const std::wstring &amp;searchDir, eResolveFlag flags, DWORD procID, HANDLE actx=INVALID_HANDLE_VALUE)</div><div class="ttdoc">Resolve image path. </div><div class="ttdef"><b>Definition:</b> NameResolve.cpp:108</div></div>
+<div class="ttc" id="classblackbone_1_1_name_resolve_html_a70ab2bf31d8dbe0a6a7b694ab9908c84"><div class="ttname"><a href="classblackbone_1_1_name_resolve.html#a70ab2bf31d8dbe0a6a7b694ab9908c84">blackbone::NameResolve::ResolvePath</a></div><div class="ttdeci">BLACKBONE_API NTSTATUS ResolvePath(std::wstring &amp;path, const std::wstring &amp;baseName, const std::wstring &amp;searchDir, eResolveFlag flags, DWORD procID, HANDLE actx=INVALID_HANDLE_VALUE)</div><div class="ttdoc">Resolve image path. </div><div class="ttdef"><b>Definition:</b> NameResolve.cpp:110</div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><a class="el" href="dir_aa9befc4bdfa617079e96718d920d9d2.html">Visual Studio 2013</a></li><li class="navelem"><a class="el" href="dir_9749fe1d1039c274ca5f4a0137bd5805.html">Projects</a></li><li class="navelem"><a class="el" href="dir_87d371cc6a3e9a1e307775a876c8e949.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_2dd5b37e3ce8f08186c1d7d6a8b43f79.html">src</a></li><li class="navelem"><a class="el" href="dir_c12349095ba230d0c7acc796e8f40ecd.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_aa70893cb9a27556b3fe36703e93b6b9.html">Misc</a></li><li class="navelem"><b>NameResolve.h</b></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:47 for BlackBone by
+    <li class="navelem"><a class="el" href="dir_3d9ef8cac7bf1be0f1e18672d28fd269.html">visual studio 2013</a></li><li class="navelem"><a class="el" href="dir_5401094cee307be7b33997a47da28669.html">projects</a></li><li class="navelem"><a class="el" href="dir_0d6d72948ced51bdfd5fc8cf7033b913.html">blackbone</a></li><li class="navelem"><a class="el" href="dir_84cd6de3d65226a2f8718fdae009bf30.html">src</a></li><li class="navelem"><a class="el" href="dir_4dc82cc14ae072731c8b0e8bbd4f10c1.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_6a1f908d61e71845796849fffb4877b6.html">Misc</a></li><li class="navelem"><b>NameResolve.h</b></li>
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:40 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

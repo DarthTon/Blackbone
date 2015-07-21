@@ -140,17 +140,17 @@ Protected Member Functions</h2></td></tr>
 <tr class="memitem:a7c4a25f3ba08be0f02188acdfef933f7"><td class="memItemLeft" align="right" valign="top"><a class="anchor" id="a7c4a25f3ba08be0f02188acdfef933f7"></a>
 BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> (class <a class="el" href="classblackbone_1_1_process.html">Process</a> &amp;proc)</td></tr>
 <tr class="separator:a7c4a25f3ba08be0f02188acdfef933f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0c96ba19d4a173fdfac38f012adc4457"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_except.html#a0c96ba19d4a173fdfac38f012adc4457">CreateVEH</a> (size_t pTargetBase, size_t imageSize, eModType mt=mt_default)</td></tr>
-<tr class="memdesc:a0c96ba19d4a173fdfac38f012adc4457"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inject VEH wrapper into process Used to enable execution of SEH handlers out of image  <a href="#a0c96ba19d4a173fdfac38f012adc4457">More...</a><br /></td></tr>
-<tr class="separator:a0c96ba19d4a173fdfac38f012adc4457"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5eb68badd0870990cb592946dd2848fb"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_except.html#a5eb68badd0870990cb592946dd2848fb">RemoveVEH</a> ()</td></tr>
-<tr class="memdesc:a5eb68badd0870990cb592946dd2848fb"><td class="mdescLeft">&#160;</td><td class="mdescRight">Removes VEH from target process  <a href="#a5eb68badd0870990cb592946dd2848fb">More...</a><br /></td></tr>
-<tr class="separator:a5eb68badd0870990cb592946dd2848fb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a04078066ff12003a28758705d67156b4"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_except.html#a04078066ff12003a28758705d67156b4">CreateVEH</a> (size_t pTargetBase, size_t imageSize, eModType mt, bool partial)</td></tr>
+<tr class="memdesc:a04078066ff12003a28758705d67156b4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Inject VEH wrapper into process Used to enable execution of SEH handlers out of image  <a href="#a04078066ff12003a28758705d67156b4">More...</a><br /></td></tr>
+<tr class="separator:a04078066ff12003a28758705d67156b4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2aca07f204a9d581938632bcad73a46c"><td class="memItemLeft" align="right" valign="top">BLACKBONE_API NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_m_except.html#a2aca07f204a9d581938632bcad73a46c">RemoveVEH</a> (bool partial)</td></tr>
+<tr class="memdesc:a2aca07f204a9d581938632bcad73a46c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Removes VEH from target process  <a href="#a2aca07f204a9d581938632bcad73a46c">More...</a><br /></td></tr>
+<tr class="separator:a2aca07f204a9d581938632bcad73a46c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Exception handling support for arbitrary code </p>
 </div><h2 class="groupheader">Member Function Documentation</h2>
-<a class="anchor" id="a0c96ba19d4a173fdfac38f012adc4457"></a>
+<a class="anchor" id="a04078066ff12003a28758705d67156b4"></a>
 <div class="memitem">
 <div class="memproto">
 <table class="mlabels">
@@ -173,7 +173,13 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> 
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">eModType&#160;</td>
-          <td class="paramname"><em>mt</em> = <code>mt_default</code>&#160;</td>
+          <td class="paramname"><em>mt</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>partial</em>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -193,6 +199,8 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> 
   <table class="params">
     <tr><td class="paramname">pTargetBase</td><td>Target image base address</td></tr>
     <tr><td class="paramname">imageSize</td><td>Size of the image</td></tr>
+    <tr><td class="paramname">mt</td><td>Mosule type</td></tr>
+    <tr><td class="paramname">partial</td><td>Partial exception support</td></tr>
   </table>
   </dd>
 </dl>
@@ -200,7 +208,7 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> 
 
 </div>
 </div>
-<a class="anchor" id="a5eb68badd0870990cb592946dd2848fb"></a>
+<a class="anchor" id="a2aca07f204a9d581938632bcad73a46c"></a>
 <div class="memitem">
 <div class="memproto">
 <table class="mlabels">
@@ -210,7 +218,8 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> 
         <tr>
           <td class="memname">NTSTATUS blackbone::MExcept::RemoveVEH </td>
           <td>(</td>
-          <td class="paramname"></td><td>)</td>
+          <td class="paramtype">bool&#160;</td>
+          <td class="paramname"><em>partial</em></td><td>)</td>
           <td></td>
         </tr>
       </table>
@@ -222,13 +231,19 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> 
 </div><div class="memdoc">
 
 <p>Removes VEH from target process </p>
-<dl class="section return"><dt>Returns</dt><dd></dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">partial</td><td>Partial exception support</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
 
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/ManualMap/<a class="el" href="_m_except_8h_source.html">MExcept.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/ManualMap/MExcept.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/ManualMap/<a class="el" href="_m_except_8h_source.html">MExcept.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/ManualMap/MExcept.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -236,7 +251,7 @@ BLACKBONE_API&#160;</td><td class="memItemRight" valign="bottom"><b>MExcept</b> 
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_m_except.html">MExcept</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

@@ -122,6 +122,14 @@ Static Public Member Functions</h2></td></tr>
 <tr class="memitem:a99d32f5e00e2db8572ab8581f47b66a7"><td class="memTemplItemLeft" align="right" valign="top">static T&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_dyn_import.html#a99d32f5e00e2db8572ab8581f47b66a7">get</a> (const std::string &amp;name)</td></tr>
 <tr class="memdesc:a99d32f5e00e2db8572ab8581f47b66a7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get dll function  <a href="#a99d32f5e00e2db8572ab8581f47b66a7">More...</a><br /></td></tr>
 <tr class="separator:a99d32f5e00e2db8572ab8581f47b66a7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3158c11a3449ec9efeba49615621caef"><td class="memTemplParams" colspan="2">template&lt;typename T , typename... Args&gt; </td></tr>
+<tr class="memitem:a3158c11a3449ec9efeba49615621caef"><td class="memTemplItemLeft" align="right" valign="top">static NTSTATUS&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_dyn_import.html#a3158c11a3449ec9efeba49615621caef">safeNativeCall</a> (const std::string &amp;name, Args...args)</td></tr>
+<tr class="memdesc:a3158c11a3449ec9efeba49615621caef"><td class="mdescLeft">&#160;</td><td class="mdescRight">Safely call import If import not found - return STATUS_ORDINAL_NOT_FOUND  <a href="#a3158c11a3449ec9efeba49615621caef">More...</a><br /></td></tr>
+<tr class="separator:a3158c11a3449ec9efeba49615621caef"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af7de42610399315b0fae5e85e8c785c3"><td class="memTemplParams" colspan="2">template&lt;typename T , typename... Args&gt; </td></tr>
+<tr class="memitem:af7de42610399315b0fae5e85e8c785c3"><td class="memTemplItemLeft" align="right" valign="top">static auto&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_dyn_import.html#af7de42610399315b0fae5e85e8c785c3">safeCall</a> (const std::string &amp;name, Args...args) -&gt; typename std::result_of&lt; T(Args...)&gt;::type</td></tr>
+<tr class="memdesc:af7de42610399315b0fae5e85e8c785c3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Safely call import If import not found - return 0  <a href="#af7de42610399315b0fae5e85e8c785c3">More...</a><br /></td></tr>
+<tr class="separator:af7de42610399315b0fae5e85e8c785c3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5c8648b176cf7a2ec1054754451106bc"><td class="memItemLeft" align="right" valign="top">static BLACKBONE_API FARPROC&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_dyn_import.html#a5c8648b176cf7a2ec1054754451106bc">load</a> (const std::string &amp;name, const std::wstring &amp;module)</td></tr>
 <tr class="memdesc:a5c8648b176cf7a2ec1054754451106bc"><td class="mdescLeft">&#160;</td><td class="mdescRight">Load function into database  <a href="#a5c8648b176cf7a2ec1054754451106bc">More...</a><br /></td></tr>
 <tr class="separator:a5c8648b176cf7a2ec1054754451106bc"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -255,9 +263,102 @@ template&lt;typename T &gt; </div>
 
 </div>
 </div>
+<a class="anchor" id="af7de42610399315b0fae5e85e8c785c3"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T , typename... Args&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static auto blackbone::DynImport::safeCall </td>
+          <td>(</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>name</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Args...&#160;</td>
+          <td class="paramname"><em>args</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td> -&gt; typename std::result_of&lt;T(Args...)&gt;::type
+    </td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Safely call import If import not found - return 0 </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">name</td><td>Import name.</td></tr>
+    <tr><td class="paramname">...args</td><td>Function args</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Function result or 0 if import not found</dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="a3158c11a3449ec9efeba49615621caef"></a>
+<div class="memitem">
+<div class="memproto">
+<div class="memtemplate">
+template&lt;typename T , typename... Args&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">static NTSTATUS blackbone::DynImport::safeNativeCall </td>
+          <td>(</td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>name</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">Args...&#160;</td>
+          <td class="paramname"><em>args</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span><span class="mlabel">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+<p>Safely call import If import not found - return STATUS_ORDINAL_NOT_FOUND </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">name</td><td>Import name.</td></tr>
+    <tr><td class="paramname">...args</td><td>Function args</td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Function result or STATUS_ORDINAL_NOT_FOUND if import not found</dd></dl>
+
+</div>
+</div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Misc/<a class="el" href="_dyn_import_8h_source.html">DynImport.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Misc/DynImport.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Misc/<a class="el" href="_dyn_import_8h_source.html">DynImport.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Misc/DynImport.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -265,7 +366,7 @@ template&lt;typename T &gt; </div>
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_dyn_import.html">DynImport</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:48 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:41 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

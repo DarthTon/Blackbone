@@ -164,9 +164,9 @@ BLACKBONE_API const <a class="el" href="structblackbone_1_1_wow64_barrier.html">
 <tr class="memitem:acfbd6de3899317d74bb398154e6dd9b8"><td class="memItemLeft" align="right" valign="top">virtual NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_native.html#acfbd6de3899317d74bb398154e6dd9b8">SetProcessInfoT</a> (PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize)</td></tr>
 <tr class="memdesc:acfbd6de3899317d74bb398154e6dd9b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Call NtSetInformationProcess for underlying process  <a href="#acfbd6de3899317d74bb398154e6dd9b8">More...</a><br /></td></tr>
 <tr class="separator:acfbd6de3899317d74bb398154e6dd9b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1289dbadd0f7a06bc46585128a1c8475"><td class="memItemLeft" align="right" valign="top">virtual NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_native.html#a1289dbadd0f7a06bc46585128a1c8475">CreateRemoteThreadT</a> (HANDLE &amp;hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags)</td></tr>
-<tr class="memdesc:a1289dbadd0f7a06bc46585128a1c8475"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates new thread in the remote process  <a href="#a1289dbadd0f7a06bc46585128a1c8475">More...</a><br /></td></tr>
-<tr class="separator:a1289dbadd0f7a06bc46585128a1c8475"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a405f822c8bc116ecb3cc37d1fd465b15"><td class="memItemLeft" align="right" valign="top">virtual NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_native.html#a405f822c8bc116ecb3cc37d1fd465b15">CreateRemoteThreadT</a> (HANDLE &amp;hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access=THREAD_ALL_ACCESS)</td></tr>
+<tr class="memdesc:a405f822c8bc116ecb3cc37d1fd465b15"><td class="mdescLeft">&#160;</td><td class="mdescRight">Creates new thread in the remote process  <a href="#a405f822c8bc116ecb3cc37d1fd465b15">More...</a><br /></td></tr>
+<tr class="separator:a405f822c8bc116ecb3cc37d1fd465b15"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a76e92ea37173f6665e1f45df8d45a641"><td class="memItemLeft" align="right" valign="top">virtual NTSTATUS&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classblackbone_1_1_native.html#a76e92ea37173f6665e1f45df8d45a641">GetThreadContextT</a> (HANDLE hThread, <a class="el" href="structblackbone_1_1___c_o_n_t_e_x_t___t_3_01_d_w_o_r_d64_01_4.html">_CONTEXT64</a> &amp;ctx)</td></tr>
 <tr class="memdesc:a76e92ea37173f6665e1f45df8d45a641"><td class="mdescLeft">&#160;</td><td class="mdescRight">Get native thread context  <a href="#a76e92ea37173f6665e1f45df8d45a641">More...</a><br /></td></tr>
 <tr class="separator:a76e92ea37173f6665e1f45df8d45a641"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -220,7 +220,7 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
 <tr class="separator:ab76b23a45e1243f784d0f6ea1978443a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Member Function Documentation</h2>
-<a class="anchor" id="a1289dbadd0f7a06bc46585128a1c8475"></a>
+<a class="anchor" id="a405f822c8bc116ecb3cc37d1fd465b15"></a>
 <div class="memitem">
 <div class="memproto">
 <table class="mlabels">
@@ -249,7 +249,13 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
           <td class="paramkey"></td>
           <td></td>
           <td class="paramtype">CreateThreadFlags&#160;</td>
-          <td class="paramname"><em>flags</em>&#160;</td>
+          <td class="paramname"><em>flags</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">DWORD&#160;</td>
+          <td class="paramname"><em>access</em> = <code>THREAD_ALL_ACCESS</code>&#160;</td>
         </tr>
         <tr>
           <td></td>
@@ -271,12 +277,13 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
     <tr><td class="paramname">entry</td><td><a class="el" href="classblackbone_1_1_thread.html" title="Thread management ">Thread</a> entry point</td></tr>
     <tr><td class="paramname">arg</td><td><a class="el" href="classblackbone_1_1_thread.html" title="Thread management ">Thread</a> argument</td></tr>
     <tr><td class="paramname">flags</td><td>Creation flags</td></tr>
+    <tr><td class="paramname">access</td><td>Access override</td></tr>
   </table>
   </dd>
 </dl>
 <dl class="section return"><dt>Returns</dt><dd>Status code</dd></dl>
 
-<p>Reimplemented in <a class="el" href="classblackbone_1_1_native_wow64.html#a75f14788475809b790964fd22127de24">blackbone::NativeWow64</a>.</p>
+<p>Reimplemented in <a class="el" href="classblackbone_1_1_native_wow64.html#a5f97c6a031fe6e7f8bba3db9f0db5b68">blackbone::NativeWow64</a>.</p>
 
 </div>
 </div>
@@ -1284,8 +1291,8 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
 </div>
 </div>
 <hr/>The documentation for this class was generated from the following files:<ul>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Subsystem/<a class="el" href="_native_subsystem_8h_source.html">NativeSubsystem.h</a></li>
-<li>C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Subsystem/NativeSubsystem.cpp</li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Subsystem/<a class="el" href="_native_subsystem_8h_source.html">NativeSubsystem.h</a></li>
+<li>C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Subsystem/NativeSubsystem.cpp</li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
@@ -1293,7 +1300,7 @@ uint32_t&#160;</td><td class="memItemRight" valign="bottom"><b>_pageSize</b></td
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><b>blackbone</b></li><li class="navelem"><a class="el" href="classblackbone_1_1_native.html">Native</a></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:49 for BlackBone by
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:42 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>

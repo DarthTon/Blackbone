@@ -1,9 +1,12 @@
 var searchData=
 [
+  ['safecall',['safeCall',['../classblackbone_1_1_dyn_import.html#af7de42610399315b0fae5e85e8c785c3',1,'blackbone::DynImport']]],
+  ['safenativecall',['safeNativeCall',['../classblackbone_1_1_dyn_import.html#a3158c11a3449ec9efeba49615621caef',1,'blackbone::DynImport']]],
   ['saveretvalandsignalevent',['SaveRetValAndSignalEvent',['../classblackbone_1_1_asm_helper32.html#ae9794692a3f492d6c22eb52d4c317340',1,'blackbone::AsmHelper32::SaveRetValAndSignalEvent()'],['../classblackbone_1_1_asm_helper64.html#a2aaed7cb0a7d58c0ad4f4a6ad14c32a3',1,'blackbone::AsmHelper64::SaveRetValAndSignalEvent()']]],
   ['search',['Search',['../classblackbone_1_1_pattern_search.html#a30c1827fa43d3048e8502672e87a672d',1,'blackbone::PatternSearch::Search(uint8_t wildcard, void *scanStart, size_t scanSize, std::vector&lt; ptr_t &gt; &amp;out, ptr_t value_offset=0)'],['../classblackbone_1_1_pattern_search.html#a65a3674bd07294494b3cb7598f285e17',1,'blackbone::PatternSearch::Search(void *scanStart, size_t scanSize, std::vector&lt; ptr_t &gt; &amp;out, ptr_t value_offset=0)']]],
   ['searchremote',['SearchRemote',['../classblackbone_1_1_pattern_search.html#a2b6a4140441bb31c2cde699c62b547d0',1,'blackbone::PatternSearch::SearchRemote(class Process &amp;remote, uint8_t wildcard, ptr_t scanStart, size_t scanSize, std::vector&lt; ptr_t &gt; &amp;out)'],['../classblackbone_1_1_pattern_search.html#ac928700c7abcb392317ba6a8159b964c',1,'blackbone::PatternSearch::SearchRemote(class Process &amp;remote, ptr_t scanStart, size_t scanSize, std::vector&lt; ptr_t &gt; &amp;out)']]],
   ['searchremotewhole',['SearchRemoteWhole',['../classblackbone_1_1_pattern_search.html#a6a028b97489a74dbfe8fbb74c3344593',1,'blackbone::PatternSearch']]],
+  ['sectioninfo',['SectionInfo',['../structblackbone_1_1_section_info.html',1,'blackbone']]],
   ['sections',['sections',['../classblackbone_1_1pe_1_1_p_e_image.html#ac51372bae8256c57dc0095c14dec8b57',1,'blackbone::pe::PEImage']]],
   ['setarg',['setArg',['../classblackbone_1_1_remote_context.html#aee4bbea8396cd415434f4b0ab7287b5c',1,'blackbone::RemoteContext']]],
   ['setcontext',['SetContext',['../classblackbone_1_1_thread.html#ae642deffa190011d0e374b4a0fef3b12',1,'blackbone::Thread::SetContext(_CONTEXT32 &amp;ctx, bool dontSuspend=false)'],['../classblackbone_1_1_thread.html#ae24be5c07b7636845d005683b1bc131a',1,'blackbone::Thread::SetContext(_CONTEXT64 &amp;ctx, bool dontSuspend=false)']]],
@@ -19,6 +22,7 @@ var searchData=
   ['strippath',['StripPath',['../classblackbone_1_1_utils.html#a990e1ab3abe7ec42613bb307a4481f0f',1,'blackbone::Utils']]],
   ['subsystem',['subsystem',['../classblackbone_1_1pe_1_1_p_e_image.html#a579c668fb8a5fd09e69fa88f150ca4f4',1,'blackbone::pe::PEImage']]],
   ['suspend',['Suspend',['../classblackbone_1_1_thread.html#a8ea1bf47f857456c6132a0d729f50330',1,'blackbone::Thread']]],
+  ['suspended',['Suspended',['../classblackbone_1_1_thread.html#a93eae6391661208428c0666daf384feb',1,'blackbone::Thread']]],
   ['switchto64',['SwitchTo64',['../classblackbone_1_1_asm_helper_base.html#af9a4c51c6bbe88f4d74020cc833f7ddd',1,'blackbone::AsmHelperBase']]],
   ['switchto86',['SwitchTo86',['../classblackbone_1_1_asm_helper_base.html#abcaa030cb4eb64150c01fec26c96161b',1,'blackbone::AsmHelperBase']]]
 ];

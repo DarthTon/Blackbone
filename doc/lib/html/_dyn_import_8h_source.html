@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.8"/>
-<title>BlackBone: C:/Users/Ton/Documents/Visual Studio 2013/Projects/BlackBone/src/BlackBone/Misc/DynImport.h Source File</title>
+<title>BlackBone: C:/Users/Ton/Documents/visual studio 2013/projects/blackbone/src/BlackBone/Misc/DynImport.h Source File</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -130,31 +130,49 @@ $(document).ready(function(){initNavTree('_dyn_import_8h_source.html','');});
 <div class="line"><a name="l00032"></a><span class="lineno">   32</span>&#160;        <span class="keywordflow">return</span> <span class="keyword">nullptr</span>;</div>
 <div class="line"><a name="l00033"></a><span class="lineno">   33</span>&#160;    }</div>
 <div class="line"><a name="l00034"></a><span class="lineno">   34</span>&#160;</div>
-<div class="line"><a name="l00041"></a><span class="lineno">   41</span>&#160;    BLACKBONE_API <span class="keyword">static</span> FARPROC <a class="code" href="classblackbone_1_1_dyn_import.html#a5c8648b176cf7a2ec1054754451106bc">load</a>( <span class="keyword">const</span> std::string&amp; name, <span class="keyword">const</span> std::wstring&amp; module );</div>
-<div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;</div>
-<div class="line"><a name="l00049"></a><span class="lineno">   49</span>&#160;    BLACKBONE_API <span class="keyword">static</span> FARPROC <a class="code" href="classblackbone_1_1_dyn_import.html#a5c8648b176cf7a2ec1054754451106bc">load</a>( <span class="keyword">const</span> std::string&amp; name, HMODULE hMod );</div>
-<div class="line"><a name="l00050"></a><span class="lineno">   50</span>&#160;</div>
-<div class="line"><a name="l00051"></a><span class="lineno">   51</span>&#160;<span class="keyword">private</span>:</div>
-<div class="line"><a name="l00052"></a><span class="lineno">   52</span>&#160;    BLACKBONE_API <span class="keyword">static</span> std::unordered_map&lt;std::string, FARPROC&gt; _funcs;     <span class="comment">// function database</span></div>
-<div class="line"><a name="l00053"></a><span class="lineno">   53</span>&#160;    BLACKBONE_API <span class="keyword">static</span> <a class="code" href="classblackbone_1_1_critical_section.html">CriticalSection</a> _mapGuard;                           <span class="comment">// function database guard</span></div>
-<div class="line"><a name="l00054"></a><span class="lineno">   54</span>&#160;};</div>
-<div class="line"><a name="l00055"></a><span class="lineno">   55</span>&#160;</div>
-<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;<span class="comment">// Syntax sugar</span></div>
-<div class="line"><a name="l00057"></a><span class="lineno">   57</span>&#160;<span class="preprocessor">#define GET_IMPORT(name) (DynImport::get&lt;fn ## name&gt;( #name ))</span></div>
-<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;</div>
-<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;}</div>
-<div class="ttc" id="classblackbone_1_1_c_s_lock_html"><div class="ttname"><a href="classblackbone_1_1_c_s_lock.html">blackbone::CSLock</a></div><div class="ttdoc">std::lock_guard alternative </div><div class="ttdef"><b>Definition:</b> Utils.h:126</div></div>
+<div class="line"><a name="l00042"></a><span class="lineno">   42</span>&#160;    <span class="keyword">template</span>&lt;<span class="keyword">typename</span> T, <span class="keyword">typename</span>... Args&gt;</div>
+<div class="line"><a name="l00043"></a><span class="lineno"><a class="line" href="classblackbone_1_1_dyn_import.html#a3158c11a3449ec9efeba49615621caef">   43</a></span>&#160;    <span class="keyword">inline</span> <span class="keyword">static</span> NTSTATUS <a class="code" href="classblackbone_1_1_dyn_import.html#a3158c11a3449ec9efeba49615621caef">safeNativeCall</a>( <span class="keyword">const</span> std::string&amp; name, Args... args )</div>
+<div class="line"><a name="l00044"></a><span class="lineno">   44</span>&#160;    {</div>
+<div class="line"><a name="l00045"></a><span class="lineno">   45</span>&#160;        <span class="keyword">auto</span> pfn = DynImport::get&lt;T&gt;( name );</div>
+<div class="line"><a name="l00046"></a><span class="lineno">   46</span>&#160;        <span class="keywordflow">return</span> pfn ? pfn( std::forward&lt;Args&gt;( args )... ) : STATUS_ORDINAL_NOT_FOUND;</div>
+<div class="line"><a name="l00047"></a><span class="lineno">   47</span>&#160;    }</div>
+<div class="line"><a name="l00048"></a><span class="lineno">   48</span>&#160;</div>
+<div class="line"><a name="l00056"></a><span class="lineno">   56</span>&#160;    <span class="keyword">template</span>&lt;<span class="keyword">typename</span> T, <span class="keyword">typename</span>... Args&gt;</div>
+<div class="line"><a name="l00057"></a><span class="lineno"><a class="line" href="classblackbone_1_1_dyn_import.html#af7de42610399315b0fae5e85e8c785c3">   57</a></span>&#160;    <span class="keyword">inline</span> <span class="keyword">static</span> <span class="keyword">auto</span> <a class="code" href="classblackbone_1_1_dyn_import.html#af7de42610399315b0fae5e85e8c785c3">safeCall</a>( <span class="keyword">const</span> std::string&amp; name, Args... args ) -&gt; <span class="keyword">typename</span> std::result_of&lt;T(Args...)&gt;::type</div>
+<div class="line"><a name="l00058"></a><span class="lineno">   58</span>&#160;    {</div>
+<div class="line"><a name="l00059"></a><span class="lineno">   59</span>&#160;        <span class="keyword">auto</span> pfn = DynImport::get&lt;T&gt;( name );</div>
+<div class="line"><a name="l00060"></a><span class="lineno">   60</span>&#160;        <span class="keywordflow">return</span> pfn ? pfn( std::forward&lt;Args&gt;( args )... ) : (std::result_of&lt;T( Args... )&gt;::type )(0);</div>
+<div class="line"><a name="l00061"></a><span class="lineno">   61</span>&#160;    }</div>
+<div class="line"><a name="l00062"></a><span class="lineno">   62</span>&#160;</div>
+<div class="line"><a name="l00069"></a><span class="lineno">   69</span>&#160;    BLACKBONE_API <span class="keyword">static</span> FARPROC <a class="code" href="classblackbone_1_1_dyn_import.html#a5c8648b176cf7a2ec1054754451106bc">load</a>( <span class="keyword">const</span> std::string&amp; name, <span class="keyword">const</span> std::wstring&amp; module );</div>
+<div class="line"><a name="l00070"></a><span class="lineno">   70</span>&#160;</div>
+<div class="line"><a name="l00077"></a><span class="lineno">   77</span>&#160;    BLACKBONE_API <span class="keyword">static</span> FARPROC <a class="code" href="classblackbone_1_1_dyn_import.html#a5c8648b176cf7a2ec1054754451106bc">load</a>( <span class="keyword">const</span> std::string&amp; name, HMODULE hMod );</div>
+<div class="line"><a name="l00078"></a><span class="lineno">   78</span>&#160;</div>
+<div class="line"><a name="l00079"></a><span class="lineno">   79</span>&#160;<span class="keyword">private</span>:</div>
+<div class="line"><a name="l00080"></a><span class="lineno">   80</span>&#160;    BLACKBONE_API <span class="keyword">static</span> std::unordered_map&lt;std::string, FARPROC&gt; _funcs;     <span class="comment">// function database</span></div>
+<div class="line"><a name="l00081"></a><span class="lineno">   81</span>&#160;    BLACKBONE_API <span class="keyword">static</span> <a class="code" href="classblackbone_1_1_critical_section.html">CriticalSection</a> _mapGuard;                           <span class="comment">// function database guard</span></div>
+<div class="line"><a name="l00082"></a><span class="lineno">   82</span>&#160;};</div>
+<div class="line"><a name="l00083"></a><span class="lineno">   83</span>&#160;</div>
+<div class="line"><a name="l00084"></a><span class="lineno">   84</span>&#160;<span class="comment">// Syntax sugar</span></div>
+<div class="line"><a name="l00085"></a><span class="lineno">   85</span>&#160;<span class="preprocessor">#define GET_IMPORT(name) (DynImport::get&lt;fn ## name&gt;( #name ))</span></div>
+<div class="line"><a name="l00086"></a><span class="lineno">   86</span>&#160;<span class="preprocessor">#define SAFE_NATIVE_CALL(name, ...) (DynImport::safeNativeCall&lt;fn ## name&gt;( #name, __VA_ARGS__ ))</span></div>
+<div class="line"><a name="l00087"></a><span class="lineno">   87</span>&#160;<span class="preprocessor">#define SAFE_CALL(name, ...) (DynImport::safeCall&lt;fn ## name&gt;( #name, __VA_ARGS__ ))</span></div>
+<div class="line"><a name="l00088"></a><span class="lineno">   88</span>&#160;</div>
+<div class="line"><a name="l00089"></a><span class="lineno">   89</span>&#160;}</div>
+<div class="ttc" id="classblackbone_1_1_c_s_lock_html"><div class="ttname"><a href="classblackbone_1_1_c_s_lock.html">blackbone::CSLock</a></div><div class="ttdoc">std::lock_guard alternative </div><div class="ttdef"><b>Definition:</b> Utils.h:134</div></div>
 <div class="ttc" id="classblackbone_1_1_dyn_import_html"><div class="ttname"><a href="classblackbone_1_1_dyn_import.html">blackbone::DynImport</a></div><div class="ttdoc">Dynamic import </div><div class="ttdef"><b>Definition:</b> DynImport.h:15</div></div>
 <div class="ttc" id="classblackbone_1_1_dyn_import_html_a5c8648b176cf7a2ec1054754451106bc"><div class="ttname"><a href="classblackbone_1_1_dyn_import.html#a5c8648b176cf7a2ec1054754451106bc">blackbone::DynImport::load</a></div><div class="ttdeci">static BLACKBONE_API FARPROC load(const std::string &amp;name, const std::wstring &amp;module)</div><div class="ttdoc">Load function into database </div><div class="ttdef"><b>Definition:</b> DynImport.cpp:15</div></div>
-<div class="ttc" id="classblackbone_1_1_critical_section_html"><div class="ttname"><a href="classblackbone_1_1_critical_section.html">blackbone::CriticalSection</a></div><div class="ttdoc">std::mutex alternative </div><div class="ttdef"><b>Definition:</b> Utils.h:95</div></div>
+<div class="ttc" id="classblackbone_1_1_dyn_import_html_a3158c11a3449ec9efeba49615621caef"><div class="ttname"><a href="classblackbone_1_1_dyn_import.html#a3158c11a3449ec9efeba49615621caef">blackbone::DynImport::safeNativeCall</a></div><div class="ttdeci">static NTSTATUS safeNativeCall(const std::string &amp;name, Args...args)</div><div class="ttdoc">Safely call import If import not found - return STATUS_ORDINAL_NOT_FOUND </div><div class="ttdef"><b>Definition:</b> DynImport.h:43</div></div>
+<div class="ttc" id="classblackbone_1_1_critical_section_html"><div class="ttname"><a href="classblackbone_1_1_critical_section.html">blackbone::CriticalSection</a></div><div class="ttdoc">std::mutex alternative </div><div class="ttdef"><b>Definition:</b> Utils.h:103</div></div>
+<div class="ttc" id="classblackbone_1_1_dyn_import_html_af7de42610399315b0fae5e85e8c785c3"><div class="ttname"><a href="classblackbone_1_1_dyn_import.html#af7de42610399315b0fae5e85e8c785c3">blackbone::DynImport::safeCall</a></div><div class="ttdeci">static auto safeCall(const std::string &amp;name, Args...args) -&gt; typename std::result_of&lt; T(Args...)&gt;::type</div><div class="ttdoc">Safely call import If import not found - return 0 </div><div class="ttdef"><b>Definition:</b> DynImport.h:57</div></div>
 <div class="ttc" id="namespaceblackbone_html"><div class="ttname"><a href="namespaceblackbone.html">blackbone</a></div><div class="ttdef"><b>Definition:</b> AsmHelper32.cpp:6</div></div>
 </div><!-- fragment --></div><!-- contents -->
 </div><!-- doc-content -->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><a class="el" href="dir_aa9befc4bdfa617079e96718d920d9d2.html">Visual Studio 2013</a></li><li class="navelem"><a class="el" href="dir_9749fe1d1039c274ca5f4a0137bd5805.html">Projects</a></li><li class="navelem"><a class="el" href="dir_87d371cc6a3e9a1e307775a876c8e949.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_2dd5b37e3ce8f08186c1d7d6a8b43f79.html">src</a></li><li class="navelem"><a class="el" href="dir_c12349095ba230d0c7acc796e8f40ecd.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_aa70893cb9a27556b3fe36703e93b6b9.html">Misc</a></li><li class="navelem"><b>DynImport.h</b></li>
-    <li class="footer">Generated on Tue Sep 23 2014 11:46:47 for BlackBone by
+    <li class="navelem"><a class="el" href="dir_3d9ef8cac7bf1be0f1e18672d28fd269.html">visual studio 2013</a></li><li class="navelem"><a class="el" href="dir_5401094cee307be7b33997a47da28669.html">projects</a></li><li class="navelem"><a class="el" href="dir_0d6d72948ced51bdfd5fc8cf7033b913.html">blackbone</a></li><li class="navelem"><a class="el" href="dir_84cd6de3d65226a2f8718fdae009bf30.html">src</a></li><li class="navelem"><a class="el" href="dir_4dc82cc14ae072731c8b0e8bbd4f10c1.html">BlackBone</a></li><li class="navelem"><a class="el" href="dir_6a1f908d61e71845796849fffb4877b6.html">Misc</a></li><li class="navelem"><b>DynImport.h</b></li>
+    <li class="footer">Generated on Tue Jul 21 2015 12:31:40 for BlackBone by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.8 </li>
   </ul>
