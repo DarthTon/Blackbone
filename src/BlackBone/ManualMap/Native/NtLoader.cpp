@@ -858,7 +858,12 @@ bool NtLdr::ScanPatterns( )
         if (!foundData.empty())
         {
             _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
-            _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x23);
+
+            if (IsWindows10OrGreater())
+                _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x22);
+            else
+                _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x23);
+
             foundData.clear();
         }
         // Rescan using old pattern

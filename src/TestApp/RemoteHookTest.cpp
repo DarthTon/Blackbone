@@ -57,18 +57,23 @@ void TestRemoteHook()
 
         // Get function
         auto pHookFn = hclass.procTaskMgr.modules().GetExport(
-            hclass.procTaskMgr.modules().GetModule( L"ntdll.dll" ), "NtOpenProcess" );
+            hclass.procTaskMgr.modules().GetModule( L"ntdll.dll" ), 
+            "NtOpenProcess"
+            );
 
         if (pHookFn.procAddress != 0)
         {
             std::wcout << L"Found. Hooking...\n";
 
             // Hook and wait some time.
-            if (hclass.procTaskMgr.hooks().Apply( RemoteHook::hwbp, pHookFn.procAddress, &HookClass::HookFn, hclass ))
+            auto status = hclass.procTaskMgr.hooks().Apply( RemoteHook::hwbp, pHookFn.procAddress, &HookClass::HookFn, hclass );
+            if (NT_SUCCESS( status ))
             {
                 std::wcout << L"Hooked successfully. Try to terminate TestApp.exe from taskmgr now.\n";
                 Sleep( 20000 );
             }
+            else
+                std::wcout << L"Failed to install hook. Status" << std::hex << status << "\n";
         }
         else
             std::wcout << L"Not found, aborting\n";

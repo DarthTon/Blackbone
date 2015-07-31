@@ -341,7 +341,7 @@ copy /Y "$(TargetPath)" \\EXPERT-EAD-XP\RemoteDbg\$(TargetFileName)</Command>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
       <AdditionalLibraryDirectories>$(TargetDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <DataExecutionPrevention>false</DataExecutionPrevention>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
     </Link>
     <PostBuildEvent>
       <Command>copy /Y "$(ProjectDir)..\..\contrib\BeaEngine\Win64\Dll\BeaEngineCheetah64.dll" "$(TargetDir)BeaEngineCheetah64.dll"</Command>

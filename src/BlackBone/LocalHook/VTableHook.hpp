@@ -16,6 +16,7 @@ public:
 public:
     VTableDetour()
     {
+        DetourBase::AllocateBuffer( nullptr );
     }
 
     ~VTableDetour()

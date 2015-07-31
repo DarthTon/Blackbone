@@ -218,17 +218,16 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
     #elif defined (_WIN10_)
         if (ver_short != WINVER_10)           
             return STATUS_NOT_SUPPORTED;
-        if (verInfo.dwBuildNumber != 9926)
+        if (buildNo != 16393)
             pData->correctBuild = FALSE;
     #endif
 
         DPRINT( 
-            "BlackBone: OS version %d.%d.%d.%d.%d.%d - 0x%x\n",
+            "BlackBone: OS version %d.%d.%d.%d.%d - 0x%x\n",
             verInfo.dwMajorVersion,
             verInfo.dwMinorVersion,
             verInfo.dwBuildNumber,
             verInfo.wServicePackMajor,
-            verInfo.wServicePackMinor,
             buildNo,
             ver_short
             );
@@ -281,18 +280,18 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->ExRemoveTable    = 0x432A88; // 0x38E320;
                 break;
 
-                // Windows 10, technical preview, build 9926
+                // Windows 10, build 16393
             case WINVER_10:
                 pData->KExecOpt         = 0x1BF;
-                pData->Protection       = 0x69A;
+                pData->Protection       = 0x6AA;
                 pData->ObjTable         = 0x418;
-                pData->VadRoot          = 0x5F8;
-                pData->NtCreateThdIndex = 0xB2;
+                pData->VadRoot          = 0x608;
+                pData->NtCreateThdIndex = 0xB3;
                 pData->NtTermThdIndex   = 0x53;
                 pData->PrevMode         = 0x232;
                 pData->ExitStatus       = 0x6E0;
                 pData->MiAllocPage      = 0;
-                pData->ExRemoveTable    = 0x4645B0;
+                pData->ExRemoveTable    = 0x4C36AC;
                 break;
 
             default:

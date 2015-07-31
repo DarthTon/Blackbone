@@ -186,7 +186,7 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y "$(TargetPath)" \\Win10_x64\c$\$(TargetFileName)</Command>
+      <Command>copy /y "$(TargetPath)" \\Win10\c$\$(TargetFileName)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
