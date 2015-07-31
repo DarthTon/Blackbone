@@ -298,7 +298,7 @@
     </Link>
     <PostBuildEvent>
       <Command>copy /Y "$(ProjectDir)..\..\contrib\BeaEngine\Win32\Dll\BeaEngineCheetah.dll" "$(TargetDir)BeaEngineCheetah.dll"
-copy /Y "$(TargetPath)" \\EXPERT-EAD-XP\RemoteDbg\$(TargetFileName)</Command>
+copy /Y "$(TargetPath)" \\EXPERT-EAD-XP\c$\RemoteDbg\$(TargetFileName)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|Win32'">

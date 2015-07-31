@@ -728,7 +728,7 @@ NTSTATUS DriverControl::UnloadDriver( const std::wstring& svcName )
 
     // Remove previously loaded instance, if any
     NTSTATUS status = SAFE_NATIVE_CALL( NtUnloadDriver, &Ustr );
-    RegDeleteTreeW( HKEY_LOCAL_MACHINE, (L"SYSTEM\\CurrentControlSet\\Services\\" + svcName).c_str() );
+    SHDeleteKeyW( HKEY_LOCAL_MACHINE, (L"SYSTEM\\CurrentControlSet\\Services\\" + svcName).c_str() );
 
     return status;
 }
