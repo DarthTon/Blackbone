@@ -46,6 +46,7 @@
     <RootNamespace>DarkDEP</RootNamespace>
     <VCTargetsPath Condition="'$(VCTargetsPath11)' != '' and '$(VisualStudioVersion)' == '11.0'">$(VCTargetsPath11)</VCTargetsPath>
     <ProjectName>BlackBoneDrv</ProjectName>
+    <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <PropertyGroup Label="PropertySheets">
     <ConfigurationType>Driver</ConfigurationType>
@@ -55,42 +56,60 @@
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
     <TargetVersion>WindowsV6.3</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
+    <SupportsPackaging>false</SupportsPackaging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Debug|x64'" Label="Configuration">
-    <TargetVersion>WindowsV6.3</TargetVersion>
+    <TargetVersion>
+    </TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
+    <SupportsPackaging>false</SupportsPackaging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'" Label="Configuration">
     <TargetVersion>Windows8</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
+    <SupportsPackaging>false</SupportsPackaging>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
     <TargetVersion>WindowsV6.3</TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
+    <SupportsPackaging>false</SupportsPackaging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Release|x64'" Label="Configuration">
-    <TargetVersion>WindowsV6.3</TargetVersion>
+    <TargetVersion>
+    </TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
+    <SupportsPackaging>false</SupportsPackaging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'" Label="Configuration">
     <TargetVersion>Windows8</TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
+    <SupportsPackaging>false</SupportsPackaging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|x64'" Label="Configuration">
     <TargetVersion>Windows7</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
+    <SupportsPackaging>false</SupportsPackaging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'" Label="Configuration">
     <TargetVersion>Windows7</TargetVersion>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>WindowsKernelModeDriver8.1</PlatformToolset>
+    <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
+    <DriverTargetPlatform>Desktop</DriverTargetPlatform>
+    <SupportsPackaging>false</SupportsPackaging>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -103,65 +122,47 @@
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
-    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <OutDir>$(SolutionDir)bin\$(Platform)\$(ConfigurationName)\</OutDir>
     <TimeStampServer>http://timestamp.verisign.com/scripts/timstamp.dll</TimeStampServer>
-    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))81</TargetName>
+    <IntDir>$(SolutionDir)obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName)81</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Debug|x64'">
-    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <OutDir>$(SolutionDir)bin\$(Platform)\$(ConfigurationName)\</OutDir>
     <TimeStampServer>http://timestamp.verisign.com/scripts/timstamp.dll</TimeStampServer>
-    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))10</TargetName>
+    <IntDir>$(SolutionDir)obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName)10</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
-    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
-    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))8</TargetName>
+    <OutDir>$(SolutionDir)bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName)8</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|x64'">
-    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
-    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))7</TargetName>
+    <OutDir>$(SolutionDir)bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName)7</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'">
-    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
-    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))7</TargetName>
+    <OutDir>$(SolutionDir)bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName)7</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
-    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
-    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))81</TargetName>
+    <OutDir>$(SolutionDir)bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName)81</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win10Release|x64'">
-    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
-    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))10</TargetName>
+    <OutDir>$(SolutionDir)bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName)10</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'">
-    <OutDir>$(SolutionDir)\bin\$(Platform)\$(ConfigurationName)\</OutDir>
-    <IntDir>$(SolutionDir)\obj\$(Platform)\$(ConfigurationName)\</IntDir>
-    <TargetName>$(TargetName.Replace(' ',''))8</TargetName>
+    <OutDir>$(SolutionDir)bin\$(Platform)\$(ConfigurationName)\</OutDir>
+    <IntDir>$(SolutionDir)obj\$(Platform)\$(ConfigurationName)\</IntDir>
+    <TargetName>$(TargetName)8</TargetName>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Vista Debug|Win32'">
-    <ClCompile>
-      <CompileAs>CompileAsC</CompileAs>
-      <AdditionalIncludeDirectories />
-    </ClCompile>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Vista Release|Win32'">
-    <ClCompile>
-      <CompileAs>CompileAsC</CompileAs>
-      <AdditionalIncludeDirectories />
-    </ClCompile>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Vista Debug|x64'">
-    <ClCompile>
-      <CompileAs>CompileAsC</CompileAs>
-      <AdditionalIncludeDirectories />
-    </ClCompile>
-  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
     <ClCompile>
       <CompileAs>CompileAsC</CompileAs>
@@ -176,7 +177,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win10Debug|x64'">
     <ClCompile>
-      <CompileAs>CompileAsC</CompileAs>
+      <CompileAs>Default</CompileAs>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_WIN10_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -186,7 +187,8 @@
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
     </Link>
     <PostBuildEvent>
-      <Command>copy /y "$(TargetPath)" \\Win10\c$\$(TargetFileName)</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">

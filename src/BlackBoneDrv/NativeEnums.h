@@ -1,13 +1,13 @@
 #pragma once
 
-typedef enum _MEMORY_INFORMATION_CLASS
+typedef enum _MEMORY_INFORMATION_CLASS_EX
 {
-    MemoryBasicInformation = 0,
+    MemoryBasicInformationEx = 0,
     MemoryWorkingSetInformation = 1,
     MemoryMappedFilenameInformation = 2,
     MemoryRegionInformation = 3,
     MemoryWorkingSetExInformation = 4,
-} MEMORY_INFORMATION_CLASS;
+} MEMORY_INFORMATION_CLASS_EX;
 
 typedef enum _PS_PROTECTED_SIGNER
 {

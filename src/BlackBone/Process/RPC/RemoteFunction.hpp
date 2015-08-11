@@ -165,7 +165,12 @@ public: \
     template<typename... TArgs> \
     RemoteFunction( Process& proc, typename RemoteFuncBase<R( CALL_OPT* )(Args...)>::type ptr, TArgs&&... args ) \
         : RemoteFuncBase<R( CALL_OPT* )(Args...)>( proc, ptr, CALL_DEF ) \
-        , FuncArguments<Args...>( proc, static_cast<Args&&>(args)... ) { } \
+        , FuncArguments<Args...>( proc, std::forward<Args>(args)... ) { } \
+        \
+    template<typename... TArgs> \
+    RemoteFunction( Process& proc, ptr_t ptr, TArgs&&... args ) \
+        : RemoteFuncBase<R( CALL_OPT* )(Args...)>( proc, reinterpret_cast<typename RemoteFuncBase<R( CALL_OPT* )(Args...)>::type>(ptr), CALL_DEF ) \
+        , FuncArguments<Args...>( proc, std::forward<Args>(args)... ) { } \
         \
     inline NTSTATUS Call( ReturnType& result, Thread* contextThread = nullptr ) \
     { \

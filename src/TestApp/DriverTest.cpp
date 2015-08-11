@@ -58,8 +58,8 @@ void TestDriver()
         else
         {
             PUBLIC_OBJECT_BASIC_INFORMATION info = { 0 };
-            ULONG size = 0;
-            status = SAFE_CALL( NtQueryObject, proc.core().handle(), ObjectBasicInformation, &info, (ULONG)sizeof( info ), &size );
+            ULONG sz = 0;
+            status = SAFE_CALL( NtQueryObject, proc.core().handle(), ObjectBasicInformation, &info, (ULONG)sizeof( info ), &sz );
             if (!NT_SUCCESS( status ))
             {
                 std::cout << "TestDriver: IOCTL_BLACKBONE_GRANT_ACCESS failed, status 0x" << std::hex << status << "\r\n";

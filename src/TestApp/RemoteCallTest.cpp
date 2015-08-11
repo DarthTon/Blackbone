@@ -47,7 +47,7 @@ void TestRemoteCall()
 
             RemoteFunction<fnNtQueryVirtualMemory> pFN(
                 explorer,
-                reinterpret_cast<fnNtQueryVirtualMemory>(pRemote.procAddress),
+                pRemote.procAddress,
                 INVALID_HANDLE_VALUE,
                 reinterpret_cast<LPVOID>(hMainMod->baseAddress),
                 MemorySectionName,

@@ -28,42 +28,42 @@ MMap::~MMap(void)
 /// </summary>
 /// <param name="path">Image path</param>
 /// <param name="flags">Image mapping flags</param>
-/// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
-/// <param name="ldrContext">User-supplied Loader callback context</param>
+/// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
+/// <param name="context">User-supplied callback context</param>
 /// <returns>Mapped image info </returns>
 const ModuleData* MMap::MapImage(
     const std::wstring& path,
     eLoadFlags flags /*= NoFlags*/,
-    LdrCallback ldrCallback /*= nullptr*/,
-    void* ldrContext /*= nullptr*/
+    MapCallback mapCallback /*= nullptr*/,
+    void* context /*= nullptr*/
     )
 {
-    return MapImageInternal( path, nullptr, 0, false, flags, ldrCallback, ldrContext );
+    return MapImageInternal( path, nullptr, 0, false, flags, mapCallback, context );
 }
 
 /// <summary>
-/// Manually map PE image into underlying target process
+///Manually map PE image into underlying target process
 /// </summary>
 /// <param name="buffer">Image data buffer</param>
 /// <param name="size">Buffer size.</param>
 /// <param name="asImage">If set to true - buffer has image memory layout</param>
 /// <param name="flags">Image mapping flags</param>
-/// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
-/// <param name="ldrContext">User-supplied Loader callback context</param>
+/// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
+/// <param name="context">User-supplied callback context</param>
 /// <returns>Mapped image info</returns>
 const ModuleData* MMap::MapImage(
     size_t size, void* buffer,
     bool asImage /*= false*/,
     eLoadFlags flags /*= NoFlags*/,
-    LdrCallback ldrCallback /*= nullptr*/,
-    void* ldrContext /*= nullptr */
+    MapCallback mapCallback /*= nullptr*/,
+    void* context /*= nullptr*/
     )
 {
     // Create fake path
     wchar_t path[64];
     wsprintfW( path, L"MemoryImage_0x%p", buffer );
 
-    return MapImageInternal( path, buffer, size, asImage, flags, ldrCallback, ldrContext );
+    return MapImageInternal( path, buffer, size, asImage, flags, mapCallback, context );
 }
 
 /// <summary>
@@ -74,16 +74,16 @@ const ModuleData* MMap::MapImage(
 /// <param name="size">Buffer size.</param>
 /// <param name="asImage">If set to true - buffer has image memory layout</param>
 /// <param name="flags">Image mapping flags</param>
-/// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
-/// <param name="ldrContext">User-supplied Loader callback context</param>
+/// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
+/// <param name="context">User-supplied callback context</param>
 /// <returns>Mapped image info</returns>
 const ModuleData* MMap::MapImageInternal(
     const std::wstring& path,
     void* buffer, size_t size,
     bool asImage /*= false*/,
     eLoadFlags flags /*= NoFlags*/,
-    LdrCallback ldrCallback /*= nullptr*/,
-    void* ldrContext /*= nullptr*/
+    MapCallback mapCallback /*= nullptr*/,
+    void* context /*= nullptr*/
     )
 {
     // Already loaded
@@ -106,8 +106,8 @@ const ModuleData* MMap::MapImageInternal(
         flags &= ~MapInHighMem;
 
     // Set native loader callback
-    _ldrCallback = ldrCallback;
-    _ldrContext = ldrContext;
+    _mapCallback = mapCallback;
+    _userContext = context;
 
     BLACBONE_TRACE( L"ManualMap: Mapping image '%ls' with flags 0x%x", path.c_str(), flags );
 
@@ -174,7 +174,8 @@ const ModuleData* MMap::MapImageInternal(
 const ModuleData* MMap::FindOrMapModule(
     const std::wstring& path,
     void* buffer, size_t size, bool asImage,
-    eLoadFlags flags /*= NoFlags*/ )
+    eLoadFlags flags /*= NoFlags*/ 
+    )
 {
     NTSTATUS status = STATUS_SUCCESS;
     std::unique_ptr<ImageContext> pImage( new ImageContext() );
@@ -209,8 +210,8 @@ const ModuleData* MMap::FindOrMapModule(
     // Try to map image at it's original ASRL-aware base
     else if (flags & HideVAD)
     {      
-        ptr_t base = pImage->peImage.imageBase();
-        ptr_t size = pImage->peImage.imageSize();
+        ptr_t base  = pImage->peImage.imageBase();
+        ptr_t isize = pImage->peImage.imageSize();
 
         if (!NT_SUCCESS( Driver().EnsureLoaded() ))
         {
@@ -219,20 +220,20 @@ const ModuleData* MMap::FindOrMapModule(
         }
 
         // Allocate as physical at desired base
-        auto status = Driver().AllocateMem( _process.pid(), base, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
+        status = Driver().AllocateMem( _process.pid(), base, isize, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
 
         // Allocate at any base
         if (!NT_SUCCESS( status ))
         {
             base = 0;
             size = pImage->peImage.imageSize();
-            status = Driver().AllocateMem( _process.pid(), base, size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
+            status = Driver().AllocateMem( _process.pid(), base, isize, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
         }
 
         // Store allocated region
         if (NT_SUCCESS( status ))
         {
-            pImage->imgMem = MemBlock( &_process.memory(), base, static_cast<size_t>(size), PAGE_EXECUTE_READWRITE, true, true );
+            pImage->imgMem = MemBlock( &_process.memory(), base, static_cast<size_t>(isize), PAGE_EXECUTE_READWRITE, true, true );
         }
         // Stop mapping
         else
@@ -317,8 +318,11 @@ const ModuleData* MMap::FindOrMapModule(
 
     // Create reference for native loader functions
     LdrRefFlags ldrFlags = flags & CreateLdrRef ? Ldr_All: Ldr_None;
-    if (_ldrCallback != nullptr)
-        ldrFlags = _ldrCallback( _ldrContext, *pMod );
+    if (_mapCallback != nullptr)
+    {
+        auto mapData = _mapCallback( PostCallback, _userContext, _process, *pMod );
+        ldrFlags = mapData.ldrFlags;
+    }
 
     if (ldrFlags != Ldr_None)
     {
@@ -604,11 +608,35 @@ const ModuleData* MMap::FindOrMapDependency( ImageContext* pImage, std::wstring&
 
     BLACBONE_TRACE( L"ManualMap: Dependency path resolved to '%ls'", path.c_str() );
 
+    LoadData data;
+    if (_mapCallback != nullptr)
+    {
+        ModuleData tmpData;
+        tmpData.baseAddress = 0;
+        tmpData.manual = ((pImage->flags & ManualImports) != 0);
+        tmpData.fullPath = path;
+        tmpData.name = Utils::StripPath( path );
+        tmpData.size = 0;
+        tmpData.type = mt_unknown;
+
+        data = _mapCallback( PreCallback, _userContext, _process, tmpData );
+    }
+
     // Loading method
-    if (pImage->flags & ManualImports)
+    if (data.mtype == MT_Manual || (data.mtype == MT_Default && pImage->flags & ManualImports))
+    {
         return FindOrMapModule( path, nullptr, 0, false, pImage->flags | NoSxS | NoDelayLoad | PartialExcept );
-    else
+    }
+    else if (data.mtype != MT_None)
+    {
         return _process.modules().Inject( path );
+    }
+    // Aborted by user
+    else
+    {
+        LastNtStatus( STATUS_REQUEST_CANCELED );
+        return nullptr;
+    }
 };
 
 /// <summary>

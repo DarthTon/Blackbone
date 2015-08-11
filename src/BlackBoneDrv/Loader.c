@@ -386,13 +386,13 @@ PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord, IN PEPROCESS pProce
                     RtlInitEmptyUnicodeString( &uForwarder, strbuf, sizeof( strbuf ) );
 
                     RtlAnsiStringToUnicodeString( &uForwarder, &forwarder, FALSE );
-                    for (ULONG i = 0; i < uForwarder.Length / sizeof( WCHAR ); i++)
+                    for (ULONG j = 0; j < uForwarder.Length / sizeof( WCHAR ); j++)
                     {
-                        if (uForwarder.Buffer[i] == L'.')
+                        if (uForwarder.Buffer[j] == L'.')
                         {
-                            uForwarder.Length = (USHORT)(i * sizeof( WCHAR ));
-                            uForwarder.Buffer[i] = L'\0';
-                            delimIdx = i;
+                            uForwarder.Length = (USHORT)(j * sizeof( WCHAR ));
+                            uForwarder.Buffer[j] = L'\0';
+                            delimIdx = j;
                             break;
                         }
                     }

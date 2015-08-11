@@ -82,13 +82,13 @@ bool ImageNET::Parse( mapMethodRVA& methods )
     WCHAR     wcName[1024]   = { 0 };
     mdToken   rTokens[10]    = { 0 };
 
-    while (SUCCEEDED( _pMetaImport->EnumTypeDefs( &hceTypeDefs, rTypeDefs, ARRAYSIZE( rTypeDefs ), &dwcTypeDefs ))
-            && dwcTypeDefs > 0)
+    while (SUCCEEDED( _pMetaImport->EnumTypeDefs( &hceTypeDefs, rTypeDefs, ARRAYSIZE( rTypeDefs ), &dwcTypeDefs ) )
+        && dwcTypeDefs > 0)
     {
         for (UINT i = 0; i < dwcTypeDefs; i++)
         {
             HRESULT hr = _pMetaImport->GetTypeDefProps( rTypeDefs[i], wcName, ARRAYSIZE( wcName ), NULL, &dwTypeDefFlags, &tExtends );
-            if ( FAILED(hr) )
+            if (FAILED( hr ))
                 continue;
 
             while (SUCCEEDED( _pMetaImport->EnumMethods( &hceMethods, rTypeDefs[i], rTokens, ARRAYSIZE( rTokens ), &dwcTokens ) )
@@ -101,11 +101,12 @@ bool ImageNET::Parse( mapMethodRVA& methods )
                 for (UINT j = 0; j < dwcTokens; j++)
                 {
                     // get method information
-                    HRESULT hr = _pMetaImport->GetMemberProps(
-                        rTokens[j], NULL, wmName, 
+                    hr = _pMetaImport->GetMemberProps(
+                        rTokens[j], NULL, wmName,
                         ARRAYSIZE( wmName ), NULL,
                         &dwAttr, &pbySigBlob, &dwSigBlobSize,
-                        &dwCodeRVA, NULL, NULL, NULL, NULL );
+                        &dwCodeRVA, NULL, NULL, NULL, NULL 
+                        );
 
                     if (FAILED( hr ))
                         continue;

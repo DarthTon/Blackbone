@@ -549,10 +549,10 @@ size_t Native::EnumSections( listModules& result )
             if (_wowBarrier.x86OS == true)
             {
                 _UNICODE_STRING_T<DWORD>* ustr32 = reinterpret_cast<_UNICODE_STRING_T<DWORD>*>(ustr);
-                data.fullPath = Utils::ToLower( (const wchar_t*)ustr32->Buffer );
+                data.fullPath = Utils::ToLower( reinterpret_cast<wchar_t*>((uintptr_t)ustr32->Buffer) );
             }
             else
-                data.fullPath = Utils::ToLower( (const wchar_t*)ustr->Buffer );
+                data.fullPath = Utils::ToLower( reinterpret_cast<wchar_t*>((uintptr_t)ustr->Buffer) );
 
             data.name = Utils::StripPath( data.fullPath );
             data.baseAddress = mbi.AllocationBase;
@@ -590,10 +590,10 @@ size_t Native::EnumPEHeaders( listModules& result )
             continue;
 
         // Filter regions
-        if (mbi.State != MEM_COMMIT || 
-             mbi.AllocationProtect == PAGE_NOACCESS || 
-             mbi.AllocationProtect & PAGE_GUARD || 
-             lastBase == mbi.AllocationBase)
+        if (mbi.State != MEM_COMMIT ||
+            mbi.AllocationProtect == PAGE_NOACCESS ||
+            mbi.AllocationProtect & PAGE_GUARD ||
+            lastBase == mbi.AllocationBase)
         {
             continue;
         }
@@ -637,19 +637,19 @@ size_t Native::EnumPEHeaders( listModules& result )
             if (_wowBarrier.x86OS == true)
             {
                 _UNICODE_STRING_T<DWORD>* ustr32 = reinterpret_cast<_UNICODE_STRING_T<DWORD>*>(ustr);
-                data.fullPath = Utils::ToLower( (const wchar_t*)ustr32->Buffer );
+                data.fullPath = Utils::ToLower( reinterpret_cast<wchar_t*>((uintptr_t)ustr32->Buffer) );
             }
             else
-                data.fullPath = Utils::ToLower( (const wchar_t*)ustr->Buffer );
+                data.fullPath = Utils::ToLower( reinterpret_cast<wchar_t*>((uintptr_t)ustr->Buffer) );
 
             data.name = Utils::StripPath( data.fullPath );
         }
         else
         {
-            wchar_t buf[64];
-            wsprintfW( buf, L"Unknown_0x%I64x", data.baseAddress );
+            wchar_t name[64] = { 0 };
+            wsprintfW( name, L"Unknown_0x%I64x", data.baseAddress );
 
-            data.fullPath = buf;
+            data.fullPath = name;
             data.name = data.fullPath;
         }
 

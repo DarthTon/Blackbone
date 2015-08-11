@@ -33,14 +33,13 @@ NtLdr::~NtLdr(void)
 bool NtLdr::Init()
 {
     FindLdrpHashTable();
+    FindLdrHeap();
+
     if (IsWindows8OrGreater())
         FindLdrpModuleIndexBase();
 
     ScanPatterns();
-    FindLdrHeap();
-
     _nodeMap.clear();
-
     return true;
 }
 
@@ -1018,7 +1017,7 @@ bool NtLdr::ScanPatterns( )
     if (_LdrpHandleTlsData == 0)
         BLACBONE_TRACE( "NativeLdr: LdrpHandleTlsData not found" );
 #ifdef USE64
-    if (IsWindows7OrGreater())
+    if (IsWindows7OrGreater() && !IsWindows8OrGreater())
     {
         if (_LdrKernel32PatchAddress == 0)
             BLACBONE_TRACE( "NativeLdr: LdrKernel32PatchAddress not found" );
@@ -1030,9 +1029,9 @@ bool NtLdr::ScanPatterns( )
         BLACBONE_TRACE( "NativeLdr: LdrpInvertedFunctionTable not found" );
     if (_RtlInsertInvertedFunctionTable == 0)
         BLACBONE_TRACE( "NativeLdr: RtlInsertInvertedFunctionTable not found" );
-#endif
     if (IsWindows8Point1OrGreater() && _LdrProtectMrdata == 0)
         BLACBONE_TRACE( "NativeLdr: LdrProtectMrdata not found" );
+#endif
 #endif
     return true;
 }

@@ -3,6 +3,7 @@
 #include "Routines.h"
 #include "BlackBoneDef.h"
 #include "Utils.h"
+#include "apiset.h"
 #include <ntstrsafe.h>
 
 #define IMAGE32(hdr) (hdr->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC)
@@ -19,10 +20,10 @@ typedef PAPI_SET_VALUE_ARRAY_10     PAPISET_VALUE_ARRAY;
 typedef PAPI_SET_NAMESPACE_ENTRY_10 PAPISET_NAMESPACE_ENTRY;
 typedef PAPI_SET_NAMESPACE_ARRAY_10 PAPISET_NAMESPACE_ARRAY;
 #elif defined (_WIN81_)
-typedef PAPI_SET_VALUE_ENTRY     PAPISET_VALUE_ENTRY;
-typedef PAPI_SET_VALUE_ARRAY     PAPISET_VALUE_ARRAY;
-typedef PAPI_SET_NAMESPACE_ENTRY PAPISET_NAMESPACE_ENTRY;
-typedef PAPI_SET_NAMESPACE_ARRAY PAPISET_NAMESPACE_ARRAY;
+typedef PAPI_SET_VALUE_ENTRY        PAPISET_VALUE_ENTRY;
+typedef PAPI_SET_VALUE_ARRAY        PAPISET_VALUE_ARRAY;
+typedef PAPI_SET_NAMESPACE_ENTRY    PAPISET_NAMESPACE_ENTRY;
+typedef PAPI_SET_NAMESPACE_ARRAY    PAPISET_NAMESPACE_ARRAY;
 #else
 typedef PAPI_SET_VALUE_ENTRY_V2     PAPISET_VALUE_ENTRY;
 typedef PAPI_SET_VALUE_ARRAY_V2     PAPISET_VALUE_ARRAY;
@@ -235,8 +236,8 @@ NTSTATUS BBMapUserImage(
     status = BBCreateWorkerThread( &context );
     if (NT_SUCCESS( status ))
     {
-        SIZE_T size = 0x2000;
-        status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &context.userMem, 0, &size, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
+        SIZE_T mapSize = 0x2000;
+        status = ZwAllocateVirtualMemory( ZwCurrentProcess(), &context.userMem, 0, &mapSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE );
     }
 
     // Create sync event
@@ -287,7 +288,7 @@ NTSTATUS BBMapUserImage(
 
         pPeb->ImageBaseAddress = pImage->baseAddress;
         if (pPeb32)
-            pPeb32->ImageBaseAddress = (ULONG)pImage->baseAddress;
+            pPeb32->ImageBaseAddress = (ULONG)(ULONG_PTR)pImage->baseAddress;
     }
 
     // Run module initializers
@@ -336,15 +337,15 @@ NTSTATUS BBMapUserImage(
     // Worker code buffer
     if (context.pWorkerBuf)
     {
-        SIZE_T size = 0;
-        ZwFreeVirtualMemory( ZwCurrentProcess(), &context.pWorkerBuf, &size, MEM_RELEASE );
+        SIZE_T mapSize = 0;
+        ZwFreeVirtualMemory( ZwCurrentProcess(), &context.pWorkerBuf, &mapSize, MEM_RELEASE );
     }
 
     // Code buffer
     if (context.userMem)
     {
-        SIZE_T size = 0;
-        ZwFreeVirtualMemory( ZwCurrentProcess(), &context.userMem, &size, MEM_RELEASE );
+        SIZE_T mapSize = 0;
+        ZwFreeVirtualMemory( ZwCurrentProcess(), &context.userMem, &mapSize, MEM_RELEASE );
     }
 
     // Cleanup module list
@@ -732,7 +733,7 @@ NTSTATUS BBResolveImageRefs(
                 }
                 else
                 {
-                    pContext->userMem->ustr32.Buffer = (ULONG)pContext->userMem->buffer;
+                    pContext->userMem->ustr32.Buffer = (ULONG)(ULONG_PTR)pContext->userMem->buffer;
                     pContext->userMem->ustr32.MaximumLength = sizeof( pContext->userMem->buffer );
                     pContext->userMem->ustr32.Length = resolvedName.Length;
 
@@ -805,10 +806,10 @@ NTSTATUS BBResolveImageRefs(
             {
                 // Save address to IAT
                 if (pImportTbl->FirstThunk)
-                    *(PULONG)((PUCHAR)pImageBase + pImportTbl->FirstThunk + IAT_Index) = (ULONG)pFunc;
+                    *(PULONG)((PUCHAR)pImageBase + pImportTbl->FirstThunk + IAT_Index) = (ULONG)(ULONG_PTR)pFunc;
                 // Save address to OrigianlFirstThunk
                 else
-                    *(PULONG)((PUCHAR)pImageBase + THUNK_VAL_T( pHeader, pThunk, u1.AddressOfData )) = (ULONG)pFunc;
+                    *(PULONG)((PUCHAR)pImageBase + THUNK_VAL_T( pHeader, pThunk, u1.AddressOfData )) = (ULONG)(ULONG_PTR)pFunc;
             }
 
             // Go to next entry
@@ -982,11 +983,11 @@ NTSTATUS BBResolveSxS(
     memcpy( pStringBuf->origBuf, name->Buffer, name->Length );
     if (wow64)
     {
-        pStringBuf->origName32.Buffer = (ULONG)pStringBuf->origBuf;
+        pStringBuf->origName32.Buffer = (ULONG)(ULONG_PTR)pStringBuf->origBuf;
         pStringBuf->origName32.MaximumLength = sizeof( pStringBuf->origBuf );
         pStringBuf->origName32.Length = name->Length;
 
-        pStringBuf->name132.Buffer = (ULONG)pStringBuf->staticBuf;
+        pStringBuf->name132.Buffer = (ULONG)(ULONG_PTR)pStringBuf->staticBuf;
         pStringBuf->name132.MaximumLength = sizeof( pStringBuf->staticBuf );
         pStringBuf->name132.Length = 0;
 
@@ -1073,8 +1074,6 @@ NTSTATUS BBResolveImagePath(
     // API Schema
     if (NT_SUCCESS( BBResolveApiSet( pProcess, &filename, baseImage, resolved ) ))
     {
-        UNICODE_STRING fullResolved = { 0 };
-
         BBSafeAllocateString( &fullResolved, 512 );
         
         // Perpend system directory
@@ -1104,8 +1103,6 @@ NTSTATUS BBResolveImagePath(
     status = BBResolveSxS( pContext, &filename, resolved );
     if (pContext && NT_SUCCESS( status ))
     {
-        UNICODE_STRING fullResolved = { 0 };
-
         BBSafeAllocateString( &fullResolved, 1024 );
         RtlUnicodeStringCatString( &fullResolved, L"\\??\\" );
         RtlUnicodeStringCat( &fullResolved, resolved );
@@ -1295,7 +1292,7 @@ void BBCallTlsInitializers( IN PMMAP_CONTEXT pContext, IN PVOID imageBase )
             if (PsGetProcessWow64Process( pContext->pProcess ) != NULL)
             {
                 // TEB32 is 2 pages after TEB64
-                *(PULONG)(pTeb64 + 0x2000 + 0x2C) = (ULONG)pTLSMem;
+                *(PULONG)(pTeb64 + 0x2000 + 0x2C) = (ULONG)(ULONG_PTR)pTLSMem;
                 *(PULONG)pTLSMem = (ULONG)TLS_VAL_T( pHeaders, pTLS, StartAddressOfRawData );
             }
             // Native
@@ -1369,12 +1366,12 @@ NTSTATUS BBPrepareACTX( IN PUNICODE_STRING pPath, IN BOOLEAN asImage, IN LONG ma
             RtlZeroMemory( &pContext->userMem->actx32, sizeof( pContext->userMem->actx32 ) );
 
             pContext->userMem->actx32.cbSize = sizeof( ACTCTXW32 );
-            pContext->userMem->actx32.lpSource = (ULONG)pContext->userMem->buffer;
+            pContext->userMem->actx32.lpSource = (ULONG)(ULONG_PTR)pContext->userMem->buffer;
             if (asImage)
             {
                 pContext->userMem->actx32.lpSource += 4 * sizeof( wchar_t );
                 pContext->userMem->actx32.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
-                pContext->userMem->actx32.lpResourceName = (ULONG)MAKEINTRESOURCEW( manifestID );
+                pContext->userMem->actx32.lpResourceName = (ULONG)(ULONG_PTR)MAKEINTRESOURCEW( manifestID );
             }
 
             BBCallRoutine( FALSE, pContext, pCreateActCtxW, 1, &pContext->userMem->actx32 );
@@ -1485,7 +1482,7 @@ NTSTATUS BBCreateCookie( IN PVOID imageBase )
         // TODO: implement proper cookie algorithm
         if (pCfgDir && CFG_DIR_VAL_T( pHeader, pCfgDir, SecurityCookie ))
         {
-            ULONG seed = (ULONG)imageBase ^ (ULONG)((ULONG_PTR)imageBase >> 32);
+            ULONG seed = (ULONG)(ULONG_PTR)imageBase ^ (ULONG)((ULONG_PTR)imageBase >> 32);
             ULONG_PTR cookie = (ULONG_PTR)imageBase ^  RtlRandomEx( &seed );
 
             // SecurityCookie value must be rebased by this moment
@@ -1604,14 +1601,14 @@ NTSTATUS BBCreateWorkerThread( IN PMMAP_CONTEXT pContext )
             if (wow64)
             {            
                 *(PUCHAR)(pBuf + ofst) = 0x68;                      // push pDelay
-                *(PULONG)(pBuf + ofst + 1) = (ULONG)pDelay;         //
+                *(PULONG)(pBuf + ofst + 1) = (ULONG)(ULONG_PTR)pDelay;      //
                 ofst += 5;
 
                 *(PUSHORT)(pBuf + ofst) = 0x016A;                   // push TRUE
                 ofst += 2;
 
                 *(PUCHAR)(pBuf + ofst) = 0xB8;                      // mov eax, pFn
-                *(PULONG)(pBuf + ofst + 1) = (ULONG)pNtDelayExec;   //
+                *(PULONG)(pBuf + ofst + 1) = (ULONG)(ULONG_PTR)pNtDelayExec;//
                 ofst += 5;
 
                 *(PUSHORT)(pBuf + ofst) = 0xD0FF;                   // call eax

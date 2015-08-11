@@ -50,10 +50,10 @@ NTAPI
 ZwQueryVirtualMemory(
     IN HANDLE  ProcessHandle,
     IN PVOID   BaseAddress,
-    IN MEMORY_INFORMATION_CLASS MemoryInformationClass,
+    IN MEMORY_INFORMATION_CLASS_EX MemoryInformationClass,
     OUT PVOID  Buffer,
-    IN ULONG   Length,
-    OUT PULONG ResultLength 
+    IN SIZE_T  Length,
+    OUT PSIZE_T ResultLength 
     );
 
 NTSTATUS 

@@ -224,22 +224,22 @@ ULONG GenCall32V( IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, IN va_list vl )
     for (INT i = 0; i < argc; i++)
     {
         PVOID arg = va_arg( vl, PVOID );
-        pArgBuf[i] = (ULONG)arg;
+        pArgBuf[i] = (ULONG)(ULONG_PTR)arg;
     }
 
     // push args
     for (INT i = argc - 1; i >= 0; i--)
     {
-        *(PUSHORT)(pBuf + ofst) = 0x68;             // push arg
-        *(PULONG)(pBuf + ofst + 1) = pArgBuf[i];    //
+        *(PUSHORT)(pBuf + ofst) = 0x68;                 // push arg
+        *(PULONG)(pBuf + ofst + 1) = pArgBuf[i];        //
         ofst += 5;
     }
 
-    *(PUCHAR)(pBuf + ofst) = 0xB8;                  // mov eax, pFn
-    *(PULONG)(pBuf + ofst + 1) = (ULONG)pFn;        //
+    *(PUCHAR)(pBuf + ofst) = 0xB8;                      // mov eax, pFn
+    *(PULONG)(pBuf + ofst + 1) = (ULONG)(ULONG_PTR)pFn; //
     ofst += 5;
 
-    *(PUSHORT)(pBuf + ofst) = 0xD0FF;               // call eax
+    *(PUSHORT)(pBuf + ofst) = 0xD0FF;                   // call eax
     ofst += 2;
 
     ExFreePoolWithTag( pArgBuf, 'enoB' );
@@ -259,11 +259,11 @@ ULONG GenSync32( IN PUCHAR pBuf, IN PNTSTATUS pStatus, IN PVOID pSetEvent, IN HA
     ofst += 2;
 
     *(PUCHAR)(pBuf + ofst) = 0x68;                  // push hEvent
-    *(PULONG)(pBuf + ofst + 1) = (ULONG)hEvent;     //
+    *(PULONG)(pBuf + ofst + 1) = (ULONG)(ULONG_PTR)hEvent;  //
     ofst += 5;
 
     *(PUCHAR)(pBuf + ofst) = 0xB8;                  // mov eax, pSetEvent
-    *(PULONG)(pBuf + ofst + 1) = (ULONG)pSetEvent;  //
+    *(PULONG)(pBuf + ofst + 1) = (ULONG)(ULONG_PTR)pSetEvent;//
     ofst += 5;
 
     *(PUSHORT)(pBuf + ofst) = 0xD0FF;               // call eax

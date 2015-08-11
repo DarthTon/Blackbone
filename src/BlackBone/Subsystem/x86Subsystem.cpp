@@ -133,7 +133,7 @@ ptr_t x86Native::getTEB( HANDLE hThread, _TEB32* pteb )
     ULONG bytes = 0;
 
     if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ) && pteb)
-        ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof(_TEB32), NULL );
+        ReadProcessMemory( _hProcess, (LPCVOID)((uintptr_t)tbi.TebBaseAddress), pteb, sizeof(_TEB32), NULL );
 
     return tbi.TebBaseAddress;
 }

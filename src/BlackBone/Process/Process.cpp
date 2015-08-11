@@ -196,14 +196,14 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
     ULONG returnLength = 0;
 
     // Query handle list
-    NTSTATUS status = SAFE_NATIVE_CALL( NtQuerySystemInformation, SystemHandleInformation, buffer, bufSize, &returnLength);
+    NTSTATUS status = SAFE_NATIVE_CALL( NtQuerySystemInformation, SystemHandleInformation, buffer, bufSize, &returnLength );
     while (status == STATUS_INFO_LENGTH_MISMATCH)
     {
         bufSize *= 2;
         VirtualFree( buffer, 0, MEM_RELEASE );
         buffer = (uint8_t*)VirtualAlloc( NULL, bufSize, MEM_COMMIT, PAGE_READWRITE );
 
-        status = SAFE_NATIVE_CALL( NtQuerySystemInformation, SystemHandleInformation, buffer, bufSize, &returnLength);
+        status = SAFE_NATIVE_CALL( NtQuerySystemInformation, SystemHandleInformation, buffer, bufSize, &returnLength );
     }
 
     if (!NT_SUCCESS( status ))
@@ -220,14 +220,20 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
         OBJECT_TYPE_INFORMATION_T* pTypeInfo = nullptr;
         PVOID pNameInfo = nullptr;
         UNICODE_STRING objectName = { 0 };
-        ULONG returnLength = 0;
 
         // Filter process
         if (handleInfo->Handles[i].ProcessId != _core._pid)
             continue;
 
         // Get local handle copy
-        status = SAFE_NATIVE_CALL( NtDuplicateObject, _core._hProcess, reinterpret_cast<HANDLE>(handleInfo->Handles[i].Handle), GetCurrentProcess(), &hLocal, 0, 0, DUPLICATE_SAME_ACCESS);
+        status = SAFE_NATIVE_CALL(
+            NtDuplicateObject,
+            _core._hProcess,
+            reinterpret_cast<HANDLE>(handleInfo->Handles[i].Handle),
+            GetCurrentProcess(),
+            &hLocal, 0, 0, DUPLICATE_SAME_ACCESS
+            );
+
         if (!NT_SUCCESS( status ))
             continue;
 

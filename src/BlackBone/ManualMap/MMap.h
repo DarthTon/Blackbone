@@ -15,7 +15,6 @@ namespace blackbone
 {
 
 // Loader flags
-
 enum eLoadFlags
 {
     NoFlags         = 0x00,     // No flags
@@ -35,8 +34,35 @@ enum eLoadFlags
 
 ENUM_OPS( eLoadFlags )
 
-// Native loader flags callback
-typedef enum LdrRefFlags( *LdrCallback )(void* context, const ModuleData& modInfo);
+// Image mapping type
+enum MappingType
+{
+    MT_Default,     // Use eLoadFlags value
+    MT_Native,      // Use native loader
+    MT_Manual,      // Manually map
+    MT_None,        // Don't load
+};
+
+struct LoadData
+{
+    MappingType mtype = MT_Default;
+    enum LdrRefFlags ldrFlags = static_cast<enum LdrRefFlags>(0);
+
+    LoadData() = default;
+
+    LoadData( MappingType mtype_, enum LdrRefFlags ldrFlags_ )
+        : mtype( mtype_ )
+        , ldrFlags( ldrFlags_ ) { }
+};
+
+// Image mapping callback
+enum CallbackType
+{
+    PreCallback,        // Called before loading, loading type is decided here
+    PostCallback        // Called after manual mapping, but before entry point invocation, Loader flags are decided here
+};
+
+typedef LoadData( *MapCallback )(CallbackType type, void* context, Process& process, const ModuleData& modInfo);
 
 
 /// <summary>
@@ -74,14 +100,14 @@ public:
     /// </summary>
     /// <param name="path">Image path</param>
     /// <param name="flags">Image mapping flags</param>
-    /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
-    /// <param name="ldrContext">User-supplied Loader callback context</param>
+    /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
+    /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info </returns>
     BLACKBONE_API const ModuleData* MapImage(
         const std::wstring& path,
         eLoadFlags flags = NoFlags,
-        LdrCallback ldrCallback = nullptr,
-        void* ldrContext = nullptr
+        MapCallback mapCallback = nullptr,
+        void* context = nullptr
         );
 
     /// <summary>
@@ -91,15 +117,15 @@ public:
     /// <param name="size">Buffer size.</param>
     /// <param name="asImage">If set to true - buffer has image memory layout</param>
     /// <param name="flags">Image mapping flags</param>
-    /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
-    /// <param name="ldrContext">User-supplied Loader callback context</param>
+    /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
+    /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info</returns>
     BLACKBONE_API const ModuleData* MapImage(
         size_t size, void* buffer,
         bool asImage = false,
         eLoadFlags flags = NoFlags,
-        LdrCallback ldrCallback = nullptr,
-        void* ldrContext = nullptr
+        MapCallback mapCallback = nullptr,
+        void* context = nullptr
         );
 
     /// <summary>
@@ -128,15 +154,15 @@ private:
     /// <param name="size">Buffer size.</param>
     /// <param name="asImage">If set to true - buffer has image memory layout</param>
     /// <param name="flags">Image mapping flags</param>
-    /// <param name="ldrCallback">Loader callback. Triggers for each mapped module</param>
-    /// <param name="ldrContext">User-supplied Loader callback context</param>
+    /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
+    /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info</returns>
     const ModuleData* MapImageInternal(
         const std::wstring& path,
         void* buffer, size_t size,
         bool asImage = false,
         eLoadFlags flags = NoFlags,
-        LdrCallback ldrCallback = nullptr,
+        MapCallback ldrCallback = nullptr,
         void* ldrContext = nullptr
         );
 
@@ -276,8 +302,8 @@ private:
     vecImageCtx     _images;                // Mapped images
     class Process&  _process;               // Target process manager
     MemBlock        _pAContext;             // SxS activation context memory address
-    LdrCallback     _ldrCallback = nullptr; // Loader callback for adding image into loader lists
-    void*           _ldrContext = nullptr;  // user context for _ldrCallback       
+    MapCallback     _mapCallback = nullptr; // Loader callback for adding image into loader lists
+    void*           _userContext = nullptr;  // user context for _ldrCallback       
 
     std::vector<std::pair<ptr_t, size_t>> _usedBlocks;   // Used memory blocks 
 };

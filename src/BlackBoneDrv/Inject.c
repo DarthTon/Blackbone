@@ -204,9 +204,9 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
                         if (pHdr)
                         {
                             ULONG oldProt = 0;
-                            SIZE_T size = (pHdr->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) ? 
-                                            ((PIMAGE_NT_HEADERS32)pHdr)->OptionalHeader.SizeOfHeaders :
-                                            pHdr->OptionalHeader.SizeOfHeaders;
+                            size = (pHdr->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) ?
+                                ((PIMAGE_NT_HEADERS32)pHdr)->OptionalHeader.SizeOfHeaders :
+                                pHdr->OptionalHeader.SizeOfHeaders;
 
                             if (NT_SUCCESS( ZwProtectVirtualMemory( ZwCurrentProcess(), &pUserBuf->module, &size, PAGE_EXECUTE_READWRITE, &oldProt ) ))
                             {
@@ -280,7 +280,7 @@ PINJECT_BUFFER BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
         PUNICODE_STRING32 pUserPath = &pBuffer->path32;
         pUserPath->Length = pPath->Length;
         pUserPath->MaximumLength = pPath->MaximumLength;
-        pUserPath->Buffer = (ULONG)pBuffer->buffer;
+        pUserPath->Buffer = (ULONG)(ULONG_PTR)pBuffer->buffer;
 
         // Copy path
         memcpy( (PVOID)pUserPath->Buffer, pPath->Buffer, pPath->Length );
@@ -289,10 +289,10 @@ PINJECT_BUFFER BBGetWow64Code( IN PVOID LdrLoadDll, IN PUNICODE_STRING pPath )
         memcpy( pBuffer, code, sizeof( code ) );
 
         // Fill stubs
-        *(ULONG*)((PUCHAR)pBuffer + 1)  = (ULONG)&pBuffer->module;
-        *(ULONG*)((PUCHAR)pBuffer + 6)  = (ULONG)pUserPath;
+        *(ULONG*)((PUCHAR)pBuffer + 1)  = (ULONG)(ULONG_PTR)&pBuffer->module;
+        *(ULONG*)((PUCHAR)pBuffer + 6)  = (ULONG)(ULONG_PTR)pUserPath;
         *(ULONG*)((PUCHAR)pBuffer + 15) = (ULONG)((ULONG_PTR)LdrLoadDll - ((ULONG_PTR)pBuffer + 15) - 5 + 1);
-        *(ULONG*)((PUCHAR)pBuffer + 20) = (ULONG)&pBuffer->complete;
+        *(ULONG*)((PUCHAR)pBuffer + 20) = (ULONG)(ULONG_PTR)&pBuffer->complete;
 
         return pBuffer;
     }

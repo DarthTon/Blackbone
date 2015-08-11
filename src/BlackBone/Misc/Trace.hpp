@@ -3,7 +3,10 @@
 #include <cstdio>
 #include <cstdlib>
 #include <algorithm>
+
+#pragma warning(disable : 4091)
 #include <DbgHelp.h>
+#pragma warning(default : 4091)
 
 namespace blackbone
 {
@@ -17,7 +20,7 @@ inline void DoTraceV<char>( const char* fmt, va_list va_args )
 {
     char buf[2048], userbuf[1024];
     vsprintf_s( userbuf, fmt, va_args );
-    sprintf_s( buf, "BlackBone: %ls\r\n", userbuf );
+    sprintf_s( buf, "BlackBone: %s\r\n", userbuf );
     OutputDebugStringA( buf );
 
 #ifdef CONSOLE_TRACE

@@ -46,35 +46,35 @@ struct regDR7
     //
     // Local/global enabled index
     //
-    int l0 : 1;
-    int g0 : 1;
-    int l1 : 1;
-    int g1 : 1;
-    int l2 : 1;
-    int g2 : 1;
-    int l3 : 1;
-    int g3 : 1;
+    uint32_t l0 : 1;
+    uint32_t g0 : 1;
+    uint32_t l1 : 1;
+    uint32_t g1 : 1;
+    uint32_t l2 : 1;
+    uint32_t g2 : 1;
+    uint32_t l3 : 1;
+    uint32_t g3 : 1;
 
-    int l_enable : 1;       // Local breakpoints, obsolete for P6+
-    int g_enable : 1;       // Global breakpoints, obsolete for P6+
-    int one : 1;            // Reserved
-    int rtm : 1;            // Restricted transactional memory
-    int ice : 1;            // ICE debugger
-    int gd  : 1;            // General detect table
-    int tr1 : 1;            // Trace 1
-    int tr2 : 1;            // Trace2
+    uint32_t l_enable : 1;       // Local breakpoints, obsolete for P6+
+    uint32_t g_enable : 1;       // Global breakpoints, obsolete for P6+
+    uint32_t one : 1;            // Reserved
+    uint32_t rtm : 1;            // Restricted transactional memory
+    uint32_t ice : 1;            // ICE debugger
+    uint32_t gd  : 1;            // General detect table
+    uint32_t tr1 : 1;            // Trace 1
+    uint32_t tr2 : 1;            // Trace2
 
     //
     // Breakpoint type/length
     //
-    int rw0  : 1;
-    int len0 : 1;
-    int rw1  : 1;
-    int len1 : 1;
-    int rw2  : 1;
-    int len2 : 1;
-    int rw3  : 1;
-    int len3 : 1;
+    uint32_t rw0  : 1;
+    uint32_t len0 : 1;
+    uint32_t rw1  : 1;
+    uint32_t len1 : 1;
+    uint32_t rw2  : 1;
+    uint32_t len2 : 1;
+    uint32_t rw3  : 1;
+    uint32_t len3 : 1;
 
     inline void setLocal( int idx, int val ) { idx == 0 ? l0   = val : (idx == 1 ? l1   = val : (idx == 2 ? l2   = val : l3   = val)); }
     inline void setRW   ( int idx, int val ) { idx == 0 ? rw0  = val : (idx == 1 ? rw1  = val : (idx == 2 ? rw2  = val : rw3  = val)); }

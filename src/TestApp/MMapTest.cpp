@@ -8,13 +8,22 @@ void TestMMap()
     Process thisProc;
     thisProc.Attach( GetCurrentProcessId() );
 
-    auto ldrDef = []( void* /*context*/, const ModuleData& modInfo )
+    auto callback = []( CallbackType type, void* /*context*/, Process& /*process*/, const ModuleData& modInfo )
     {
-        //auto pProc = reinterpret_cast<Process*>(context);
-        if (modInfo.name == L"msvcr120.dll" || modInfo.name == L"msvcp120.dll" || modInfo.name == L"calc.exe")
-            return Ldr_ModList | Ldr_HashTable;
+        if(type == PreCallback)
+        {
+#ifdef USE64
+            if (modInfo.name == L"msvcr120.dll" || modInfo.name == L"msvcp120.dll")
+                return LoadData( MT_Native, Ldr_None );
+#endif
+        }
+        else
+        {
+            if (modInfo.name == L"windows.storage.dll" || modInfo.name == L"shell32.dll")
+                return LoadData( MT_Default, Ldr_ModList );
+        }
 
-        return Ldr_ModList;
+        return LoadData( MT_Default, Ldr_None );
     };
 
     std::wcout << L"Manual image mapping test\n";
@@ -22,7 +31,7 @@ void TestMMap()
 
     eLoadFlags flags = ManualImports | RebaseProcess | NoDelayLoad;
 
-    if (thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", flags, ldrDef, &thisProc ) == 0)
+    if (thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", flags, callback ) == 0)
     {
         std::wcout << L"Mapping failed with error 0x" << std::hex << LastNtStatus()
                    << L". " << Utils::GetErrorDescription( LastNtStatus() ) << std::endl << std::endl;

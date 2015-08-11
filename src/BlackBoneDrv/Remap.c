@@ -213,13 +213,13 @@ NTSTATUS BBBuildProcessRegionListForRange( IN PLIST_ENTRY pList, IN ULONG_PTR st
 {
     NTSTATUS status = STATUS_SUCCESS;
     MEMORY_BASIC_INFORMATION mbi = { 0 };
-    ULONG length = 0;
+    SIZE_T length = 0;
     ULONG_PTR memptr = 0;
     PMAP_ENTRY pEntry = NULL;
 
     for (memptr = start; memptr < end; memptr = (ULONG_PTR)mbi.BaseAddress + mbi.RegionSize)
     {
-        status = ZwQueryVirtualMemory( ZwCurrentProcess(), (PVOID)memptr, MemoryBasicInformation, &mbi, sizeof( mbi ), &length );
+        status = ZwQueryVirtualMemory( ZwCurrentProcess(), (PVOID)memptr, MemoryBasicInformationEx, &mbi, sizeof( mbi ), &length );
 
         if (!NT_SUCCESS( status ))
         {
@@ -349,7 +349,7 @@ NTSTATUS BBHandleSharedRegion( IN PMAP_ENTRY pEntry )
     NTSTATUS status = STATUS_SUCCESS;
 
     MEMORY_BASIC_INFORMATION mbi = { 0 };
-    ULONG length = 0;
+    SIZE_T length = 0;
     ULONG_PTR memptr = 0;
 
     // Iterate underlying memory regions

@@ -4,11 +4,13 @@
 
 #include "../Include/Winheaders.h"
 
+#include <map>
+
+#pragma warning(disable : 4091)
 #include <cor.h>
 #include <CorError.h>
-
-#include <map>
 #include <atlbase.h>
+#pragma warning(default : 4091)
 
 namespace blackbone
 {

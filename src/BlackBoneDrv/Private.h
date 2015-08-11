@@ -51,7 +51,38 @@
 
 #define SharedUserData ((KUSER_SHARED_DATA * const)KI_USER_SHARED_DATA)
 
+#ifndef PTE_SHIFT
 #define PTE_SHIFT 3
+#endif
+#ifndef PTI_SHIFT
+#define PTI_SHIFT 12
+#endif
+#ifndef PDI_SHIFT
+#define PDI_SHIFT 21
+#endif
+#ifndef PPI_SHIFT
+#define PPI_SHIFT 30
+#endif
+#ifndef PXI_SHIFT
+#define PXI_SHIFT 39
+#endif
+
+#ifndef PXE_BASE
+#define PXE_BASE    0xFFFFF6FB7DBED000UI64
+#endif
+#ifndef PXE_SELFMAP
+#define PXE_SELFMAP 0xFFFFF6FB7DBEDF68UI64
+#endif
+#ifndef PPE_BASE
+#define PPE_BASE    0xFFFFF6FB7DA00000UI64
+#endif
+#ifndef PDE_BASE
+#define PDE_BASE    0xFFFFF6FB40000000UI64
+#endif
+#ifndef PTE_BASE
+#define PTE_BASE    0xFFFFF68000000000UI64
+#endif
+
 #define ObpDecodeGrantedAccess( Access ) \
     ((Access)& ~ObpAccessProtectCloseBit)
 

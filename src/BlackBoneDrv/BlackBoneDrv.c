@@ -184,6 +184,14 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
     RTL_OSVERSIONINFOEXW verInfo = { 0 };
     ULONG buildNo = 0;
 
+    const ULONG w7Build  = 18798;
+    const ULONG w8Build  = 17328;
+    const ULONG w10Build = 16412;
+
+    UNREFERENCED_PARAMETER( w7Build );
+    UNREFERENCED_PARAMETER( w8Build );
+    UNREFERENCED_PARAMETER( w10Build );
+
     if (pData == NULL)
         return STATUS_INVALID_ADDRESS;
 
@@ -205,7 +213,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
     #if defined(_WIN7_)
         if (ver_short != WINVER_7 && ver_short != WINVER_7_SP1)
             return STATUS_NOT_SUPPORTED;
-        if(ver_short == WINVER_7_SP1 && buildNo != 18798)
+        if(ver_short == WINVER_7_SP1 && buildNo != w7Build)
             pData->correctBuild = FALSE;
     #elif defined(_WIN8_)
         if (ver_short != WINVER_8)
@@ -213,23 +221,24 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
     #elif defined (_WIN81_)
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
-        if (buildNo != 17328)
+        if (buildNo != w8Build)
             pData->correctBuild = FALSE;
     #elif defined (_WIN10_)
         if (ver_short != WINVER_10)           
             return STATUS_NOT_SUPPORTED;
-        if (buildNo != 16393)
+        if (buildNo != w10Build)
             pData->correctBuild = FALSE;
     #endif
 
         DPRINT( 
-            "BlackBone: OS version %d.%d.%d.%d.%d - 0x%x\n",
+            "BlackBone: OS version %d.%d.%d.%d.%d - 0x%x. Build supported: %s\n",
             verInfo.dwMajorVersion,
             verInfo.dwMinorVersion,
             verInfo.dwBuildNumber,
             verInfo.wServicePackMajor,
             buildNo,
-            ver_short
+            ver_short,
+            pData->correctBuild ? "true" : "false"
             );
 
         switch (ver_short)
@@ -280,7 +289,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->ExRemoveTable    = 0x432A88; // 0x38E320;
                 break;
 
-                // Windows 10, build 16393
+                // Windows 10, build 16412
             case WINVER_10:
                 pData->KExecOpt         = 0x1BF;
                 pData->Protection       = 0x6AA;

@@ -301,7 +301,7 @@ typedef struct _IMAGE_NT_HEADERS
     ULONG Signature;
     IMAGE_FILE_HEADER FileHeader;
     IMAGE_OPTIONAL_HEADER32 OptionalHeader;
-};
+} IMAGE_NT_HEADERS;
 
 typedef struct _IMAGE_EXPORT_DIRECTORY {
     ULONG   Characteristics;

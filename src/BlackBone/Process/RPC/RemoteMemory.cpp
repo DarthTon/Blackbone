@@ -55,18 +55,18 @@ NTSTATUS RemoteMemory::Map( bool mapSections )
 /// <returns>Status code</returns>
 NTSTATUS RemoteMemory::Map( ptr_t base, uint32_t size )
 {
-    MapMemoryRegionResult result;
+    MapMemoryRegionResult memRes = { };
 
     Driver().EnsureLoaded();
-    NTSTATUS status = Driver().MapMemoryRegion( _process->pid(), base, size, result );
+    NTSTATUS status = Driver().MapMemoryRegion( _process->pid(), base, size, memRes );
 
     // Update regions
     if (NT_SUCCESS( status ))
     {
-        MapMemoryResult result;
+        MapMemoryResult rgnRes = { };
 
-        if (NT_SUCCESS( Driver().MapMemory( _process->pid(), _pipeName, false, result ) ))
-             std::swap( _mapDatabase, result.regions );
+        if (NT_SUCCESS( Driver().MapMemory( _process->pid(), _pipeName, false, rgnRes ) ))
+            std::swap( _mapDatabase, rgnRes.regions );
     }
 
     return status;
