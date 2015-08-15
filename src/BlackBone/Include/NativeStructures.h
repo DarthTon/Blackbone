@@ -330,19 +330,20 @@ namespace blackbone
         LONG BasePriority;
     };
 
-    struct VM_COUNTERS
+    template<typename T>
+    struct _VM_COUNTERS_T
     {
-        SIZE_T PeakVirtualSize;
-        SIZE_T VirtualSize;
+        T PeakVirtualSize;
+        T VirtualSize;
         ULONG PageFaultCount;
-        SIZE_T PeakWorkingSetSize;
-        SIZE_T WorkingSetSize;
-        SIZE_T QuotaPeakPagedPoolUsage;
-        SIZE_T QuotaPagedPoolUsage;
-        SIZE_T QuotaPeakNonPagedPoolUsage;
-        SIZE_T QuotaNonPagedPoolUsage;
-        SIZE_T PagefileUsage;
-        SIZE_T PeakPagefileUsage;
+        T PeakWorkingSetSize;
+        T WorkingSetSize;
+        T QuotaPeakPagedPoolUsage;
+        T QuotaPagedPoolUsage;
+        T QuotaPeakNonPagedPoolUsage;
+        T QuotaNonPagedPoolUsage;
+        T PagefileUsage;
+        T PeakPagefileUsage;
     };
 
     template<typename T>
@@ -368,7 +369,8 @@ namespace blackbone
         T StackBase;
         T StackLimit;
         T Win32StartAddress;
-        T Reserved[4];
+        T TebBase;
+        T Reserved[3];
     };
 
     template<typename T>
@@ -389,9 +391,9 @@ namespace blackbone
         T InheritedFromUniqueProcessId;
         ULONG HandleCount;
         ULONG SessionId;
-        ULONG_PTR UniqueProcessKey;
-        VM_COUNTERS VmCounters;
-        SIZE_T PrivatePageCount;
+        T UniqueProcessKey;
+        _VM_COUNTERS_T<T> VmCounters;
+        T PrivatePageCount;
         IO_COUNTERS IoCounters;
         _SYSTEM_EXTENDED_THREAD_INFORMATION_T<T> Threads[1];
     };
