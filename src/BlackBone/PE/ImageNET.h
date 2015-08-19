@@ -39,7 +39,7 @@ public:
     /// </summary>
     /// <param name="methods">Found Methods</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool Parse( mapMethodRVA& methods );
+    BLACKBONE_API bool Parse( mapMethodRVA* methods = nullptr );
 
     /// <summary>
     /// Get image .NET runtime version

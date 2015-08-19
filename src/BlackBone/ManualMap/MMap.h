@@ -165,6 +165,13 @@ private:
         MapCallback ldrCallback = nullptr,
         void* ldrContext = nullptr
         );
+ 
+    /// <summary>
+    /// Fix image path for pure managed mapping
+    /// </summary>
+    /// <param name="base">Image base</param>
+    /// <param name="path">New image path</param>
+    void FixManagedPath( size_t base, const std::wstring &path );
 
     /// <summary>
     /// Get existing module or map it if absent
@@ -283,13 +290,6 @@ private:
     /// <param name="path">Dependency path</param>
     /// <returns></returns>
     const ModuleData* FindOrMapDependency( ImageContext* pImage, std::wstring& path );
-
-    /// <summary>
-    /// Map pure IL image
-    /// Not supported yet
-    /// </summary>
-    /// <returns>Image base</returns>
-    module_t MapPureManaged();
 
     /// <summary>
     /// Transform section characteristics into memory protection flags

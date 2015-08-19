@@ -120,11 +120,33 @@ const ModuleData* MMap::MapImageInternal(
     }
 
     // Change process base module address if needed
-    if (flags & RebaseProcess && !_images.empty() && _images.rbegin()->get()->peImage.IsExe())
+    if (flags & RebaseProcess && !_images.empty() && _images.rbegin()->get()->peImage.isExe())
     {
         BLACBONE_TRACE( L"ManualMap: Rebasing process to address 0x%p", static_cast<size_t>(mod->baseAddress) );
+
+        // Managed path fix
+        if (_images.rbegin()->get()->peImage.pureIL() && !path.empty())
+            FixManagedPath( _process.memory().Read<size_t>( _process.core().peb() + 2 * WordSize ), path );
+
         _process.memory().Write( _process.core().peb() + 2 * WordSize, WordSize, &mod->baseAddress );
     }
+
+    auto wipeMemory = []( DWORD pid, ImageContext* img, size_t offset, size_t size )
+    {
+        size = Align( size, 0x1000 );
+        std::unique_ptr<uint8_t[]> zeroBuf( new uint8_t[size]() );
+
+        if (img->flags & HideVAD)
+        {
+            Driver().WriteMem( pid, img->imgMem.ptr() + offset, size, zeroBuf.get() );
+        }
+        else
+        {
+            img->imgMem.Write( offset, size, zeroBuf.get() );
+            if (!NT_SUCCESS( img->imgMem.Free( img->peImage.headersSize() ) ))
+                img->imgMem.Protect( PAGE_NOACCESS, 0, img->peImage.headersSize() );
+        }
+    };
 
     // Run initializers
     for (auto& img : _images)
@@ -132,26 +154,27 @@ const ModuleData* MMap::MapImageInternal(
         // Init once
         if (!img->initialized)
         {
+            // Hack for IL dlls
+            if (!img->peImage.isExe() && img->peImage.pureIL())
+            {
+                DWORD flOld = 0;
+                auto flg = img->imgMem.Read( img->peImage.ilFlagOffset(), 0 );
+                img->imgMem.Protect( PAGE_EXECUTE_READWRITE, img->peImage.ilFlagOffset(), sizeof( flg ), &flOld );
+                img->imgMem.Write( img->peImage.ilFlagOffset(), flg & ~COMIMAGE_FLAGS_ILONLY );
+                img->imgMem.Protect( flOld, img->peImage.ilFlagOffset(), sizeof( flg ), &flOld );
+            }
+
             if (!RunModuleInitializers( img.get(), DLL_PROCESS_ATTACH ))
                 return nullptr;
 
             // Wipe header
             if (img->flags & WipeHeader)
-            {
-                uint8_t zeroBuf[0x1000] = { 0 };
+                wipeMemory( _process.pid(), img.get(), 0, 0x1000 );
 
-                // Fill with 0 
-                if (img->flags & HideVAD)
-                {
-                    Driver().WriteMem( _process.pid(), img->imgMem.ptr(), sizeof( zeroBuf ), zeroBuf );
-                }
-                else
-                {
-                    img->imgMem.Write( 0, zeroBuf );
-                    if (!NT_SUCCESS( img->imgMem.Free( img->peImage.headersSize() ) ))
-                        img->imgMem.Protect( PAGE_NOACCESS, 0, img->peImage.headersSize() );
-                }
-            }
+            // Wipe discardable sections for non pure IL images
+            for (auto& sec : img->peImage.sections())
+                if (sec.Characteristics & IMAGE_SCN_MEM_DISCARDABLE)
+                    wipeMemory( _process.pid(), img.get(), sec.VirtualAddress, sec.Misc.VirtualSize );   
 
             img->initialized = true;
         }
@@ -160,6 +183,41 @@ const ModuleData* MMap::MapImageInternal(
     Cleanup();
 
     return mod;
+}
+
+/// <summary>
+/// Fix image path for pure managed mapping
+/// </summary>
+/// <param name="base">Image base</param>
+/// <param name="path">New image path</param>
+void MMap::FixManagedPath( size_t base, const std::wstring &path )
+{
+    _PEB_T2<DWORD_PTR>::type peb = { { { 0 } } };
+    _PEB_LDR_DATA2<DWORD_PTR> ldr = { 0 };
+
+    if (_process.core().peb( &peb ) != 0 && _process.memory().Read( peb.Ldr, sizeof( ldr ), &ldr ) == STATUS_SUCCESS)
+    {
+        // Get PEB loader entry
+        for (auto head = static_cast<DWORD_PTR>(ldr.InLoadOrderModuleList.Flink);
+            head != (peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<DWORD_PTR>, InLoadOrderModuleList ));
+            head = _process.memory().Read<DWORD_PTR>( head ))
+        {
+            _LDR_DATA_TABLE_ENTRY_BASE<DWORD_PTR> localdata = { { 0 } };
+
+            _process.memory().Read( head, sizeof( localdata ), &localdata );
+            if (localdata.DllBase == base)
+            {
+                auto len = path.length()* sizeof( wchar_t );
+                _process.memory().Write( localdata.FullDllName.Buffer, len + 2, path.c_str() );
+                _process.memory().Write<short>(
+                    head + FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<DWORD_PTR>, FullDllName.Length ),
+                    static_cast<short>(len)
+                    );
+
+                return;
+            }
+        }
+    }
 }
 
 /// <summary>
@@ -358,17 +416,6 @@ const ModuleData* MMap::FindOrMapModule(
 }
 
 /// <summary>
-/// Map pure IL image
-/// Not supported yet
-/// </summary>
-/// <returns>Image base</returns>
-module_t MMap::MapPureManaged( )
-{
-    LastNtStatus( STATUS_NOT_IMPLEMENTED );
-    return 0;
-}
-
-/// <summary>
 /// Unmap all manually mapped modules
 /// </summary>
 /// <returns>true on success</returns>
@@ -439,11 +486,10 @@ bool MMap::CopyImage( ImageContext* pImage )
     auto& sections = pImage->peImage.sections();
 
     // Copy sections
-    for( auto& section : sections)
+    for (auto& section : sections)
     {
         // Skip discardable sections
-        if (section.Characteristics & (IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE) &&
-             !(section.Characteristics & IMAGE_SCN_MEM_DISCARDABLE))
+        if (section.Characteristics & (IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_MEM_EXECUTE))
         {
             if (section.SizeOfRawData == 0)
                 continue;
@@ -453,8 +499,10 @@ bool MMap::CopyImage( ImageContext* pImage )
             // Copy section data
             if (pImage->flags & HideVAD)
             {
-                status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + section.VirtualAddress,
-                                            section.SizeOfRawData, pSource );
+                status = Driver().WriteMem(
+                    _process.pid(), pImage->imgMem.ptr() + section.VirtualAddress,
+                    section.SizeOfRawData, pSource
+                    );
             }
             else
             {
@@ -463,7 +511,10 @@ bool MMap::CopyImage( ImageContext* pImage )
 
             if (!NT_SUCCESS( status ))
             {
-                BLACBONE_TRACE( L"ManualMap: Failed to copy image section at offset 0x%x. Status = 0x%x", section.VirtualAddress, status );
+                BLACBONE_TRACE(
+                    L"ManualMap: Failed to copy image section at offset 0x%x. Status = 0x%x",
+                    section.VirtualAddress, status
+                    );
                 return false;
             }
         } 
@@ -487,8 +538,11 @@ bool MMap::ProtectImageMemory( ImageContext* pImage )
         {
             if (pImage->imgMem.Protect( prot, section.VirtualAddress, section.Misc.VirtualSize ) != STATUS_SUCCESS)
             {
-                BLACBONE_TRACE( L"ManualMap: Failed to set section memory protection at offset 0x%x. Status = 0x%x", 
-                                section.VirtualAddress, LastNtStatus() );
+                BLACBONE_TRACE(
+                    L"ManualMap: Failed to set section memory protection at offset 0x%x. Status = 0x%x",
+                    section.VirtualAddress, LastNtStatus()
+                    );
+
                 return false;
             }
         }
@@ -922,7 +976,7 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
     a.GenPrologue();
 
     // ActivateActCtx
-    if (_pAContext.valid())
+    if (_pAContext.valid() && pActivateActx.procAddress)
     {
         a->mov( a->zax, _pAContext.ptr<size_t>() );
         a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
@@ -972,7 +1026,7 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
     }
 
     // DeactivateActCtx
-    if (_pAContext.valid())
+    if (_pAContext.valid() && pDeactivateeActx.procAddress)
     {
         a->mov( a->zax, _pAContext.ptr<size_t>() + sizeof(HANDLE) );
         a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
@@ -1174,11 +1228,7 @@ DWORD MMap::GetSectionProt( DWORD characteristics )
 {
     DWORD dwResult = PAGE_NOACCESS;
 
-    if (characteristics & IMAGE_SCN_MEM_DISCARDABLE)
-    {
-        dwResult = PAGE_NOACCESS;
-    }
-    else if(characteristics & IMAGE_SCN_MEM_EXECUTE) 
+    if(characteristics & IMAGE_SCN_MEM_EXECUTE) 
     {
         if(characteristics & IMAGE_SCN_MEM_WRITE)
             dwResult = PAGE_EXECUTE_READWRITE;

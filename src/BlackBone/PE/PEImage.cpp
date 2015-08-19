@@ -36,9 +36,11 @@ NTSTATUS PEImage::Load( const std::wstring& path, bool skipActx /*= false*/ )
     _imagePath = path;
     _noFile = false;
 
-    _hFile = CreateFileW( path.c_str(), FILE_GENERIC_READ,
-                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                          NULL, OPEN_EXISTING, 0, NULL );
+    _hFile = CreateFileW(
+        path.c_str(), FILE_GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        NULL, OPEN_EXISTING, 0, NULL
+        );
 
     if (_hFile != INVALID_HANDLE_VALUE)
     {
@@ -203,6 +205,18 @@ NTSTATUS PEImage::Parse( void* pImageBase /*= nullptr*/ )
 
     _isPureIL = (pCorHdr && (pCorHdr->Flags & COMIMAGE_FLAGS_ILONLY)) ? true : false;
 
+    if (_isPureIL)
+    {
+        _ILFlagOffset = reinterpret_cast<uint8_t*>(pCorHdr)
+                      - reinterpret_cast<uint8_t*>(_pFileBase)
+                      + static_cast<int32_t>(offsetof( IMAGE_COR20_HEADER, Flags ));
+
+#ifdef COMPILER_MSVC
+        if (_netImage.Init( _imagePath ))
+            _netImage.Parse();
+#endif
+    }
+
     // Sections
     for (int i = 0; i < _pImageHdr32->FileHeader.NumberOfSections; ++i, ++pSection)
         _sections.push_back( *pSection );
@@ -329,7 +343,7 @@ mapImports& PEImage::GetImports( bool useDelayed /*= false*/ )
 /// Retrieve all exported functions with names
 /// </summary>
 /// <param name="names">Found exports</param>
-BLACKBONE_API void PEImage::GetExports( vecExports& exports )
+void PEImage::GetExports( vecExports& exports )
 {
     exports.clear();
 
@@ -526,7 +540,7 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
 /// <param name="size">Manifest size</param>
 /// <param name="manifestID">Mmanifest ID</param>
 /// <returns>Manifest data</returns>
-void* PEImage::GetManifest( uint32_t& size, int& manifestID )
+void* PEImage::GetManifest( uint32_t& size, int32_t& manifestID )
 {
     // 3 levels of pointers to nodes
     const IMAGE_RESOURCE_DIRECTORY_ENTRY *pDirNode1 = nullptr;

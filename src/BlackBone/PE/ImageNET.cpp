@@ -33,35 +33,47 @@ bool ImageNET::Init( const std::wstring& path )
 
     _path = path;
 
-    if (FAILED( CoInitialize( 0 ) ))
-         return false;
-
-    hr = CoCreateInstance( CLSID_CorMetaDataDispenser, NULL, CLSCTX_INPROC_SERVER, 
-                           IID_IMetaDataDispenserEx, reinterpret_cast<void**>(&_pMetaDisp) );
-    if (FAILED( hr ))
-        return false;
-
-    //
-    // query required interfaces
-    //
-    hr = _pMetaDisp->OpenScope( _path.c_str(), 0, IID_IMetaDataImport, reinterpret_cast<IUnknown**>(&_pMetaImport) );
-    if (hr == CLDB_E_BADUPDATEMODE)
+    if(!_pMetaDisp)
     {
-        V_VT(&value)  = VT_UI4;
-        V_UI4(&value) = MDUpdateIncremental;
-
-        if (FAILED( hr = _pMetaDisp->SetOption( MetaDataSetUpdate, &value ) ))
+        if (FAILED( CoInitialize( 0 ) ))
             return false;
 
-        hr = _pMetaDisp->OpenScope( _path.c_str(), 0, IID_IMetaDataImport, reinterpret_cast<IUnknown**>(&_pMetaImport) );
+        hr = CoCreateInstance(
+            CLSID_CorMetaDataDispenser, NULL, CLSCTX_INPROC_SERVER,
+            IID_IMetaDataDispenserEx, reinterpret_cast<void**>(&_pMetaDisp)
+            );
+
+        if (FAILED( hr ))
+            return false;
     }
 
-    if (FAILED( hr ))
-        return false;
+    //
+    // Query required interfaces
+    //
+    if(!_pMetaImport)
+    {
+        hr = _pMetaDisp->OpenScope( _path.c_str(), 0, IID_IMetaDataImport, reinterpret_cast<IUnknown**>(&_pMetaImport) );
+        if (hr == CLDB_E_BADUPDATEMODE)
+        {
+            V_VT( &value ) = VT_UI4;
+            V_UI4( &value ) = MDUpdateIncremental;
 
-    hr = _pMetaImport->QueryInterface( IID_IMetaDataAssemblyImport, reinterpret_cast<void**>(&_pAssemblyImport) );
-    if (FAILED( hr ))
-        return false;
+            if (FAILED( hr = _pMetaDisp->SetOption( MetaDataSetUpdate, &value ) ))
+                return false;
+
+            hr = _pMetaDisp->OpenScope( _path.c_str(), 0, IID_IMetaDataImport, reinterpret_cast<IUnknown**>(&_pMetaImport) );
+        }
+
+        if (FAILED( hr ))
+            return false;
+    }
+
+    if(!_pAssemblyImport)
+    {
+        hr = _pMetaImport->QueryInterface( IID_IMetaDataAssemblyImport, reinterpret_cast<void**>(&_pAssemblyImport) );
+        if (FAILED( hr ))
+            return false;
+    }
 
     return true;
 }
@@ -71,7 +83,7 @@ bool ImageNET::Init( const std::wstring& path )
 /// </summary>
 /// <param name="methods">Found Methods</param>
 /// <returns>true on success</returns>
-bool ImageNET::Parse( mapMethodRVA& methods )
+bool ImageNET::Parse( mapMethodRVA* methods /*= nullptr*/ )
 {
     DWORD dwcTypeDefs, dwTypeDefFlags, dwcTokens, dwSigBlobSize;
 
@@ -117,7 +129,8 @@ bool ImageNET::Parse( mapMethodRVA& methods )
         }
     }
 
-    methods = _methods;
+    if(methods)
+        *methods = _methods;
 
     return true;
 }

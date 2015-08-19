@@ -213,13 +213,14 @@ public:
     /// Check if image is an executable file and not a dll
     /// </summary>
     /// <returns>true if image is an *.exe</returns>
-    BLACKBONE_API inline bool IsExe() const { return _isExe; }
+    BLACKBONE_API inline bool isExe() const { return _isExe; }
 
     /// <summary>
     /// Check if image is pure IL image
     /// </summary>
     /// <returns>true on success</returns>
-    BLACKBONE_API inline bool IsPureManaged() const  { return _isPureIL; }
+    BLACKBONE_API inline bool pureIL() const  { return _isPureIL; }
+    BLACKBONE_API inline int32_t ilFlagOffset() const { return _ILFlagOffset; }
 
     /// <summary>
     /// Get image type. 32/64 bit
@@ -285,7 +286,7 @@ private:
     /// <param name="size">Manifest size</param>
     /// <param name="manifestID">Mmanifest ID</param>
     /// <returns>Manifest data</returns>
-    void* GetManifest( uint32_t& size, int& manifestID );
+    void* GetManifest( uint32_t& size, int32_t& manifestID );
 
 private:
     HANDLE      _hFile = INVALID_HANDLE_VALUE;  // Target file HANDLE
@@ -303,8 +304,9 @@ private:
     uint32_t    _epRVA = 0;                     // Entry point RVA
     uint32_t    _hdrSize = 0;                   // Size of headers
     HANDLE      _hctx = INVALID_HANDLE_VALUE;   // Activation context
-    int         _manifestIdx = 0;               // Manifest resource ID
-    uint32_t    _subsystem;                     // Image subsystem
+    int32_t     _manifestIdx = 0;               // Manifest resource ID
+    uint32_t    _subsystem = 0;                 // Image subsystem
+    int32_t     _ILFlagOffset = 0;              // Offset of pure IL flag
 
     vecSections _sections;                      // Section info
     mapImports  _imports;                       // Import functions

@@ -134,7 +134,7 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
     // Execute code in thread context
     if (QueueUserAPC( _userCode.ptr<PAPCFUNC>(), _hWorkThd.handle(), _userCode.ptr<ULONG_PTR>() ))
     {
-        dwResult = WaitForSingleObject( _hWaitEvent, INFINITE );
+        dwResult = WaitForSingleObject( _hWaitEvent, 30 * 1000 /*wait 30s*/ );
         callResult = _userData.Read<uint64_t>( RET_OFFSET, 0 );
     }
     else
