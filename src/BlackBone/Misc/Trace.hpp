@@ -2,7 +2,6 @@
 
 #include <cstdio>
 #include <cstdlib>
-#include <algorithm>
 
 #pragma warning(disable : 4091)
 #include <DbgHelp.h>
@@ -12,11 +11,7 @@ namespace blackbone
 {
 #ifndef BLACBONE_NO_TRACE
 
-template<typename Ch>
-inline void DoTraceV( const Ch* fmt, va_list va_args );
-
-template<>
-inline void DoTraceV<char>( const char* fmt, va_list va_args )
+inline void DoTraceV( const char* fmt, va_list va_args )
 {
     char buf[2048], userbuf[1024];
     vsprintf_s( userbuf, fmt, va_args );
@@ -28,8 +23,7 @@ inline void DoTraceV<char>( const char* fmt, va_list va_args )
 #endif
 }
 
-template<>
-inline void DoTraceV<wchar_t>( const wchar_t* fmt, va_list va_args )
+inline void DoTraceV( const wchar_t* fmt, va_list va_args )
 {
     wchar_t buf[2048], userbuf[1024];
     vswprintf_s( userbuf, fmt, va_args );

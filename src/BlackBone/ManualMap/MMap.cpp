@@ -131,20 +131,20 @@ const ModuleData* MMap::MapImageInternal(
         _process.memory().Write( _process.core().peb() + 2 * WordSize, WordSize, &mod->baseAddress );
     }
 
-    auto wipeMemory = []( DWORD pid, ImageContext* img, size_t offset, size_t size )
+    auto wipeMemory = []( Process& proc, ImageContext* img, size_t offset, size_t size )
     {
         size = Align( size, 0x1000 );
         std::unique_ptr<uint8_t[]> zeroBuf( new uint8_t[size]() );
 
         if (img->flags & HideVAD)
         {
-            Driver().WriteMem( pid, img->imgMem.ptr() + offset, size, zeroBuf.get() );
+            Driver().WriteMem( proc.pid(), img->imgMem.ptr() + offset, size, zeroBuf.get() );
         }
         else
         {
             img->imgMem.Write( offset, size, zeroBuf.get() );
-            if (!NT_SUCCESS( img->imgMem.Free( img->peImage.headersSize() ) ))
-                img->imgMem.Protect( PAGE_NOACCESS, 0, img->peImage.headersSize() );
+            if (!NT_SUCCESS( proc.memory().Free( img->imgMem.ptr() + offset, size ) ))
+                proc.memory().Protect( img->imgMem.ptr() + offset, size, PAGE_NOACCESS );
         }
     };
 
@@ -169,12 +169,12 @@ const ModuleData* MMap::MapImageInternal(
 
             // Wipe header
             if (img->flags & WipeHeader)
-                wipeMemory( _process.pid(), img.get(), 0, 0x1000 );
+                wipeMemory( _process, img.get(), 0, img->peImage.headersSize() );
 
             // Wipe discardable sections for non pure IL images
             for (auto& sec : img->peImage.sections())
                 if (sec.Characteristics & IMAGE_SCN_MEM_DISCARDABLE)
-                    wipeMemory( _process.pid(), img.get(), sec.VirtualAddress, sec.Misc.VirtualSize );   
+                    wipeMemory( _process, img.get(), sec.VirtualAddress, sec.Misc.VirtualSize );
 
             img->initialized = true;
         }

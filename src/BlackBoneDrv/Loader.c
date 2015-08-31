@@ -790,7 +790,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
             }
         }
 
-        // Call entrypoint
+        // Call entry point
         if (NT_SUCCESS( status ) && pNTHeader->OptionalHeader.AddressOfEntryPoint)
         {
             PDRIVER_INITIALIZE pEntryPoint = (PDRIVER_INITIALIZE)((ULONG_PTR)imageSection + pNTHeader->OptionalHeader.AddressOfEntryPoint);
@@ -803,7 +803,8 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
-        DPRINT( "BlackBone: %s: Exception: 0x%X \n", __FUNCTION__, GetExceptionCode() );
+        status = GetExceptionCode();
+        DPRINT( "BlackBone: %s: Exception: 0x%X \n", __FUNCTION__, status );
     }
 
     // Erase info about allocated region

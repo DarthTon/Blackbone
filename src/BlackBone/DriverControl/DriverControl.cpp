@@ -355,7 +355,11 @@ NTSTATUS DriverControl::AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD 
     if (_hDriver == INVALID_HANDLE_VALUE)
         return STATUS_DEVICE_DOES_NOT_EXIST;
 
-    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_ALLOCATE_FREE_MEMORY, &allocMem, sizeof( allocMem ), &result, sizeof( result ), &bytes, NULL ))
+    if (!DeviceIoControl( 
+        _hDriver, IOCTL_BLACKBONE_ALLOCATE_FREE_MEMORY, 
+        &allocMem, sizeof( allocMem ), 
+        &result, sizeof( result ), &bytes, NULL 
+        ))
     {
         size = base = 0;
         return LastNtStatus();
@@ -392,8 +396,14 @@ NTSTATUS DriverControl::FreeMem( DWORD pid, ptr_t base, ptr_t size, DWORD type )
     if (_hDriver == INVALID_HANDLE_VALUE)
         return STATUS_DEVICE_DOES_NOT_EXIST;
 
-    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_ALLOCATE_FREE_MEMORY, &freeMem, sizeof( freeMem ), &result, sizeof( result ), &bytes, NULL ))
+    if (!DeviceIoControl(
+        _hDriver, IOCTL_BLACKBONE_ALLOCATE_FREE_MEMORY,
+        &freeMem, sizeof( freeMem ),
+        &result, sizeof( result ), &bytes, NULL
+        ))
+    {
         return LastNtStatus();
+    }
 
     return STATUS_SUCCESS;
 }

@@ -173,7 +173,7 @@ void DetourBase::CopyOldCode( uint8_t* ptr )
     {
         SET_JUMP( old, src );
         _callOriginal = _origCode;
-    }         
+    } 
 }
 
 

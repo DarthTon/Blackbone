@@ -696,16 +696,23 @@ NTSTATUS BBResolveImageRefs(
         RtlAnsiStringToUnicodeString( &ustrImpDll, &strImpDll, TRUE );
 
         // Resolve image name
-        status = BBResolveImagePath( pContext, pProcess, 0, &ustrImpDll, NULL, &resolved );
-        BBStripPath( &resolved, &resolvedName );
-
-        // Something went terribly wrong
-        if (status == STATUS_UNHANDLED_EXCEPTION)
+        if(!systemImage)
         {
-            RtlFreeUnicodeString( &ustrImpDll );
-            RtlFreeUnicodeString( &resolved );
+            status = BBResolveImagePath( pContext, pProcess, 0, &ustrImpDll, NULL, &resolved );
+            BBStripPath( &resolved, &resolvedName );
 
-            return STATUS_NOT_FOUND;
+            // Something went terribly wrong
+            if (status == STATUS_UNHANDLED_EXCEPTION)
+            {
+                RtlFreeUnicodeString( &ustrImpDll );
+                RtlFreeUnicodeString( &resolved );
+
+                return STATUS_NOT_FOUND;
+            }
+        }
+        else
+        {
+            BBSafeInitString( &resolved, &ustrImpDll );
         }
 
         // Get import module
@@ -779,7 +786,12 @@ NTSTATUS BBResolveImageRefs(
                 impFunc = (PCCHAR)(THUNK_VAL_T( pHeader, pThunk, u1.AddressOfData ) & 0xFFFF);
             }
 
-            pFunc = BBGetModuleExport( systemImage ? pModule.ldrEntry->DllBase : pModule.address, impFunc, pContext->pProcess, &resolved );
+            pFunc = BBGetModuleExport(
+                systemImage ? pModule.ldrEntry->DllBase : pModule.address,
+                impFunc,
+                systemImage ?  NULL : pContext->pProcess,
+                &resolved 
+                );
 
             // No export found
             if (!pFunc)

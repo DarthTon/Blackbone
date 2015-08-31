@@ -207,9 +207,10 @@ NTSTATUS PEImage::Parse( void* pImageBase /*= nullptr*/ )
 
     if (_isPureIL)
     {
-        _ILFlagOffset = reinterpret_cast<uint8_t*>(pCorHdr)
-                      - reinterpret_cast<uint8_t*>(_pFileBase)
-                      + static_cast<int32_t>(offsetof( IMAGE_COR20_HEADER, Flags ));
+        _ILFlagOffset = static_cast<int32_t>(
+            reinterpret_cast<uint8_t*>(pCorHdr)
+            - reinterpret_cast<uint8_t*>(_pFileBase)
+            + static_cast<int32_t>(offsetof( IMAGE_COR20_HEADER, Flags )));
 
 #ifdef COMPILER_MSVC
         if (_netImage.Init( _imagePath ))
