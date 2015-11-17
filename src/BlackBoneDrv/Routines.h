@@ -96,6 +96,25 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData );
 NTSTATUS BBUnlinkHandleTable( IN PUNLINK_HTABLE pUnlink );
 
 /// <summary>
+/// Hook SSDT entry
+/// </summary>
+/// <param name="index">SSDT index to hook</param>
+/// <param name="newAddr">Hook function</param>
+/// <param name="ppOldAddr">Original function pointer</param>
+/// <returns>Status code</returns>
+NTSTATUS BBHookSSDT( IN ULONG index, IN PVOID newAddr, OUT PVOID *ppOldAddr );
+
+/// <summary>
+/// Restore SSDT hook
+/// </summary>
+/// <param name="index">SSDT index to restore</param>
+/// <param name="origAddr">Original function address</param>
+/// <returns>Status code</returns>
+NTSTATUS BBRestoreSSDT( IN ULONG index, IN PVOID origAddr );
+
+NTSTATUS BBHookInline( IN PVOID origAddr, IN PVOID newAddr );
+
+/// <summary>
 /// Process termination handler
 /// </summary>
 /// <param name="ParentId">Parent PID</param>

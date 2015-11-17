@@ -3,6 +3,10 @@
 #include <Ntstrsafe.h>
 
 LIST_ENTRY g_PhysProcesses;
+PVOID g_kernelPage = NULL;  // Trampoline buffer page
+LONG g_trIndex = 0;         // Trampoline global index
+
+
 
 /// <summary>
 /// Find allocated memory region entry
@@ -11,6 +15,7 @@ LIST_ENTRY g_PhysProcesses;
 /// <param name="pBase">Region base</param>
 /// <returns>Found entry, NULL if not found</returns>
 PMEM_PHYS_ENTRY BBLookupPhysMemEntry( IN PLIST_ENTRY pList, IN PVOID pBase );
+VOID BBWriteTrampoline( IN PUCHAR place, IN PVOID pfn );
 
 #pragma alloc_text(PAGE, BBDisableDEP)
 #pragma alloc_text(PAGE, BBSetProtection)
@@ -19,6 +24,8 @@ PMEM_PHYS_ENTRY BBLookupPhysMemEntry( IN PLIST_ENTRY pList, IN PVOID pBase );
 #pragma alloc_text(PAGE, BBAllocateFreeMemory)
 #pragma alloc_text(PAGE, BBAllocateFreePhysical)
 #pragma alloc_text(PAGE, BBProtectMemory)
+#pragma alloc_text(PAGE, BBWriteTrampoline)
+#pragma alloc_text(PAGE, BBHookSSDT)
 
 #pragma alloc_text(PAGE, BBLookupPhysProcessEntry)
 #pragma alloc_text(PAGE, BBLookupPhysMemEntry)
@@ -211,7 +218,7 @@ NTSTATUS BBUnlinkHandleTable( IN PUNLINK_HTABLE pUnlink )
         PHANDLE_TABLE pTable = *(PHANDLE_TABLE*)((PUCHAR)pProcess + dynData.ObjTable);
 
         // Unlink process handle table
-        fnExRemoveHandleTable ExRemoveHandleTable = (fnExRemoveHandleTable)((ULONG_PTR)GetKernelBase() + dynData.ExRemoveTable);
+        fnExRemoveHandleTable ExRemoveHandleTable = (fnExRemoveHandleTable)((ULONG_PTR)GetKernelBase( NULL ) + dynData.ExRemoveTable);
         //DPRINT( "BlackBone: %s: ExRemoveHandleTable address 0x%p. Object Table offset: 0x%X\n", 
                // __FUNCTION__, ExRemoveHandleTable, dynData.ObjTable );
 
@@ -559,6 +566,159 @@ NTSTATUS BBHideVAD( IN PHIDE_VAD pData )
         ObDereferenceObject( pProcess );
 
     return status;
+}
+
+/// <summary>
+/// Create hook trampoline
+/// </summary>
+/// <param name="place">Trampoline address</param>
+/// <param name="pfn">Function pointer</param>
+VOID BBWriteTrampoline( IN PUCHAR place, IN PVOID pfn )
+{
+    if (!place || !pfn)
+        return;
+
+    // jmp [rip + 0]
+    ULONGLONG cr0 = __readcr0();
+    __writecr0( cr0 & 0xFFFEFFFF );
+    *(PUSHORT)place = 0x25FF;
+    *(PULONG)(place + 2) = 0;
+    *(PVOID**)(place + 6) = pfn;
+    __writecr0( cr0 );
+}
+
+PVOID BBFindTrampolineSpace( IN PVOID lowest )
+{
+    ASSERT( lowest != NULL );
+    if (lowest == NULL)
+        return NULL;
+
+    const ULONG size = sizeof( USHORT ) + sizeof( ULONG ) + sizeof( PVOID );
+    PUCHAR ntosBase = GetKernelBase( NULL );
+    if (!ntosBase)
+        return NULL;
+
+    PIMAGE_NT_HEADERS pHdr = RtlImageNtHeader( ntosBase );
+    PIMAGE_SECTION_HEADER pFirstSec = (PIMAGE_SECTION_HEADER)(pHdr + 1);
+    for (PIMAGE_SECTION_HEADER pSec = pFirstSec; pSec < pFirstSec + pHdr->FileHeader.NumberOfSections; pSec++)
+    {
+        // First appropriate section
+        if ((PUCHAR)lowest < ntosBase + pSec->VirtualAddress || (PUCHAR)lowest < ntosBase + pSec->VirtualAddress + (ULONG_PTR)PAGE_ALIGN( pSec->Misc.VirtualSize ))
+        {
+            if (pSec->Characteristics & IMAGE_SCN_MEM_EXECUTE &&
+                !(pSec->Characteristics & IMAGE_SCN_MEM_DISCARDABLE) &&
+                (*(PULONG)pSec->Name != 'TINI'))
+            {
+                ULONG_PTR offset = 0;
+                if((PUCHAR)lowest >= ntosBase + pSec->VirtualAddress)
+                    offset = (PUCHAR)lowest - ntosBase - pSec->VirtualAddress;
+
+                for (ULONG_PTR i = offset, bytes = 0; i < (ULONG_PTR)PAGE_ALIGN( pSec->Misc.VirtualSize - size ); i++)
+                {
+                    // int3, nop, or inside unused section space
+                    if (ntosBase[pSec->VirtualAddress + i] == 0xCC || ntosBase[pSec->VirtualAddress + i] == 0x90 || i > pSec->Misc.VirtualSize - size)
+                        bytes++;
+                    else
+                        bytes = 0;
+
+                    if (bytes >= size)
+                        return &ntosBase[pSec->VirtualAddress + i - bytes + 1];
+                }
+            }
+        }
+    }
+
+    return NULL;
+}
+
+/// <summary>
+/// Hook SSDT entry
+/// </summary>
+/// <param name="index">SSDT index to hook</param>
+/// <param name="newAddr">Hook function</param>
+/// <param name="ppOldAddr">Original function pointer</param>
+/// <returns>Status code</returns>
+NTSTATUS BBHookSSDT( IN ULONG index, IN PVOID newAddr, OUT PVOID *ppOldAddr )
+{
+    ASSERT( newAddr != NULL );
+    if (newAddr == NULL)
+        return STATUS_INVALID_PARAMETER;
+
+    NTSTATUS status = STATUS_SUCCESS;
+    PSYSTEM_SERVICE_DESCRIPTOR_TABLE pSSDT = GetSSDTBase();
+    if (!pSSDT)
+        return STATUS_NOT_FOUND;
+
+    if (ppOldAddr)
+        *ppOldAddr = (PUCHAR)pSSDT->ServiceTableBase + (((PLONG)pSSDT->ServiceTableBase)[index] >> 4);
+
+    ULONG_PTR offset = (ULONG_PTR)newAddr - (ULONG_PTR)pSSDT->ServiceTableBase;
+
+    // Intermediate jump is required
+    if (offset > 0x07FFFFFF)
+    {
+        // Allocate trampoline, if required
+        PVOID pTrampoline = BBFindTrampolineSpace( pSSDT->ServiceTableBase );
+        if (!pTrampoline)
+            return STATUS_NOT_FOUND;
+
+        // Write jmp
+        BBWriteTrampoline( pTrampoline, newAddr );
+        offset = (((ULONG_PTR)pTrampoline - (ULONG_PTR)pSSDT->ServiceTableBase) << 4) & 0xFFFFFFF0;
+    }
+    // Direct jump
+    else
+        offset = (offset << 4) & 0xFFFFFFF0;
+
+    // Update pointer
+    ULONGLONG cr0 = __readcr0();
+    __writecr0( cr0 & 0xFFFEFFFF );
+    InterlockedExchange( (PLONG)pSSDT->ServiceTableBase + index, (LONG)offset );
+    __writecr0( cr0 );
+
+    return status;
+}
+
+/// <summary>
+/// Restore SSDT hook
+/// </summary>
+/// <param name="index">SSDT index to restore</param>
+/// <param name="origAddr">Original function address</param>
+/// <returns>Status code</returns>
+NTSTATUS BBRestoreSSDT( IN ULONG index, IN PVOID origAddr )
+{
+    ASSERT( origAddr != NULL );
+    if (origAddr == NULL)
+        return STATUS_INVALID_PARAMETER;
+
+    PSYSTEM_SERVICE_DESCRIPTOR_TABLE pSSDT = GetSSDTBase();
+    if (!pSSDT)
+        return STATUS_NOT_FOUND;
+
+    ULONG_PTR offset = (((ULONG_PTR)origAddr - (ULONG_PTR)pSSDT->ServiceTableBase) << 4) | (pSSDT->ParamTableBase[index] >> 2);
+    ULONGLONG cr0 = __readcr0();
+    __writecr0( cr0 & 0xFFFEFFFF );
+    InterlockedExchange( (PLONG)pSSDT->ServiceTableBase + index, (LONG)offset );
+    __writecr0( cr0 );
+
+    return STATUS_SUCCESS;
+}
+
+
+NTSTATUS BBHookInline( IN PVOID origAddr, IN PVOID newAddr )
+{
+    UNREFERENCED_PARAMETER( origAddr );
+    UNREFERENCED_PARAMETER( newAddr );
+
+    NOPPROCINFO info;
+    InitializeStopProcessors( &info );
+    StopProcessors( &info );
+    ULONGLONG cr0 = __readcr0();
+    __writecr0( cr0 & 0xFFFEFFFF );
+
+    __writecr0( cr0 );
+    StartProcessors( &info );
+    return STATUS_SUCCESS;
 }
 
 /// <summary>

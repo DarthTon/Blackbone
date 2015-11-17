@@ -16,6 +16,14 @@
 
 #define MAKEINTRESOURCEW(i) ((PWCH)((ULONG_PTR)((USHORT)(i))))
 
+typedef struct _SYSTEM_SERVICE_DESCRIPTOR_TABLE 
+{
+    PULONG_PTR ServiceTableBase;
+    PULONG ServiceCounterTableBase;
+    ULONG_PTR NumberOfServices;
+    PUCHAR ParamTableBase;
+} SYSTEM_SERVICE_DESCRIPTOR_TABLE, *PSYSTEM_SERVICE_DESCRIPTOR_TABLE;
+
 typedef union _PS_PROTECTION
 {
     UCHAR Level;

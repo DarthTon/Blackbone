@@ -88,6 +88,14 @@
 
 #define ObpDecodeObject( Object ) (PVOID)(((LONG_PTR)Object >> 0x10) & ~(ULONG_PTR)0xF)
 
+#define PTE_PER_PAGE 512
+#define PDE_PER_PAGE 512
+#define PPE_PER_PAGE 512
+#define PXE_PER_PAGE 512
+
+#define PPI_MASK (PPE_PER_PAGE - 1)
+#define PXI_MASK (PXE_PER_PAGE - 1)
+
 #define MiGetPxeOffset(va) \
     ((ULONG)(((ULONG_PTR)(va) >> PXI_SHIFT) & PXI_MASK))
 
@@ -115,6 +123,13 @@
 
 #define ExpIsValidObjectEntry(Entry) \
     ( (Entry != NULL) && (Entry->LowValue != 0) && (Entry->HighValue != EX_ADDITIONAL_INFO_SIGNATURE) )
+
+// Workaround for compiler warning
+#define FN_CAST(T, p)   (T)(ULONG_PTR)p
+#define FN_CAST_V(p)    (PVOID)(ULONG_PTR)p
+
+// Get SSDT index from function pointer
+#define SSDTIndex(pfn)  *(PULONG)((ULONG_PTR)pfn + 0x15)
 
 typedef ULONG WIN32_PROTECTION_MASK;
 typedef PULONG PWIN32_PROTECTION_MASK;
@@ -152,6 +167,17 @@ typedef struct _DYNAMIC_DATA
     ULONG ExRemoveTable;    // ExRemoveHandleTable offset
 } DYNAMIC_DATA, *PDYNAMIC_DATA;
 
+
+typedef struct _NOPPROCINFO
+{
+    KDPC DpcTraps[MAXIMUM_PROCESSORS];
+    LONG ActiveCores;
+    LONG DPCCount;
+    ULONG Cores;
+    KIRQL SavedIrql;
+    KPRIORITY SavedPriority;
+    LONG IsCodeExecuted;
+}NOPPROCINFO, *PNOPPROCINFO;
 
 typedef NTSTATUS( NTAPI* fnNtCreateThreadEx )
     (
@@ -231,14 +257,15 @@ PHANDLE_TABLE_ENTRY ExpLookupHandleTableEntry( IN PHANDLE_TABLE HandleTable, IN 
 /// <summary>
 /// Get ntoskrnl base address
 /// </summary>
+/// <param name="pSize">Size of module</param>
 /// <returns>Found address, NULL if not found</returns>
-PVOID GetKernelBase();
+PVOID GetKernelBase( OUT PULONG pSize );
 
 /// <summary>
 /// Gets SSDT base - KiSystemServiceTable
 /// </summary>
 /// <returns>SSDT base, NULL if not found</returns>
-PVOID GetSSDTBase();
+PSYSTEM_SERVICE_DESCRIPTOR_TABLE GetSSDTBase();
 
 /// <summary>
 /// Gets the SSDT entry address by index.
@@ -254,3 +281,29 @@ PVOID GetSSDTEntry( IN ULONG index );
 /// <param name="pAddress">Target address</param>
 /// <returns>Found PTE</returns>
 PMMPTE GetPTEForVA( IN PVOID pAddress );
+
+/// <summary>
+/// Initialize structure for processor start/stop
+/// </summary>
+/// <param name="Info">>Processors data</param>
+VOID InitializeStopProcessors( OUT NOPPROCINFO* Info );
+
+/// <summary>
+/// Stall all but current active processors 
+/// </summary>
+/// <param name="Info">Processors data</param>
+VOID StopProcessors( IN NOPPROCINFO* Info );
+
+/// <summary>
+/// Resume all stopped active processors 
+/// </summary>
+/// <param name="Info">Processors data</param>
+VOID StartProcessors( IN NOPPROCINFO* Info );
+
+/// <summary>
+/// Allocate memory in one of the ntoskrnl discarded section
+/// </summary>
+/// <param name="SizeOfImage">Block size to allocate</param>
+/// <param name="ppFoundBase">Allocated address</param>
+/// <returns>Status code</returns>
+NTSTATUS AllocateInDiscardedMemory( IN ULONG size, OUT PVOID* ppFoundBase );

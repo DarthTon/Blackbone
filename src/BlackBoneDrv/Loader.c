@@ -39,7 +39,7 @@ FORCEINLINE VOID RemoveEntryList32( IN PLIST_ENTRY32 Entry )
 /// <returns>Status code</returns>
 NTSTATUS BBInitLdrData( IN PKLDR_DATA_TABLE_ENTRY pThisModule )
 {
-    PVOID kernelBase = GetKernelBase();
+    PVOID kernelBase = GetKernelBase( NULL );
     if (kernelBase == NULL)
     {
         DPRINT( "BlackBone: %s: Failed to retrieve Kernel base address. Aborting\n", __FUNCTION__ );
@@ -686,7 +686,6 @@ VOID KernelApcInjectCallback(
 
     ExFreePoolWithTag( Apc, BB_POOL_TAG );
 }
-
 
 /// <summary>
 /// System worker thread that performs actual mapping
