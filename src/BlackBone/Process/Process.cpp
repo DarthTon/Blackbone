@@ -158,6 +158,23 @@ NTSTATUS Process::EnsureInit()
     return STATUS_NOT_FOUND;
 }
 
+/// <summary>
+/// Suspend process
+/// </summary>
+/// <returns>Status code</returns>
+NTSTATUS Process::Suspend()
+{
+    return SAFE_NATIVE_CALL( NtSuspendProcess, _core._hProcess );
+}
+
+/// <summary>
+/// Resume process
+/// </summary>
+/// <returns>Status code</returns>
+NTSTATUS Process::Resume()
+{
+    return SAFE_NATIVE_CALL( NtResumeProcess, _core._hProcess );
+}
 
 /// <summary>
 /// Checks if process still exists

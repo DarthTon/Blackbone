@@ -122,6 +122,33 @@ NTSTATUS ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, boo
 }
 
 /// <summary>
+/// Read data
+/// </summary>
+/// <param name="adrList">Base address + list of offsets</param>
+/// <param name="dwSize">Size of data to read</param>
+/// <param name="pResult">Output buffer</param>
+/// <param name="handleHoles">
+/// If true, function will try to read all committed pages in range ignoring uncommitted ones.
+/// Otherwise function will fail if there is at least one non-committed page in region.
+/// </param>
+/// <returns>Status</returns>
+NTSTATUS ProcessMemory::Read( std::vector<ptr_t>&& adrList, size_t dwSize, PVOID pResult, bool handleHoles /*= false */ )
+{
+    if (adrList.empty())
+        return STATUS_INVALID_PARAMETER;
+    if(adrList.size() == 1)
+        return Read( adrList.front(), dwSize, pResult, handleHoles );
+
+    bool wow64 = _core.native()->GetWow64Barrier().targetWow64;
+    ptr_t ptr = wow64 ? Read<uint32_t>( adrList[0] ) : Read<ptr_t>( adrList[0] );
+
+    for (size_t i = 1; i < adrList.size() - 1; i++)
+        ptr = wow64 ? Read<uint32_t>( ptr + adrList[i] ) : Read<ptr_t>( ptr + adrList[i] );
+
+    return Read( ptr + adrList.back(), dwSize, pResult, handleHoles );
+}
+
+/// <summary>
 /// Write data
 /// </summary>
 /// <param name="pAddress">Memory address to write to</param>
@@ -131,6 +158,29 @@ NTSTATUS ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, boo
 NTSTATUS ProcessMemory::Write( ptr_t pAddress, size_t dwSize, const void* pData )
 {
     return _core.native()->WriteProcessMemoryT( pAddress, pData, dwSize );
+}
+
+/// <summary>
+/// Write data
+/// </summary>
+/// <param name="adrList">Base address + list of offsets</param>
+/// <param name="dwSize">Size of data to write</param>
+/// <param name="pData">Buffer to write</param>
+/// <returns>Status</returns>
+NTSTATUS ProcessMemory::Write( std::vector<ptr_t>&& adrList, size_t dwSize, const void* pData )
+{
+    if (adrList.empty())
+        return STATUS_INVALID_PARAMETER;
+    if (adrList.size() == 1)
+        return Write( adrList.front(), dwSize, pData );
+
+    bool wow64 = _core.native()->GetWow64Barrier().targetWow64;
+    ptr_t ptr = wow64 ? Read<uint32_t>( adrList[0] ) : Read<ptr_t>( adrList[0] );
+
+    for (size_t i = 1; i < adrList.size() - 1; i++)
+        ptr = wow64 ? Read<uint32_t>( ptr + adrList[i] ) : Read<ptr_t>( ptr + adrList[i] );
+
+    return Write( ptr + adrList.back(), dwSize, pData );
 }
 
 /// <summary>

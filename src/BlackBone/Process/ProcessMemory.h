@@ -55,7 +55,7 @@ public:
     /// <summary>
     /// Read data
     /// </summary>
-    /// <param name="dwAddress">Memoey address to read from</param>
+    /// <param name="dwAddress">Memory address to read from</param>
     /// <param name="dwSize">Size of data to read</param>
     /// <param name="pResult">Output buffer</param>
     /// <param name="handleHoles">
@@ -64,6 +64,19 @@ public:
     /// </param>
     /// <returns>Status</returns>
     BLACKBONE_API NTSTATUS Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, bool handleHoles = false );
+
+    /// <summary>
+    /// Read data
+    /// </summary>
+    /// <param name="adrList">Base address + list of offsets</param>
+    /// <param name="dwSize">Size of data to read</param>
+    /// <param name="pResult">Output buffer</param>
+    /// <param name="handleHoles">
+    /// If true, function will try to read all committed pages in range ignoring uncommitted ones.
+    /// Otherwise function will fail if there is at least one non-committed page in region.
+    /// </param>
+    /// <returns>Status</returns>
+    BLACKBONE_API NTSTATUS Read( std::vector<ptr_t>&& adrList, size_t dwSize, PVOID pResult, bool handleHoles = false );
 
     /// <summary>
     /// Write data
@@ -75,6 +88,15 @@ public:
     BLACKBONE_API NTSTATUS Write( ptr_t pAddress, size_t dwSize, const void* pData );
 
     /// <summary>
+    /// Write data
+    /// </summary>
+    /// <param name="adrList">Base address + list of offsets</param>
+    /// <param name="dwSize">Size of data to write</param>
+    /// <param name="pData">Buffer to write</param>
+    /// <returns>Status</returns>
+    BLACKBONE_API NTSTATUS Write( std::vector<ptr_t>&& adrList, size_t dwSize, const void* pData );
+
+    /// <summary>
     /// Read data
     /// </summary>
     /// <param name="dwAddress">Address to read from</param>
@@ -83,9 +105,22 @@ public:
     inline T Read( ptr_t dwAddress )
     {
         T res; 
-        Read( dwAddress, sizeof(T), &res );
+        LastNtStatus( Read( dwAddress, sizeof( T ), &res ) );
         return res;
     };
+
+    /// <summary>
+    /// Read data
+    /// </summary>
+    /// <param name="adrList">Base address + list of offsets</param>
+    /// <returns>Read data</returns>
+    template<class T>
+    inline T Read( std::vector<ptr_t>&& adrList )
+    {
+        T res;
+        LastNtStatus( Read( std::forward<std::vector<ptr_t>>( adrList ), sizeof( T ), &res ) );
+        return res;
+    }
 
     /// <summary>
     /// Read data
@@ -100,6 +135,18 @@ public:
     };
 
     /// <summary>
+    /// Read data
+    /// </summary>
+    /// <param name="adrList">Base address + list of offsets</param>
+    /// <param name="result">Read data</param>
+    /// <returns>Status code</returns>
+    template<class T>
+    inline NTSTATUS Read( std::vector<ptr_t>&& adrList, T& result )
+    {
+        return Read( std::forward<std::vector<ptr_t>>( adrList ), sizeof( result ), &result );
+    };
+
+    /// <summary>
     /// Write data
     /// </summary>
     /// <param name="dwSize">Size of data to write</param>
@@ -108,7 +155,19 @@ public:
     template<class T>
     inline NTSTATUS Write( ptr_t dwAddress, const T& data )
     {
-        return Write( dwAddress, sizeof(T), &data );
+        return Write( dwAddress, sizeof( T ), &data );
+    }
+
+    /// <summary>
+    /// Write data
+    /// </summary>
+    /// <param name="adrList">Base address + list of offset</param>
+    /// <param name="data">Data to write</param>
+    /// <returns>Status</returns>
+    template<class T>
+    inline NTSTATUS Write( std::vector<ptr_t>&& adrList, const T& data )
+    {
+        return Write( std::forward<std::vector<ptr_t>>( adrList ), sizeof( T ), &data );
     }
 
     /// <summary>
@@ -124,7 +183,7 @@ public:
 
 private:
     ProcessMemory( const ProcessMemory& ) = delete;
-    ProcessMemory& operator =(const ProcessMemory&) = delete;
+    ProcessMemory& operator =( const ProcessMemory& ) = delete;
 
 private:
     class Process* _process;    // Owning process object

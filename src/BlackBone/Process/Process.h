@@ -76,6 +76,7 @@ struct HandleInfo
                           PROCESS_CREATE_THREAD     | \
                           PROCESS_SET_QUOTA         | \
                           PROCESS_TERMINATE         | \
+                          PROCESS_SUSPEND_RESUME    | \
                           PROCESS_DUP_HANDLE
 class Process
 {
@@ -128,6 +129,18 @@ public:
     /// </summary>
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS EnsureInit();
+
+    /// <summary>
+    /// Suspend process
+    /// </summary>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Suspend();
+
+    /// <summary>
+    /// Resume process
+    /// </summary>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Resume();
 
     /// <summary>
     /// Get process ID

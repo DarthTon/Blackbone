@@ -56,6 +56,8 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
     DynImport::load( "NtQueryVirtualMemory",       hNtdll );
     DynImport::load( "NtCreateThreadEx",           hNtdll );
     DynImport::load( "NtLockVirtualMemory",        hNtdll );
+    DynImport::load( "NtSuspendProcess",           hNtdll );
+    DynImport::load( "NtResumeProcess",            hNtdll );
     DynImport::load( "Wow64GetThreadContext",      hKernel32 );
     DynImport::load( "Wow64SetThreadContext",      hKernel32 );
     DynImport::load( "Wow64SuspendThread",         hKernel32 );    
