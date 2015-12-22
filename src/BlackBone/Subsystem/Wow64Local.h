@@ -116,6 +116,9 @@ public:
 
             X64_End();
 
+			mov    ax, ds
+			mov    ss, ax
+			
             mov    esp, back_esp
 	    }
         
@@ -216,6 +219,9 @@ public:
             pop    _rax.dw[0]
 
             X64_End();
+
+			mov    ax, ds
+			mov    ss, ax
 
             mov    esp, back_esp
 	    }
