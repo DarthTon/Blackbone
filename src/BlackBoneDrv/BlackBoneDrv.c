@@ -186,11 +186,13 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
 
     const ULONG w7Build  = 18798;
     const ULONG w8Build  = 17328;
-    const ULONG w10Build = 16412;
+    const ULONG w10Build = 10586;
+    const ULONG w10Rev   = 17;
 
     UNREFERENCED_PARAMETER( w7Build );
     UNREFERENCED_PARAMETER( w8Build );
     UNREFERENCED_PARAMETER( w10Build );
+    UNREFERENCED_PARAMETER( w10Rev );
 
     if (pData == NULL)
         return STATUS_INVALID_ADDRESS;
@@ -226,7 +228,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
     #elif defined (_WIN10_)
         if (ver_short != WINVER_10)           
             return STATUS_NOT_SUPPORTED;
-        if (buildNo != w10Build)
+        if (verInfo.dwBuildNumber != w10Build || buildNo != w10Rev)
             pData->correctBuild = FALSE;
     #endif
 
@@ -289,7 +291,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->ExRemoveTable    = 0x432A88; // 0x38E320;
                 break;
 
-                // Windows 10, build 16412
+                // Windows 10, build 10586.17
             case WINVER_10:
                 pData->KExecOpt         = 0x1BF;
                 pData->Protection       = 0x6AA;
