@@ -116,6 +116,9 @@ public:
 
             X64_End();
 
+			mov    ax, ds
+			mov    ss, ax
+			
             mov    esp, back_esp
 	    }
         
