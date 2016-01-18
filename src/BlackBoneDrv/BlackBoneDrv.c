@@ -297,7 +297,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 pData->Protection       = 0x6AA;
                 pData->ObjTable         = 0x418;
                 pData->VadRoot          = 0x608;
-                pData->NtCreateThdIndex = 0xB3;
+                pData->NtCreateThdIndex = 0xB4;
                 pData->NtTermThdIndex   = 0x53;
                 pData->PrevMode         = 0x232;
                 pData->ExitStatus       = 0x6E0;
