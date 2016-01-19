@@ -226,9 +226,9 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (buildNo != w8Build)
             pData->correctBuild = FALSE;
     #elif defined (_WIN10_)
-        if (ver_short != WINVER_10)           
+        if (ver_short != WINVER_10 || verInfo.dwBuildNumber != w10Build)
             return STATUS_NOT_SUPPORTED;
-        if (verInfo.dwBuildNumber != w10Build || buildNo != w10Rev)
+        if (buildNo != w10Rev)
             pData->correctBuild = FALSE;
     #endif
 
