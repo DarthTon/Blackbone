@@ -3,6 +3,9 @@
 #include "../../Misc/DynImport.h"
 
 #include <VersionHelpers.h>
+#include <sddl.h>
+#include <AccCtrl.h>
+#include <Aclapi.h>
 
 namespace blackbone
 {
@@ -17,6 +20,7 @@ RemoteExec::RemoteExec( Process& proc )
     , _apcPatched( false )
 {
     DynImport::load( "NtOpenEvent", L"ntdll.dll" );
+    DynImport::load( "NtCreateEvent", L"ntdll.dll" );
 }
 
 RemoteExec::~RemoteExec()
@@ -384,6 +388,7 @@ DWORD RemoteExec::CreateWorkerThread()
     return _hWorkThd.id();
 }
 
+
 /// <summary>
 /// Create event to synchronize APC procedures
 /// </summary>
@@ -411,21 +416,37 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         // Event name
         swprintf_s( pEventName, ARRAYSIZE( pEventName ), L"\\BaseNamedObjects\\_MMapEvent_0x%x_0x%x", threadID, GetTickCount() );
 
+        wchar_t* szStringSecurityDis = L"S:(ML;;NW;;;LW)D:(A;;GA;;;S-1-15-2-1)(A;;GA;;;WD)";
+        PSECURITY_DESCRIPTOR pDescriptor = nullptr;
+        BOOL res = ConvertStringSecurityDescriptorToSecurityDescriptorW( szStringSecurityDis, SDDL_REVISION_1, &pDescriptor, NULL );
+
         // Prepare Arguments
         ustr.Length = static_cast<USHORT>(wcslen( pEventName ) * sizeof(wchar_t));
         ustr.MaximumLength = static_cast<USHORT>(sizeof(pEventName));
-        ustr.Buffer = reinterpret_cast<PWSTR>(_userData.ptr<size_t>() + ARGS_OFFSET + sizeof(obAttr) + sizeof(ustr));
+        ustr.Buffer = pEventName;
 
-        obAttr.ObjectName = reinterpret_cast<PUNICODE_STRING>(_userData.ptr<size_t>() + ARGS_OFFSET + sizeof(obAttr));
+        obAttr.ObjectName = &ustr;
         obAttr.Length = sizeof(obAttr);
+        obAttr.SecurityDescriptor = pDescriptor;
 
-        auto pCreateEvent = _mods.GetExport( _mods.GetModule( L"ntdll.dll", Sections, mt ), "NtCreateEvent" ).procAddress;
-        if (pCreateEvent == 0)
+        auto pOpenEvent = _mods.GetExport( _mods.GetModule( L"ntdll.dll", Sections, mt ), "NtOpenEvent" ).procAddress;
+        if (pOpenEvent == 0)
             return false;
 
-        a.GenCall( static_cast<size_t>(pCreateEvent), { 
-            _userData.ptr<size_t>() + EVENT_OFFSET, EVENT_ALL_ACCESS,
-            _userData.ptr<size_t>() + ARGS_OFFSET, 0, FALSE } );
+        status = SAFE_NATIVE_CALL( NtCreateEvent, &_hWaitEvent, EVENT_ALL_ACCESS, &obAttr, 0, 0 );
+        if(pDescriptor)
+            LocalFree( pDescriptor );
+
+        if (!NT_SUCCESS( status ))
+            return LastNtStatus( status );
+
+        ustr.Buffer = reinterpret_cast<PWSTR>(_userData.ptr<size_t>() + ARGS_OFFSET + sizeof( obAttr ) + sizeof( ustr ));
+        obAttr.ObjectName = reinterpret_cast<PUNICODE_STRING>(_userData.ptr<size_t>() + ARGS_OFFSET + sizeof(obAttr));
+        obAttr.SecurityDescriptor = nullptr;
+
+        a.GenCall( static_cast<size_t>(pOpenEvent), {
+            _userData.ptr<size_t>() + EVENT_OFFSET, EVENT_MODIFY_STATE | SYNCHRONIZE,
+            _userData.ptr<size_t>() + ARGS_OFFSET } );
 
         // Save status
         a->mov( a->zdx, _userData.ptr<size_t>() + ERR_OFFSET );
@@ -436,24 +457,14 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         status = _userData.Write( ARGS_OFFSET, obAttr );
         status |= _userData.Write( ARGS_OFFSET + sizeof(obAttr), ustr );
         status |= _userData.Write( ARGS_OFFSET + sizeof(obAttr) + sizeof(ustr), len, pEventName );
-
         if (!NT_SUCCESS( status ))
             return LastNtStatus( status );
 
         ExecInNewThread( a->make(), a->getCodeSize(), dwResult );
-
         status = _userData.Read<NTSTATUS>( ERR_OFFSET, -1 );
-        if (!NT_SUCCESS( status ))
-            return LastNtStatus( status );
-
-        ustr.Buffer = pEventName;
-        obAttr.ObjectName = &ustr;
-
-        // Open created event
-        status = SAFE_NATIVE_CALL( NtOpenEvent, &_hWaitEvent, SYNCHRONIZE | EVENT_MODIFY_STATE, &obAttr );
     }
 
-    return status;
+    return LastNtStatus( status );
 }
 
 /// <summary>
