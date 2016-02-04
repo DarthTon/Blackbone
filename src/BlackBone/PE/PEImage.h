@@ -105,9 +105,16 @@ public:
     BLACKBONE_API NTSTATUS Load( void* pData, size_t size, bool plainData = true );
 
     /// <summary>
+    /// Reload closed image
+    /// </summary>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Reload();
+
+    /// <summary>
     /// Release mapping, if any
     /// </summary>
-    BLACKBONE_API void Release();
+    /// <param name="temporary">Preserve file paths for file reopening</param>
+    BLACKBONE_API void Release( bool temporary = false );
 
     /// <summary>
     /// Parses PE image

@@ -119,14 +119,14 @@ public:
     /// </summary>
     /// <param name="pteb">Process TEB</param>
     /// <returns>TEB pointer</returns>
-    BLACKBONE_API ptr_t teb( _TEB32* pteb = nullptr ) const;
+    BLACKBONE_API ptr_t teb( _TEB32* pteb ) const;
    
     /// <summary>
     /// Get Native TEB
     /// </summary>
     /// <param name="pteb">Process TEB</param>
     /// <returns>TEB pointer</returns>
-    BLACKBONE_API ptr_t teb( _TEB64* pteb = nullptr ) const;
+    BLACKBONE_API ptr_t teb( _TEB64* pteb ) const;
 
     /// <summary>
     /// Get TEB

@@ -38,7 +38,7 @@ Thread::~Thread()
 /// </summary>
 /// <param name="pteb">Process TEB</param>
 /// <returns>TEB pointer</returns>
-blackbone::ptr_t Thread::teb( _TEB32* pteb /*= nullptr */ ) const
+blackbone::ptr_t Thread::teb( _TEB32* pteb ) const
 {
     return _core->native()->getTEB( _handle, pteb );
 }
@@ -48,7 +48,7 @@ blackbone::ptr_t Thread::teb( _TEB32* pteb /*= nullptr */ ) const
 /// </summary>
 /// <param name="pteb">Process TEB</param>
 /// <returns>TEB pointer</returns>
-blackbone::ptr_t Thread::teb( _TEB64* pteb /*= nullptr */ ) const
+blackbone::ptr_t Thread::teb( _TEB64* pteb ) const
 {
     return _core->native()->getTEB( _handle, pteb );
 }

@@ -418,7 +418,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
 
         wchar_t* szStringSecurityDis = L"S:(ML;;NW;;;LW)D:(A;;GA;;;S-1-15-2-1)(A;;GA;;;WD)";
         PSECURITY_DESCRIPTOR pDescriptor = nullptr;
-        BOOL res = ConvertStringSecurityDescriptorToSecurityDescriptorW( szStringSecurityDis, SDDL_REVISION_1, &pDescriptor, NULL );
+        ConvertStringSecurityDescriptorToSecurityDescriptorW( szStringSecurityDis, SDDL_REVISION_1, &pDescriptor, NULL );
 
         // Prepare Arguments
         ustr.Length = static_cast<USHORT>(wcslen( pEventName ) * sizeof(wchar_t));
@@ -433,7 +433,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         if (pOpenEvent == 0)
             return false;
 
-        status = SAFE_NATIVE_CALL( NtCreateEvent, &_hWaitEvent, EVENT_ALL_ACCESS, &obAttr, 0, 0 );
+        status = SAFE_NATIVE_CALL( NtCreateEvent, &_hWaitEvent, EVENT_ALL_ACCESS, &obAttr, 0, static_cast<BOOLEAN>(FALSE) );
         if(pDescriptor)
             LocalFree( pDescriptor );
 

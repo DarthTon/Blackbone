@@ -115,7 +115,9 @@ const ModuleData* MMap::MapImageInternal(
     auto mod = FindOrMapModule( path, buffer, size, asImage, flags );
     if (mod == nullptr)
     {
+        NTSTATUS tmp = LastNtStatus();
         Cleanup();
+        LastNtStatus( tmp );
         return nullptr;
     }
 
@@ -246,6 +248,7 @@ const ModuleData* MMap::FindOrMapModule(
     status = buffer ? pImage->peImage.Load( buffer, size, !asImage ) : pImage->peImage.Load( path, flags & NoSxS ? true : false );
     if (!NT_SUCCESS( status ))
     {
+        LastNtStatus( status );
         BLACBONE_TRACE( L"ManualMap: Failed to load image '%ls'/0x%p. Status 0x%X", path.c_str(), buffer, status );
         pImage->peImage.Release();
         return nullptr;
@@ -1214,7 +1217,8 @@ NTSTATUS MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
 /// <returns></returns>
 void MMap::Cleanup()
 {
-    _pAContext.Reset();
+    reset();
+    MExcept::reset();
     _process.remote().reset();
 }
 

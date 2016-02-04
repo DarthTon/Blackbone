@@ -383,38 +383,32 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
     UNICODE_STRING ustr = { 0 };
     auto modName = _memory.Allocate( 0x1000, PAGE_READWRITE );
 
-    ustr.Buffer = reinterpret_cast<PWSTR>(modName.ptr<size_t>() + sizeof(ustr));
-    ustr.Length = static_cast<USHORT>(path.size() * sizeof(wchar_t));
+    ustr.Buffer = reinterpret_cast<PWSTR>(modName.ptr<intptr_t>() + sizeof( ustr ));
+    ustr.Length = static_cast<USHORT>(path.size() * sizeof( wchar_t ));
     ustr.MaximumLength = ustr.Length;
 
     modName.Write( 0, ustr );
-    modName.Write( sizeof(ustr), path.size() * sizeof(wchar_t), path.c_str() );
+    modName.Write( sizeof( ustr ), path.size() * sizeof( wchar_t ), path.c_str() );
 
     // Image and process have same processor architecture
     bool sameArch = (img.mType() == mt_mod64 && _core.isWow64() == false) || (img.mType() == mt_mod32 && _core.isWow64() == true);
     auto pLoadLibrary = GetExport( GetModule( L"kernel32.dll", LdrList, img.mType() ), "LoadLibraryW" ).procAddress;
 
-    // Try to use LoadLibrary if possible
-    if (pLoadLibrary != 0 && sameArch)
-    {
-        _proc.remote().ExecDirect( pLoadLibrary, modName.ptr() + sizeof( ustr ) );
-    }
     // Can't generate code through WOW64 barrier
-    else if ((barrier.type != wow_32_64 && img.mType() == mt_mod64) ||
-              (barrier.type == wow_32_32 || barrier.type == wow_64_64) )
+    if ((barrier.type != wow_32_64 && img.mType() == mt_mod64) || (barrier.type == wow_32_32 || barrier.type == wow_64_64))
     {
         auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" ).procAddress;
         if (pLdrLoadDll == 0)
         {
             if (pStatus)
-                *pStatus = STATUS_NOT_FOUND;
+                *pStatus = STATUS_ORDINAL_NOT_FOUND;
 
             return nullptr;
         }
 
         // Patch LdrFindOrMapDll to enable kernel32.dll loading
         #ifdef USE64
-        if (!_ldrPatched && IsWindows7OrGreater( ) && !IsWindows8OrGreater( ))
+        if (!_ldrPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
         {
             uint8_t patch[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
             auto patchBase = _proc.nativeLdr().LdrKernel32PatchAddress();
@@ -431,21 +425,21 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
         }
         #endif
 
-        a.GenCall( (size_t)pLdrLoadDll, { 0, 0, modName.ptr<size_t>(), modName.ptr<size_t>() + 0x800 } );
+        a.GenCall( (intptr_t)pLdrLoadDll, { 0, 0, modName.ptr<intptr_t>(), modName.ptr<intptr_t>() + 0x800 } );
         a->ret();
 
         status = _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
         if (NT_SUCCESS( status ))
             status = static_cast<NTSTATUS>(res);
     }
+    // Try to use LoadLibrary if possible
+    else if (pLoadLibrary != 0 && sameArch)
+        status = _proc.remote().ExecDirect( pLoadLibrary, modName.ptr() + sizeof( ustr ) );
 
     if (pStatus)
         *pStatus = status;
 
-    if (res == STATUS_SUCCESS)
-        return GetModule( path, LdrList, img.mType() );
-    else
-        return nullptr;
+    return (res == STATUS_SUCCESS) ? GetModule( path, LdrList, img.mType() ) : nullptr;
 }
 
 /// <summary>

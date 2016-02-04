@@ -99,9 +99,19 @@ NTSTATUS PEImage::Load( void* pData, size_t size, bool plainData /*= true */ )
 }
 
 /// <summary>
+/// Reload closed image
+/// </summary>
+/// <returns>Status code</returns>
+NTSTATUS PEImage::Reload()
+{
+    return Load( _imagePath );
+}
+
+/// <summary>
 /// Release mapping, if any
 /// </summary>
-void PEImage::Release()
+/// <param name="temporary">Preserve file paths for file reopening</param>
+void PEImage::Release( bool temporary /*= false*/ )
 {
     if (_hctx != INVALID_HANDLE_VALUE)
     {
@@ -131,13 +141,16 @@ void PEImage::Release()
     _pImageHdr32 = nullptr;
     _pImageHdr64 = nullptr;
 
-    _imagePath.clear();
+    if(!temporary)
+    {
+        _imagePath.clear();
 
-    // Ensure temporary file is deleted
-    if (_noFile)
-        DeleteFileW( _manifestPath.c_str() );
+        // Ensure temporary file is deleted
+        if (_noFile)
+            DeleteFileW( _manifestPath.c_str() );
 
-    _manifestPath.clear();
+        _manifestPath.clear();
+    }
 }
 
 /// <summary>

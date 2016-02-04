@@ -57,6 +57,11 @@ protected:
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS RemoveVEH( bool partial );
 
+    /// <summary>
+    /// Reset data
+    /// </summary>
+    BLACKBONE_API  inline void reset() { _pModTable.Free(); }
+
 private:
     MExcept( const MExcept& ) = delete;
     MExcept& operator =(const MExcept&) = delete;
