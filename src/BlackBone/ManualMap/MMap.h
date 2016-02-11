@@ -8,11 +8,99 @@
 #include "../Process/MemBlock.h"
 #include "MExcept.h"
 
+#include <array>
+#include <vector>
 #include <map>
 #include <stack>
 
 namespace blackbone
 {
+
+class CustomArgs_t {
+private:
+    /// <summary>The buffer.</summary>
+    std::vector< char > _buffer;
+
+    /// <summary>Buffers.</summary>
+    /// <param name="ptr">[in] If non-null, the pointer.</param>
+    /// <param name="size">The size.</param>
+    void buffer( const void* ptr, size_t size )
+    {
+        if( !ptr )
+        {
+            return;
+        }
+        _buffer.resize( size );
+        memcpy( _buffer.data(), ptr, size );
+    }
+
+public:
+    /// <summary>Default constructor - Deleted</summary>
+    CustomArgs_t() = delete;
+
+    /// <summary>Constructor.</summary>
+    /// <param name="ptr">The pointer.</param>
+    /// <param name="size">The size.</param>
+    CustomArgs_t( const void* ptr, size_t size )
+    {
+        buffer( ptr, size );
+    }
+
+    /// <summary>Constructor.</summary>
+    /// <typeparam name="Arg_t">Type of the argument.</typeparam>
+    /// <param name="str">The string.</param>
+    template< typename Arg_t >
+    explicit CustomArgs_t( const std::basic_string< Arg_t >& str )
+    {
+        buffer( str.data(), str.size() * sizeof Arg_t );
+    }
+
+    /// <summary>Constructor.</summary>
+    /// <typeparam name="Arg_t">Type of the argument.</typeparam>
+    /// <param name="ptr">[in,out] If non-null, the pointer.</param>
+    template< class Arg_t >
+    explicit CustomArgs_t( Arg_t* ptr )
+    {
+        buffer( ptr, sizeof Arg_t );
+    }
+
+    /// <summary>Constructor.</summary>
+    /// <typeparam name="Arg_t">Type of the argument.</typeparam>
+    /// <param name="cVec">The vector.</param>
+    template< class Arg_t >
+    explicit CustomArgs_t( const std::vector< Arg_t >& cVec )
+    {
+        buffer( cVec.data(), cVec.size() * sizeof Arg_t );
+    }
+
+    /// <summary>Constructor.</summary>
+    /// <typeparam name="Arg_t">Type of the argument.</typeparam>
+    /// <typeparam name="N">Type of the n.</typeparam>
+    /// <param name="cArray">The array.</param>
+    template< class Arg_t, size_t N >
+    explicit CustomArgs_t( const std::array< Arg_t, N >& cArray )
+    {
+        buffer( cArray.data(), cArray.size() * sizeof Arg_t );
+    }
+
+    /// <summary>Gets the size.</summary>
+    /// <returns>An size_t.</returns>
+    size_t size() const {
+        return _buffer.size();
+    }
+
+    /// <summary>Gets the data.</summary>
+    /// <returns>null if it fails, else a char*.</returns>
+    char* data() {
+        return _buffer.data();
+    }
+
+    /// <summary>Gets the data.</summary>
+    /// <returns>null if it fails, else a char*.</returns>
+    const char* data() const {
+        return _buffer.data();
+    }
+};
 
 // Loader flags
 enum eLoadFlags
@@ -107,7 +195,8 @@ public:
         const std::wstring& path,
         eLoadFlags flags = NoFlags,
         MapCallback mapCallback = nullptr,
-        void* context = nullptr
+        void* context = nullptr,
+        CustomArgs_t* pCustomArgs_t = nullptr
         );
 
     /// <summary>
@@ -125,7 +214,8 @@ public:
         bool asImage = false,
         eLoadFlags flags = NoFlags,
         MapCallback mapCallback = nullptr,
-        void* context = nullptr
+        void* context = nullptr,
+        CustomArgs_t* pCustomArgs_t = nullptr
         );
 
     /// <summary>
@@ -163,7 +253,8 @@ private:
         bool asImage = false,
         eLoadFlags flags = NoFlags,
         MapCallback ldrCallback = nullptr,
-        void* ldrContext = nullptr
+        void* ldrContext = nullptr,
+        CustomArgs_t* pCustomArgs_t = nullptr
         );
  
     /// <summary>
@@ -196,7 +287,7 @@ private:
     /// DLL_THREAD_DETTACH
     /// </param>
     /// <returns>true on success</returns>
-    bool RunModuleInitializers( ImageContext* pImage, DWORD dwReason );
+    bool RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomArgs_t* pCustomArgs_t = nullptr );
 
     /// <summary>
     /// Copies image into target process

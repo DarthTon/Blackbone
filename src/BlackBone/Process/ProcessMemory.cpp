@@ -21,10 +21,11 @@ ProcessMemory::~ProcessMemory()
 /// <param name="size">Block size</param>
 /// <param name="protection">Memory protection</param>
 /// <param name="desired">Desired base address of new block</param>
+/// <param name="own">false if caller will be responsible for block deallocation</param>
 /// <returns>Memory block. If failed - returned block will be invalid</returns>
-MemBlock ProcessMemory::Allocate( size_t size, DWORD protection /*= PAGE_EXECUTE_READWRITE*/, ptr_t desired /*= 0*/ )
+MemBlock ProcessMemory::Allocate( size_t size, DWORD protection /*= PAGE_EXECUTE_READWRITE*/, ptr_t desired /*= 0*/, bool own /*= true*/ )
 {
-    return MemBlock::Allocate( *this, size, desired, protection );
+    return MemBlock::Allocate( *this, size, desired, protection, own );
 }
 
 /// <summary>

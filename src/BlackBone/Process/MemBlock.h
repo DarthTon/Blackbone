@@ -76,12 +76,14 @@ public:
     /// <param name="size">Block size</param>
     /// <param name="desired">Desired base address of new block</param>
     /// <param name="protection">Win32 Memory protection flags</param>
+    /// <param name="own">false if caller will be responsible for block deallocation</param>
     /// <returns>Memory block. If failed - returned block will be invalid</returns>
     BLACKBONE_API static MemBlock Allocate(
-        class ProcessMemory& process,
+    class ProcessMemory& process,
         size_t size,
-        ptr_t desired = 0, 
-        DWORD protection = PAGE_EXECUTE_READWRITE 
+        ptr_t desired = 0,
+        DWORD protection = PAGE_EXECUTE_READWRITE,
+        bool own = true
         );
 
     /// <summary>
