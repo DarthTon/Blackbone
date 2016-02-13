@@ -993,9 +993,9 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomAr
     intptr_t customArgumentsAddress = 0;
     if (pCustomArgs)
     {
-        auto memBuf = _process.memory().Allocate( pCustomArgs->size() + sizeof( size_t ), PAGE_EXECUTE_READWRITE, 0, false );
+        auto memBuf = _process.memory().Allocate( pCustomArgs->size() + sizeof( uint64_t ), PAGE_EXECUTE_READWRITE, 0, false );
         memBuf.Write( 0, pCustomArgs->size() );
-        memBuf.Write( sizeof(uint64_t), pCustomArgs->size(), pCustomArgs->data() );
+        memBuf.Write( sizeof( uint64_t ), pCustomArgs->size(), pCustomArgs->data() );
         customArgumentsAddress = static_cast<intptr_t>( memBuf.ptr() );
     }
 
