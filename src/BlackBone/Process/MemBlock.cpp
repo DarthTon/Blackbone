@@ -18,7 +18,7 @@ MemBlock::MemBlock()
 /// <param name="ptr">Memory address</param>
 /// <param name="size">Block size</param>
 /// <param name="prot">Memory protection</param>
-/// <param name="own">true if caller will be responsible for block deallocation</param>
+/// <param name="own">false if caller will be responsible for block deallocation</param>
 MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own /*= true*/, bool physical /*= false*/ )
     : _ptr( ptr )
     , _size( size )
@@ -60,8 +60,9 @@ MemBlock::~MemBlock()
 /// <param name="size">Block size</param>
 /// <param name="desired">Desired base address of new block</param>
 /// <param name="protection">Memory protection</param>
+/// <param name="own">false if caller will be responsible for block deallocation</param>
 /// <returns>Memory block. If failed - returned block will be invalid</returns>
-MemBlock MemBlock::Allocate( ProcessMemory& process, size_t size, ptr_t desired /*= 0*/, DWORD protection /*= PAGE_EXECUTE_READWRITE */ )
+MemBlock MemBlock::Allocate( ProcessMemory& process, size_t size, ptr_t desired /*= 0*/, DWORD protection /*= PAGE_EXECUTE_READWRITE */, bool own /*= true*/ )
 {
     ptr_t desired64 = desired;
     DWORD newProt = CastProtection( protection, process.core().DEP() );
@@ -75,7 +76,7 @@ MemBlock MemBlock::Allocate( ProcessMemory& process, size_t size, ptr_t desired 
             desired64 = 0;
     }
 
-    return MemBlock( &process, desired64, size, protection );
+    return MemBlock( &process, desired64, size, protection, own );
 }
 
 /// <summary>

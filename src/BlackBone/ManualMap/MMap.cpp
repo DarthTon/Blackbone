@@ -35,10 +35,11 @@ const ModuleData* MMap::MapImage(
     const std::wstring& path,
     eLoadFlags flags /*= NoFlags*/,
     MapCallback mapCallback /*= nullptr*/,
-    void* context /*= nullptr*/
+    void* context /*= nullptr*/,
+    CustomArgs_t* pCustomArgs /*= nullptr*/
     )
 {
-    return MapImageInternal( path, nullptr, 0, false, flags, mapCallback, context );
+    return MapImageInternal( path, nullptr, 0, false, flags, mapCallback, context, pCustomArgs );
 }
 
 /// <summary>
@@ -56,14 +57,15 @@ const ModuleData* MMap::MapImage(
     bool asImage /*= false*/,
     eLoadFlags flags /*= NoFlags*/,
     MapCallback mapCallback /*= nullptr*/,
-    void* context /*= nullptr*/
+    void* context /*= nullptr*/,
+    CustomArgs_t* pCustomArgs /*= nullptr*/
     )
 {
     // Create fake path
     wchar_t path[64];
     wsprintfW( path, L"MemoryImage_0x%p", buffer );
 
-    return MapImageInternal( path, buffer, size, asImage, flags, mapCallback, context );
+    return MapImageInternal( path, buffer, size, asImage, flags, mapCallback, context, pCustomArgs );
 }
 
 /// <summary>
@@ -83,7 +85,8 @@ const ModuleData* MMap::MapImageInternal(
     bool asImage /*= false*/,
     eLoadFlags flags /*= NoFlags*/,
     MapCallback mapCallback /*= nullptr*/,
-    void* context /*= nullptr*/
+    void* context /*= nullptr*/,
+    CustomArgs_t* pCustomArgs /*= nullptr*/
     )
 {
     // Already loaded
@@ -166,7 +169,7 @@ const ModuleData* MMap::MapImageInternal(
                 img->imgMem.Protect( flOld, img->peImage.ilFlagOffset(), sizeof( flg ), &flOld );
             }
 
-            if (!RunModuleInitializers( img.get(), DLL_PROCESS_ATTACH ))
+            if (!RunModuleInitializers( img.get(), DLL_PROCESS_ATTACH, pCustomArgs ))
                 return nullptr;
 
             // Wipe header
@@ -967,7 +970,7 @@ bool MMap::InitializeCookie( ImageContext* pImage )
 /// DLL_THREAD_DETTACH
 /// </param>
 /// <returns>true on success</returns>
-bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
+bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomArgs_t* pCustomArgs /*= nullptr*/ )
 {
     AsmJitHelper a;
     uint64_t result = 0;
@@ -983,7 +986,17 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
     {
         a->mov( a->zax, _pAContext.ptr<size_t>() );
         a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
-        a.GenCall( static_cast<size_t>(pActivateActx.procAddress), { 0, a->zax, _pAContext.ptr<size_t>() + sizeof( HANDLE ) } );
+        a.GenCall( static_cast<size_t>( pActivateActx.procAddress ), { 0, a->zax, _pAContext.ptr<size_t>() + sizeof( HANDLE ) } );
+    }
+
+    // Prepare custom arguments
+    intptr_t customArgumentsAddress = 0;
+    if (pCustomArgs)
+    {
+        auto memBuf = _process.memory().Allocate( pCustomArgs->size() + sizeof( uint64_t ), PAGE_EXECUTE_READWRITE, 0, false );
+        memBuf.Write( 0, pCustomArgs->size() );
+        memBuf.Write( sizeof( uint64_t ), pCustomArgs->size(), pCustomArgs->data() );
+        customArgumentsAddress = static_cast<intptr_t>( memBuf.ptr() );
     }
 
     // Function order
@@ -991,20 +1004,20 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
     if (dwReason == DLL_PROCESS_ATTACH || dwReason == DLL_THREAD_ATTACH)
     {
         // PTLS_CALLBACK_FUNCTION(pImage->ImageBase, dwReason, NULL);
-        if (!(pImage->flags & NoTLS))
+        if (!( pImage->flags & NoTLS ))
             for (auto& pCallback : pImage->tlsCallbacks)
             {
-                BLACBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d", 
-                                static_cast<size_t>(pCallback), pImage->FileName.c_str(), dwReason );
+                BLACBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d",
+                    static_cast<size_t>( pCallback ), pImage->FileName.c_str(), dwReason );
 
-                a.GenCall( static_cast<size_t>(pCallback), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
+                a.GenCall( static_cast<size_t>( pCallback ), { pImage->imgMem.ptr<size_t>(), dwReason, customArgumentsAddress } );
             }
 
         // DllMain
         if (pImage->EntryPoint != 0)
         {
             BLACBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->FileName.c_str(), dwReason );
-            a.GenCall( static_cast<size_t>(pImage->EntryPoint), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
+            a.GenCall( static_cast<size_t>( pImage->EntryPoint ), { pImage->imgMem.ptr<size_t>(), dwReason, customArgumentsAddress } );
         }
     }
     // Entry point first, TLS last
@@ -1014,26 +1027,26 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason )
         if (pImage->EntryPoint != 0)
         {
             BLACBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->FileName.c_str(), dwReason );
-            a.GenCall( static_cast<size_t>(pImage->EntryPoint), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
+            a.GenCall( static_cast<size_t>( pImage->EntryPoint ), { pImage->imgMem.ptr<size_t>(), dwReason, customArgumentsAddress } );
         }
 
         // PTLS_CALLBACK_FUNCTION(pImage->ImageBase, dwReason, NULL);
-        if (!(pImage->flags & NoTLS))
+        if (!( pImage->flags & NoTLS ))
             for (auto& pCallback : pImage->tlsCallbacks)
             {
-                BLACBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d", 
-                                static_cast<size_t>(pCallback), pImage->FileName.c_str(), dwReason );
+                BLACBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d",
+                    static_cast<size_t>( pCallback ), pImage->FileName.c_str(), dwReason );
 
-                a.GenCall( static_cast<size_t>(pCallback), { pImage->imgMem.ptr<size_t>(), dwReason, NULL } );
+                a.GenCall( static_cast<size_t>( pCallback ), { pImage->imgMem.ptr<size_t>(), dwReason, customArgumentsAddress } );
             }
     }
 
     // DeactivateActCtx
     if (_pAContext.valid() && pDeactivateeActx.procAddress)
     {
-        a->mov( a->zax, _pAContext.ptr<size_t>() + sizeof(HANDLE) );
+        a->mov( a->zax, _pAContext.ptr<size_t>() + sizeof( HANDLE ) );
         a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
-        a.GenCall( static_cast<size_t>(pDeactivateeActx.procAddress), { 0, a->zax } );
+        a.GenCall( static_cast<size_t>( pDeactivateeActx.procAddress ), { 0, a->zax } );
     }
 
     _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
