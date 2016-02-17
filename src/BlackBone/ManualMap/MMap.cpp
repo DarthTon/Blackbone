@@ -127,16 +127,16 @@ const ModuleData* MMap::MapImageInternal(
     // Change process base module address if needed
     if (flags & RebaseProcess && !_images.empty() && _images.rbegin()->get()->peImage.isExe())
     {
-        BLACBONE_TRACE( L"ManualMap: Rebasing process to address 0x%p", static_cast<size_t>(mod->baseAddress) );
+        BLACBONE_TRACE( L"ManualMap: Rebasing process to address 0x%p", static_cast<uintptr_t>(mod->baseAddress) );
 
         // Managed path fix
         if (_images.rbegin()->get()->peImage.pureIL() && !path.empty())
-            FixManagedPath( _process.memory().Read<size_t>( _process.core().peb() + 2 * WordSize ), path );
+            FixManagedPath( _process.memory().Read<uintptr_t>( _process.core().peb() + 2 * WordSize ), path );
 
         _process.memory().Write( _process.core().peb() + 2 * WordSize, WordSize, &mod->baseAddress );
     }
 
-    auto wipeMemory = []( Process& proc, ImageContext* img, size_t offset, size_t size )
+    auto wipeMemory = []( Process& proc, ImageContext* img, uintptr_t offset, uintptr_t size )
     {
         size = Align( size, 0x1000 );
         std::unique_ptr<uint8_t[]> zeroBuf( new uint8_t[size]() );
@@ -195,7 +195,7 @@ const ModuleData* MMap::MapImageInternal(
 /// </summary>
 /// <param name="base">Image base</param>
 /// <param name="path">New image path</param>
-void MMap::FixManagedPath( size_t base, const std::wstring &path )
+void MMap::FixManagedPath( uintptr_t base, const std::wstring &path )
 {
     _PEB_T2<DWORD_PTR>::type peb = { { { 0 } } };
     _PEB_LDR_DATA2<DWORD_PTR> ldr = { 0 };
@@ -313,7 +313,7 @@ const ModuleData* MMap::FindOrMapModule(
     if (pImage->imgMem == 0)
         pImage->imgMem = _process.memory().Allocate( pImage->peImage.imageSize(), PAGE_EXECUTE_READWRITE, pImage->peImage.imageBase() );
 
-    BLACBONE_TRACE( L"ManualMap: Image base allocated at 0x%p", pImage->imgMem.ptr<size_t>() );
+    BLACBONE_TRACE( L"ManualMap: Image base allocated at 0x%p", pImage->imgMem.ptr<uintptr_t>() );
 
     if (!pImage->imgMem.valid())
         return nullptr;
@@ -394,7 +394,7 @@ const ModuleData* MMap::FindOrMapModule(
             pImage->imgMem.ptr<HMODULE>(),
             pImage->peImage.imageSize(),
             pImage->FilePath,
-            static_cast<size_t>(pImage->EntryPoint),
+            static_cast<uintptr_t>(pImage->EntryPoint),
             ldrFlags
             );
     }
@@ -572,7 +572,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
     BLACBONE_TRACE( L"ManualMap: Relocating image '%ls'", pImage->FilePath.c_str() );
 
     // Reloc delta
-    size_t Delta = pImage->imgMem.ptr<size_t>() - static_cast<size_t>(pImage->peImage.imageBase());
+    uintptr_t Delta = pImage->imgMem.ptr<uintptr_t>() - static_cast<uintptr_t>(pImage->peImage.imageBase());
 
     // No need to relocate
     if (Delta == 0)
@@ -594,7 +594,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
         return false;
     }
 
-    while ((size_t)fixrec < end && fixrec->BlockSize)
+    while ((uintptr_t)fixrec < end && fixrec->BlockSize)
     {
         DWORD count = (fixrec->BlockSize - 8) >> 1;             // records count
 
@@ -610,8 +610,8 @@ bool MMap::RelocateImage( ImageContext* pImage )
             // add delta 
             if (fixtype == IMAGE_REL_BASED_HIGHLOW || fixtype == IMAGE_REL_BASED_DIR64)
             {
-                size_t fixRVA = fixoffset + fixrec->PageRVA;
-                size_t val = *reinterpret_cast<size_t*>(pImage->peImage.ResolveRVAToVA( fixoffset + fixrec->PageRVA )) + Delta;
+                uintptr_t fixRVA = fixoffset + fixrec->PageRVA;
+                uintptr_t val = *reinterpret_cast<uintptr_t*>(pImage->peImage.ResolveRVAToVA( fixoffset + fixrec->PageRVA )) + Delta;
 
                 auto status = STATUS_SUCCESS;
 
@@ -637,7 +637,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
         }
 
         // next reloc entry
-        fixrec = reinterpret_cast<pe::RelocData*>(reinterpret_cast<size_t>(fixrec) + fixrec->BlockSize);
+        fixrec = reinterpret_cast<pe::RelocData*>(reinterpret_cast<uintptr_t>(fixrec) + fixrec->BlockSize);
     }
 
     return true;
@@ -772,11 +772,11 @@ bool MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
 
             if (pImage->flags & HideVAD)
             {
-                size_t address = static_cast<size_t>(expData.procAddress);
+                uintptr_t address = static_cast<uintptr_t>(expData.procAddress);
                 status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + importFn.ptrRVA, sizeof( address ), &address );
             }
             else
-                status = pImage->imgMem.Write( importFn.ptrRVA, static_cast<size_t>(expData.procAddress) );
+                status = pImage->imgMem.Write( importFn.ptrRVA, static_cast<uintptr_t>(expData.procAddress) );
 
             // Write function address
             if (!NT_SUCCESS( status ))
@@ -819,10 +819,10 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
 
         a.GenPrologue();
         a.GenCall( 
-            static_cast<size_t>(pAddTable.procAddress), {
+            static_cast<uintptr_t>(pAddTable.procAddress), {
             pImage->pExpTableAddr,
             size / sizeof( IMAGE_RUNTIME_FUNCTION_ENTRY ),
-            pImage->imgMem.ptr<size_t>() }
+            pImage->imgMem.ptr<uintptr_t>() }
         );
 
         _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
@@ -833,7 +833,7 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
             return status;
 
         return (pImage->flags & CreateLdrRef) ? STATUS_SUCCESS : 
-            MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
+            MExcept::CreateVEH( pImage->imgMem.ptr<uintptr_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
     }
     // No exception table
     else
@@ -844,7 +844,7 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
         return STATUS_UNSUCCESSFUL;
 
     return safeseh ? STATUS_SUCCESS : 
-        MExcept::CreateVEH( pImage->imgMem.ptr<size_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
+        MExcept::CreateVEH( pImage->imgMem.ptr<uintptr_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
 
 #endif
 }
@@ -862,7 +862,7 @@ NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
     if (pImage->pExpTableAddr)
     {
         AsmJitHelper a;
-        size_t result = 0;
+        uint64_t result = 0;
 
         auto pRemoveTable = _process.modules().GetExport(
             _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
@@ -871,7 +871,7 @@ NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
 
         a.GenPrologue();
         // RtlDeleteFunctionTable(pExpTable);
-        a.GenCall( static_cast<size_t>(pRemoveTable.procAddress), { pImage->pExpTableAddr } );
+        a.GenCall( static_cast<uintptr_t>(pRemoveTable.procAddress), { pImage->pExpTableAddr } );
         _process.remote().AddReturnWithEvent( a );
         a.GenEpilogue();
 
@@ -984,19 +984,19 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomAr
     // ActivateActCtx
     if (_pAContext.valid() && pActivateActx.procAddress)
     {
-        a->mov( a->zax, _pAContext.ptr<size_t>() );
+        a->mov( a->zax, _pAContext.ptr<uintptr_t>() );
         a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
-        a.GenCall( static_cast<size_t>( pActivateActx.procAddress ), { 0, a->zax, _pAContext.ptr<size_t>() + sizeof( HANDLE ) } );
+        a.GenCall( static_cast<uintptr_t>( pActivateActx.procAddress ), { 0, a->zax, _pAContext.ptr<uintptr_t>() + sizeof( HANDLE ) } );
     }
 
     // Prepare custom arguments
-    intptr_t customArgumentsAddress = 0;
+    uintptr_t customArgumentsAddress = 0;
     if (pCustomArgs)
     {
-        auto memBuf = _process.memory().Allocate( pCustomArgs->size() + sizeof( uint64_t ), PAGE_EXECUTE_READWRITE, 0, false );
+        auto memBuf = _process.memory().Allocate( static_cast<size_t>(pCustomArgs->size()) + sizeof( uint64_t ), PAGE_EXECUTE_READWRITE, 0, false );
         memBuf.Write( 0, pCustomArgs->size() );
-        memBuf.Write( sizeof( uint64_t ), pCustomArgs->size(), pCustomArgs->data() );
-        customArgumentsAddress = static_cast<intptr_t>( memBuf.ptr() );
+        memBuf.Write( sizeof( uint64_t ), static_cast<size_t>(pCustomArgs->size()), pCustomArgs->data() );
+        customArgumentsAddress = static_cast<uintptr_t>( memBuf.ptr() );
     }
 
     // Function order
@@ -1008,16 +1008,16 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomAr
             for (auto& pCallback : pImage->tlsCallbacks)
             {
                 BLACBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d",
-                    static_cast<size_t>( pCallback ), pImage->FileName.c_str(), dwReason );
+                    static_cast<uintptr_t>( pCallback ), pImage->FileName.c_str(), dwReason );
 
-                a.GenCall( static_cast<size_t>( pCallback ), { pImage->imgMem.ptr<size_t>(), dwReason, customArgumentsAddress } );
+                a.GenCall( static_cast<uintptr_t>( pCallback ), { pImage->imgMem.ptr<uintptr_t>(), dwReason, customArgumentsAddress } );
             }
 
         // DllMain
         if (pImage->EntryPoint != 0)
         {
             BLACBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->FileName.c_str(), dwReason );
-            a.GenCall( static_cast<size_t>( pImage->EntryPoint ), { pImage->imgMem.ptr<size_t>(), dwReason, customArgumentsAddress } );
+            a.GenCall( static_cast<uintptr_t>( pImage->EntryPoint ), { pImage->imgMem.ptr<uintptr_t>(), dwReason, customArgumentsAddress } );
         }
     }
     // Entry point first, TLS last
@@ -1027,7 +1027,7 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomAr
         if (pImage->EntryPoint != 0)
         {
             BLACBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->FileName.c_str(), dwReason );
-            a.GenCall( static_cast<size_t>( pImage->EntryPoint ), { pImage->imgMem.ptr<size_t>(), dwReason, customArgumentsAddress } );
+            a.GenCall( static_cast<uintptr_t>( pImage->EntryPoint ), { pImage->imgMem.ptr<uintptr_t>(), dwReason, customArgumentsAddress } );
         }
 
         // PTLS_CALLBACK_FUNCTION(pImage->ImageBase, dwReason, NULL);
@@ -1035,18 +1035,18 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomAr
             for (auto& pCallback : pImage->tlsCallbacks)
             {
                 BLACBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d",
-                    static_cast<size_t>( pCallback ), pImage->FileName.c_str(), dwReason );
+                    static_cast<uintptr_t>( pCallback ), pImage->FileName.c_str(), dwReason );
 
-                a.GenCall( static_cast<size_t>( pCallback ), { pImage->imgMem.ptr<size_t>(), dwReason, customArgumentsAddress } );
+                a.GenCall( static_cast<uintptr_t>( pCallback ), { pImage->imgMem.ptr<uintptr_t>(), dwReason, customArgumentsAddress } );
             }
     }
 
     // DeactivateActCtx
     if (_pAContext.valid() && pDeactivateeActx.procAddress)
     {
-        a->mov( a->zax, _pAContext.ptr<size_t>() + sizeof( HANDLE ) );
+        a->mov( a->zax, _pAContext.ptr<uintptr_t>() + sizeof( HANDLE ) );
         a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
-        a.GenCall( static_cast<size_t>( pDeactivateeActx.procAddress ), { 0, a->zax } );
+        a.GenCall( static_cast<uintptr_t>( pDeactivateeActx.procAddress ), { 0, a->zax } );
     }
 
     _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
@@ -1079,7 +1079,7 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
     _pAContext = _process.memory().Allocate( 512, PAGE_READWRITE );
     
     act.cbSize = sizeof(act);
-    act.lpSource = reinterpret_cast<LPCWSTR>(_pAContext.ptr<size_t>() + sizeof( HANDLE ) + sizeof( act ));
+    act.lpSource = reinterpret_cast<LPCWSTR>(_pAContext.ptr<uintptr_t>() + sizeof( HANDLE ) + sizeof( act ));
 
     // Ignore some fields for pure manifest file
     if (asImage)
@@ -1135,9 +1135,9 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
     {
         a.GenPrologue();
 
-        a.GenCall( static_cast<size_t>(pCreateActx.procAddress), { _pAContext.ptr<size_t>() + sizeof(HANDLE) } );
+        a.GenCall( static_cast<uintptr_t>(pCreateActx.procAddress), { _pAContext.ptr<uintptr_t>() + sizeof(HANDLE) } );
 
-        a->mov( a->zdx, _pAContext.ptr<size_t>() );
+        a->mov( a->zdx, _pAContext.ptr<uintptr_t>() );
         a->mov( a->intptr_ptr( a->zdx ), a->zax );
 
         _process.remote().AddReturnWithEvent( a );

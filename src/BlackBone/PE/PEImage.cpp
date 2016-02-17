@@ -264,7 +264,7 @@ mapImports& PEImage::GetImports( bool useDelayed /*= false*/ )
             while (_is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData)
             {
                 uint64_t AddressOfData = _is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData;
-                auto pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( static_cast<size_t>(AddressOfData) ));
+                auto pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( static_cast<uintptr_t>(AddressOfData) ));
                 ImportData data;
 
                 // import by name
@@ -316,7 +316,7 @@ mapImports& PEImage::GetImports( bool useDelayed /*= false*/ )
             {
                 uint64_t AddressOfData = _is64 ? THK64( pRVA )->u1.AddressOfData : THK32( pRVA )->u1.AddressOfData;
                 
-                auto* pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( static_cast<size_t>(AddressOfData) ));
+                auto* pAddressTable = reinterpret_cast<IMAGE_IMPORT_BY_NAME*>(ResolveRVAToVA( static_cast<uintptr_t>(AddressOfData) ));
                 ImportData data;
 
                 // import by name
@@ -338,7 +338,7 @@ mapImports& PEImage::GetImports( bool useDelayed /*= false*/ )
                     data.ptrRVA = pImportTbl->FirstThunk + IAT_Index;
                 // Save address to OrigianlFirstThunk
                 else
-                    data.ptrRVA = static_cast<size_t>(AddressOfData) - reinterpret_cast<size_t>(_pFileBase);
+                    data.ptrRVA = static_cast<uintptr_t>(AddressOfData) - reinterpret_cast<uintptr_t>(_pFileBase);
 
                 _imports[dllStr].emplace_back( data );
 
@@ -365,8 +365,8 @@ void PEImage::GetExports( vecExports& exports )
     if (pExport == 0)
         return;
 
-    DWORD *pAddressOfNames = reinterpret_cast<DWORD*>(pExport->AddressOfNames + reinterpret_cast<size_t>(_pFileBase));
-    DWORD *pAddressOfFuncs = reinterpret_cast<DWORD*>(pExport->AddressOfFunctions + reinterpret_cast<size_t>(_pFileBase));
+    DWORD *pAddressOfNames = reinterpret_cast<DWORD*>(pExport->AddressOfNames + reinterpret_cast<uintptr_t>(_pFileBase));
+    DWORD *pAddressOfFuncs = reinterpret_cast<DWORD*>(pExport->AddressOfFunctions + reinterpret_cast<uintptr_t>(_pFileBase));
     WORD  *pAddressOfOrds  = reinterpret_cast<WORD*> (pExport->AddressOfNameOrdinals + reinterpret_cast<size_t>(_pFileBase));
 
     for (DWORD i = 0; i < pExport->NumberOfNames; ++i)
@@ -403,7 +403,7 @@ size_t PEImage::DirectoryAddress( int index, bool keepRelative /*= false*/ ) con
 /// <param name="Rva">Memory address</param>
 /// <param name="keepRelative">Keep address relative to file start</param>
 /// <returns>Resolved address</returns>
-size_t PEImage::ResolveRVAToVA( size_t Rva, bool keepRelative /*= false*/ ) const
+uintptr_t PEImage::ResolveRVAToVA( uintptr_t Rva, bool keepRelative /*= false*/ ) const
 {
     if (_isPlainData)
     {
@@ -414,14 +414,14 @@ size_t PEImage::ResolveRVAToVA( size_t Rva, bool keepRelative /*= false*/ ) cons
                 if (keepRelative)
                     return  (Rva - sec.VirtualAddress + sec.PointerToRawData);
                 else
-                    return reinterpret_cast<size_t>(_pFileBase)+(Rva - sec.VirtualAddress + sec.PointerToRawData);
+                    return reinterpret_cast<uintptr_t>(_pFileBase)+(Rva - sec.VirtualAddress + sec.PointerToRawData);
             }
         }
 
         return 0;
     }
     else
-        return (keepRelative ? Rva : (reinterpret_cast<size_t>(_pFileBase) + Rva));
+        return (keepRelative ? Rva : (reinterpret_cast<uintptr_t>(_pFileBase) + Rva));
 }
 
 /// <summary>

@@ -42,31 +42,31 @@ namespace blackbone
             : AsmVariant( noarg, 0, 0 ) { }
 
         BLACKBONE_API AsmVariant( int _imm )
-            : AsmVariant( imm, sizeof(_imm), static_cast<size_t>(_imm) ) { }
+            : AsmVariant( imm, sizeof(_imm), static_cast<uintptr_t>(_imm) ) { }
 
         BLACKBONE_API AsmVariant( unsigned long _imm )
-            : AsmVariant( imm, sizeof(_imm), static_cast<size_t>(_imm) ) { }
+            : AsmVariant( imm, sizeof(_imm), static_cast<uintptr_t>(_imm) ) { }
 
-        BLACKBONE_API AsmVariant( size_t _imm )
+        BLACKBONE_API AsmVariant( uintptr_t _imm )
             : AsmVariant( imm, sizeof(_imm), _imm ) { }
         
         BLACKBONE_API AsmVariant( char* ptr )
-            : AsmVariant( dataPtr, strlen( ptr ) + 1, reinterpret_cast<size_t>(ptr) ) { }
+            : AsmVariant( dataPtr, strlen( ptr ) + 1, reinterpret_cast<uintptr_t>(ptr) ) { }
 
         BLACKBONE_API AsmVariant( const char* ptr )
             : AsmVariant( const_cast<char*>(ptr) ) { }
 
         BLACKBONE_API AsmVariant( wchar_t* ptr )
-            : AsmVariant( dataPtr, (wcslen( ptr ) + 1) * sizeof(wchar_t), reinterpret_cast<size_t>(ptr) ) { }
+            : AsmVariant( dataPtr, (wcslen( ptr ) + 1) * sizeof(wchar_t), reinterpret_cast<uintptr_t>(ptr) ) { }
 
         BLACKBONE_API AsmVariant( const wchar_t* ptr )
             : AsmVariant( const_cast<wchar_t*>(ptr) ) { }
 
         BLACKBONE_API AsmVariant( void* _imm )
-            : AsmVariant( imm, sizeof(void*), reinterpret_cast<size_t>(_imm) ) { }
+            : AsmVariant( imm, sizeof(void*), reinterpret_cast<uintptr_t>(_imm) ) { }
 
         BLACKBONE_API AsmVariant( const void* _imm )
-            : AsmVariant( imm, sizeof(void*), reinterpret_cast<size_t>(_imm) ) { }
+            : AsmVariant( imm, sizeof(void*), reinterpret_cast<uintptr_t>(_imm) ) { }
 
         // In MSVS compiler 'long double' and 'double' are both 8 bytes long
         BLACKBONE_API  AsmVariant( long double _imm_fpu )
@@ -86,7 +86,7 @@ namespace blackbone
 
         BLACKBONE_API AsmVariant( asmjit::GpReg _reg )
             : type( reg )
-            , size( sizeof(size_t) )
+            , size( sizeof( uintptr_t ) )
             , reg_val( _reg )
             , imm_double_val( -1.0 )
             , new_imm_val( 0 ) { }
@@ -94,14 +94,14 @@ namespace blackbone
         // Stack variable
         BLACKBONE_API AsmVariant( asmjit::Mem _mem )
             : type( mem )
-            , size( sizeof(size_t) )
+            , size( sizeof( uintptr_t ) )
             , mem_val( _mem )
             , imm_double_val( -1.0 ) { }
 
         // Pointer to stack address
         BLACKBONE_API AsmVariant( asmjit::Mem* _mem )
             : type( mem_ptr )
-            , size( sizeof(size_t) )
+            , size( sizeof( uintptr_t ) )
             , mem_val( *_mem )
             , imm_double_val( -1.0 )
             , new_imm_val( 0 ) { }
@@ -111,7 +111,7 @@ namespace blackbone
 
         template <typename T>
         AsmVariant( T* ptr )
-            : AsmVariant( dataPtr, sizeof(T), reinterpret_cast<size_t>(ptr) ) { }
+            : AsmVariant( dataPtr, sizeof(T), reinterpret_cast<uintptr_t>(ptr) ) { }
 
         template <typename T>
         AsmVariant( const T* ptr )
@@ -124,28 +124,28 @@ namespace blackbone
 
             type = isFunction ? imm : dataPtr;
             size = sizeof(Type);
-            imm_val = reinterpret_cast<size_t>(ptr);
+            imm_val = reinterpret_cast<uintptr_t>(ptr);
             new_imm_val = 0;
         }
 
         template <typename T>
         AsmVariant( const T* ptr, size_t size )
-            : AsmVariant( dataPtr, size, reinterpret_cast<size_t>(ptr) ) { }
+            : AsmVariant( dataPtr, size, reinterpret_cast<uintptr_t>(ptr) ) { }
 
         template <typename T>
         AsmVariant( T& val )
-            : AsmVariant( dataPtr, sizeof(T), reinterpret_cast<size_t>(&val) ) { }
+            : AsmVariant( dataPtr, sizeof(T), reinterpret_cast<uintptr_t>(&val) ) { }
 
         template <typename T>
         AsmVariant( const T& val )
-            : AsmVariant( dataPtr, sizeof(T), reinterpret_cast<size_t>(&val) ) {}
+            : AsmVariant( dataPtr, sizeof(T), reinterpret_cast<uintptr_t>(&val) ) {}
 
         // Pass argument by value case
         // Real RValue reference types are not supported because of ambiguity
         #pragma warning(disable : 4127)
         template <typename T>
         AsmVariant( T&& val )
-            : AsmVariant( dataStruct, sizeof(T), reinterpret_cast<size_t>(&val) )
+            : AsmVariant( dataStruct, sizeof(T), reinterpret_cast<uintptr_t>(&val) )
         {
             // Check if argument fits into register
             if (sizeof(T) <= sizeof(void*) && !std::is_class<T>::value)
@@ -157,7 +157,7 @@ namespace blackbone
             else
             {
                 buf.reset( new uint8_t[sizeof(T)] );
-                imm_val = reinterpret_cast<size_t>(buf.get());
+                imm_val = reinterpret_cast<uintptr_t>(buf.get());
                 memcpy( buf.get(), &val, sizeof(T) );
             }
         }
@@ -197,7 +197,7 @@ namespace blackbone
         /// <param name="_type">Argument type</param>
         /// <param name="_size">Argument size</param>
         /// <param name="val">Immediate value</param>
-        AsmVariant( eType _type, size_t _size, size_t val )
+        AsmVariant( eType _type, size_t _size, uintptr_t val )
             : type( _type )
             , size( _size )
             , imm_val( val )
@@ -213,12 +213,12 @@ namespace blackbone
         // Immediate values
         union
         {
-            size_t    imm_val;
+            uintptr_t imm_val;
             double    imm_double_val;
             float     imm_float_val;
         };
 
-        size_t        new_imm_val;      // Replaced immediate value for dataPtr type
+        uintptr_t     new_imm_val;      // Replaced immediate value for dataPtr type
 
         // rvalue reference buffer
         std::shared_ptr<uint8_t> buf;

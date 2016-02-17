@@ -332,7 +332,7 @@ DWORD RemoteHook::OnDebugEvent( const DEBUG_EVENT& DebugEv )
 DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
 {
     // Prevent highest bit extension.
-    ptr_t addr = (size_t)DebugEv.u.Exception.ExceptionRecord.ExceptionAddress;
+    ptr_t addr = (uintptr_t)DebugEv.u.Exception.ExceptionRecord.ExceptionAddress;
     ptr_t ip = 0, sp = 0;
     Thread thd( DebugEv.dwThreadId, &_core );
 
@@ -402,7 +402,7 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
 DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
 {
     // Prevent highest bit extension.
-    ptr_t addr = (size_t)DebugEv.u.Exception.ExceptionRecord.ExceptionAddress;
+    ptr_t addr = (uintptr_t)DebugEv.u.Exception.ExceptionRecord.ExceptionAddress;
     ptr_t ip = 0, sp = 0;
     bool use64 = !_core.native()->GetWow64Barrier().x86OS;
     _CONTEXT32 ctx32 = { 0 };

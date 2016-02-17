@@ -103,7 +103,7 @@ public:
     /// <param name="size">Block size</param>
     /// <param name="pOld">Old protection flags</param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS Protect( DWORD protection, size_t offset = 0, size_t size = 0, DWORD* pOld = nullptr );
+    BLACKBONE_API NTSTATUS Protect( DWORD protection, uintptr_t offset = 0, size_t size = 0, DWORD* pOld = nullptr );
 
     /// <summary>
     /// Free memory
@@ -122,7 +122,7 @@ public:
     /// Otherwise function will fail if there is at least one non-committed page in region.
     /// </param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS Read( size_t offset, size_t size, PVOID pResult, bool handleHoles = false );
+    BLACKBONE_API NTSTATUS Read( uintptr_t offset, size_t size, PVOID pResult, bool handleHoles = false );
 
     /// <summary>
     /// Write data
@@ -131,7 +131,7 @@ public:
     /// <param name="size">Size of data to write</param>
     /// <param name="pData">Buffer to write</param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS Write( size_t offset, size_t size, const void* pData );
+    BLACKBONE_API NTSTATUS Write( uintptr_t offset, size_t size, const void* pData );
 
     /// <summary>
     /// Read data
@@ -140,7 +140,7 @@ public:
     /// <param name="def_val">Defult return value if read has failed</param>
     /// <returns>Read data</returns>
     template<class T>
-    T Read( size_t offset, const T& def_val )
+    T Read( uintptr_t offset, const T& def_val )
     {
         T res = def_val;
         Read( offset, sizeof( T ), &res );
@@ -166,7 +166,7 @@ public:
     /// <param name="data">Data to write</param>
     /// <returns>Status</returns>
     template<class T>
-    NTSTATUS Write( size_t offset, const T& data )
+    NTSTATUS Write( uintptr_t offset, const T& data )
     {
         return Write( offset, sizeof( data ), &data );
     }

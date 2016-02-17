@@ -87,9 +87,9 @@ size_t PatternSearch::Search( void* scanStart, size_t scanSize, std::vector<ptr_
 
     const uint8_t* haystack = reinterpret_cast<const uint8_t*>(scanStart);
     const uint8_t* needle   = &_pattern[0];
-    intptr_t       nlen     = _pattern.size();
-    intptr_t       scan     = 0;
-    intptr_t       last     = nlen - 1;
+    uintptr_t       nlen     = _pattern.size();
+    uintptr_t       scan     = 0;
+    uintptr_t       last     = nlen - 1;
 
     //
     // Preprocess

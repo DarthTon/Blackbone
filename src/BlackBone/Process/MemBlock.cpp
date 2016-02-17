@@ -121,7 +121,7 @@ ptr_t MemBlock::Realloc( size_t size, ptr_t desired /*= 0*/, DWORD protection /*
 /// <param name="size">Block size</param>
 /// <param name="pOld">Old protection flags</param>
 /// <returns>Status</returns>
-NTSTATUS MemBlock::Protect( DWORD protection, size_t offset /*= 0*/, size_t size /*= 0*/, DWORD* pOld /*= nullptr */ )
+NTSTATUS MemBlock::Protect( DWORD protection, uintptr_t offset /*= 0*/, size_t size /*= 0*/, DWORD* pOld /*= nullptr */ )
 {
     auto prot = CastProtection( protection, _memory->core().DEP() );
 
@@ -175,7 +175,7 @@ NTSTATUS MemBlock::Free( size_t size /*= 0*/ )
 /// Otherwise function will fail if there is at least one non-committed page in region.
 /// </param>
 /// <returns>Status</returns>
-NTSTATUS MemBlock::Read( size_t offset, size_t size, PVOID pResult, bool handleHoles /*= false*/ )
+NTSTATUS MemBlock::Read( uintptr_t offset, size_t size, PVOID pResult, bool handleHoles /*= false*/ )
 {
     return _memory->Read( _ptr + offset, size, pResult, handleHoles );
 }
@@ -188,7 +188,7 @@ NTSTATUS MemBlock::Read( size_t offset, size_t size, PVOID pResult, bool handleH
 /// <param name="size">Size of data to write</param>
 /// <param name="pData">Buffer to write</param>
 /// <returns>Status</returns>
-NTSTATUS MemBlock::Write( size_t offset, size_t size, const void* pData )
+NTSTATUS MemBlock::Write( uintptr_t offset, size_t size, const void* pData )
 {
     return _memory->Write( _ptr + offset, size, pData );
 }

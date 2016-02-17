@@ -37,7 +37,7 @@ namespace blackbone
                 };
             };
 
-            size_t ParentValue;
+            uintptr_t ParentValue;
         };
     } RTL_BALANCED_NODE, *PRTL_BALANCED_NODE;
 

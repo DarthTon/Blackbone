@@ -85,7 +85,7 @@ public:
 
     /// <summary>Gets the size.</summary>
     /// <returns>An size_t.</returns>
-    size_t size() const {
+    uint64_t size() const {
         return _buffer.size();
     }
 
@@ -262,7 +262,7 @@ private:
     /// </summary>
     /// <param name="base">Image base</param>
     /// <param name="path">New image path</param>
-    void FixManagedPath( size_t base, const std::wstring &path );
+    void FixManagedPath( uintptr_t base, const std::wstring &path );
 
     /// <summary>
     /// Get existing module or map it if absent

@@ -107,7 +107,7 @@ void AsmHelper64::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
 /// </summary>
 /// <param name="pExitThread">NtTerminateThread address</param>
 /// <param name="resultPtr">Memry where rax value will be saved</param>
-void AsmHelper64::ExitThreadWithStatus( uint64_t pExitThread, size_t resultPtr )
+void AsmHelper64::ExitThreadWithStatus( uintptr_t pExitThread, uintptr_t resultPtr )
 {
     if (resultPtr != 0)
     {
@@ -129,11 +129,13 @@ void AsmHelper64::ExitThreadWithStatus( uint64_t pExitThread, size_t resultPtr )
 /// <param name="EventPtr">Event memory location</param>
 /// <param name="errPtr">Error code memory location</param>
 /// <param name="rtype">Return type</param>
-void AsmHelper64::SaveRetValAndSignalEvent( size_t pSetEvent,
-                                            size_t ResultPtr,
-                                            size_t EventPtr, 
-                                            size_t lastStatusPtr, 
-                                            eReturnType rtype /*= rt_int32*/ )
+void AsmHelper64::SaveRetValAndSignalEvent( 
+    uintptr_t pSetEvent,
+    uintptr_t ResultPtr,
+    uintptr_t EventPtr,
+    uintptr_t lastStatusPtr,
+    eReturnType rtype /*= rt_int32*/ 
+    )
 {
     _assembler.mov( asmjit::host::rcx, ResultPtr );
 

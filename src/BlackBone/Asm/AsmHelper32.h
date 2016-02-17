@@ -40,7 +40,7 @@ public:
     /// </summary>
     /// <param name="pExitThread">NtTerminateThread address</param>
     /// <param name="resultPtr">Memry where eax value will be saved</param>
-    virtual void ExitThreadWithStatus( size_t pExitThread, size_t resultPtr );
+    virtual void ExitThreadWithStatus( uintptr_t pExitThread, uintptr_t resultPtr );
 
     /// <summary>
     /// Save return value and signal thread return event
@@ -51,10 +51,10 @@ public:
     /// <param name="errPtr">Error code memory location</param>
     /// <param name="rtype">Return type</param>
     virtual void SaveRetValAndSignalEvent( 
-        size_t pSetEvent, 
-        size_t ResultPtr,
-        size_t EventPtr,
-        size_t errPtr,
+        uintptr_t pSetEvent,
+        uintptr_t ResultPtr,
+        uintptr_t EventPtr,
+        uintptr_t errPtr,
         eReturnType rtype = rt_int32
         );
 

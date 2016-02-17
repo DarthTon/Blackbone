@@ -177,7 +177,7 @@ private:
         if (sizeof(T) > sizeof(uint64_t))
         {
             if (std::is_reference<T>::value)
-                return _userData.Read( _userData.Read<size_t>( RET_OFFSET, 0 ), sizeof(T), (PVOID)&result ) == STATUS_SUCCESS;
+                return _userData.Read( _userData.Read<uintptr_t>( RET_OFFSET, 0 ), sizeof(T), (PVOID)&result ) == STATUS_SUCCESS;
             else
                 return _userData.Read( ARGS_OFFSET, sizeof(T), (PVOID)&result ) == STATUS_SUCCESS;
         }

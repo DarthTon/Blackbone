@@ -135,8 +135,8 @@ void DetourBase::CopyOldCode( uint8_t* ptr )
         if (ld.flags & F_RELATIVE)
         {
             int32_t diff = 0;
-            const size_t ofst = (ld.disp_offset != 0 ? ld.disp_offset : ld.imm_offset);
-            const size_t sz = ld.disp_size != 0 ? ld.disp_size : ld.imm_size;
+            const uintptr_t ofst = (ld.disp_offset != 0 ? ld.disp_offset : ld.imm_offset);
+            const uintptr_t sz = ld.disp_size != 0 ? ld.disp_size : ld.imm_size;
 
             memcpy( &diff, src + ofst, sz );
 

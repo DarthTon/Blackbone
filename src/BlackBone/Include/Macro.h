@@ -7,11 +7,11 @@
 // Rebase address
 #define MAKE_PTR(T, pRVA, base)           (T)((ptr_t)pRVA + (ptr_t)base)
 #define REBASE(pRVA, baseOld, baseNew)       ((ptr_t)pRVA - (ptr_t)baseOld + (ptr_t)baseNew)
-#define REBASE2(T, rva, baseOld, baseNew) (T)((size_t)rva - (size_t)baseOld + (size_t)baseNew)
+#define REBASE2(T, rva, baseOld, baseNew) (T)((uintptr_t)rva - (uintptr_t)baseOld + (uintptr_t)baseNew)
 
 // Field offset info
 #define FIELD_OFFSET2(type, field)  ((LONG)(LONG_PTR)&(((type)0)->field))
-#define GET_FIELD_PTR(entry, field) (size_t)((uint8_t*)entry + FIELD_OFFSET2(decltype(entry), field))
+#define GET_FIELD_PTR(entry, field) (uintptr_t)((uint8_t*)entry + FIELD_OFFSET2(decltype(entry), field))
 
 #define LODWORD(l) ((uint32_t)(((uint64_t)(l)) & 0xffffffff))
 #define HIDWORD(l) ((uint32_t)((((uint64_t)(l)) >> 32) & 0xffffffff))

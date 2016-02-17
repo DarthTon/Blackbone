@@ -21,7 +21,7 @@ namespace blackbone
 class ImageNET
 {
 public:
-    typedef std::map<std::pair<std::wstring, std::wstring>, size_t> mapMethodRVA;
+    typedef std::map<std::pair<std::wstring, std::wstring>, uintptr_t> mapMethodRVA;
 
 public:
     BLACKBONE_API ImageNET(void);

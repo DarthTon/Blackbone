@@ -46,7 +46,7 @@ public:
         HMODULE hMod,
         size_t ImageSize,
         const std::wstring& DllBasePath,
-        size_t entryPoint,
+        uintptr_t entryPoint,
         LdrRefFlags flags = Ldr_All
         );
 
@@ -79,10 +79,10 @@ public:
     // 
     // Get some not exported values
     //
-    BLACKBONE_API inline size_t LdrpInvertedFunctionTable( ) const { return _LdrpInvertedFunctionTable; }
-    BLACKBONE_API inline size_t LdrKernel32PatchAddress() const { return _LdrKernel32PatchAddress; }
-    BLACKBONE_API inline size_t APC64PatchAddress() const { return _APC64PatchAddress; }
-    BLACKBONE_API inline size_t LdrProtectMrdata() const { return _LdrProtectMrdata; }
+    BLACKBONE_API inline uintptr_t LdrpInvertedFunctionTable( ) const { return _LdrpInvertedFunctionTable; }
+    BLACKBONE_API inline uintptr_t LdrKernel32PatchAddress() const { return _LdrKernel32PatchAddress; }
+    BLACKBONE_API inline uintptr_t APC64PatchAddress() const { return _APC64PatchAddress; }
+    BLACKBONE_API inline uintptr_t LdrProtectMrdata() const { return _LdrProtectMrdata; }
     
 private:
 
@@ -123,7 +123,7 @@ private:
         void* ModuleBase,
         size_t ImageSize,
         const std::wstring& dllpath,
-        size_t entryPoint,
+        uintptr_t entryPoint,
         ULONG& outHash
         );
 
@@ -140,7 +140,7 @@ private:
         void* ModuleBase,
         size_t ImageSize,
         const std::wstring& dllpath,
-        size_t entryPoint,
+        uintptr_t entryPoint,
         ULONG& outHash
         );
 
@@ -148,28 +148,28 @@ private:
     /// Insert entry into win8 module graph
     /// </summary>
     /// <param name="pNode">Node to insert</param>
-    void InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, size_t modBase );
+    void InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, uintptr_t modBase );
 
     /// <summary>
     /// Insert entry into LdrpHashTable[]
     /// </summary>
     /// <param name="pNodeLink">Link of entry to be inserted</param>
     /// <param name="hash">Module hash</param>
-    void InsertHashNode( size_t pNodeLink, ULONG hash );
+    void InsertHashNode( uintptr_t pNodeLink, ULONG hash );
 
     /// <summary>
     /// Insert entry into InLoadOrderModuleList and InMemoryOrderModuleList
     /// </summary>
     /// <param name="pNodeMemoryOrderLink">InMemoryOrderModuleList link of entry to be inserted</param>
     /// <param name="pNodeLoadOrderLink">InLoadOrderModuleList link of entry to be inserted</param>
-    void InsertMemModuleNode( size_t pNodeMemoryOrderLink, size_t pNodeLoadOrderLink, size_t pNodeInitOrderLink );
+    void InsertMemModuleNode( uintptr_t pNodeMemoryOrderLink, uintptr_t pNodeLoadOrderLink, uintptr_t pNodeInitOrderLink );
 
     /// <summary>
     /// Insert entry into standard double linked list
     /// </summary>
     /// <param name="ListHead">List head pointer</param>
     /// <param name="Entry">Entry list link to be inserted</param>
-    void InsertTailList( size_t ListHead, size_t Entry );
+    void InsertTailList( uintptr_t ListHead, uintptr_t Entry );
 
     /// <summary>
     /// Hash image name
@@ -204,7 +204,7 @@ private:
     /// <param name="baseAddress">Record to remove.</param>
     /// <returns>Address of removed record</returns>
     template<typename T> 
-    ptr_t UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, size_t ofst, ptr_t baseAddress );
+    ptr_t UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, uintptr_t ofst, ptr_t baseAddress );
 
     template<typename T>
     void UnlinkListEntry( ptr_t pListLink );
@@ -220,19 +220,19 @@ private:
     NtLdr& operator =(const NtLdr&) = delete;
 
 private:
-    class Process& _process;                        // Process memory routines
+    class Process& _process;                            // Process memory routines
 
-    size_t _LdrpHashTable = 0;                      // LdrpHashTable address
-    size_t _LdrpModuleIndexBase = 0;                // LdrpModuleIndex address
-    size_t _LdrHeapBase = 0;                        // Loader heap base address
-    size_t _LdrKernel32PatchAddress = 0;            // Address to patch to enable kernel32 loading under win7
-    size_t _APC64PatchAddress = 0;                  // Address to patch for x64->WOW64 APC dispatching under win7
-    size_t _LdrpHandleTlsData = 0;                  // LdrpHandleTlsData address
-    size_t _LdrpInvertedFunctionTable = 0;          // LdrpInvertedFunctionTable address
-    size_t _RtlInsertInvertedFunctionTable = 0;     // RtlInsertInvertedFunctionTable address
-    size_t _LdrProtectMrdata = 0;                   // LdrProtectMrdata address
+    uintptr_t _LdrpHashTable = 0;                        // LdrpHashTable address
+    uintptr_t _LdrpModuleIndexBase = 0;                  // LdrpModuleIndex address
+    uintptr_t _LdrHeapBase = 0;                          // Loader heap base address
+    uintptr_t _LdrKernel32PatchAddress = 0;              // Address to patch to enable kernel32 loading under win7
+    uintptr_t _APC64PatchAddress = 0;                    // Address to patch for x64->WOW64 APC dispatching under win7
+    uintptr_t _LdrpHandleTlsData = 0;                    // LdrpHandleTlsData address
+    uintptr_t _LdrpInvertedFunctionTable = 0;            // LdrpInvertedFunctionTable address
+    uintptr_t _RtlInsertInvertedFunctionTable = 0;       // RtlInsertInvertedFunctionTable address
+    uintptr_t _LdrProtectMrdata = 0;                     // LdrProtectMrdata address
 
-    std::map<HMODULE, void*> _nodeMap;              // Allocated native structures
+    std::map<HMODULE, void*> _nodeMap;                  // Allocated native structures
 };
 
 }

@@ -37,7 +37,7 @@ MExcept::~MExcept()
 /// <param name="mt">Mosule type</param>
 /// <param name="partial">Partial exception support</param>
 /// <returns>Error code</returns>
-NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, bool partial )
+NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType mt, bool partial )
 {    
     AsmJitHelper a;
     uint64_t result = 0;
@@ -164,21 +164,21 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, 
           pData++)
     {
         // LdrpInvertedFunctionTable
-        if(*(size_t*)pData == 0xDEADDA7A)
+        if(*(uintptr_t*)pData == 0xDEADDA7A)
         {
             dataOfs = pData - reinterpret_cast<uint8_t*>(pFunc);
             continue;
         }
 
         // DecodeSystemPointer address
-        if(*(size_t*)pData == 0xDEADC0DE)
+        if(*(uintptr_t*)pData == 0xDEADC0DE)
         {
             code_ofs = pData - reinterpret_cast<uint8_t*>(pFunc);
             break;
         }  
 
         // LdrProtectMrdata address
-        if (*(size_t*)pData == 0xDEADC0D2)
+        if (*(uintptr_t*)pData == 0xDEADC0D2)
         {
             code_ofs2 = pData - reinterpret_cast<uint8_t*>(pFunc);
             continue;
@@ -190,7 +190,7 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, 
     // Write handler data into target process
     if ( !NT_SUCCESS( _pVEHCode.Write( 0, fnSize, pFunc ) ) ||
          !NT_SUCCESS( _pVEHCode.Write( dataOfs, _proc.nativeLdr().LdrpInvertedFunctionTable() ) ) ||
-         !NT_SUCCESS( _pVEHCode.Write( code_ofs, static_cast<size_t>(pDecode) ) ) ||
+         !NT_SUCCESS( _pVEHCode.Write( code_ofs, static_cast<uintptr_t>(pDecode) ) ) ||
          !NT_SUCCESS( _pVEHCode.Write( code_ofs2, _proc.nativeLdr().LdrProtectMrdata() ) ))
     {
         _pVEHCode.Free();
@@ -206,13 +206,13 @@ NTSTATUS MExcept::CreateVEH( size_t pTargetBase, size_t imageSize, eModType mt, 
     a->reset();
     a.GenPrologue();
 
-    a.GenCall( static_cast<size_t>(pAddHandler), { 0, _pVEHCode.ptr<size_t>() } );
+    a.GenCall( static_cast<uintptr_t>(pAddHandler), { 0, _pVEHCode.ptr<uintptr_t>() } );
 
     _proc.remote().AddReturnWithEvent( a, mt );
     a.GenEpilogue();
 
     _proc.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-    _hVEH = static_cast<size_t>(result);
+    _hVEH = static_cast<uintptr_t>(result);
 
     return (_hVEH == 0 ? STATUS_NOT_FOUND : STATUS_SUCCESS);
 }
@@ -235,7 +235,7 @@ NTSTATUS MExcept::RemoveVEH( bool partial )
     a.GenPrologue();
 
     // RemoveVectoredExceptionHandler(pHandler);
-    a.GenCall( static_cast<size_t>(pRemoveHandler), { _hVEH } );
+    a.GenCall( static_cast<uintptr_t>(pRemoveHandler), { _hVEH } );
 
     _proc.remote().AddReturnWithEvent( a );
     a.GenEpilogue();
@@ -352,8 +352,8 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
         // Find image for handler
         for (ULONG imageIndex = 0; imageIndex < pTable->Count; imageIndex++)
         {
-            if ( reinterpret_cast<size_t>(pFs->Handler) >= reinterpret_cast<size_t>(pEntries[imageIndex].ImageBase) &&
-                 reinterpret_cast<size_t>(pFs->Handler) <= reinterpret_cast<size_t>(pEntries[imageIndex].ImageBase)
+            if ( reinterpret_cast<uintptr_t>(pFs->Handler) >= reinterpret_cast<uintptr_t>(pEntries[imageIndex].ImageBase) &&
+                 reinterpret_cast<uintptr_t>(pFs->Handler) <= reinterpret_cast<uintptr_t>(pEntries[imageIndex].ImageBase)
                                                            + pEntries[imageIndex].ImageSize)
             {
                 newHandler = false;
@@ -373,7 +373,7 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
                 {
                     if (*pDec == 0)
                     {
-                        *pDec = reinterpret_cast<size_t>(pFs->Handler) - reinterpret_cast<size_t>(pEntries[imageIndex].ImageBase);
+                        *pDec = reinterpret_cast<uintptr_t>(pFs->Handler) - reinterpret_cast<uintptr_t>(pEntries[imageIndex].ImageBase);
                         pEntries[imageIndex].SizeOfTable++;
                         newHandler = true;
 

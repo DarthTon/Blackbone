@@ -42,7 +42,7 @@ struct RelocData
 struct ImportData
 {
     std::string importName;     // Function name
-    size_t ptrRVA;              // Function pointer RVA in
+    uintptr_t ptrRVA;            // Function pointer RVA in
     WORD importOrdinal;         // Function ordinal
     bool importByOrd;           // Function is imported by ordinal
 };
@@ -165,7 +165,7 @@ public:
     /// <param name="Rva">Memory address</param>
     /// <param name="keepRelative">Keep address relative to file start</param>
     /// <returns>Resolved address</returns>
-    BLACKBONE_API size_t ResolveRVAToVA( size_t Rva, bool keepRelative = false ) const;
+    BLACKBONE_API uintptr_t ResolveRVAToVA( uintptr_t Rva, bool keepRelative = false ) const;
 
     /// <summary>
     /// Get image path

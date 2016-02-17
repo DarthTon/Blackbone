@@ -57,7 +57,7 @@ bool NtLdr::CreateNTReference(
     HMODULE hMod,
     size_t ImageSize,
     const std::wstring& DllBasePath,
-    size_t entryPoint,
+    uintptr_t entryPoint,
     LdrRefFlags flags /*= Ldr_All*/
     )
 {
@@ -78,7 +78,7 @@ bool NtLdr::CreateNTReference(
 
         // Insert into module graph
         if (flags & Ldr_ModList)
-            InsertTreeNode( pEntry, reinterpret_cast<size_t>(hMod) );
+            InsertTreeNode( pEntry, reinterpret_cast<uintptr_t>(hMod) );
 
         if (flags & Ldr_ThdCall)
         {
@@ -181,7 +181,7 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
 
         _process.memory().Read( remoteTls.StartAddressOfRawData, size, buf.get() );
 
-        tlsStore.Write( 0, tlsStore.ptr<size_t>() + 0x800 );
+        tlsStore.Write( 0, tlsStore.ptr<uintptr_t>() + 0x800 );
         tlsStore.Write( 0x800, size, buf.get() );
 
         if (wxp)
@@ -199,7 +199,7 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
         uint64_t result = 0;
 
         a.GenPrologue();
-        a.GenCall( _LdrpHandleTlsData, { reinterpret_cast<size_t>(pNode) }, IsWindows8Point1OrGreater() ? cc_thiscall : cc_stdcall );
+        a.GenCall( _LdrpHandleTlsData, { reinterpret_cast<uintptr_t>(pNode) }, IsWindows8Point1OrGreater() ? cc_thiscall : cc_stdcall );
         _process.remote().AddReturnWithEvent( a );
         a.GenEpilogue();
 
@@ -249,11 +249,11 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
     a.GenPrologue();
 
     if (IsWindows8Point1OrGreater())
-        a.GenCall( _RtlInsertInvertedFunctionTable, { reinterpret_cast<size_t>(ModuleBase), ImageSize }, cc_fastcall );
+        a.GenCall( _RtlInsertInvertedFunctionTable, { reinterpret_cast<uintptr_t>(ModuleBase), ImageSize }, cc_fastcall );
     else if (IsWindows8OrGreater())
-        a.GenCall( _RtlInsertInvertedFunctionTable, { reinterpret_cast<size_t>(ModuleBase), ImageSize } );
+        a.GenCall( _RtlInsertInvertedFunctionTable, { reinterpret_cast<uintptr_t>(ModuleBase), ImageSize } );
     else
-        a.GenCall( _RtlInsertInvertedFunctionTable, { _LdrpInvertedFunctionTable, reinterpret_cast<size_t>(ModuleBase), ImageSize } );
+        a.GenCall( _RtlInsertInvertedFunctionTable, { _LdrpInvertedFunctionTable, reinterpret_cast<uintptr_t>(ModuleBase), ImageSize } );
 
     _process.remote().AddReturnWithEvent( a );
     a.GenEpilogue();
@@ -284,16 +284,16 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
         auto pEncoded = EncodeSystemPointer( pImgEntry );
 
         // m_LdrpInvertedFunctionTable->Entries[i].ExceptionDirectory
-        size_t field_ofst = reinterpret_cast<size_t>(&Entries[i].ExceptionDirectory)
-            - reinterpret_cast<size_t>(&table);
+        uintptr_t field_ofst = reinterpret_cast<uintptr_t>(&Entries[i].ExceptionDirectory)
+            - reinterpret_cast<uintptr_t>(&table);
 
         // In Win10 _LdrpInvertedFunctionTable is located in mrdata section
         // mrdata is read-only by default 
         // LdrProtectMrdata is used to make it writable when needed
         DWORD flOld = 0;
-        memory.Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), PAGE_EXECUTE_READWRITE, &flOld );
+        memory.Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( uintptr_t ), PAGE_EXECUTE_READWRITE, &flOld );
         auto status = memory.Write( _LdrpInvertedFunctionTable + field_ofst, pEncoded );
-        memory.Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( size_t ), flOld, &flOld );
+        memory.Protect( _LdrpInvertedFunctionTable + field_ofst, sizeof( uintptr_t ), flOld, &flOld );
 
         return NT_SUCCESS( status );
     }
@@ -314,7 +314,7 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
     void* ModuleBase,
     size_t ImageSize,
     const std::wstring& dllpath,
-    size_t entryPoint,
+    uintptr_t entryPoint,
     ULONG& outHash
     )
 {
@@ -344,7 +344,7 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
         //
         a.GenPrologue();
 
-        a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W8 ) } );
+        a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W8 ) } );
         _process.remote().AddReturnWithEvent( a, mt );
         a.GenEpilogue();
 
@@ -370,7 +370,7 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
             //
             a.GenPrologue();
 
-            a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DDAG_NODE ) } );
+            a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DDAG_NODE ) } );
 
             _process.remote().AddReturnWithEvent( a, mt );
             a.GenEpilogue();
@@ -456,7 +456,7 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node(
     void* ModuleBase,
     size_t ImageSize,
     const std::wstring& dllpath,
-    size_t entryPoint,
+    uintptr_t entryPoint,
     ULONG& outHash 
     )
 {
@@ -485,7 +485,7 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node(
         //
         a.GenPrologue();
 
-        a.GenCall( static_cast<size_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W7 ) } );
+        a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W7 ) } );
 
         _process.remote().AddReturnWithEvent( a, mt );
         a.GenEpilogue();
@@ -549,12 +549,12 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node(
 /// Insert entry into win8 module graph
 /// </summary>
 /// <param name="pNode">Node to insert</param>
-void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, size_t modBase )
+void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, uintptr_t modBase )
 {
     //
     // Win8 module tree
     //
-    size_t root = _process.memory().Read<size_t>( _LdrpModuleIndexBase );
+    uintptr_t root = _process.memory().Read<uintptr_t>( _LdrpModuleIndexBase );
 
     _LDR_DATA_TABLE_ENTRY_W8 *pLdrNode = CONTAINING_RECORD( root, _LDR_DATA_TABLE_ENTRY_W8, BaseAddressIndexNode );
     _LDR_DATA_TABLE_ENTRY_W8 LdrNode = _process.memory().Read<_LDR_DATA_TABLE_ENTRY_W8>( reinterpret_cast<ptr_t>(pLdrNode) );
@@ -612,9 +612,9 @@ void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, size_t modBase )
         _process.modules().GetModule( L"ntdll.dll", LdrList, mt ), "RtlRbInsertNodeEx" ).procAddress;
 
     a.GenPrologue( );
-    a.GenCall( static_cast<size_t>(RtlRbInsertNodeEx), { _LdrpModuleIndexBase,
+    a.GenCall( static_cast<uintptr_t>(RtlRbInsertNodeEx), { _LdrpModuleIndexBase,
                                                            GET_FIELD_PTR( pLdrNode, BaseAddressIndexNode ), 
-                                                           static_cast<size_t>(bRight), GET_FIELD_PTR( pNode, BaseAddressIndexNode ) } );
+                                                           static_cast<uintptr_t>(bRight), GET_FIELD_PTR( pNode, BaseAddressIndexNode ) } );
     _process.remote().AddReturnWithEvent( a, mt );
     a.GenEpilogue();
 
@@ -626,7 +626,7 @@ void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, size_t modBase )
 /// </summary>
 /// <param name="pNodeMemoryOrderLink">InMemoryOrderModuleList link of entry to be inserted</param>
 /// <param name="pNodeLoadOrderLink">InLoadOrderModuleList link of entry to be inserted</param>
-void NtLdr::InsertMemModuleNode( size_t pNodeMemoryOrderLink, size_t pNodeLoadOrderLink, size_t pNodeInitOrderLink )
+void NtLdr::InsertMemModuleNode( uintptr_t pNodeMemoryOrderLink, uintptr_t pNodeLoadOrderLink, uintptr_t pNodeInitOrderLink )
 {
     PEB_T* pPeb = reinterpret_cast<PEB_T*>(_process.core().peb());
     PEB_LDR_DATA_T* pLdr = nullptr;
@@ -655,12 +655,12 @@ void NtLdr::InsertMemModuleNode( size_t pNodeMemoryOrderLink, size_t pNodeLoadOr
 /// </summary>
 /// <param name="pNodeLink">Link of entry to be inserted</param>
 /// <param name="hash">Module hash</param>
-void NtLdr::InsertHashNode( size_t pNodeLink, ULONG hash )
+void NtLdr::InsertHashNode( uintptr_t pNodeLink, ULONG hash )
 {
     if(pNodeLink)
     {
         // LrpHashTable record
-        auto pHashList = _process.memory().Read<size_t>( _LdrpHashTable + sizeof(LIST_ENTRY)*(hash & 0x1F) );
+        auto pHashList = _process.memory().Read<uintptr_t>( _LdrpHashTable + sizeof(LIST_ENTRY)*(hash & 0x1F) );
         InsertTailList( pHashList, pNodeLink );
     }
 }
@@ -670,10 +670,10 @@ void NtLdr::InsertHashNode( size_t pNodeLink, ULONG hash )
 /// </summary>
 /// <param name="ListHead">List head pointer</param>
 /// <param name="Entry">Entry list link to be inserted</param>
-void NtLdr::InsertTailList( size_t ListHead, size_t Entry )
+void NtLdr::InsertTailList( uintptr_t ListHead, uintptr_t Entry )
 {
     // PrevEntry = ListHead->Blink;
-    auto PrevEntry = _process.memory().Read<size_t>( GET_FIELD_PTR( reinterpret_cast<PLIST_ENTRY>(ListHead), Blink) );
+    auto PrevEntry = _process.memory().Read<uintptr_t>( GET_FIELD_PTR( reinterpret_cast<PLIST_ENTRY>(ListHead), Blink) );
 
     // Entry->Flink = ListHead;
     // Entry->Blink = PrevEntry;
@@ -747,7 +747,7 @@ bool NtLdr::FindLdrpHashTable( )
     }
 
     if (bHeadFound)
-        _LdrpHashTable = reinterpret_cast<size_t>(pNtdllHashHead - NtdllHashIndex);
+        _LdrpHashTable = reinterpret_cast<uintptr_t>(pNtdllHashHead - NtdllHashIndex);
 
    return bHeadFound;
 }
@@ -774,31 +774,31 @@ bool NtLdr::FindLdrpModuleIndexBase( )
         for(; pNode->ParentValue; )
         {
             // Ignore last few bits
-            lastNode = reinterpret_cast<PRTL_BALANCED_NODE>(pNode->ParentValue & size_t( -8 ));
+            lastNode = reinterpret_cast<PRTL_BALANCED_NODE>(pNode->ParentValue & uintptr_t( -8 ));
             pNode = lastNode;
         }
 
         // Get pointer to root
         pe::PEImage ntdll;
-        size_t* pStart = nullptr;
-        size_t* pEnd = nullptr;
+        uintptr_t* pStart = nullptr;
+        uintptr_t* pEnd = nullptr;
 
         ntdll.Parse( reinterpret_cast<void*>(Ntdll->DllBase) );
 
         for (auto& section : ntdll.sections())
             if (_stricmp( reinterpret_cast<LPCSTR>(section.Name), ".data") == 0 )
             {
-                pStart = reinterpret_cast<size_t*>(Ntdll->DllBase + section.VirtualAddress);
-                pEnd   = reinterpret_cast<size_t*>(Ntdll->DllBase + section.VirtualAddress + section.Misc.VirtualSize);
+                pStart = reinterpret_cast<uintptr_t*>(Ntdll->DllBase + section.VirtualAddress);
+                pEnd   = reinterpret_cast<uintptr_t*>(Ntdll->DllBase + section.VirtualAddress + section.Misc.VirtualSize);
 
                 break;
             }
 
-        auto iter = std::find( pStart, pEnd, reinterpret_cast<size_t>(lastNode) );
+        auto iter = std::find( pStart, pEnd, reinterpret_cast<uintptr_t>(lastNode) );
 
         if (iter != pEnd)
         {
-            _LdrpModuleIndexBase = reinterpret_cast<size_t>(iter);
+            _LdrpModuleIndexBase = reinterpret_cast<uintptr_t>(iter);
             return true;
         }
     }
@@ -847,7 +847,7 @@ bool NtLdr::ScanPatterns( )
         ps.Search( pStart, scanSize, foundData );
 
         if (!foundData.empty())
-            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x43);
+            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x43);
     #else
         // RtlInsertInvertedFunctionTable
         // 53 56 57 8B DA 8B F9 50 
@@ -859,9 +859,9 @@ bool NtLdr::ScanPatterns( )
             _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
 
             if (IsWindows10OrGreater())
-                _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x22);
+                _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x22);
             else
-                _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x23);
+                _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x23);
 
             foundData.clear();
         }
@@ -875,8 +875,8 @@ bool NtLdr::ScanPatterns( )
 
             if (!foundData.empty())
             {
-                _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
-                _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x1D);
+                _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(foundData.front() - 0xB);
+                _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x1D);
                 foundData.clear();
             }
         }
@@ -888,7 +888,7 @@ bool NtLdr::ScanPatterns( )
 
         if (!foundData.empty())
         {
-            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x18);
+            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x18);
             foundData.clear();
         }
 
@@ -898,7 +898,7 @@ bool NtLdr::ScanPatterns( )
         ps3.Search( pStart, scanSize, foundData );
 
         if (!foundData.empty())
-            _LdrProtectMrdata = static_cast<size_t>(foundData.front() - 0x12);
+            _LdrProtectMrdata = static_cast<uintptr_t>(foundData.front() - 0x12);
     #endif
     }
     // Win 8
@@ -911,7 +911,7 @@ bool NtLdr::ScanPatterns( )
         ps.Search( pStart, scanSize, foundData );
 
         if (!foundData.empty())
-            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x49);
+            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x49);
     #else
         // RtlInsertInvertedFunctionTable
         // 8B FF 55 8B EC 51 51 53 57 8B 7D 08 8D
@@ -920,8 +920,8 @@ bool NtLdr::ScanPatterns( )
 
         if(!foundData.empty())
         {
-            _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front());
-            _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(_RtlInsertInvertedFunctionTable + 0x26);
+            _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(foundData.front());
+            _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(_RtlInsertInvertedFunctionTable + 0x26);
             foundData.clear();
         }
 
@@ -931,7 +931,7 @@ bool NtLdr::ScanPatterns( )
         ps2.Search( pStart, scanSize, foundData );
 
         if (!foundData.empty())
-            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0xC);             
+            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0xC);
     #endif
     }
     // Win 7
@@ -945,7 +945,7 @@ bool NtLdr::ScanPatterns( )
 
         if (!foundData.empty())
         {
-            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x27);
+            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x27);
             foundData.clear();            
         }
 
@@ -956,7 +956,7 @@ bool NtLdr::ScanPatterns( )
 
         if (!foundData.empty())
         {
-            _LdrKernel32PatchAddress = static_cast<size_t>(foundData.front() + 0x12);
+            _LdrKernel32PatchAddress = static_cast<uintptr_t>(foundData.front() + 0x12);
             foundData.clear();            
         }
 
@@ -967,7 +967,7 @@ bool NtLdr::ScanPatterns( )
 
         if (!foundData.empty())
         {
-            _APC64PatchAddress = static_cast<size_t>(foundData.front());
+            _APC64PatchAddress = static_cast<uintptr_t>(foundData.front());
             foundData.clear();            
         }
     #else
@@ -989,7 +989,7 @@ bool NtLdr::ScanPatterns( )
                 
         if(!foundData.empty())
         {
-            _LdrpInvertedFunctionTable = *reinterpret_cast<size_t*>(foundData.front() + 0x1B);
+            _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x1B);
             foundData.clear();
         }
 
@@ -999,7 +999,7 @@ bool NtLdr::ScanPatterns( )
         ps3.Search( pStart, scanSize, foundData );
 
         if(!foundData.empty())
-            _LdrpHandleTlsData = static_cast<size_t>(foundData.front() - 0x14);
+            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x14);
 
     #endif
     }
@@ -1048,12 +1048,12 @@ bool NtLdr::FindLdrHeap()
 
     if (pPeb)
     {
-        PEB_LDR_DATA Ldr = _process.memory().Read<PEB_LDR_DATA>( _process.memory().Read<size_t>( GET_FIELD_PTR( pPeb, Ldr ) ) );
+        PEB_LDR_DATA Ldr = _process.memory().Read<PEB_LDR_DATA>( _process.memory().Read<uintptr_t>( GET_FIELD_PTR( pPeb, Ldr ) ) );
         PLDR_DATA_TABLE_ENTRY NtdllEntry = CONTAINING_RECORD( Ldr.InMemoryOrderModuleList.Flink, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks );
 
         if (_process.core().native()->VirtualQueryExT( reinterpret_cast<ptr_t>(NtdllEntry), &mbi ) == STATUS_SUCCESS)
         {
-            _LdrHeapBase = static_cast<size_t>(mbi.AllocationBase);
+            _LdrHeapBase = static_cast<uintptr_t>(mbi.AllocationBase);
             return true;
         }
     }
@@ -1157,7 +1157,7 @@ ptr_t NtLdr::UnlinkFromLdr( ptr_t baseAddress, const std::wstring& name )
 /// <param name="baseAddress">Record to remove.</param>
 /// <returns>Address of removed record</returns>
 template<typename T>
-ptr_t NtLdr::UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, size_t ofst, ptr_t baseAddress )
+ptr_t NtLdr::UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, uintptr_t ofst, ptr_t baseAddress )
 {
     auto native = _process.core().native();
 
@@ -1222,10 +1222,10 @@ ptr_t NtLdr::UnlinkTreeNode( ptr_t ldrEntry )
         _process.modules().GetModule( L"ntdll.dll" ), "RtlRbRemoveNode" ).procAddress;
 
     a.GenPrologue();
-    a.GenCall( static_cast<size_t>(RtlRbRemoveNode), 
+    a.GenCall( static_cast<uintptr_t>(RtlRbRemoveNode),
     { 
         _LdrpModuleIndexBase, 
-        static_cast<size_t>(ldrEntry) 
+        static_cast<uintptr_t>(ldrEntry)
         + FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_W8, BaseAddressIndexNode ) 
     } );
 

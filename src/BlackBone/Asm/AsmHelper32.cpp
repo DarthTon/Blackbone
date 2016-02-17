@@ -122,7 +122,7 @@ void AsmHelper32::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
 /// </summary>
 /// <param name="pExitThread">NtTerminateThread address</param>
 /// <param name="resultPtr">Memry where eax value will be saved</param>
-void AsmHelper32::ExitThreadWithStatus( size_t pExitThread, size_t resultPtr = 0 )
+void AsmHelper32::ExitThreadWithStatus( uintptr_t pExitThread, uintptr_t resultPtr )
 {
     if (resultPtr != 0)
     {
@@ -148,10 +148,10 @@ void AsmHelper32::ExitThreadWithStatus( size_t pExitThread, size_t resultPtr = 0
 /// <param name="errPtr">Error code memory location</param>
 /// <param name="rtype">Return type</param>
 void AsmHelper32::SaveRetValAndSignalEvent( 
-    size_t pSetEvent,
-    size_t ResultPtr, 
-    size_t EventPtr, 
-    size_t errPtr, 
+    uintptr_t pSetEvent,
+    uintptr_t ResultPtr,
+    uintptr_t EventPtr,
+    uintptr_t errPtr,
     eReturnType rtype /*= rt_int32*/ 
     )
 {

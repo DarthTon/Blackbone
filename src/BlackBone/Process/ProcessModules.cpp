@@ -243,7 +243,7 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
     auto phdrNt32 = reinterpret_cast<PIMAGE_NT_HEADERS32>(hdrNt32);
     auto phdrNt64 = reinterpret_cast<PIMAGE_NT_HEADERS64>(hdrNt32);
     DWORD expSize = 0;
-    size_t expBase = 0;
+    uintptr_t expBase = 0;
 
     _memory.Read( hMod->baseAddress, sizeof(hdrDos), &hdrDos );
 
@@ -274,13 +274,13 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
         _memory.Read( hMod->baseAddress + expBase, expSize, pExpData );
 
         WORD *pAddressOfOrds = reinterpret_cast<WORD*> (
-            pExpData->AddressOfNameOrdinals + reinterpret_cast<size_t>(pExpData) - expBase);
+            pExpData->AddressOfNameOrdinals + reinterpret_cast<uintptr_t>(pExpData) - expBase);
 
         DWORD *pAddressOfNames = reinterpret_cast<DWORD*>(
-            pExpData->AddressOfNames + reinterpret_cast<size_t>(pExpData) - expBase);
+            pExpData->AddressOfNames + reinterpret_cast<uintptr_t>(pExpData) - expBase);
 
         DWORD *pAddressOfFuncs = reinterpret_cast<DWORD*>(
-            pExpData->AddressOfFunctions + reinterpret_cast<size_t>(pExpData) - expBase);
+            pExpData->AddressOfFunctions + reinterpret_cast<uintptr_t>(pExpData) - expBase);
 
         for (DWORD i = 0; i < pExpData->NumberOfFunctions; ++i)
         {
@@ -288,21 +288,21 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
             char *pName = nullptr;
 
             // Find by index
-            if (reinterpret_cast<size_t>(name_ord) <= 0xFFFF)
+            if (reinterpret_cast<uintptr_t>(name_ord) <= 0xFFFF)
             {
                 OrdIndex = static_cast<WORD>(i);
             }
             // Find by name
-            else if (reinterpret_cast<size_t>(name_ord) > 0xFFFF && i < pExpData->NumberOfNames)
+            else if (reinterpret_cast<uintptr_t>(name_ord) > 0xFFFF && i < pExpData->NumberOfNames)
             {
-                pName = (char*)(pAddressOfNames[i] + reinterpret_cast<size_t>(pExpData) - expBase);
+                pName = (char*)(pAddressOfNames[i] + reinterpret_cast<uintptr_t>(pExpData) - expBase);
                 OrdIndex = static_cast<WORD>(pAddressOfOrds[i]);
             }
             else
                 return data;
 
-            if ((reinterpret_cast<size_t>(name_ord) <= 0xFFFF && (WORD)((uintptr_t)name_ord) == (OrdIndex + pExpData->Base)) ||
-                 (reinterpret_cast<size_t>(name_ord) > 0xFFFF && strcmp( pName, name_ord ) == 0))
+            if ((reinterpret_cast<uintptr_t>(name_ord) <= 0xFFFF && (WORD)((uintptr_t)name_ord) == (OrdIndex + pExpData->Base)) ||
+                 (reinterpret_cast<uintptr_t>(name_ord) > 0xFFFF && strcmp( pName, name_ord ) == 0))
             {
                 data.procAddress = pAddressOfFuncs[OrdIndex] + hMod->baseAddress;
 
@@ -383,7 +383,7 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
     UNICODE_STRING ustr = { 0 };
     auto modName = _memory.Allocate( 0x1000, PAGE_READWRITE );
 
-    ustr.Buffer = reinterpret_cast<PWSTR>(modName.ptr<intptr_t>() + sizeof( ustr ));
+    ustr.Buffer = reinterpret_cast<PWSTR>(modName.ptr<uintptr_t>() + sizeof( ustr ));
     ustr.Length = static_cast<USHORT>(path.size() * sizeof( wchar_t ));
     ustr.MaximumLength = ustr.Length;
 
@@ -425,7 +425,7 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
         }
         #endif
 
-        a.GenCall( (intptr_t)pLdrLoadDll, { 0, 0, modName.ptr<intptr_t>(), modName.ptr<intptr_t>() + 0x800 } );
+        a.GenCall( (uintptr_t)pLdrLoadDll, { 0, 0, modName.ptr<uintptr_t>(), modName.ptr<uintptr_t>() + 0x800 } );
         a->ret();
 
         status = _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
@@ -468,7 +468,7 @@ bool ProcessModules::Unload( const ModuleData* hMod )
         
         AsmJitHelper a;
 
-        a.GenCall( static_cast<size_t>(pUnload.procAddress), { static_cast<size_t>(hMod->baseAddress) } );
+        a.GenCall( static_cast<uintptr_t>(pUnload.procAddress), { static_cast<uintptr_t>(hMod->baseAddress) } );
         a->ret();
 
         _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
@@ -553,7 +553,7 @@ void ProcessModules::RemoveManualModule( const std::wstring& filename, eModType 
 // DWORD alignment
 inline size_t DWAlign( size_t offset )
 {
-    return offset % sizeof(size_t) == 0 ? offset : offset + (sizeof(size_t)-offset % sizeof(size_t));;
+    return offset % sizeof( size_t ) == 0 ? offset : offset + (sizeof( size_t ) - offset % sizeof( size_t ));
 }
 
 
@@ -591,14 +591,14 @@ bool ProcessModules::InjectPureIL(
 
     auto address = _memory.Allocate( 0x10000 );
 
-    size_t offset = 4;
+    uintptr_t offset = 4;
 
-    size_t address_VersionString, address_netAssemblyDll, address_netAssemblyClass, 
+    uintptr_t address_VersionString, address_netAssemblyDll, address_netAssemblyClass,
            address_netAssemblyMethod, address_netAssemblyArgs;
 
     const std::wstring* strArr[] = { &netVersion, &netAssemblyPath, &ClassName, &MethodName, &netAssemblyArgs };
 
-    size_t* ofstArr[] = { &address_VersionString, &address_netAssemblyDll, &address_netAssemblyClass, 
+    uintptr_t* ofstArr[] = { &address_VersionString, &address_netAssemblyDll, &address_netAssemblyClass,
                           &address_netAssemblyMethod, &address_netAssemblyArgs };
 
     // Write strings
@@ -606,7 +606,7 @@ bool ProcessModules::InjectPureIL(
     {
         size_t len = strArr[i]->length();
 
-        *(ofstArr[i]) = address.ptr<size_t>() + offset;
+        *(ofstArr[i]) = address.ptr<uintptr_t>() + offset;
 
         // runtime version to use
         if (address.Write( offset, len * sizeof(wchar_t) + 2, strArr[i]->c_str( ) ) != STATUS_SUCCESS)
@@ -629,11 +629,11 @@ bool ProcessModules::InjectPureIL(
         return false;
     }
 
-    size_t address_CLSID_CLRMetaHost    = address.ptr<size_t>() + offset + 0;
-    size_t address_IID_ICLRMetaHost     = address.ptr<size_t>() + offset + 0x10;
-    size_t address_IID_ICLRRuntimeInfo  = address.ptr<size_t>() + offset + 0x20;
-    size_t address_CLSID_CLRRuntimeHost = address.ptr<size_t>() + offset + 0x30;
-    size_t address_IID_ICLRRuntimeHost  = address.ptr<size_t>() + offset + 0x40;
+    uintptr_t address_CLSID_CLRMetaHost    = address.ptr<uintptr_t>() + offset + 0;
+    uintptr_t address_IID_ICLRMetaHost     = address.ptr<uintptr_t>() + offset + 0x10;
+    uintptr_t address_IID_ICLRRuntimeInfo  = address.ptr<uintptr_t>() + offset + 0x20;
+    uintptr_t address_CLSID_CLRRuntimeHost = address.ptr<uintptr_t>() + offset + 0x30;
+    uintptr_t address_IID_ICLRRuntimeHost  = address.ptr<uintptr_t>() + offset + 0x40;
 
     offset += sizeof(GArray);
 
@@ -649,7 +649,7 @@ bool ProcessModules::InjectPureIL(
     }
 
     // CLRCreateInstance address
-    size_t CreateInstanceAddress = (size_t)GetExport( pMscoree, "CLRCreateInstance" ).procAddress;
+    uintptr_t CreateInstanceAddress = (uintptr_t)GetExport( pMscoree, "CLRCreateInstance" ).procAddress;
 
     // Scary assembler code incoming!
     AsmJitHelper a;
@@ -691,7 +691,7 @@ bool ProcessModules::InjectPureIL(
     a->xor_( a->zsi, a->zsi );
 
     // CLRCreateInstance()
-    a.GenCall( (size_t)CreateInstanceAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
+    a.GenCall( (uintptr_t)CreateInstanceAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
     // success?
     a->test( a->zax, a->zax );
     a->jnz( L_Error1 );
@@ -759,7 +759,7 @@ bool ProcessModules::InjectPureIL(
     // Write the managed code's return value to the first DWORD
     // in the allocated buffer
     a->mov( eax, stack_returnCode );
-    a->mov( a->zdx, address.ptr<size_t>() );
+    a->mov( a->zdx, address.ptr<uintptr_t>() );
     a->mov( dword_ptr( a->zdx ), eax );
     a->mov( a->zax, 0 );
 
@@ -840,7 +840,7 @@ bool ProcessModules::InjectPureIL(
 
     // write JIT code to target
     size_t codeSize = a->getCodeSize();
-    size_t codeAddress = address.ptr<size_t>() + offset;
+    uintptr_t codeAddress = address.ptr<uintptr_t>() + offset;
 
     std::vector<uint8_t> codeBuffer( codeSize );
 
