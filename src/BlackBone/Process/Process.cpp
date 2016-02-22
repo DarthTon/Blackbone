@@ -44,7 +44,7 @@ NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
     if (NT_SUCCESS( status ))
     {
         _nativeLdr.Init();
-        _remote.CreateRPCEnvironment( false, false );
+        status = _remote.CreateRPCEnvironment( false, false );
     }
 
     return status;

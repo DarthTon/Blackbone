@@ -66,8 +66,6 @@ NTSTATUS DriverControl::EnsureLoaded( const std::wstring& path /*= L"" */ )
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
 {
-    NTSTATUS status = STATUS_SUCCESS;
-
     Unload();
 
     // Use default path
@@ -89,11 +87,11 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
         path = Utils::GetExeDirectory() + L"\\" + filename;
     }
 
-    status = _loadStatus = LoadDriver( DRIVER_SVC_NAME, path );
-    if (!NT_SUCCESS( status ))
+    _loadStatus = LoadDriver( DRIVER_SVC_NAME, path );
+    if (!NT_SUCCESS( _loadStatus ))
     {
-        BLACBONE_TRACE( L"Failed to load driver %ls. Status 0x%X", path.c_str(), status );
-        return LastNtStatus( status );
+        BLACBONE_TRACE( L"Failed to load driver %ls. Status 0x%X", path.c_str(), _loadStatus );
+        return LastNtStatus( _loadStatus );
     }
 
     _hDriver = CreateFileW( 
@@ -105,12 +103,12 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
 
     if (_hDriver == INVALID_HANDLE_VALUE)
     {
-        status = LastNtStatus();
-        BLACBONE_TRACE( L"Failed to open driver handle. Status 0x%X", status );
-        return status;
+        _loadStatus = LastNtStatus();
+        BLACBONE_TRACE( L"Failed to open driver handle. Status 0x%X", _loadStatus );
+        return _loadStatus;
     }
 
-    return status;
+    return _loadStatus;
 }
 
 /// <summary>
