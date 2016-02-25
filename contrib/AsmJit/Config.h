@@ -51,8 +51,8 @@
 // ============================================================================
 
 // If none of these is defined AsmJit will select host architecture by default.
-// #define ASMJIT_BUILD_X86          // Define to enable x86 instruction set (32-bit).
-// #define ASMJIT_BUILD_X64          // Define to enable x64 instruction set (64-bit).
+ #define ASMJIT_BUILD_X86          // Define to enable x86 instruction set (32-bit).
+ #define ASMJIT_BUILD_X64          // Define to enable x64 instruction set (64-bit).
 // #define ASMJIT_BUILD_HOST         // Define to enable host instruction set.
 
 // AsmJit features are enabled by default.
