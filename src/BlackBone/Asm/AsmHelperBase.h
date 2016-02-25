@@ -48,7 +48,9 @@ namespace blackbone
     class AsmHelperBase
     {
     public:
-        BLACKBONE_API AsmHelperBase() : _assembler( &_runtime ) { }
+        BLACKBONE_API AsmHelperBase( uint32_t arch = asmjit::kArchHost ) 
+            : _assembler( &_runtime, arch ) { }
+
         virtual ~AsmHelperBase() { }
 
         virtual void GenPrologue( bool switchMode = false ) = 0;

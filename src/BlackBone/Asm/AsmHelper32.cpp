@@ -7,6 +7,7 @@ namespace blackbone
 {
 
 AsmHelper32::AsmHelper32( )
+    : AsmHelperBase( asmjit::kArchX86 )
 {
 }
 

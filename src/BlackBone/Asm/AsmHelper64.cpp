@@ -6,7 +6,8 @@ namespace blackbone
 {
 
 AsmHelper64::AsmHelper64( )
-    : _stackEnabled( true )
+    : AsmHelperBase( asmjit::kArchX64 )
+    ,_stackEnabled( true )
 {
 }
 
