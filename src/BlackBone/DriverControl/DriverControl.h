@@ -7,6 +7,7 @@
 
 #include <string>
 #include <map>
+#include <vector>
 
 ENUM_OPS( KMmapFlags );
 
@@ -260,6 +261,14 @@ public:
     /// <param name="pid">Target process ID</param>
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS UnlinkHandleTable( DWORD pid );
+
+    /// <summary>
+    ///  Enumerate committed, accessible, non-guarded memory regions
+    /// </summary>
+    /// <param name="pid">Target process ID</param>
+    /// <param name="regions">Found regions</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS EnumMemoryRegions( DWORD pid, std::vector<MEMORY_BASIC_INFORMATION64>& regions );
 
     /// <summary>
     /// Check if driver is loaded

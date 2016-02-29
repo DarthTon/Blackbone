@@ -108,6 +108,14 @@ void TestDriver()
             std::cout << "TestDriver: IOCTL_BLACKBONE_UNLINK_HTABLE failed, status 0x" << std::hex << status << "\r\n";
         else
             std::cout << "TestDriver: IOCTL_BLACKBONE_UNLINK_HTABLE succeeded\r\n";
+
+        // Enum regions
+        std::vector<MEMORY_BASIC_INFORMATION64> info;
+        status = Driver().EnumMemoryRegions( proc.pid(), info );
+        if (!NT_SUCCESS( status ))
+            std::cout << "TestDriver: IOCTL_BLACKBONE_ENUM_REGIONS failed, status 0x" << std::hex << status << "\r\n";
+        else
+            std::cout << "TestDriver: IOCTL_BLACKBONE_ENUM_REGIONS succeeded\r\n";
     }
     else
         std::cout << "TestDriver: Failed to load driver. Status 0x" << std::hex << LastNtStatus() << "\r\n";

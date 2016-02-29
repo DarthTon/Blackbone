@@ -698,6 +698,54 @@ NTSTATUS DriverControl::UnlinkHandleTable( DWORD pid )
     return STATUS_SUCCESS;
 }
 
+/// <summary>
+///  Enumerate committed, accessible, non-guarded memory regions
+/// </summary>
+/// <param name="pid">Target process ID</param>
+/// <param name="regions">Found regions</param>
+/// <returns>Status code</returns>
+NTSTATUS DriverControl::EnumMemoryRegions( DWORD pid, std::vector<MEMORY_BASIC_INFORMATION64>& regions )
+{
+    DWORD bytes = 0;
+    ENUM_REGIONS data = { 0 };
+    auto result = (PENUM_REGIONS_RESULT)malloc( sizeof( ENUM_REGIONS_RESULT ) );
+
+    data.pid = pid;
+    result->count = 0;
+
+    // Not loaded
+    if (_hDriver == INVALID_HANDLE_VALUE)
+        return STATUS_DEVICE_DOES_NOT_EXIST;
+
+    DeviceIoControl( _hDriver, IOCTL_BLACKBONE_ENUM_REGIONS, &data, sizeof( data ), result, sizeof( ENUM_REGIONS_RESULT ), &bytes, NULL );
+
+    result->count += 100;
+    DWORD size = static_cast<DWORD>(result->count * sizeof( result->regions[0] ) + sizeof( result->count ));
+    result = (PENUM_REGIONS_RESULT)realloc( result, size );
+
+    if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_ENUM_REGIONS, &data, sizeof( data ), result, size, &bytes, NULL ))
+    {
+        free( result );
+        return LastNtStatus();
+    }
+
+    regions.resize( static_cast<size_t>(result->count) );
+    for (uint32_t i = 0; i < result->count; i++)
+    {
+        regions[i].AllocationBase = result->regions[i].AllocationBase;
+        regions[i].AllocationProtect = result->regions[i].AllocationProtect;
+        regions[i].BaseAddress = result->regions[i].BaseAddress;
+        regions[i].Protect = result->regions[i].Protect;
+        regions[i].RegionSize = result->regions[i].RegionSize;
+        regions[i].State = result->regions[i].State;
+        regions[i].Type = result->regions[i].Type;
+    }
+    
+    free( result );
+
+    return STATUS_SUCCESS;
+}
+
 
 
 

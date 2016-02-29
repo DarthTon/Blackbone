@@ -5,16 +5,6 @@ RTL_AVL_TABLE g_ProcessPageTables;      // Mapping table
 KGUARDED_MUTEX g_globalLock;            // ProcessPageTables mutex
 
 /// <summary>
-/// Enumerate committed, accessible, non-guarded memory regions
-/// </summary>
-/// <param name="pList">Region list</param>
-/// <param name="start">Region start</param>
-/// <param name="end">Region end</param>
-/// <param name="mapSections">If set to FALSE, section objects will be excluded from list</param>
-/// <returns>Status code</returns>
-NTSTATUS BBBuildProcessRegionListForRange( IN PLIST_ENTRY pList, IN ULONG_PTR start, IN ULONG_PTR end, IN BOOLEAN mapSections );
-
-/// <summary>
 /// Walk region list and create MDL for each region
 /// </summary>
 /// <param name="pList">Region list</param>
@@ -243,8 +233,7 @@ NTSTATUS BBBuildProcessRegionListForRange( IN PLIST_ENTRY pList, IN ULONG_PTR st
                 return STATUS_NO_MEMORY;
             }
 
-            pEntry->originalPtr = (ULONG_PTR)mbi.BaseAddress;
-            pEntry->size = mbi.RegionSize;
+            pEntry->mem = mbi;
             pEntry->newPtr = 0;
             pEntry->pMdl = NULL;
             pEntry->locked = FALSE;
@@ -285,9 +274,9 @@ NTSTATUS BBConsolidateRegionList( IN PLIST_ENTRY pList )
         if (pEntry->pMdl == NULL && pNextEntry->pMdl == NULL && pEntry->shared == pNextEntry->shared)
         {
             // Regions are adjacent
-            if (pEntry->originalPtr + pEntry->size == pNextEntry->originalPtr)
+            if ((PUCHAR)pEntry->mem.BaseAddress + pEntry->mem.RegionSize == pNextEntry->mem.BaseAddress)
             {
-                pEntry->size += pNextEntry->size;
+                pEntry->mem.RegionSize += pNextEntry->mem.RegionSize;
                 RemoveEntryList( &pNextEntry->link );
             }
             else
@@ -353,7 +342,9 @@ NTSTATUS BBHandleSharedRegion( IN PMAP_ENTRY pEntry )
     ULONG_PTR memptr = 0;
 
     // Iterate underlying memory regions
-    for (memptr = pEntry->originalPtr; memptr < pEntry->originalPtr + pEntry->size; memptr = (ULONG_PTR)mbi.BaseAddress + mbi.RegionSize)
+    for (memptr = (ULONG_PTR)pEntry->mem.BaseAddress; 
+         memptr < (ULONG_PTR)pEntry->mem.BaseAddress + pEntry->mem.RegionSize;
+         memptr = (ULONG_PTR)mbi.BaseAddress + mbi.RegionSize)
     {
         PVOID pBase = NULL;
         SIZE_T size = 0;
@@ -448,11 +439,11 @@ NTSTATUS BBPrepareMDLListEntry( IN OUT PMAP_ENTRY pEntry )
     else
         pEntry->readonly = FALSE;
 
-    pEntry->pMdl = IoAllocateMdl( (PVOID)pEntry->originalPtr, (ULONG)pEntry->size, FALSE, FALSE, NULL );
+    pEntry->pMdl = IoAllocateMdl( pEntry->mem.BaseAddress, (ULONG)pEntry->mem.RegionSize, FALSE, FALSE, NULL );
 
     if (pEntry->pMdl == NULL)
     {
-        DPRINT( "BlackBone: %s: Failed to allocate MDL for address 0x%p\n", __FUNCTION__, pEntry->originalPtr );
+        DPRINT( "BlackBone: %s: Failed to allocate MDL for address 0x%p\n", __FUNCTION__, pEntry->mem.BaseAddress );
         return STATUS_NO_MEMORY;
     }
 
@@ -463,7 +454,7 @@ NTSTATUS BBPrepareMDLListEntry( IN OUT PMAP_ENTRY pEntry )
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
-        DPRINT( "BlackBone: %s: Exception in MmProbeAndLockPages. Base = 0x%p\n", __FUNCTION__, pEntry->originalPtr );
+        DPRINT( "BlackBone: %s: Exception in MmProbeAndLockPages. Base = 0x%p\n", __FUNCTION__, pEntry->mem.BaseAddress );
         IoFreeMdl( pEntry->pMdl );
         pEntry->pMdl = NULL;
     }
@@ -510,8 +501,9 @@ NTSTATUS BBMapRegionIntoCurrentProcess( IN PMAP_ENTRY pEntry, IN PMAP_ENTRY pPre
 
     // Try to map at original address
     __try {
-        pEntry->newPtr = (ULONG_PTR)MmMapLockedPagesSpecifyCache( pEntry->pMdl, UserMode, MmCached,
-                                                                  (PVOID)pEntry->originalPtr, FALSE, NormalPagePriority );
+        pEntry->newPtr = (ULONG_PTR)MmMapLockedPagesSpecifyCache( 
+            pEntry->pMdl, UserMode, MmCached, pEntry->mem.BaseAddress, FALSE, NormalPagePriority 
+            );
     }
     __except (EXCEPTION_EXECUTE_HANDLER) { }
 
@@ -519,8 +511,9 @@ NTSTATUS BBMapRegionIntoCurrentProcess( IN PMAP_ENTRY pEntry, IN PMAP_ENTRY pPre
     if (pEntry->newPtr == 0 && pPrevEntry != NULL && pPrevEntry->newPtr != 0)
     {
         __try {
-            pEntry->newPtr = (ULONG_PTR)MmMapLockedPagesSpecifyCache( pEntry->pMdl, UserMode, MmCached,
-                                                                      (PVOID)(pPrevEntry->newPtr + pPrevEntry->size), FALSE, NormalPagePriority );
+            pEntry->newPtr = (ULONG_PTR)MmMapLockedPagesSpecifyCache( 
+                pEntry->pMdl, UserMode, MmCached, (PVOID)(pPrevEntry->newPtr + pPrevEntry->mem.RegionSize), FALSE, NormalPagePriority
+                );
         }
         __except (EXCEPTION_EXECUTE_HANDLER) { }
     }
@@ -545,7 +538,7 @@ NTSTATUS BBMapRegionIntoCurrentProcess( IN PMAP_ENTRY pEntry, IN PMAP_ENTRY pPre
 
         // ZwProtectVirtualMemory can't update protection of pages that represent Physical View
         // So PTEs are updated directly
-        for (ULONG_PTR pAdress = pEntry->newPtr; pAdress < pEntry->newPtr + pEntry->size; pAdress += PAGE_SIZE)
+        for (ULONG_PTR pAdress = pEntry->newPtr; pAdress < pEntry->newPtr + pEntry->mem.RegionSize; pAdress += PAGE_SIZE)
         {
             PMMPTE pPTE = GetPTEForVA( (PVOID)pAdress );
 
@@ -557,7 +550,7 @@ NTSTATUS BBMapRegionIntoCurrentProcess( IN PMAP_ENTRY pEntry, IN PMAP_ENTRY pPre
     }
     else
     {
-        DPRINT( "BlackBone: %s: Failed to map region at adress 0x%p\n", __FUNCTION__, pEntry->originalPtr );
+        DPRINT( "BlackBone: %s: Failed to map region at adress 0x%p\n", __FUNCTION__, pEntry->mem.BaseAddress );
         status = STATUS_NONE_MAPPED;
     }
 
@@ -584,7 +577,7 @@ NTSTATUS BBMapRegionListIntoCurrentProcess( IN PLIST_ENTRY pList, IN BOOLEAN noW
         if (pEntry->newPtr != 0)
         {
             if (noWarning == FALSE)
-                DPRINT( "BlackBone: %s: Warning! Region 0x%p already mapped to 0x%p\n", __FUNCTION__, pEntry->originalPtr, pEntry->newPtr );
+                DPRINT( "BlackBone: %s: Warning! Region 0x%p already mapped to 0x%p\n", __FUNCTION__, pEntry->mem.BaseAddress, pEntry->newPtr );
 
             continue;
         }
@@ -593,7 +586,7 @@ NTSTATUS BBMapRegionListIntoCurrentProcess( IN PLIST_ENTRY pList, IN BOOLEAN noW
         if (pEntry->pMdl && pEntry->locked)
             status |= BBMapRegionIntoCurrentProcess( pEntry, pPrevEntry );
         else
-            DPRINT( "BlackBone: %s: No valid MDL for address 0x%p. Either not allocated or not locked\n", __FUNCTION__, pEntry->originalPtr );
+            DPRINT( "BlackBone: %s: No valid MDL for address 0x%p. Either not allocated or not locked\n", __FUNCTION__, pEntry->mem.BaseAddress );
 
         pPrevEntry = pEntry;
     }
@@ -885,15 +878,18 @@ NTSTATUS BBMapMemoryRegion( IN PMAP_MEMORY_REGION pRegion, OUT PMAP_MEMORY_REGIO
         pPageEntry = BBFindPageEntry( &pFoundEntry->pageList, pRegion->base, pRegion->size );
         if (pPageEntry)
         {
-            if (pRegion->base < pPageEntry->originalPtr || pRegion->base + pRegion->size > pPageEntry->originalPtr + pPageEntry->size)
+            if (pRegion->base < (ULONGLONG)pPageEntry->mem.BaseAddress ||
+                pRegion->base + pRegion->size > (ULONGLONG)pPageEntry->mem.BaseAddress + pPageEntry->mem.RegionSize)
             {
-                DPRINT( "BlackBone: %s: Target region 0%p - 0x%p conficts with existing: 0x%p - 0x%p\n", __FUNCTION__,
-                        pRegion->base, pRegion->base + pRegion->size,
-                        pPageEntry->originalPtr, pPageEntry->originalPtr + pPageEntry->size );
+                DPRINT(
+                    "BlackBone: %s: Target region 0%p - 0x%p conficts with existing: 0x%p - 0x%p\n", __FUNCTION__,
+                    pRegion->base, pRegion->base + pRegion->size,
+                    pPageEntry->mem.BaseAddress, (ULONGLONG)pPageEntry->mem.BaseAddress + pPageEntry->mem.RegionSize
+                    );
 
                 // Unmap conflicting region
-                removedBase = pPageEntry->originalPtr;
-                removedSize = (ULONG)pPageEntry->size;
+                removedBase = (ULONG_PTR)pPageEntry->mem.BaseAddress;
+                removedSize = (ULONG)pPageEntry->mem.RegionSize;
 
                 status = BBUnmapRegionEntry( pPageEntry, pFoundEntry );
             }
@@ -940,12 +936,12 @@ NTSTATUS BBMapMemoryRegion( IN PMAP_MEMORY_REGION pRegion, OUT PMAP_MEMORY_REGIO
         PMAP_ENTRY pEntry = BBFindPageEntry( &pFoundEntry->pageList, pRegion->base, pRegion->size );
         if (pEntry)
         {
-            DPRINT( "BlackBone: %s: Updated 0x%p --> 0x%p\n", __FUNCTION__, pEntry->originalPtr, pEntry->newPtr );
+            DPRINT( "BlackBone: %s: Updated 0x%p --> 0x%p\n", __FUNCTION__, pEntry->mem.BaseAddress, pEntry->newPtr );
 
-            pResult->originalPtr = pEntry->originalPtr;
+            pResult->originalPtr = (ULONGLONG)pEntry->mem.BaseAddress;
             pResult->newPtr = pEntry->newPtr;
             pResult->removedPtr = removedBase;
-            pResult->size = (ULONG)pEntry->size;
+            pResult->size = (ULONG)pEntry->mem.RegionSize;
             pResult->removedSize = removedSize;
         }
     }
@@ -1287,11 +1283,17 @@ PMAP_ENTRY BBFindPageEntry( IN PLIST_ENTRY pList, IN ULONG_PTR baseAddress, IN U
     {
         PMAP_ENTRY pEntry = CONTAINING_RECORD( pListEntry, MAP_ENTRY, link );
 
-        if (baseAddress >= pEntry->originalPtr && baseAddress < pEntry->originalPtr + pEntry->size)
-            return pEntry;
+        if (baseAddress >= (ULONG_PTR)pEntry->mem.BaseAddress &&
+            baseAddress < (ULONG_PTR)pEntry->mem.BaseAddress + pEntry->mem.RegionSize)
+        { 
+               return pEntry;
+        }
 
-        if (baseAddress + size >= pEntry->originalPtr && baseAddress + size < pEntry->originalPtr + pEntry->size)
+        if (baseAddress + size >= (ULONG_PTR)pEntry->mem.BaseAddress &&
+            baseAddress + size < (ULONG_PTR)pEntry->mem.BaseAddress + pEntry->mem.RegionSize)
+        {
             return pEntry;
+        }
     }
 
     return NULL;

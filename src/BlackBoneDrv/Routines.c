@@ -6,8 +6,6 @@ LIST_ENTRY g_PhysProcesses;
 PVOID g_kernelPage = NULL;  // Trampoline buffer page
 LONG g_trIndex = 0;         // Trampoline global index
 
-
-
 /// <summary>
 /// Find allocated memory region entry
 /// </summary>
@@ -287,7 +285,6 @@ NTSTATUS BBCopyMemory( IN PCOPY_MEMORY pCopy )
     return status;
 }
 
-
 /// <summary>
 /// Allocate/Free process memory
 /// </summary>
@@ -347,7 +344,6 @@ NTSTATUS BBAllocateFreeMemory( IN PALLOCATE_FREE_MEMORY pAllocFree, OUT PALLOCAT
     return status;
 }
 
-
 /// <summary>
 /// Allocate kernel memory and map into User space. Or free previously allocated memory
 /// </summary>
@@ -401,8 +397,9 @@ NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY
 
         // Map at original base
         __try {
-            pResult->address = (ULONGLONG)MmMapLockedPagesSpecifyCache( pMDL, UserMode, MmCached,
-                                                                        (PVOID)pAllocFree->base, FALSE, NormalPagePriority );
+            pResult->address = (ULONGLONG)MmMapLockedPagesSpecifyCache( 
+                pMDL, UserMode, MmCached, (PVOID)pAllocFree->base, FALSE, NormalPagePriority 
+                );
         }
         __except (EXCEPTION_EXECUTE_HANDLER) { }
 
@@ -410,8 +407,9 @@ NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY
         if (pResult->address == 0 && pAllocFree->base != 0)
         {
             __try {
-                pResult->address = (ULONGLONG)MmMapLockedPagesSpecifyCache( pMDL, UserMode, MmCached,
-                                                                            NULL, FALSE, NormalPagePriority );
+                pResult->address = (ULONGLONG)MmMapLockedPagesSpecifyCache(
+                    pMDL, UserMode, MmCached, NULL, FALSE, NormalPagePriority
+                    );
             }
             __except (EXCEPTION_EXECUTE_HANDLER) { }
         }
@@ -482,7 +480,6 @@ NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY
 
     return status;
 }
-
 
 /// <summary>
 /// Change process memory protection
@@ -561,6 +558,77 @@ NTSTATUS BBHideVAD( IN PHIDE_VAD pData )
         status = BBProtectVAD( pProcess, pData->base, MM_ZERO_ACCESS );
     else
         DPRINT( "BlackBone: %s: PsLookupProcessByProcessId failed with status 0x%X\n", __FUNCTION__, status );
+
+    if (pProcess)
+        ObDereferenceObject( pProcess );
+
+    return status;
+}
+
+/// <summary>
+/// Enumerate committed, accessible, non-guarded memory regions
+/// </summary>
+/// <param name="pData">Target process ID</param>
+/// <param name="pResult">Result</param>
+/// <returns>Status code</returns>
+NTSTATUS BBEnumMemRegions( IN PENUM_REGIONS pData, OUT PENUM_REGIONS_RESULT pResult )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    PEPROCESS pProcess = NULL;
+    LIST_ENTRY memList;
+    ULONG totalCount = 0;
+
+    ASSERT( pResult != NULL && pData != NULL && pData->pid != 0 );
+    if (pResult == NULL || pData == NULL || pData->pid == 0)
+        return STATUS_INVALID_PARAMETER;
+
+    InitializeListHead( &memList );
+
+    status = PsLookupProcessByProcessId( (HANDLE)pData->pid, &pProcess );
+    if (NT_SUCCESS( status ))
+    {
+        KAPC_STATE apc;
+        KeStackAttachProcess( pProcess, &apc );
+        status = BBBuildProcessRegionListForRange( &memList, (ULONG_PTR)MM_LOWEST_USER_ADDRESS, (ULONG_PTR)MM_HIGHEST_USER_ADDRESS, TRUE );
+        KeUnstackDetachProcess( &apc );
+    }
+
+    if (NT_SUCCESS( status ))
+    {
+        for (PLIST_ENTRY pListEntry = memList.Flink; pListEntry != &memList; pListEntry = pListEntry->Flink, totalCount++);
+
+        // Not enough memory
+        if (pResult->count < totalCount)
+        {
+            pResult->count = totalCount;
+            status = STATUS_BUFFER_TOO_SMALL;
+        }
+        // Copy from list to array
+        else
+        {
+            ULONG i = 0;
+            pResult->count = totalCount;
+            for (PLIST_ENTRY pListEntry = memList.Flink; pListEntry != &memList; pListEntry = pListEntry->Flink, i++)
+            {
+                PMEMORY_BASIC_INFORMATION pMem = &CONTAINING_RECORD( pListEntry, MAP_ENTRY, link )->mem;
+                pResult->regions[i].AllocationBase = (ULONGLONG)pMem->AllocationBase;
+                pResult->regions[i].AllocationProtect = pMem->AllocationProtect;
+                pResult->regions[i].BaseAddress = (ULONGLONG)pMem->BaseAddress;
+                pResult->regions[i].Protect = pMem->Protect;
+                pResult->regions[i].RegionSize = pMem->RegionSize;
+                pResult->regions[i].State = pMem->State;
+                pResult->regions[i].Type = pMem->Type;
+            }
+        }
+    }
+
+    // Cleanup list
+    while (!IsListEmpty( &memList ))
+    {
+        PMAP_ENTRY ptr = CONTAINING_RECORD( memList.Flink, MAP_ENTRY, link );
+        RemoveEntryList( &ptr->link );
+        ExFreePoolWithTag( ptr, BB_POOL_TAG );
+    }
 
     if (pProcess)
         ObDereferenceObject( pProcess );

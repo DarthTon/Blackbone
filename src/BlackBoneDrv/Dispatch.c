@@ -136,9 +136,9 @@ NTSTATUS BBDispatch( IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp )
                                     {
                                         PMAP_ENTRY pEntry = CONTAINING_RECORD( pListEntry, MAP_ENTRY, link );
 
-                                        pResult->entries[pResult->count].originalPtr = pEntry->originalPtr;
+                                        pResult->entries[pResult->count].originalPtr = (ULONGLONG)pEntry->mem.BaseAddress;
                                         pResult->entries[pResult->count].newPtr = pEntry->newPtr;
-                                        pResult->entries[pResult->count].size = (ULONG)pEntry->size;
+                                        pResult->entries[pResult->count].size = (ULONG)pEntry->mem.RegionSize;
                                         pResult->count++;
                                     }
 
@@ -236,6 +236,37 @@ NTSTATUS BBDispatch( IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp )
                             Irp->IoStatus.Status = STATUS_INFO_LENGTH_MISMATCH;
                     }
                     break;
+
+                case IOCTL_BLACKBONE_ENUM_REGIONS:
+                    {
+                        if (inputBufferLength >= sizeof( ENUM_REGIONS ) && outputBufferLength >= sizeof( ENUM_REGIONS_RESULT ) && ioBuffer)
+                        {
+                            ULONG count = (outputBufferLength - sizeof( ULONGLONG )) / sizeof( MEMORY_BASIC_INFORMATION );
+                            PENUM_REGIONS_RESULT pResult = ExAllocatePoolWithTag( PagedPool, outputBufferLength, BB_POOL_TAG );
+                            pResult->count = count;
+
+                            Irp->IoStatus.Status = BBEnumMemRegions( (PENUM_REGIONS)ioBuffer, pResult );
+
+                            // Full info
+                            if (NT_SUCCESS( Irp->IoStatus.Status ))
+                            {
+                                Irp->IoStatus.Information = sizeof( pResult->count ) + pResult->count * sizeof( MEMORY_BASIC_INFORMATION );
+                                RtlCopyMemory( ioBuffer, pResult, Irp->IoStatus.Information );
+                            }
+                            // Size only
+                            else
+                            {
+                                Irp->IoStatus.Status = STATUS_SUCCESS;
+                                Irp->IoStatus.Information = sizeof( pResult->count );
+                                RtlCopyMemory( ioBuffer, pResult, sizeof( pResult->count ) );
+                            }
+
+                            ExFreePoolWithTag( pResult, BB_POOL_TAG );
+                        }
+                        else
+                            Irp->IoStatus.Status = STATUS_INFO_LENGTH_MISMATCH;
+                    }
+                    break; 
 
                 default:
                     DPRINT( "BlackBone: %s: Unknown IRP_MJ_DEVICE_CONTROL 0x%X\n", __FUNCTION__, ioControlCode );

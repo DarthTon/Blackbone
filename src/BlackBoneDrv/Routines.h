@@ -81,6 +81,14 @@ NTSTATUS BBProtectMemory( IN PPROTECT_MEMORY pProtect );
 NTSTATUS BBHideVAD( IN PHIDE_VAD pData );
 
 /// <summary>
+/// Enumerate committed, accessible, non-guarded memory regions
+/// </summary>
+/// <param name="pData">Target process ID</param>
+/// <param name="pResult">Result</param>
+/// <returns>Status code</returns>
+NTSTATUS BBEnumMemRegions( IN PENUM_REGIONS pData, OUT PENUM_REGIONS_RESULT pResult );
+
+/// <summary>
 /// Inject dll into process
 /// </summary>
 /// <param name="pid">Target PID</param>

@@ -43,15 +43,14 @@ typedef struct _PROCESS_MAP_ENTRY
 /// </summary>
 typedef struct _MAP_ENTRY
 {
-    LIST_ENTRY link;        // Linked list link
-    ULONG_PTR originalPtr;  // Original memory address in target process
-    ULONG_PTR newPtr;       // Mapped memory address in host process
-    ULONG_PTR size;         // Region size
+    LIST_ENTRY link;                // Linked list link
+    MEMORY_BASIC_INFORMATION mem;   // Original memory info
 
-    PMDL    pMdl;           // Region MDL entry
-    BOOLEAN locked;         // MDL is locked
-    BOOLEAN shared;         // Regions has shared pages
-    BOOLEAN readonly;       // Region must be mapped as readonly
+    ULONG_PTR newPtr;               // Mapped memory address in host process
+    PMDL    pMdl;                   // Region MDL entry
+    BOOLEAN locked;                 // MDL is locked
+    BOOLEAN shared;                 // Regions has shared pages
+    BOOLEAN readonly;               // Region must be mapped as readonly
 } MAP_ENTRY, *PMAP_ENTRY;
 
 extern DYNAMIC_DATA dynData;
@@ -95,6 +94,16 @@ NTSTATUS BBUnmapMemoryRegion( IN PUNMAP_MEMORY_REGION pRegion );
 /// <param name="pSize">Resulting size</param>
 /// <returns>Status code</returns>
 NTSTATUS BBGetRequiredRemapOutputSize( IN PLIST_ENTRY pList, OUT PULONG_PTR pSize );
+
+/// <summary>
+/// Enumerate committed, accessible, non-guarded memory regions
+/// </summary>
+/// <param name="pList">Region list</param>
+/// <param name="start">Region start</param>
+/// <param name="end">Region end</param>
+/// <param name="mapSections">If set to FALSE, section objects will be excluded from list</param>
+/// <returns>Status code</returns>
+NTSTATUS BBBuildProcessRegionListForRange( IN PLIST_ENTRY pList, IN ULONG_PTR start, IN ULONG_PTR end, IN BOOLEAN mapSections );
 
 /// <summary>
 /// Search process entry in list by PID

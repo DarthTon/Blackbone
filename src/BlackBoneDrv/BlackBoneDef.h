@@ -3,7 +3,7 @@
 #define BLACKBONE_DEVICE_NAME           L"BlackBone"
 #define BLACKBONE_DEVICE_FILE           L"\\\\.\\" BLACKBONE_DEVICE_NAME
 
-#define FILE_DEVICE_BLACKBONE           0x00008005
+#define FILE_DEVICE_BLACKBONE           0x8005
 
 /*
     Disable process DEP
@@ -211,7 +211,6 @@
 */
 #define IOCTL_BLACKBONE_INJECT_DLL  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80B, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
-
 /*
     Manually map system driver
 
@@ -246,6 +245,22 @@
 */
 #define IOCTL_BLACKBONE_UNLINK_HTABLE  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80D, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
+/*
+Map entire address space of target process into calling process
+
+    Input:
+       ENUM_REGIONS
+
+    Input size: 
+        sizeof(ENUM_REGIONS)
+
+    Output:
+        ENUM_REGIONS_RESULT - enumerated regions
+
+    Output size:
+        >= sizeof(ENUM_REGIONS_RESULT)
+*/
+#define IOCTL_BLACKBONE_ENUM_REGIONS  (ULONG)CTL_CODE(FILE_DEVICE_BLACKBONE, 0x80E, METHOD_BUFFERED, FILE_READ_ACCESS | FILE_WRITE_ACCESS)
 
 
 /// <summary>
@@ -461,3 +476,31 @@ typedef struct _UNLINK_HTABLE
 {
     ULONG      pid;         // Process ID
 } UNLINK_HTABLE, *PUNLINK_HTABLE;
+
+/// <summary>
+/// Input for IOCTL_BLACKBONE_ENUM_REGIONS
+/// </summary>
+typedef struct _ENUM_REGIONS
+{
+    ULONG      pid;         // Process ID
+} ENUM_REGIONS, *PENUM_REGIONS;
+
+typedef struct _MEM_REGION
+{
+    ULONGLONG BaseAddress;
+    ULONGLONG AllocationBase;
+    ULONG AllocationProtect;
+    ULONGLONG RegionSize;
+    ULONG State;
+    ULONG Protect;
+    ULONG Type;
+} MEM_REGION, *PMEM_REGION;
+
+/// <summary>
+/// Output for IOCTL_BLACKBONE_ENUM_REGIONS
+/// </summary>
+typedef struct _ENUM_REGIONS_RESULT
+{
+    ULONGLONG  count;                   // Number of records
+    MEM_REGION regions[1];              // Found regions, variable-sized
+} ENUM_REGIONS_RESULT, *PENUM_REGIONS_RESULT;
