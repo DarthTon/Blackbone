@@ -32,7 +32,7 @@ PEImage::~PEImage( void )
 /// <returns>Status code</returns>
 NTSTATUS PEImage::Load( const std::wstring& path, bool skipActx /*= false*/ )
 {
-    Release();
+    Release( true );
     _imagePath = path;
     _noFile = false;
 
@@ -85,7 +85,7 @@ NTSTATUS PEImage::Load( const std::wstring& path, bool skipActx /*= false*/ )
 /// <returns>Status code</returns>
 NTSTATUS PEImage::Load( void* pData, size_t size, bool plainData /*= true */ )
 {
-    Release();
+    Release( true );
 
     _noFile = true;
     _pFileBase = pData;
@@ -360,6 +360,7 @@ mapImports& PEImage::GetImports( bool useDelayed /*= false*/ )
 void PEImage::GetExports( vecExports& exports )
 {
     exports.clear();
+    Reload();
 
     auto pExport = reinterpret_cast<PIMAGE_EXPORT_DIRECTORY>(DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXPORT ));
     if (pExport == 0)
@@ -373,7 +374,7 @@ void PEImage::GetExports( vecExports& exports )
         exports.push_back( ExportData( reinterpret_cast<const char*>(_pFileBase)+pAddressOfNames[i], pAddressOfFuncs[pAddressOfOrds[i]] ) );
 
     std::sort( exports.begin(), exports.end() );
-    return;
+    return Release( true );
 }
 
 /// <summary>
