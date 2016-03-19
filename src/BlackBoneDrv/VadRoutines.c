@@ -131,26 +131,19 @@ NTSTATUS BBFindVAD( IN PEPROCESS pProcess, IN ULONG_PTR address, OUT PMMVAD_SHOR
         status = STATUS_INVALID_ADDRESS;
     }
 
-    __try
-    {
-        PMM_AVL_TABLE pTable = (PMM_AVL_TABLE)((PUCHAR)pProcess + dynData.VadRoot);
-        PMM_AVL_NODE pNode = GET_VAD_ROOT( pTable );
 
-        // Search VAD
-        if (MiFindNodeOrParent( pTable, vpnStart, &pNode ) == TableFoundNode)
-        {
-            *pResult = (PMMVAD_SHORT)pNode;
-        }
-        else
-        {
-            DPRINT( "BlackBone: %s: VAD entry for address 0x%p not found\n", __FUNCTION__, address );
-            status = STATUS_NOT_FOUND;
-        }
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
+    PMM_AVL_TABLE pTable = (PMM_AVL_TABLE)((PUCHAR)pProcess + dynData.VadRoot);
+    PMM_AVL_NODE pNode = GET_VAD_ROOT( pTable );
+
+    // Search VAD
+    if (MiFindNodeOrParent( pTable, vpnStart, &pNode ) == TableFoundNode)
     {
-        DPRINT( "BlackBone: %s: Exception\n", __FUNCTION__ );
-        status = STATUS_UNHANDLED_EXCEPTION;
+        *pResult = (PMMVAD_SHORT)pNode;
+    }
+    else
+    {
+        DPRINT( "BlackBone: %s: VAD entry for address 0x%p not found\n", __FUNCTION__, address );
+        status = STATUS_NOT_FOUND;
     }
 
     return status;

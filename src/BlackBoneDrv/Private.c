@@ -127,43 +127,35 @@ PVOID GetKernelBase( OUT PULONG pSize )
         return NULL;
 
     // Protect from UserMode AV
-    __try
+    status = ZwQuerySystemInformation( SystemModuleInformation, 0, bytes, &bytes );
+    if (bytes == 0)
     {
-        status = ZwQuerySystemInformation( SystemModuleInformation, 0, bytes, &bytes );
-        if (bytes == 0)
+        DPRINT( "BlackBone: %s: Invalid SystemModuleInformation size\n", __FUNCTION__ );
+        return NULL;
+    }
+
+    pMods = (PRTL_PROCESS_MODULES)ExAllocatePoolWithTag( NonPagedPool, bytes, BB_POOL_TAG );
+    RtlZeroMemory( pMods, bytes );
+
+    status = ZwQuerySystemInformation( SystemModuleInformation, pMods, bytes, &bytes );
+
+    if (NT_SUCCESS( status ))
+    {
+        PRTL_PROCESS_MODULE_INFORMATION pMod = pMods->Modules;
+
+        for (ULONG i = 0; i < pMods->NumberOfModules; i++)
         {
-            DPRINT( "BlackBone: %s: Invalid SystemModuleInformation size\n", __FUNCTION__ );
-            return NULL;
-        }
-
-        pMods = (PRTL_PROCESS_MODULES)ExAllocatePoolWithTag( NonPagedPool, bytes, BB_POOL_TAG );
-        RtlZeroMemory( pMods, bytes );
-
-        status = ZwQuerySystemInformation( SystemModuleInformation, pMods, bytes, &bytes );
-
-        if (NT_SUCCESS( status ))
-        {
-            PRTL_PROCESS_MODULE_INFORMATION pMod = pMods->Modules;
-
-            for (ULONG i = 0; i < pMods->NumberOfModules; i++)
+            // System routine is inside module
+            if (checkPtr >= pMod[i].ImageBase &&
+                checkPtr < (PVOID)((PUCHAR)pMod[i].ImageBase + pMod[i].ImageSize))
             {
-                // System routine is inside module
-                if (checkPtr >= pMod[i].ImageBase &&
-                     checkPtr < (PVOID)((PUCHAR)pMod[i].ImageBase + pMod[i].ImageSize))
-                {
-                    g_KernelBase = pMod[i].ImageBase;
-                    g_KernelSize = pMod[i].ImageSize;
-                    if (pSize)
-                        *pSize = g_KernelSize;
-                    break;
-                }
+                g_KernelBase = pMod[i].ImageBase;
+                g_KernelSize = pMod[i].ImageSize;
+                if (pSize)
+                    *pSize = g_KernelSize;
+                break;
             }
         }
-
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        DPRINT( "BlackBone: %s: Exception\n", __FUNCTION__ );
     }
 
     if (pMods)

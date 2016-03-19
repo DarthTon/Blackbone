@@ -384,30 +384,21 @@ NTSTATUS BBApcInject( IN PINJECT_BUFFER pUserBuf, IN HANDLE pid, IN ULONG initRV
             LARGE_INTEGER interval = { 0 };
             interval.QuadPart = -(5LL * 10 * 1000);
 
-            // Protect from UserMode AV
-            __try
+            for (ULONG i = 0; pUserBuf->complete != CALL_COMPLETE && i < 10000; i++)
+                KeDelayExecutionThread( KernelMode, FALSE, &interval );
+
+            // Call init routine
+            if (pUserBuf->module != 0 && initRVA != 0)
             {
-                for (ULONG i = 0; pUserBuf->complete != CALL_COMPLETE && i < 10000; i++)
-                    KeDelayExecutionThread( KernelMode, FALSE, &interval );
+                RtlCopyMemory( (PUCHAR)pUserBuf->buffer, InitArg, sizeof( pUserBuf->buffer ) );
+                BBQueueUserApc( pThread, (PUCHAR)pUserBuf->module + initRVA, pUserBuf->buffer, NULL, NULL, TRUE );
 
-                // Call init routine
-                if (pUserBuf->module != 0 && initRVA != 0)
-                {
-                    RtlCopyMemory( (PUCHAR)pUserBuf->buffer, InitArg, sizeof( pUserBuf->buffer ) );
-                    BBQueueUserApc( pThread, (PUCHAR)pUserBuf->module + initRVA, pUserBuf->buffer, NULL, NULL, TRUE );
-
-                    // Wait some time for routine to finish
-                    interval.QuadPart = -(100LL * 10 * 1000);
-                    KeDelayExecutionThread( KernelMode, FALSE, &interval );
-                }
-                else if (pUserBuf->module == 0)
-                    DPRINT( "BlackBone: %s: Module base = 0. Aborting\n", __FUNCTION__ );
+                // Wait some time for routine to finish
+                interval.QuadPart = -(100LL * 10 * 1000);
+                KeDelayExecutionThread( KernelMode, FALSE, &interval );
             }
-            __except (EXCEPTION_EXECUTE_HANDLER)
-            {
-                DPRINT( "BlackBone: %s: Exception\n", __FUNCTION__ );
-                status = STATUS_ACCESS_VIOLATION;
-            }            
+            else if (pUserBuf->module == 0)
+                DPRINT( "BlackBone: %s: Module base = 0. Aborting\n", __FUNCTION__ );
         }
     }
     else

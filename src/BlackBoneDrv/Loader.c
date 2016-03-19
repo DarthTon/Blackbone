@@ -310,119 +310,111 @@ PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord, IN PEPROCESS pProce
     if (pBase == NULL)
         return NULL;
 
-    // Protect from UserMode AV
-    __try
+    /// Not a PE file
+    if (pDosHdr->e_magic != IMAGE_DOS_SIGNATURE)
+        return NULL;
+
+    pNtHdr32 = (PIMAGE_NT_HEADERS32)((PUCHAR)pBase + pDosHdr->e_lfanew);
+    pNtHdr64 = (PIMAGE_NT_HEADERS64)((PUCHAR)pBase + pDosHdr->e_lfanew);
+
+    // Not a PE file
+    if (pNtHdr32->Signature != IMAGE_NT_SIGNATURE)
+        return NULL;
+
+    // 64 bit image
+    if (pNtHdr32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
     {
-        // Not a PE file
-        if (pDosHdr->e_magic != IMAGE_DOS_SIGNATURE)
-            return NULL;
+        pExport = (PIMAGE_EXPORT_DIRECTORY)(pNtHdr64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress + (ULONG_PTR)pBase);
+        expSize = pNtHdr64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+    }
+    // 32 bit image
+    else
+    {
+        pExport = (PIMAGE_EXPORT_DIRECTORY)(pNtHdr32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress + (ULONG_PTR)pBase);
+        expSize = pNtHdr32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+    }
 
-        pNtHdr32 = (PIMAGE_NT_HEADERS32)((PUCHAR)pBase + pDosHdr->e_lfanew);
-        pNtHdr64 = (PIMAGE_NT_HEADERS64)((PUCHAR)pBase + pDosHdr->e_lfanew);
+    PUSHORT pAddressOfOrds = (PUSHORT)(pExport->AddressOfNameOrdinals + (ULONG_PTR)pBase);
+    PULONG  pAddressOfNames = (PULONG)(pExport->AddressOfNames + (ULONG_PTR)pBase);
+    PULONG  pAddressOfFuncs = (PULONG)(pExport->AddressOfFunctions + (ULONG_PTR)pBase);
 
-        // Not a PE file
-        if (pNtHdr32->Signature != IMAGE_NT_SIGNATURE)
-            return NULL;
+    for (ULONG i = 0; i < pExport->NumberOfFunctions; ++i)
+    {
+        USHORT OrdIndex = 0xFFFF;
+        PCHAR  pName = NULL;
 
-        // 64 bit image
-        if (pNtHdr32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+        // Find by index
+        if ((ULONG_PTR)name_ord <= 0xFFFF)
         {
-            pExport = (PIMAGE_EXPORT_DIRECTORY)(pNtHdr64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress + (ULONG_PTR)pBase);
-            expSize = pNtHdr64->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+            OrdIndex = (USHORT)i;
         }
-        // 32 bit image
+        // Find by name
+        else if ((ULONG_PTR)name_ord > 0xFFFF && i < pExport->NumberOfNames)
+        {
+            pName = (PCHAR)(pAddressOfNames[i] + (ULONG_PTR)pBase);
+            OrdIndex = pAddressOfOrds[i];
+        }
+        // Weird params
         else
+            return NULL;
+
+        if (((ULONG_PTR)name_ord <= 0xFFFF && (USHORT)((ULONG_PTR)name_ord) == OrdIndex + pExport->Base) ||
+            ((ULONG_PTR)name_ord > 0xFFFF && strcmp( pName, name_ord ) == 0))
         {
-            pExport = (PIMAGE_EXPORT_DIRECTORY)(pNtHdr32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress + (ULONG_PTR)pBase);
-            expSize = pNtHdr32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
-        }
+            pAddress = pAddressOfFuncs[OrdIndex] + (ULONG_PTR)pBase;
 
-        PUSHORT pAddressOfOrds = (PUSHORT)(pExport->AddressOfNameOrdinals + (ULONG_PTR)pBase);
-        PULONG  pAddressOfNames = (PULONG)(pExport->AddressOfNames + (ULONG_PTR)pBase);
-        PULONG  pAddressOfFuncs = (PULONG)(pExport->AddressOfFunctions + (ULONG_PTR)pBase);
-
-        for (ULONG i = 0; i < pExport->NumberOfFunctions; ++i)
-        {
-            USHORT OrdIndex = 0xFFFF;
-            PCHAR  pName = NULL;
-
-            // Find by index
-            if ((ULONG_PTR)name_ord <= 0xFFFF)
+            // Check forwarded export
+            if (pAddress >= (ULONG_PTR)pExport && pAddress <= (ULONG_PTR)pExport + expSize)
             {
-                OrdIndex = (USHORT)i;
-            }
-            // Find by name
-            else if ((ULONG_PTR)name_ord > 0xFFFF && i < pExport->NumberOfNames)
-            {
-                pName = (PCHAR)(pAddressOfNames[i] + (ULONG_PTR)pBase);
-                OrdIndex = pAddressOfOrds[i];
-            }
-            // Weird params
-            else
-                return NULL;
+                WCHAR strbuf[256] = { 0 };
+                ANSI_STRING forwarder = { 0 };
+                ANSI_STRING import = { 0 };
 
-            if (((ULONG_PTR)name_ord <= 0xFFFF && (USHORT)((ULONG_PTR)name_ord) == OrdIndex + pExport->Base) ||
-                 ((ULONG_PTR)name_ord > 0xFFFF && strcmp( pName, name_ord ) == 0))
-            {
-                pAddress = pAddressOfFuncs[OrdIndex] + (ULONG_PTR)pBase;
+                UNICODE_STRING uForwarder = { 0 };
+                ULONG delimIdx = 0;
+                PVOID forwardBase = NULL;
+                PVOID result = NULL;
 
-                // Check forwarded export
-                if (pAddress >= (ULONG_PTR)pExport && pAddress <= (ULONG_PTR)pExport + expSize)
+                // System image, not supported
+                if (pProcess == NULL)
+                    return NULL;
+
+                RtlInitAnsiString( &forwarder, (PCSZ)pAddress );
+                RtlInitEmptyUnicodeString( &uForwarder, strbuf, sizeof( strbuf ) );
+
+                RtlAnsiStringToUnicodeString( &uForwarder, &forwarder, FALSE );
+                for (ULONG j = 0; j < uForwarder.Length / sizeof( WCHAR ); j++)
                 {
-                    WCHAR strbuf[256] = { 0 };
-                    ANSI_STRING forwarder = { 0 };
-                    ANSI_STRING import = { 0 };
-
-                    UNICODE_STRING uForwarder = { 0 };              
-                    ULONG delimIdx = 0;
-                    PVOID forwardBase = NULL;
-                    PVOID result = NULL;
-
-                    // System image, not supported
-                    if (pProcess == NULL)
-                        return NULL;
-
-                    RtlInitAnsiString( &forwarder, (PCSZ)pAddress );
-                    RtlInitEmptyUnicodeString( &uForwarder, strbuf, sizeof( strbuf ) );
-
-                    RtlAnsiStringToUnicodeString( &uForwarder, &forwarder, FALSE );
-                    for (ULONG j = 0; j < uForwarder.Length / sizeof( WCHAR ); j++)
+                    if (uForwarder.Buffer[j] == L'.')
                     {
-                        if (uForwarder.Buffer[j] == L'.')
-                        {
-                            uForwarder.Length = (USHORT)(j * sizeof( WCHAR ));
-                            uForwarder.Buffer[j] = L'\0';
-                            delimIdx = j;
-                            break;
-                        }
+                        uForwarder.Length = (USHORT)(j * sizeof( WCHAR ));
+                        uForwarder.Buffer[j] = L'\0';
+                        delimIdx = j;
+                        break;
                     }
-
-                    // Get forward function name/ordinal
-                    RtlInitAnsiString( &import, forwarder.Buffer + delimIdx + 1 );
-                    RtlAppendUnicodeToString( &uForwarder, L".dll" );
-
-                    //
-                    // Check forwarded module
-                    //
-                    UNICODE_STRING resolved = { 0 };
-                    UNICODE_STRING resolvedName = { 0 };
-                    BBResolveImagePath( NULL, pProcess, KApiShemaOnly, &uForwarder, baseName, &resolved );
-                    BBStripPath( &resolved, &resolvedName );
-
-                    forwardBase = BBGetUserModule( pProcess, &resolvedName, PsGetProcessWow64Process( pProcess ) != NULL );
-                    result = BBGetModuleExport( forwardBase, import.Buffer, pProcess, &resolvedName );
-                    RtlFreeUnicodeString( &resolved );
-
-                    return result;
                 }
 
-                break;
+                // Get forward function name/ordinal
+                RtlInitAnsiString( &import, forwarder.Buffer + delimIdx + 1 );
+                RtlAppendUnicodeToString( &uForwarder, L".dll" );
+
+                //
+                // Check forwarded module
+                //
+                UNICODE_STRING resolved = { 0 };
+                UNICODE_STRING resolvedName = { 0 };
+                BBResolveImagePath( NULL, pProcess, KApiShemaOnly, &uForwarder, baseName, &resolved );
+                BBStripPath( &resolved, &resolvedName );
+
+                forwardBase = BBGetUserModule( pProcess, &resolvedName, PsGetProcessWow64Process( pProcess ) != NULL );
+                result = BBGetModuleExport( forwardBase, import.Buffer, pProcess, &resolvedName );
+                RtlFreeUnicodeString( &resolved );
+
+                return result;
             }
+
+            break;
         }
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        DPRINT( "BlackBone: %s: Exception\n", __FUNCTION__ );
     }
 
     return (PVOID)pAddress;
@@ -743,68 +735,60 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
 
     ZwClose( hFile );
 
-    __try
+    if (NT_SUCCESS( status ))
     {
-        if (NT_SUCCESS( status ))
-        {
-            //
-            // Allocate memory from System PTEs
-            //
-            PHYSICAL_ADDRESS start = { 0 }, end = { 0 };
-            end.QuadPart = MAXULONG64;
+        //
+        // Allocate memory from System PTEs
+        //
+        PHYSICAL_ADDRESS start = { 0 }, end = { 0 };
+        end.QuadPart = MAXULONG64;
 
-            pMDL = MmAllocatePagesForMdl( start, end, start, pNTHeader->OptionalHeader.SizeOfImage );
-            imageSection = MmGetSystemAddressForMdlSafe( pMDL, NormalPagePriority );
+        pMDL = MmAllocatePagesForMdl( start, end, start, pNTHeader->OptionalHeader.SizeOfImage );
+        imageSection = MmGetSystemAddressForMdlSafe( pMDL, NormalPagePriority );
 
-            if (NT_SUCCESS( status ) && imageSection)
-            {
-                // Copy header
-                RtlCopyMemory( imageSection, fileData, pNTHeader->OptionalHeader.SizeOfHeaders );
-
-                // Copy sections
-                for (PIMAGE_SECTION_HEADER pSection = (PIMAGE_SECTION_HEADER)(pNTHeader + 1);
-                      pSection < (PIMAGE_SECTION_HEADER)(pNTHeader + 1) + pNTHeader->FileHeader.NumberOfSections;
-                      pSection++)
-                {
-                    RtlCopyMemory( 
-                        (PUCHAR)imageSection + pSection->VirtualAddress,
-                        (PUCHAR)fileData + pSection->PointerToRawData,
-                        pSection->SizeOfRawData
-                        );
-                }
-
-                // Relocate image
-                status = LdrRelocateImage( imageSection, STATUS_SUCCESS, STATUS_CONFLICTING_ADDRESSES, STATUS_INVALID_IMAGE_FORMAT );
-                if (!NT_SUCCESS( status ))
-                    DPRINT( "BlackBone: %s: Failed to relocate image '%wZ'. Status: 0x%X\n", __FUNCTION__, pPath, status );
-
-                // Fill IAT
-                if (NT_SUCCESS( status ))
-                    status = BBResolveImageRefs( imageSection, TRUE, NULL, FALSE, NULL, 0 );
-            }
-            else
-            {
-                DPRINT( "BlackBone: %s: Failed to allocate memory for image '%wZ'\n", __FUNCTION__, pPath );
-                status = STATUS_MEMORY_NOT_ALLOCATED;
-            }
-        }
-
-        // Call entry point
-        if (NT_SUCCESS( status ) && pNTHeader->OptionalHeader.AddressOfEntryPoint)
-        {
-            PDRIVER_INITIALIZE pEntryPoint = (PDRIVER_INITIALIZE)((ULONG_PTR)imageSection + pNTHeader->OptionalHeader.AddressOfEntryPoint);
-            pEntryPoint( NULL, NULL );
-        }
-
-        // Wipe header
         if (NT_SUCCESS( status ) && imageSection)
-            RtlZeroMemory( imageSection, pNTHeader->OptionalHeader.SizeOfHeaders );
+        {
+            // Copy header
+            RtlCopyMemory( imageSection, fileData, pNTHeader->OptionalHeader.SizeOfHeaders );
+
+            // Copy sections
+            for (PIMAGE_SECTION_HEADER pSection = (PIMAGE_SECTION_HEADER)(pNTHeader + 1);
+            pSection < (PIMAGE_SECTION_HEADER)(pNTHeader + 1) + pNTHeader->FileHeader.NumberOfSections;
+                pSection++)
+            {
+                RtlCopyMemory(
+                    (PUCHAR)imageSection + pSection->VirtualAddress,
+                    (PUCHAR)fileData + pSection->PointerToRawData,
+                    pSection->SizeOfRawData
+                    );
+            }
+
+            // Relocate image
+            status = LdrRelocateImage( imageSection, STATUS_SUCCESS, STATUS_CONFLICTING_ADDRESSES, STATUS_INVALID_IMAGE_FORMAT );
+            if (!NT_SUCCESS( status ))
+                DPRINT( "BlackBone: %s: Failed to relocate image '%wZ'. Status: 0x%X\n", __FUNCTION__, pPath, status );
+
+            // Fill IAT
+            if (NT_SUCCESS( status ))
+                status = BBResolveImageRefs( imageSection, TRUE, NULL, FALSE, NULL, 0 );
+        }
+        else
+        {
+            DPRINT( "BlackBone: %s: Failed to allocate memory for image '%wZ'\n", __FUNCTION__, pPath );
+            status = STATUS_MEMORY_NOT_ALLOCATED;
+        }
     }
-    __except (EXCEPTION_EXECUTE_HANDLER)
+
+    // Call entry point
+    if (NT_SUCCESS( status ) && pNTHeader->OptionalHeader.AddressOfEntryPoint)
     {
-        status = GetExceptionCode();
-        DPRINT( "BlackBone: %s: Exception: 0x%X \n", __FUNCTION__, status );
+        PDRIVER_INITIALIZE pEntryPoint = (PDRIVER_INITIALIZE)((ULONG_PTR)imageSection + pNTHeader->OptionalHeader.AddressOfEntryPoint);
+        pEntryPoint( NULL, NULL );
     }
+
+    // Wipe header
+    if (NT_SUCCESS( status ) && imageSection)
+        RtlZeroMemory( imageSection, pNTHeader->OptionalHeader.SizeOfHeaders );
 
     // Erase info about allocated region
     if (pMDL)

@@ -1,4 +1,5 @@
 #include "Utils.h"
+#include "Private.h"
 #include <ntstrsafe.h>
 
 #pragma alloc_text(PAGE, BBSafeAllocateString)
@@ -19,7 +20,7 @@ NTSTATUS BBSafeAllocateString( OUT PUNICODE_STRING result, IN USHORT size )
     if (result == NULL || size == 0)
         return STATUS_INVALID_PARAMETER;
 
-    result->Buffer = ExAllocatePoolWithTag( PagedPool, size, 'enoB' );
+    result->Buffer = ExAllocatePoolWithTag( PagedPool, size, BB_POOL_TAG );
     result->Length = 0;
     result->MaximumLength = size;
 
@@ -51,7 +52,7 @@ NTSTATUS BBSafeInitString( OUT PUNICODE_STRING result, IN PUNICODE_STRING source
         return STATUS_SUCCESS;
     }
 
-    result->Buffer = ExAllocatePoolWithTag( PagedPool, source->MaximumLength, 'enoB' );
+    result->Buffer = ExAllocatePoolWithTag( PagedPool, source->MaximumLength, BB_POOL_TAG );
     result->Length = source->Length;
     result->MaximumLength = source->MaximumLength;
 
@@ -201,30 +202,23 @@ NTSTATUS BBSearchPattern( IN PCUCHAR pattern, IN UCHAR wildcard, IN ULONG_PTR le
     if (ppFound == NULL || pattern == NULL || base == NULL)
         return STATUS_INVALID_PARAMETER;
 
-    __try
+    for (ULONG_PTR i = 0; i < size - len; i++)
     {
-        for (ULONG_PTR i = 0; i < size - len; i++)
+        BOOLEAN found = TRUE;
+        for (ULONG_PTR j = 0; j < len; j++)
         {
-            BOOLEAN found = TRUE;
-            for (ULONG_PTR j = 0; j < len; j++)
+            if (pattern[j] != wildcard && pattern[j] != ((PCUCHAR)base)[i + j])
             {
-                if (pattern[j] != wildcard && pattern[j] != ((PCUCHAR)base)[i + j])
-                {
-                    found = FALSE;
-                    break;
-                }
-            }
-
-            if (found != FALSE)
-            {
-                *ppFound = (PUCHAR)base + i;
-                return STATUS_SUCCESS;
+                found = FALSE;
+                break;
             }
         }
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return STATUS_UNHANDLED_EXCEPTION;
+
+        if (found != FALSE)
+        {
+            *ppFound = (PUCHAR)base + i;
+            return STATUS_SUCCESS;
+        }
     }
 
     return STATUS_NOT_FOUND;
@@ -262,7 +256,7 @@ ULONG GenCall32V( IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, IN va_list vl )
 {
     ULONG ofst = 0;
 
-    PULONG pArgBuf = ExAllocatePoolWithTag( PagedPool, argc * sizeof( ULONG ), 'enoB' );
+    PULONG pArgBuf = ExAllocatePoolWithTag( PagedPool, argc * sizeof( ULONG ), BB_POOL_TAG );
 
     // cast args
     for (INT i = 0; i < argc; i++)
@@ -286,7 +280,7 @@ ULONG GenCall32V( IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, IN va_list vl )
     *(PUSHORT)(pBuf + ofst) = 0xD0FF;                   // call eax
     ofst += 2;
 
-    ExFreePoolWithTag( pArgBuf, 'enoB' );
+    ExFreePoolWithTag( pArgBuf, BB_POOL_TAG );
 
     return ofst;
 }

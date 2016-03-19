@@ -1,5 +1,5 @@
 #pragma once
-#include <wdm.h>
+#include <ntifs.h>
 
 /// <summary>
 /// Allocate new Unicode string from Paged pool
