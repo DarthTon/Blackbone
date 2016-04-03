@@ -107,9 +107,16 @@ public:
         {
             case HookType::Inline:
             case HookType::InternalInline:
-            case HookType::Int3:
-                WriteProcessMemory( GetCurrentProcess(), this->_original, this->_origCode, this->_origSize, NULL );
-                break;
+			case HookType::Int3:
+			{
+				DWORD flOld = 0;
+				if (!VirtualProtect(this->_original, this->_origSize, PAGE_EXECUTE_READWRITE, &flOld))
+					return false;
+				memcpy(this->_original, this->_origCode, this->_origSize);
+				VirtualProtect(this->_original, this->_origSize, flOld, &flOld);
+			}
+			break;
+
 
             case HookType::HWBP:
                 {
@@ -206,11 +213,10 @@ private:
 
         // Write break instruction
         DWORD flOld = 0;
-        VirtualProtect( this->_original, this->_origSize, PAGE_EXECUTE_READWRITE, &flOld );
+        if (!VirtualProtect(this->_original, this->_origSize, PAGE_EXECUTE_READWRITE, &flOld))
+			return false;
         memcpy( this->_original, this->_newCode, this->_origSize );
         VirtualProtect( this->_original, this->_origSize, flOld, &flOld );
-
-        WriteProcessMemory( GetCurrentProcess(), this->_original, this->_newCode, this->_origSize, NULL );
 
         return this->_hooked = TRUE;
     }
