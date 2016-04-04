@@ -107,15 +107,18 @@ public:
         {
             case HookType::Inline:
             case HookType::InternalInline:
-			case HookType::Int3:
-			{
-				DWORD flOld = 0;
-				if (!VirtualProtect(this->_original, this->_origSize, PAGE_EXECUTE_READWRITE, &flOld))
-					return false;
-				memcpy(this->_original, this->_origCode, this->_origSize);
-				VirtualProtect(this->_original, this->_origSize, flOld, &flOld);
-			}
-			break;
+	    case HookType::Int3:
+	    {
+		DWORD flOld = 0;
+		if (!VirtualProtect(this->_original, this->_origSize, PAGE_EXECUTE_READWRITE, &flOld))
+			return false;
+		memcpy(this->_original, this->_origCode, this->_origSize);
+		if (!VirtualProtect(this->_original, this->_origSize, flOld, &flOld))
+			return false;
+		if (!FlushInstructionCache(GetCurrentProcess(), this->_original, this->_origSize))
+			return false;
+	    }
+	    break;
 
 
             case HookType::HWBP:
