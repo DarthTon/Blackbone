@@ -46,7 +46,8 @@ struct HookHandler<R( *)(Args...), C> : public DetourBase
             val_original = val_new = CallCallback( std::forward<Args>( args )... );
         }
 
-        EnableHook();
+        if (this->_hooked)
+            EnableHook();
 
         return (_retType == ReturnMethod::UseOriginal ? val_original : val_new);
     }
