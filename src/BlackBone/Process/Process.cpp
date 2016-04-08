@@ -108,8 +108,6 @@ NTSTATUS Process::CreateAndAttach(
     auto status = _core.Open( pi.hProcess );
     if (NT_SUCCESS( status ))
     {
-        _nativeLdr.Init();
-
         // Check if process must be left in suspended mode
         if (suspended)
         {
@@ -119,6 +117,8 @@ NTSTATUS Process::CreateAndAttach(
         }
         else
             ResumeThread( pi.hThread );
+
+        _nativeLdr.Init();
     }
 
     // Close unneeded handles

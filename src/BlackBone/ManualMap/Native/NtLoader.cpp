@@ -1043,12 +1043,17 @@ bool NtLdr::ScanPatterns( )
 /// <returns>true on success</returns>
 bool NtLdr::FindLdrHeap()
 {
-    PEB_T* pPeb = reinterpret_cast<PEB_T*>(_process.core().peb());
+    int32_t retries = 10;
+    _PEB64 Peb = { 0 };
     MEMORY_BASIC_INFORMATION64 mbi = { 0 };
 
-    if (pPeb)
+    _process.core().peb( &Peb );
+    for (; Peb.Ldr == 0 && retries > 0; retries--, Sleep( 10 ))
+        _process.core().peb( &Peb );
+
+    if (Peb.Ldr)
     {
-        PEB_LDR_DATA Ldr = _process.memory().Read<PEB_LDR_DATA>( _process.memory().Read<uintptr_t>( GET_FIELD_PTR( pPeb, Ldr ) ) );
+        _PEB_LDR_DATA264 Ldr = _process.memory().Read<_PEB_LDR_DATA264>( Peb.Ldr );
         PLDR_DATA_TABLE_ENTRY NtdllEntry = CONTAINING_RECORD( Ldr.InMemoryOrderModuleList.Flink, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks );
 
         if (_process.core().native()->VirtualQueryExT( reinterpret_cast<ptr_t>(NtdllEntry), &mbi ) == STATUS_SUCCESS)
