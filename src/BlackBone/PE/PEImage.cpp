@@ -410,7 +410,7 @@ uintptr_t PEImage::ResolveRVAToVA( uintptr_t Rva, bool keepRelative /*= false*/ 
     {
         for (auto& sec : _sections)
         {
-            if (Rva >= sec.VirtualAddress && Rva <= sec.VirtualAddress + sec.Misc.VirtualSize)
+            if (Rva >= sec.VirtualAddress && Rva < sec.VirtualAddress + sec.Misc.VirtualSize)
             {
                 if (keepRelative)
                     return  (Rva - sec.VirtualAddress + sec.PointerToRawData);
