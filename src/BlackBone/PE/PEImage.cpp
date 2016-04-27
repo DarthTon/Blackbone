@@ -415,7 +415,7 @@ uintptr_t PEImage::ResolveRVAToVA( uintptr_t Rva, bool keepRelative /*= false*/ 
                 if (keepRelative)
                     return  (Rva - sec.VirtualAddress + sec.PointerToRawData);
                 else
-                    return reinterpret_cast<uintptr_t>(_pFileBase)+(Rva - sec.VirtualAddress + sec.PointerToRawData);
+                    return reinterpret_cast<uintptr_t>(_pFileBase) + (Rva - sec.VirtualAddress + sec.PointerToRawData);
             }
         }
 
@@ -436,13 +436,8 @@ size_t PEImage::DirectorySize( int index ) const
     if (index < 0 || index >= IMAGE_NUMBEROF_DIRECTORY_ENTRIES)
         return 0;
 
-    const IMAGE_DATA_DIRECTORY* idd = _is64 ? _pImageHdr64->OptionalHeader.DataDirectory 
-                                            : _pImageHdr32->OptionalHeader.DataDirectory;
-
-    if (idd[index].VirtualAddress == 0)
-        return 0;
-    else
-        return static_cast<size_t>(idd[index].Size);
+    const IMAGE_DATA_DIRECTORY* idd = _is64 ? _pImageHdr64->OptionalHeader.DataDirectory : _pImageHdr32->OptionalHeader.DataDirectory;
+    return idd[index].VirtualAddress != 0 ? static_cast<size_t>(idd[index].Size) : 0;
 }
 
 
