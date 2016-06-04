@@ -2,6 +2,8 @@
 
 #include "../Include/Winheaders.h"
 #include <string>
+#include <vector>
+#include <tuple>
 
 namespace blackbone
 {
@@ -152,5 +154,34 @@ private:
 private:
     CriticalSection& _cs;
 };
+
+namespace tuple_detail
+{
+    template<int... Is>
+    struct seq { };
+
+    template<int N, int... Is>
+    struct gen_seq : gen_seq<N - 1, N - 1, Is...> { };
+
+    template<int... Is>
+    struct gen_seq<0, Is...> : seq<Is...> { };
+
+    template<typename T, typename F, int... Is>
+    void visit_each( T&& t, F f, seq<Is...> ) { auto l = { (f( std::get<Is>( t ) ), 0)... }; }
+}
+
+template<typename... Ts>
+void copyTuple( std::tuple<Ts...> const& t, std::vector<char>& buf )
+{
+    auto f = [&buf]( auto v )
+    {
+        auto ptr = buf.size();
+        buf.resize( ptr + sizeof( v ) );
+        memcpy( buf.data() + ptr, &v, sizeof( v ) );
+        return 0;
+    };
+
+    tuple_detail::visit_each( t, f, tuple_detail::gen_seq<sizeof...(Ts)>() );
+}
 
 }

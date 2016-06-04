@@ -11,12 +11,13 @@
 #include <array>
 #include <vector>
 #include <map>
-#include <stack>
+#include <tuple>
 
 namespace blackbone
 {
 
-class CustomArgs_t {
+class CustomArgs_t 
+{
 private:
     /// <summary>The buffer.</summary>
     std::vector< char > _buffer;
@@ -27,9 +28,7 @@ private:
     void buffer( const void* ptr, size_t size )
     {
         if( !ptr )
-        {
             return;
-        }
         _buffer.resize( size );
         memcpy( _buffer.data(), ptr, size );
     }
@@ -81,6 +80,12 @@ public:
     explicit CustomArgs_t( const std::array< Arg_t, N >& cArray )
     {
         buffer( cArray.data(), cArray.size() * sizeof Arg_t );
+    }
+
+    template<typename... Args>
+    explicit CustomArgs_t( std::tuple<Args...>&& cTuple )
+    {
+        copyTuple( cTuple, _buffer );
     }
 
     /// <summary>Gets the size.</summary>
