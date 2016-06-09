@@ -29,7 +29,7 @@ NativeWow64::~NativeWow64()
 /// <param name="flAllocationType">Allocation type</param>
 /// <param name="flProtect">Memory protection</param>
 /// <returns>Status code</returns>
-NTSTATUS NativeWow64::VirualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect )
+NTSTATUS NativeWow64::VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect )
 {
     DWORD64 size64 = dwSize;
     static ptr_t ntavm = _local.GetProcAddress64( _local.getNTDLL64(), "NtAllocateVirtualMemory" );
@@ -46,7 +46,7 @@ NTSTATUS NativeWow64::VirualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flA
 /// <param name="dwSize">Region size</param>
 /// <param name="dwFreeType">Memory release type.</param>
 /// <returns>Status code</returns>
-NTSTATUS NativeWow64::VirualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType )
+NTSTATUS NativeWow64::VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType )
 {
     static ptr_t ntfvm = _local.GetProcAddress64( _local.getNTDLL64( ), "NtFreeVirtualMemory" );
     if (ntfvm == 0)

@@ -67,10 +67,10 @@ MemBlock MemBlock::Allocate( ProcessMemory& process, size_t size, ptr_t desired 
     ptr_t desired64 = desired;
     DWORD newProt = CastProtection( protection, process.core().DEP() );
     
-    if (process.core().native()->VirualAllocExT( desired64, size, MEM_COMMIT, newProt ) != STATUS_SUCCESS)
+    if (process.core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, newProt ) != STATUS_SUCCESS)
     {
         desired64 = 0;
-        if (process.core().native()->VirualAllocExT( desired64, size, MEM_COMMIT, newProt ) == STATUS_SUCCESS)
+        if (process.core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, newProt ) == STATUS_SUCCESS)
             LastNtStatus( STATUS_IMAGE_NOT_AT_BASE );
         else
             desired64 = 0;
@@ -89,12 +89,12 @@ MemBlock MemBlock::Allocate( ProcessMemory& process, size_t size, ptr_t desired 
 ptr_t MemBlock::Realloc( size_t size, ptr_t desired /*= 0*/, DWORD protection /*= PAGE_EXECUTE_READWRITE*/ )
 {
     ptr_t desired64 = desired;
-    _memory->core().native()->VirualAllocExT( desired64, size, MEM_COMMIT, protection );
+    _memory->core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, protection );
 
     if (!desired64)
     {
         desired64 = 0;
-        _memory->core( ).native( )->VirualAllocExT( desired64, size, MEM_COMMIT, protection );
+        _memory->core( ).native( )->VirtualAllocExT( desired64, size, MEM_COMMIT, protection );
 
         if (desired64)
             LastNtStatus( STATUS_IMAGE_NOT_AT_BASE );
