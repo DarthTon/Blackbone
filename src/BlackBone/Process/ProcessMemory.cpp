@@ -37,7 +37,7 @@ MemBlock ProcessMemory::Allocate( size_t size, DWORD protection /*= PAGE_EXECUTE
 /// <returns>Status</returns>
 NTSTATUS ProcessMemory::Free( ptr_t pAddr, size_t size /*= 0*/, DWORD freeType /*= MEM_RELEASE*/ )
 {
-    return _core.native()->VirualFreeExT( pAddr, size, freeType );
+    return _core.native()->VirtualFreeExT( pAddr, size, freeType );
 }
 
 /// <summary>

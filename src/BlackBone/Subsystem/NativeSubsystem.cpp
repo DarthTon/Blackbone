@@ -77,7 +77,7 @@ Native::~Native()
 /// <param name="flAllocationType">Allocation type</param>
 /// <param name="flProtect">Memory protection</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::VirualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect )
+NTSTATUS Native::VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect )
 {
     LastNtStatus( STATUS_SUCCESS );
     lpAddress = reinterpret_cast<ptr_t>
@@ -94,7 +94,7 @@ NTSTATUS Native::VirualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAlloca
 /// <param name="dwSize">Region size</param>
 /// <param name="dwFreeType">Memory release type.</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::VirualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType )
+NTSTATUS Native::VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType )
 {
     LastNtStatus( STATUS_SUCCESS );
     VirtualFreeEx( _hProcess, reinterpret_cast<LPVOID>(lpAddress), dwSize, dwFreeType );

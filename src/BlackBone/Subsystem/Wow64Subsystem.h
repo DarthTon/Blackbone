@@ -20,7 +20,7 @@ public:
     /// <param name="flAllocationType">Allocation type</param>
     /// <param name="flProtect">Memory protection</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS VirualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect );
+    virtual NTSTATUS VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect );
 
     /// <summary>
     /// Free virtual memory
@@ -29,7 +29,7 @@ public:
     /// <param name="dwSize">Region size</param>
     /// <param name="dwFreeType">Memory release type.</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS VirualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType );
+    virtual NTSTATUS VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType );
 
     /// <summary>
     /// Change memory protection
