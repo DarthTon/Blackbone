@@ -157,31 +157,22 @@ private:
 
 namespace tuple_detail
 {
-    template<int... Is>
-    struct seq { };
+    template<typename T, typename F, size_t... Is>
+    void visit_each( T&& t, F f, std::index_sequence<Is...> ) { auto l = { (f( std::get<Is>( t ) ), 0)... }; }
 
-    template<int N, int... Is>
-    struct gen_seq : gen_seq<N - 1, N - 1, Is...> { };
-
-    template<int... Is>
-    struct gen_seq<0, Is...> : seq<Is...> { };
-
-    template<typename T, typename F, int... Is>
-    void visit_each( T&& t, F f, seq<Is...> ) { auto l = { (f( std::get<Is>( t ) ), 0)... }; }
-}
-
-template<typename... Ts>
-void copyTuple( std::tuple<Ts...> const& t, std::vector<char>& buf )
-{
-    auto f = [&buf]( auto v )
+    template<typename... Ts>
+    void copyTuple( std::tuple<Ts...> const& from, std::vector<char>& to )
     {
-        auto ptr = buf.size();
-        buf.resize( ptr + sizeof( v ) );
-        memcpy( buf.data() + ptr, &v, sizeof( v ) );
-        return 0;
-    };
+        auto func = [&to]( auto& v )
+        {
+            auto ptr = to.size();
+            to.resize( ptr + sizeof( v ) );
+            memcpy( to.data() + ptr, &v, sizeof( v ) );
+            return 0;
+        };
 
-    tuple_detail::visit_each( t, f, tuple_detail::gen_seq<sizeof...(Ts)>() );
+        visit_each( from, func, std::index_sequence_for<Ts...>() );
+    }
 }
 
 }

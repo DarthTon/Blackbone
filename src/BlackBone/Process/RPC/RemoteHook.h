@@ -5,6 +5,7 @@
 
 #include "../../Include/Winheaders.h"
 #include "../../Include/Macro.h"
+#include "../../Misc/Utils.h"
 #include "../Threads/Threads.h"
 
 #include <map>
@@ -239,6 +240,7 @@ private:
 private:
     class ProcessMemory& _memory;
     class ProcessCore&   _core;
+    CriticalSection _lock;              // Hook lock
 
     DWORD        _debugPID = 0;         // PID of process being debugged
     HANDLE       _hEventThd = NULL;     // Debug Event thread

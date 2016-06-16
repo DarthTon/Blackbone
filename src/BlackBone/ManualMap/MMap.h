@@ -85,7 +85,7 @@ public:
     template<typename... Args>
     explicit CustomArgs_t( std::tuple<Args...>&& cTuple )
     {
-        copyTuple( cTuple, _buffer );
+        tuple_detail::copyTuple( cTuple, _buffer );
     }
 
     /// <summary>Gets the size.</summary>
