@@ -122,7 +122,7 @@ std::wstring Utils::GetExeDirectory()
     wchar_t imgName[MAX_PATH] = { 0 };
     DWORD len = ARRAYSIZE(imgName);
 
-    auto pFunc = reinterpret_cast<fnQueryFullProcessImageNameW>(DynImport::load( "QueryFullProcessImageNameW", L"kernel32.dll" ));
+    auto pFunc = reinterpret_cast<fnQueryFullProcessImageNameW>(LOAD_IMPORT( "QueryFullProcessImageNameW", L"kernel32.dll" ));
     if (pFunc != nullptr)
         pFunc( GetCurrentProcess(), 0, imgName, &len );
     else

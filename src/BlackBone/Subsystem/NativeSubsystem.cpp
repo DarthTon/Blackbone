@@ -46,21 +46,21 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
     HMODULE hNtdll = GetModuleHandleW( L"ntdll.dll" );
     HMODULE hKernel32 = GetModuleHandleW( L"kernel32.dll" );
     
-    DynImport::load( "NtQueryInformationProcess",  hNtdll );
-    DynImport::load( "NtSetInformationProcess",    hNtdll );
-    DynImport::load( "NtQueryInformationThread",   hNtdll );
-    DynImport::load( "NtDuplicateObject",          hNtdll );
-    DynImport::load( "NtQueryObject",              hNtdll );  
-    DynImport::load( "NtQuerySection",             hNtdll );
-    DynImport::load( "RtlCreateActivationContext", hNtdll );
-    DynImport::load( "NtQueryVirtualMemory",       hNtdll );
-    DynImport::load( "NtCreateThreadEx",           hNtdll );
-    DynImport::load( "NtLockVirtualMemory",        hNtdll );
-    DynImport::load( "NtSuspendProcess",           hNtdll );
-    DynImport::load( "NtResumeProcess",            hNtdll );
-    DynImport::load( "Wow64GetThreadContext",      hKernel32 );
-    DynImport::load( "Wow64SetThreadContext",      hKernel32 );
-    DynImport::load( "Wow64SuspendThread",         hKernel32 );    
+    LOAD_IMPORT( "NtQueryInformationProcess",  hNtdll );
+    LOAD_IMPORT( "NtSetInformationProcess",    hNtdll );
+    LOAD_IMPORT( "NtQueryInformationThread",   hNtdll );
+    LOAD_IMPORT( "NtDuplicateObject",          hNtdll );
+    LOAD_IMPORT( "NtQueryObject",              hNtdll );  
+    LOAD_IMPORT( "NtQuerySection",             hNtdll );
+    LOAD_IMPORT( "RtlCreateActivationContext", hNtdll );
+    LOAD_IMPORT( "NtQueryVirtualMemory",       hNtdll );
+    LOAD_IMPORT( "NtCreateThreadEx",           hNtdll );
+    LOAD_IMPORT( "NtLockVirtualMemory",        hNtdll );
+    LOAD_IMPORT( "NtSuspendProcess",           hNtdll );
+    LOAD_IMPORT( "NtResumeProcess",            hNtdll );
+    LOAD_IMPORT( "Wow64GetThreadContext",      hKernel32 );
+    LOAD_IMPORT( "Wow64SetThreadContext",      hKernel32 );
+    LOAD_IMPORT( "Wow64SuspendThread",         hKernel32 );    
 }
 
 /*

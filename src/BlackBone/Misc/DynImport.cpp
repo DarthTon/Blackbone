@@ -3,9 +3,6 @@
 namespace blackbone
 {
 
-decltype(DynImport::_funcs)     DynImport::_funcs;
-decltype(DynImport::_mapGuard)  DynImport::_mapGuard;
-
 /// <summary>
 /// Load function into database
 /// </summary>

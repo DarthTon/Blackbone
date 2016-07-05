@@ -67,14 +67,14 @@ struct regDR7
     //
     // Breakpoint type/length
     //
-    uint32_t rw0  : 1;
-    uint32_t len0 : 1;
-    uint32_t rw1  : 1;
-    uint32_t len1 : 1;
-    uint32_t rw2  : 1;
-    uint32_t len2 : 1;
-    uint32_t rw3  : 1;
-    uint32_t len3 : 1;
+    uint32_t rw0  : 2;
+    uint32_t len0 : 2;
+    uint32_t rw1  : 2;
+    uint32_t len1 : 2;
+    uint32_t rw2  : 2;
+    uint32_t len2 : 2;
+    uint32_t rw3  : 2;
+    uint32_t len3 : 2;
 
     inline void setLocal( int idx, int val ) { idx == 0 ? l0   = val : (idx == 1 ? l1   = val : (idx == 2 ? l2   = val : l3   = val)); }
     inline void setRW   ( int idx, int val ) { idx == 0 ? rw0  = val : (idx == 1 ? rw1  = val : (idx == 2 ? rw2  = val : rw3  = val)); }

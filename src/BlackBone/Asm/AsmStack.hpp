@@ -1,7 +1,7 @@
 #pragma once
 
 #pragma warning(disable : 4100)
-#include "AsmJit/AsmJit.h"
+#include "../../../contrib/AsmJit/AsmJit.h"
 #pragma warning(default : 4100)
 #include "../Include/Macro.h"
 

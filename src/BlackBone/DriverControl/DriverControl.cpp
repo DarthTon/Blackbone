@@ -14,11 +14,11 @@ DriverControl::DriverControl()
 {
     HMODULE ntdll = GetModuleHandleW( L"ntdll.dll" );
 
-    DynImport::load( "NtLoadDriver", ntdll );
-    DynImport::load( "NtUnloadDriver", ntdll );
-    DynImport::load( "RtlDosPathNameToNtPathName_U", ntdll );
-    DynImport::load( "RtlInitUnicodeString", ntdll );
-    DynImport::load( "RtlFreeUnicodeString", ntdll );
+    LOAD_IMPORT( "NtLoadDriver", ntdll );
+    LOAD_IMPORT( "NtUnloadDriver", ntdll );
+    LOAD_IMPORT( "RtlDosPathNameToNtPathName_U", ntdll );
+    LOAD_IMPORT( "RtlInitUnicodeString", ntdll );
+    LOAD_IMPORT( "RtlFreeUnicodeString", ntdll );
 }
 
 

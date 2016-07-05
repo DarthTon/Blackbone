@@ -16,10 +16,10 @@ NtLdr::NtLdr( Process& proc )
 {
     HMODULE hNtdll = GetModuleHandleW( L"ntdll.dll" );
 
-    DynImport::load( "RtlInitUnicodeString",   hNtdll );
-    DynImport::load( "RtlHashUnicodeString",   hNtdll );
-    DynImport::load( "RtlUpcaseUnicodeChar",   hNtdll );
-    DynImport::load( "RtlEncodeSystemPointer", hNtdll );
+    LOAD_IMPORT( "RtlInitUnicodeString",   hNtdll );
+    LOAD_IMPORT( "RtlHashUnicodeString",   hNtdll );
+    LOAD_IMPORT( "RtlUpcaseUnicodeChar",   hNtdll );
+    LOAD_IMPORT( "RtlEncodeSystemPointer", hNtdll );
 }
 
 NtLdr::~NtLdr(void)

@@ -19,8 +19,8 @@ RemoteExec::RemoteExec( Process& proc )
     , _hWaitEvent( NULL )
     , _apcPatched( false )
 {
-    DynImport::load( "NtOpenEvent", L"ntdll.dll" );
-    DynImport::load( "NtCreateEvent", L"ntdll.dll" );
+    LOAD_IMPORT( "NtOpenEvent", L"ntdll.dll" );
+    LOAD_IMPORT( "NtCreateEvent", L"ntdll.dll" );
 }
 
 RemoteExec::~RemoteExec()
@@ -79,6 +79,7 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
     if (_userCode.Write( size, a->getCodeSize(), a->make() ) == STATUS_SUCCESS)
     {
         auto thread = _threads.CreateNew( _userCode.ptr<ptr_t>() + size, _userData.ptr<ptr_t>()/*, HideFromDebug*/ );
+        thread.Resume();
 
         dwResult = thread.Join();
         callResult = _userData.Read<uint64_t>( INTRET_OFFSET, 0 );

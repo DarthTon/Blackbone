@@ -15,10 +15,10 @@ NameResolve::NameResolve()
 {
     HMODULE ntdll = GetModuleHandleW( L"ntdll.dll" );
 
-    DynImport::load( "NtQuerySystemInformation", ntdll );
-    DynImport::load( "RtlDosApplyFileIsolationRedirection_Ustr", ntdll );
-    DynImport::load( "RtlInitUnicodeString", ntdll );
-    DynImport::load( "RtlFreeUnicodeString", ntdll );
+    LOAD_IMPORT( "NtQuerySystemInformation", ntdll );
+    LOAD_IMPORT( "RtlDosApplyFileIsolationRedirection_Ustr", ntdll );
+    LOAD_IMPORT( "RtlInitUnicodeString", ntdll );
+    LOAD_IMPORT( "RtlFreeUnicodeString", ntdll );
 }
 
 NameResolve::~NameResolve()
