@@ -3,7 +3,7 @@
 
 #include "../Config.h"
 #pragma warning(disable : 4100)
-#include <AsmJit/asmjit.h>
+#include "../../../contrib/AsmJit/AsmJit.h"
 #pragma warning(default : 4100)
 
 #include <memory>

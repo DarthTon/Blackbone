@@ -14,7 +14,7 @@ namespace blackbone
 ProcessCore::ProcessCore()
     : _native( nullptr )
 {
-    DynImport::load( "GetProcessDEPPolicy", L"kernel32.dll" );
+    LOAD_IMPORT( "GetProcessDEPPolicy", L"kernel32.dll" );
 }
 
 ProcessCore::~ProcessCore()

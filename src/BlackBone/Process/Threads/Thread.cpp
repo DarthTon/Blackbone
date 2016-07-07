@@ -225,6 +225,14 @@ int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
     if (!res)
         return -1;
 
+    // Check if HWBP is already present
+    for (int i = 0; i < 4; i++)
+    {
+        if ( (use64 && *(&context64.Dr0 + i) == addr && context64.Dr7 & (1ll << 2 * i)) || 
+            (!use64 && *(&context32.Dr0 + i) == addr && context32.Dr7 & (1ll << 2 * i)))
+            return i;
+    }
+
     // Get free DR
     int freeIdx = pDR7->getFreeIndex();
 
