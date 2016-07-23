@@ -58,6 +58,7 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
     LOAD_IMPORT( "NtLockVirtualMemory",        hNtdll );
     LOAD_IMPORT( "NtSuspendProcess",           hNtdll );
     LOAD_IMPORT( "NtResumeProcess",            hNtdll );
+    LOAD_IMPORT( "RtlImageNtHeader",           hNtdll );
     LOAD_IMPORT( "Wow64GetThreadContext",      hKernel32 );
     LOAD_IMPORT( "Wow64SetThreadContext",      hKernel32 );
     LOAD_IMPORT( "Wow64SuspendThread",         hKernel32 );    

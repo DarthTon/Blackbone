@@ -1,6 +1,7 @@
 #pragma once
 
 #include "LocalHook.hpp"
+#include "../Misc/DynImport.h"
 
 namespace blackbone
 {
@@ -66,21 +67,28 @@ public:
         // Modify VTable copy
         if (copyVtable)
         {
-            uintptr_t ccpad;
-            memset( &ccpad, 0xCC, sizeof(ccpad) );
-
             // Copy VTable
             if (vtableLen != 0)
             {
                 memcpy( this->_buf + 0x300, *ppVtable, vtableLen * sizeof( void* ) );
             }
-            else for (;; vtableLen++)
+            else 
             {
-                if ((*(void***)ppVtable)[vtableLen] == nullptr ||
-                    (*(void***)ppVtable)[vtableLen] == (void**)ccpad)
+                Process proc;
+                proc.Attach( GetCurrentProcessId() );
+                auto vptr = (*(uintptr_t**)ppVtable)[index];
+                auto mod = proc.modules().GetModule( vptr, false );
+                uintptr_t imageBase = static_cast<uintptr_t>(mod->baseAddress);
+                uintptr_t imageSzie = mod->size;
+
+                for (;; vtableLen++)
                 {
-                    memcpy( this->_buf + 0x300, *ppVtable, vtableLen * sizeof( void* ) );
-                    break;
+                    vptr = (*(uintptr_t**)ppVtable)[vtableLen];
+                    if (vptr < imageBase || vptr >= imageBase + imageSzie)
+                    {
+                        memcpy( this->_buf + 0x300, *ppVtable, vtableLen * sizeof( void* ) );
+                        break;
+                    }
                 }
             }
 

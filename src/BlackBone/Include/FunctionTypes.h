@@ -218,6 +218,11 @@ typedef NTSTATUS( NTAPI *fnRtlCreateActivationContext )(
     OUT PVOID*  ActCtx
     );
 
+// RtlImageNtHeader
+typedef PIMAGE_NT_HEADERS( NTAPI* fnRtlImageNtHeader )(
+    IN PVOID ModuleAddress
+    );
+
 // RtlInitUnicodeString
 typedef decltype(&RtlInitUnicodeString) fnRtlInitUnicodeString;
 
