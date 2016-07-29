@@ -79,11 +79,13 @@ public:
     /// Get module by base address
     /// </summary>
     /// <param name="modBase">Module base address</param>
+    /// <param name="strict">If true modBase must exactly match module base address</param>
     /// <param name="type">Module type. 32 bit or 64 bit</param>
     /// <param name="search">Saerch type.</param>
     /// <returns>Module data. nullptr if not found</returns>
     BLACKBONE_API const ModuleData* GetModule(
         module_t modBase,
+        bool strict = true,
         eModSeachType search = LdrList,
         eModType type = mt_default
         );

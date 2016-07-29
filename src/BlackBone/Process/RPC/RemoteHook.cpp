@@ -364,12 +364,20 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
         RemoteContext context( _memory, thd, ctx64, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
 
         // Execute user callback
-        auto hook = _hooks[addr];
+        auto& hook = _hooks[addr];
 
         if (hook.onExecute.classFn.classPtr && hook.onExecute.classFn.ptr != nullptr)
             hook.onExecute.classFn.ptr( hook.onExecute.classFn.classPtr, context );
         else if (hook.onExecute.freeFn != nullptr)
             hook.onExecute.freeFn( context );
+
+        // Raise exceptions upon return
+        if (hook.flags & returnHook)
+        {
+            hook.entryCtx = ctx64;
+            auto newReturn = context.hookReturn();
+            _retHooks.emplace( std::make_pair( newReturn, addr ) );
+        }
 
         // Resume execution
         DWORD flOld = 0;
@@ -383,13 +391,6 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
         ctx64.Rip -= sizeof( uint8_t );
         ctx64.EFlags |= 0x100;
         thd.SetContext( ctx64, true );
-
-        // Raise exceptions upon return
-        if(hook.flags & returnHook)
-        {
-            auto newReturn = context.hookReturn();
-            _retHooks.emplace( std::make_pair( newReturn, addr ) );
-        }
 
         return DBG_CONTINUE;
     }
@@ -450,7 +451,7 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
         // Execute user callback
         if(_hooks.count( addr ))
         {
-            auto hook = _hooks[addr];
+            auto& hook = _hooks[addr];
             if (hook.onExecute.classFn.classPtr && hook.onExecute.classFn.ptr != nullptr)
                 hook.onExecute.classFn.ptr( hook.onExecute.classFn.classPtr, context );
             else if (hook.onExecute.freeFn != nullptr)
@@ -459,6 +460,7 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
             // Raise exception upon return
             if (hook.flags & returnHook)
             {
+                hook.entryCtx = ctx64;
                 auto newReturn = context.hookReturn();
                 _retHooks.emplace( std::make_pair( newReturn, addr ) );
             }
@@ -558,14 +560,18 @@ DWORD RemoteHook::OnAccessViolation( const DEBUG_EVENT& DebugEv )
     if (_retHooks.count( addr ))
     {
         // Execute user callback
-        auto hook = _hooks[_retHooks[addr]];
+        auto& hook = _hooks[_retHooks[addr]];
 
         if (hook.flags & returnHook)
         {
+            RemoteContext fixedContext( _memory, thd, hook.entryCtx, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
+
             if (hook.onReturn.classFn.classPtr && hook.onReturn.classFn.ptr != nullptr)
-                hook.onReturn.classFn.ptr( hook.onExecute.classFn.classPtr, context );
+                hook.onReturn.classFn.ptr( hook.onExecute.classFn.classPtr, fixedContext );
             else if (hook.onReturn.freeFn != nullptr)
-                hook.onReturn.freeFn( context );
+                hook.onReturn.freeFn( fixedContext );
+
+            hook.entryCtx = { 0 };
         }
 
         _retHooks.erase( addr );

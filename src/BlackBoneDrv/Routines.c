@@ -723,11 +723,11 @@ NTSTATUS BBHookSSDT( IN ULONG index, IN PVOID newAddr, OUT PVOID *ppOldAddr )
 
         // Write jmp
         BBWriteTrampoline( pTrampoline, newAddr );
-        offset = (((ULONG_PTR)pTrampoline - (ULONG_PTR)pSSDT->ServiceTableBase) << 4) & 0xFFFFFFF0;
+        offset = ((((ULONG_PTR)pTrampoline - (ULONG_PTR)pSSDT->ServiceTableBase) << 4) & 0xFFFFFFF0) | (pSSDT->ParamTableBase[index] >> 2);
     }
     // Direct jump
     else
-        offset = (offset << 4) & 0xFFFFFFF0;
+        offset = ((offset << 4) & 0xFFFFFFF0) | (pSSDT->ParamTableBase[index] >> 2);
 
     // Update pointer
     ULONGLONG cr0 = __readcr0();
