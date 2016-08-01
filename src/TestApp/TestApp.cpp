@@ -9,11 +9,11 @@ void TestPEB( Process& proc )
 
     std::wcout << L"PEB info test\n";
 
-    auto ppeb32 = proc.core().peb( &peb32 );
+    auto ppeb32 = proc.core().peb32( &peb32 );
     std::wcout << L"PEB32 address 0x" << std::hex << ppeb32 
                << L". Ldr address 0x" << peb32.Ldr << std::endl;
 
-    auto ppeb64 = proc.core().peb( &peb64 );
+    auto ppeb64 = proc.core().peb64( &peb64 );
     std::wcout << L"PEB64 address 0x" << std::hex << ppeb64 
                << L". Ldr address 0x" << peb64.Ldr << std::endl << std::endl;
 

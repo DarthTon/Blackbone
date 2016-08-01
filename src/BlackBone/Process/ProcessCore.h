@@ -51,23 +51,23 @@ public:
     /// <summary>
     /// Get WOW64 PEB
     /// </summary>
-    /// <param name="ppeb">Retrieved PEB</param>
+    /// <param name="ppeb">Retrieved PEB32</param>
     /// <returns>PEB pointer</returns>
-    BLACKBONE_API inline ptr_t peb( _PEB32* ppeb ) { return _native->getPEB( ppeb ); }
+    BLACKBONE_API inline ptr_t peb32( _PEB32* ppeb = nullptr ) { return _native->getPEB( ppeb ); }
 
     /// <summary>
     /// Get native PEB
     /// </summary>
-    /// <param name="ppeb">Retrieved PEB</param>
+    /// <param name="ppeb">Retrieved PEB64</param>
     /// <returns>PEB pointer</returns>
-    BLACKBONE_API inline ptr_t peb( _PEB64* ppeb ) { return _native->getPEB( ppeb ); }
+    BLACKBONE_API inline ptr_t peb64( _PEB64* ppeb = nullptr ) { return _native->getPEB( ppeb ); }
 
     /// <summary>
     /// Get PEB
     /// </summary>
     /// <param name="ppeb">Retrieved PEB</param>
     /// <returns>PEB pointer</returns>
-    BLACKBONE_API inline ptr_t peb() { return peb( (PEB_T*)nullptr ); }
+    BLACKBONE_API inline ptr_t peb( PEB_T* ppeb = nullptr ) { return _native->getPEB( ppeb ); }
 
     /// <summary>
     /// Check if process is a protected process

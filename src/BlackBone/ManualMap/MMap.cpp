@@ -133,7 +133,18 @@ const ModuleData* MMap::MapImageInternal(
         if (_images.rbegin()->get()->peImage.pureIL() && !path.empty())
             FixManagedPath( _process.memory().Read<uintptr_t>( _process.core().peb() + 2 * WordSize ), path );
 
-        _process.memory().Write( _process.core().peb() + 2 * WordSize, WordSize, &mod->baseAddress );
+        // PEB64
+        _process.memory().Write( 
+            _process.core().peb64() + FIELD_OFFSET( _PEB64, ImageBaseAddress ),
+            sizeof( uint64_t ), &mod->baseAddress
+            );
+
+        //PEB32
+        if(_process.core().isWow64())
+            _process.memory().Write(
+                _process.core().peb32() + FIELD_OFFSET( _PEB32, ImageBaseAddress ),
+                sizeof( uint32_t ), &mod->baseAddress
+                );
     }
 
     auto wipeMemory = []( Process& proc, ImageContext* img, uintptr_t offset, uintptr_t size )

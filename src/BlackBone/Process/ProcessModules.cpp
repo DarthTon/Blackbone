@@ -152,8 +152,7 @@ const ModuleData* ProcessModules::GetMainModule()
     if (_core.native()->GetWow64Barrier().x86OS)
     {
         _PEB32 peb = { { { 0 } } };
-
-        if (_proc.core().peb( &peb ) == 0)
+        if (_proc.core().peb32( &peb ) == 0)
             return nullptr;
 
         return GetModule( peb.ImageBaseAddress );
@@ -161,8 +160,7 @@ const ModuleData* ProcessModules::GetMainModule()
     else
     {
         _PEB64 peb = { { { 0 } } };
-
-        if (_proc.core().peb( &peb ) == 0)
+        if (_proc.core().peb64( &peb ) == 0)
             return nullptr;
 
         return GetModule( peb.ImageBaseAddress );
