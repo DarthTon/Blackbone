@@ -466,7 +466,7 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
             }
 
             ctx64.ContextFlags = use64? CONTEXT64_CONTROL : WOW64_CONTEXT_CONTROL;
-            use64 ? ctx64.EFlags |= 0x100 : ctx32.EFlags |= 100;    // Single step
+            use64 ? ctx64.EFlags |= 0x100 : ctx32.EFlags |= 0x100;      // Single step
             _repatch[addr] = true;
         }
 
