@@ -465,7 +465,7 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
                 _retHooks.emplace( std::make_pair( newReturn, addr ) );
             }
 
-            ctx64.ContextFlags = use64? CONTEXT64_CONTROL : WOW64_CONTEXT_CONTROL;
+            ctx64.ContextFlags = use64 ? CONTEXT64_ALL : WOW64_CONTEXT_ALL;
             use64 ? ctx64.EFlags |= 0x100 : ctx32.EFlags |= 0x100;      // Single step
             _repatch[addr] = true;
         }
