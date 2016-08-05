@@ -229,8 +229,6 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
     RTL_OSVERSIONINFOEXW verInfo = { 0 };
     ULONG buildNo = 0;
 
-    UNREFERENCED_PARAMETER( w10Build );
-
     if (pData == NULL)
         return STATUS_INVALID_ADDRESS;
 
