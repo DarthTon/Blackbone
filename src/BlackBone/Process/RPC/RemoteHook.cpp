@@ -178,6 +178,7 @@ NTSTATUS RemoteHook::AddReturnHookP( uint64_t ptr, fnCallback newFn, const void*
 void RemoteHook::Remove( uint64_t ptr )
 {
     // Restore hooked function
+    CSLock lck( _lock );
     if (_hooks.count( ptr ))
     {
         auto& hook = _hooks[ptr];
