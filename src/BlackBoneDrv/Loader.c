@@ -753,7 +753,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
 
             // Copy sections
             for (PIMAGE_SECTION_HEADER pSection = (PIMAGE_SECTION_HEADER)(pNTHeader + 1);
-            pSection < (PIMAGE_SECTION_HEADER)(pNTHeader + 1) + pNTHeader->FileHeader.NumberOfSections;
+                pSection < (PIMAGE_SECTION_HEADER)(pNTHeader + 1) + pNTHeader->FileHeader.NumberOfSections;
                 pSection++)
             {
                 RtlCopyMemory(
@@ -778,6 +778,14 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
             status = STATUS_MEMORY_NOT_ALLOCATED;
         }
     }
+
+    // SEH support
+    /*if (NT_SUCCESS( status ))
+    {
+        //NTSTATUS( NTAPI* RtlInsertInvertedFunctionTable )(PVOID, SIZE_T) = (NTSTATUS( *)(PVOID, SIZE_T))((ULONG_PTR)GetKernelBase( NULL ) + 0x9B0A8);
+        NTSTATUS( NTAPI* RtlInsertInvertedFunctionTable )(PVOID, PVOID, SIZE_T) = (NTSTATUS( *)(PVOID, PVOID, SIZE_T))((ULONG_PTR)GetKernelBase( NULL ) + 0x11E4C0);
+        RtlInsertInvertedFunctionTable((PUCHAR)GetKernelBase( NULL ) + 0x1ED450, imageSection, pNTHeader->OptionalHeader.SizeOfImage );
+    }*/
 
     // Call entry point
     if (NT_SUCCESS( status ) && pNTHeader->OptionalHeader.AddressOfEntryPoint)

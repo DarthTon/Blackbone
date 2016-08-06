@@ -331,32 +331,32 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
             case WINVER_10:
 				if (verInfo.dwBuildNumber == 10586)
 				{
-					pData->KExecOpt = 0x1BF;
-					pData->Protection = 0x6B2;
-					pData->ObjTable = 0x418;
-					pData->VadRoot = 0x610;
+					pData->KExecOpt         = 0x1BF;
+					pData->Protection       = 0x6B2;
+					pData->ObjTable         = 0x418;
+					pData->VadRoot          = 0x610;
 					pData->NtCreateThdIndex = 0xB4;
-					pData->NtTermThdIndex = 0x53;
-					pData->PrevMode = 0x232;
-					pData->ExitStatus = 0x6E0;
-					pData->MiAllocPage = 0;
+					pData->NtTermThdIndex   = 0x53;
+					pData->PrevMode         = 0x232;
+					pData->ExitStatus       = 0x6E0;
+					pData->MiAllocPage      = 0;
 					if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable)))
 						pData->ExRemoveTable -= 0x5C;
 					break;
 				}
 				else if (verInfo.dwBuildNumber == 14393)
 				{
-					pData->KExecOpt = 0x1BF;
-					pData->Protection = 0x6C2;
-					pData->ObjTable = 0x418;
-					pData->VadRoot = 0x620;
+					pData->KExecOpt         = 0x1BF;
+					pData->Protection       = 0x6C2;
+					pData->ObjTable         = 0x418;
+					pData->VadRoot          = 0x620;
 					pData->NtCreateThdIndex = 0xB6;
-					pData->NtTermThdIndex = 0x53;
-					pData->PrevMode = 0x232;
-					pData->ExitStatus = 0x6F0;
-					pData->MiAllocPage = 0;
+					pData->NtTermThdIndex   = 0x53;
+					pData->PrevMode         = 0x232;
+					pData->ExitStatus       = 0x6F0;
+					pData->MiAllocPage      = 0;
 					if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable)))
-						pData->ExRemoveTable -= 0x9C;
+						pData->ExRemoveTable -= 0x60;
 					break;
 				}
 				else

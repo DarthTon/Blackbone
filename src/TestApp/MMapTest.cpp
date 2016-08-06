@@ -29,7 +29,7 @@ void TestMMap()
     std::wcout << L"Manual image mapping test\n";
     std::wcout << L"Trying to map C:\\windows\\system32\\calc.exe into current process\n";
 
-    eLoadFlags flags = ManualImports | RebaseProcess | NoDelayLoad;
+    eLoadFlags flags = ManualImports | RebaseProcess;
 
     if (thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", flags, callback ) == 0)
     {
