@@ -70,6 +70,19 @@ NTSTATUS Process::Attach( HANDLE hProc )
 }
 
 /// <summary>
+/// Attach to existing process
+/// </summary>
+/// <param name="name">Process name</param>
+/// <param name="access">Access mask</param>
+/// <returns>Status code</returns>
+NTSTATUS Process::Attach( const wchar_t* name, DWORD access /*= DEFAULT_ACCESS_P*/ )
+{
+    std::vector<DWORD> pids;
+    EnumByName( name, pids );
+    return pids.empty() ? STATUS_NOT_FOUND : Attach( pids.front(), access );
+}
+
+/// <summary>
 /// Create new process and attach to it
 /// </summary>
 /// <param name="path">Executable path</param>

@@ -95,6 +95,14 @@ public:
     /// <summary>
     /// Attach to existing process
     /// </summary>
+    /// <param name="name">Process name</param>
+    /// <param name="access">Access mask</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Attach( const wchar_t* name, DWORD access = DEFAULT_ACCESS_P );
+
+    /// <summary>
+    /// Attach to existing process
+    /// </summary>
     /// <param name="pid">Process handle</param>
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS Attach( HANDLE hProc );
