@@ -178,6 +178,7 @@ NTSTATUS RemoteHook::AddReturnHookP( uint64_t ptr, fnCallback newFn, const void*
 void RemoteHook::Remove( uint64_t ptr )
 {
     // Restore hooked function
+    CSLock lck( _lock );
     if (_hooks.count( ptr ))
     {
         auto& hook = _hooks[ptr];
@@ -252,9 +253,9 @@ DWORD RemoteHook::EventThread()
     // 
     // Reset debug flag in PEB
     //
-    _memory.Write( _core.peb( (_PEB64*)nullptr ) + FIELD_OFFSET( _PEB64, BeingDebugged ), uint8_t( 0 ) );
+    _memory.Write( _core.peb64() + FIELD_OFFSET( _PEB64, BeingDebugged ), uint8_t( 0 ) );
     if (!_x64Target)
-        _memory.Write( _core.peb( (_PEB32*)nullptr ) + FIELD_OFFSET( _PEB32, BeingDebugged ), uint8_t( 0 ) );
+        _memory.Write( _core.peb32() + FIELD_OFFSET( _PEB32, BeingDebugged ), uint8_t( 0 ) );
 
     _active = true;
 
@@ -465,8 +466,8 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
                 _retHooks.emplace( std::make_pair( newReturn, addr ) );
             }
 
-            ctx64.ContextFlags = use64? CONTEXT64_CONTROL : WOW64_CONTEXT_CONTROL;
-            use64 ? ctx64.EFlags |= 0x100 : ctx32.EFlags |= 100;    // Single step
+            ctx64.ContextFlags = use64 ? CONTEXT64_ALL : WOW64_CONTEXT_ALL;
+            use64 ? ctx64.EFlags |= 0x100 : ctx32.EFlags |= 0x100;      // Single step
             _repatch[addr] = true;
         }
 

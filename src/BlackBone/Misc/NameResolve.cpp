@@ -125,7 +125,7 @@ NTSTATUS NameResolve::ResolvePath(
     std::wstring filename = Utils::StripPath( path );
 
     // 'ext-ms-' are resolved the same way 'api-ms-' are
-    if (filename.find( L"ext-ms-" ) == 0)
+    if (!IsWindows10OrGreater() && filename.find( L"ext-ms-" ) == 0)
         filename.erase( 0, 4 );
 
     //

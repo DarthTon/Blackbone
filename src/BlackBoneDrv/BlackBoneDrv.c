@@ -226,11 +226,8 @@ NTSTATUS BBGetBuildNO( OUT PULONG pBuildNo )
 NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
 {
     NTSTATUS status = STATUS_SUCCESS;
-    const ULONG w10Build = 10586;
     RTL_OSVERSIONINFOEXW verInfo = { 0 };
     ULONG buildNo = 0;
-
-    UNREFERENCED_PARAMETER( w10Build );
 
     if (pData == NULL)
         return STATUS_INVALID_ADDRESS;
@@ -260,7 +257,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
     #elif defined (_WIN10_)
-        if (ver_short != WINVER_10 || verInfo.dwBuildNumber != w10Build)
+        if (ver_short != WINVER_10)
             return STATUS_NOT_SUPPORTED;
     #endif
 
@@ -330,21 +327,42 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->ExRemoveTable -= 0x5E;
                 break;
 
-                // Windows 10, build 10586
+            // Windows 10, build 14393/10586
             case WINVER_10:
-                pData->KExecOpt         = 0x1BF;
-                pData->Protection       = 0x6B2;
-                pData->ObjTable         = 0x418;
-                pData->VadRoot          = 0x610;
-                pData->NtCreateThdIndex = 0xB4;
-                pData->NtTermThdIndex   = 0x53;
-                pData->PrevMode         = 0x232;
-                pData->ExitStatus       = 0x6E0;
-                pData->MiAllocPage      = 0;
-                if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable ) ))
-                    pData->ExRemoveTable   -= 0x5C;
-                break;
-
+				if (verInfo.dwBuildNumber == 10586)
+				{
+					pData->KExecOpt         = 0x1BF;
+					pData->Protection       = 0x6B2;
+					pData->ObjTable         = 0x418;
+					pData->VadRoot          = 0x610;
+					pData->NtCreateThdIndex = 0xB4;
+					pData->NtTermThdIndex   = 0x53;
+					pData->PrevMode         = 0x232;
+					pData->ExitStatus       = 0x6E0;
+					pData->MiAllocPage      = 0;
+					if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable)))
+						pData->ExRemoveTable -= 0x5C;
+					break;
+				}
+				else if (verInfo.dwBuildNumber == 14393)
+				{
+					pData->KExecOpt         = 0x1BF;
+					pData->Protection       = 0x6C2;
+					pData->ObjTable         = 0x418;
+					pData->VadRoot          = 0x620;
+					pData->NtCreateThdIndex = 0xB6;
+					pData->NtTermThdIndex   = 0x53;
+					pData->PrevMode         = 0x232;
+					pData->ExitStatus       = 0x6F0;
+					pData->MiAllocPage      = 0;
+					if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable)))
+						pData->ExRemoveTable -= 0x60;
+					break;
+				}
+				else
+				{
+					return STATUS_NOT_SUPPORTED;
+				}
             default:
                 break;
         }

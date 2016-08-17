@@ -162,15 +162,12 @@ public:
             case 0:
                 _ctx.Rcx = val;
                 break;
-
             case 1:
                 _ctx.Rdx = val;
                 break;
-
             case 2:
                 _ctx.R8 = val;
                 break;
-
             case 3:
                 _ctx.R9 = val;
                 break;
