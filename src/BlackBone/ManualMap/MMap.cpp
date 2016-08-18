@@ -813,42 +813,51 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
     bool partial = (pImage->flags & PartialExcept) != 0;
 
 #ifdef USE64
-    size_t size = pImage->peImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_EXCEPTION );
-    auto pExpTable = reinterpret_cast<PIMAGE_RUNTIME_FUNCTION_ENTRY>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXCEPTION ));
+    // Try RtlIsertInvertedTable
+    bool safeseh = false;
+    if (!_process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->peImage.imageSize(), safeseh ))
+    {
+        // Retry with documented method
+        size_t size = pImage->peImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_EXCEPTION );
+        auto pExpTable = reinterpret_cast<PIMAGE_RUNTIME_FUNCTION_ENTRY>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXCEPTION ));
 
-    // Invoke RtlAddFunctionTable
-    if(pExpTable)
-    {     
-        AsmJitHelper a;
-        uint64_t result = 0;
+        // Invoke RtlAddFunctionTable
+        if (pExpTable)
+        {
+            AsmJitHelper a;
+            uint64_t result = 0;
 
-        pImage->pExpTableAddr = REBASE( pExpTable, pImage->peImage.base(), pImage->imgMem.ptr<ptr_t>() );
-        auto pAddTable = _process.modules().GetExport( 
-            _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
-            "RtlAddFunctionTable" 
+            pImage->pExpTableAddr = REBASE( pExpTable, pImage->peImage.base(), pImage->imgMem.ptr<ptr_t>() );
+            auto pAddTable = _process.modules().GetExport(
+                _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
+                "RtlAddFunctionTable"
             );
 
-        a.GenPrologue();
-        a.GenCall( 
-            static_cast<uintptr_t>(pAddTable.procAddress), {
-            pImage->pExpTableAddr,
-            size / sizeof( IMAGE_RUNTIME_FUNCTION_ENTRY ),
-            pImage->imgMem.ptr<uintptr_t>() }
-        );
+            a.GenPrologue();
+            a.GenCall(
+                static_cast<uintptr_t>(pAddTable.procAddress), {
+                pImage->pExpTableAddr,
+                size / sizeof( IMAGE_RUNTIME_FUNCTION_ENTRY ),
+                pImage->imgMem.ptr<uintptr_t>() }
+            );
 
-        _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
-        a.GenEpilogue();
+            _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
+            a.GenEpilogue();
 
-        auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-        if (!NT_SUCCESS( status ))
-            return status;
+            auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
+            if (!NT_SUCCESS( status ))
+                return status;
 
-        return (pImage->flags & CreateLdrRef) ? STATUS_SUCCESS : 
-            MExcept::CreateVEH( pImage->imgMem.ptr<uintptr_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
+            return (pImage->flags & CreateLdrRef) ? STATUS_SUCCESS :
+                MExcept::CreateVEH( pImage->imgMem.ptr<uintptr_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
+        }
+        // No exception table
+        else
+            return STATUS_NOT_FOUND;
     }
-    // No exception table
-    else
-        return STATUS_NOT_FOUND;
+
+    return (safeseh || pImage->flags & CreateLdrRef) ? STATUS_SUCCESS :
+        MExcept::CreateVEH( pImage->imgMem.ptr<uintptr_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
 #else
     bool safeseh = false;
     if (!_process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->peImage.imageSize(), safeseh ))

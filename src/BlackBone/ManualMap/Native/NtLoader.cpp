@@ -847,7 +847,22 @@ bool NtLdr::ScanPatterns( )
         ps.Search( pStart, scanSize, foundData );
 
         if (!foundData.empty())
+        {
             _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x43);
+            foundData.clear();
+        }
+
+        // RtlInsertInvertedFunctionTable
+        // 8B C3 2B D3 48 8D 48 01
+        PatternSearch ps2( "\x8B\xC3\x2B\xD3\x48\x8D\x48\x01" );
+        ps2.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+        {
+            _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(foundData.front() - 0x84);
+            if (IsWindows10OrGreater())
+                _LdrpInvertedFunctionTable = *reinterpret_cast<int32_t*>(foundData.front() - 0x27 + 3) + (foundData.front() - 0x27 + 7);
+        }
     #else
         // RtlInsertInvertedFunctionTable
         // 53 56 57 8B DA 8B F9 50 
