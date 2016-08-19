@@ -90,7 +90,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
     _loadStatus = LoadDriver( DRIVER_SVC_NAME, path );
     if (!NT_SUCCESS( _loadStatus ))
     {
-        BLACBONE_TRACE( L"Failed to load driver %ls. Status 0x%X", path.c_str(), _loadStatus );
+        BLACKBONE_TRACE( L"Failed to load driver %ls. Status 0x%X", path.c_str(), _loadStatus );
         return LastNtStatus( _loadStatus );
     }
 
@@ -104,7 +104,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
     if (_hDriver == INVALID_HANDLE_VALUE)
     {
         _loadStatus = LastNtStatus();
-        BLACBONE_TRACE( L"Failed to open driver handle. Status 0x%X", _loadStatus );
+        BLACKBONE_TRACE( L"Failed to open driver handle. Status 0x%X", _loadStatus );
         return _loadStatus;
     }
 

@@ -1,5 +1,10 @@
 #pragma once
 
+// Lib/Dll switch
+#if !defined(BLACKBONE_EXPORTS) && !defined(BLACKBONE_IMPORTS) && !defined(BLACKBONE_STATIC)
+#define BLACKBONE_STATIC
+#endif
+
 #if defined(_MSC_VER)
 
     #define COMPILER_MSVC
@@ -27,4 +32,5 @@
 #else
     #error "Unknown or unsupported platform"
 #endif
+
 

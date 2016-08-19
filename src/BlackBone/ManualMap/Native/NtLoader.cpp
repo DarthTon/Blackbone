@@ -1024,28 +1024,28 @@ bool NtLdr::ScanPatterns( )
     // 
 #ifndef BLACBONE_NO_TRACE
     if (_LdrpHashTable == 0)
-        BLACBONE_TRACE( "NativeLdr: LdrpHashTable not found" );
+        BLACKBONE_TRACE( "NativeLdr: LdrpHashTable not found" );
     if (IsWindows8OrGreater() && _LdrpModuleIndexBase == 0)
-        BLACBONE_TRACE( "NativeLdr: LdrpModuleIndexBase not found" );
+        BLACKBONE_TRACE( "NativeLdr: LdrpModuleIndexBase not found" );
     if (_LdrHeapBase == 0)
-        BLACBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
+        BLACKBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
     if (_LdrpHandleTlsData == 0)
-        BLACBONE_TRACE( "NativeLdr: LdrpHandleTlsData not found" );
+        BLACKBONE_TRACE( "NativeLdr: LdrpHandleTlsData not found" );
 #ifdef USE64
     if (IsWindows7OrGreater() && !IsWindows8OrGreater())
     {
         if (_LdrKernel32PatchAddress == 0)
-            BLACBONE_TRACE( "NativeLdr: LdrKernel32PatchAddress not found" );
+            BLACKBONE_TRACE( "NativeLdr: LdrKernel32PatchAddress not found" );
         if (_APC64PatchAddress == 0)
-            BLACBONE_TRACE( "NativeLdr: APC64PatchAddress not found" );
+            BLACKBONE_TRACE( "NativeLdr: APC64PatchAddress not found" );
     }
 #else
     if (_LdrpInvertedFunctionTable == 0)
-        BLACBONE_TRACE( "NativeLdr: LdrpInvertedFunctionTable not found" );
+        BLACKBONE_TRACE( "NativeLdr: LdrpInvertedFunctionTable not found" );
     if (_RtlInsertInvertedFunctionTable == 0)
-        BLACBONE_TRACE( "NativeLdr: RtlInsertInvertedFunctionTable not found" );
+        BLACKBONE_TRACE( "NativeLdr: RtlInsertInvertedFunctionTable not found" );
     if (IsWindows8Point1OrGreater() && _LdrProtectMrdata == 0)
-        BLACBONE_TRACE( "NativeLdr: LdrProtectMrdata not found" );
+        BLACKBONE_TRACE( "NativeLdr: LdrProtectMrdata not found" );
 #endif
 #endif
     return true;

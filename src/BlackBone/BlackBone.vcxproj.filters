@@ -438,5 +438,8 @@
     <ClInclude Include="Include\ApiSet.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="Process\MultPtr.hpp">
+      <Filter>Process</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
