@@ -141,6 +141,7 @@ typedef enum _WinVer
     WINVER_8     = 0x0620,
     WINVER_81    = 0x0630,
     WINVER_10    = 0x0A00,
+    WINVER_10_AU = 0x0A00,
 } WinVer;
 
 extern PLIST_ENTRY PsLoadedModuleList;
@@ -165,6 +166,9 @@ typedef struct _DYNAMIC_DATA
     ULONG ExitStatus;       // ETHREAD::ExitStatus
     ULONG MiAllocPage;      // MiAllocateDriverPage offset
     ULONG ExRemoveTable;    // ExRemoveHandleTable offset
+
+    ULONG_PTR DYN_PDE_BASE; // Win10 AU relocated PDE base VA
+    ULONG_PTR DYN_PTE_BASE; // Win10 AU relocated PTE base VA
 } DYNAMIC_DATA, *PDYNAMIC_DATA;
 
 

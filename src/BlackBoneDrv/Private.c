@@ -232,19 +232,31 @@ PVOID GetSSDTEntry( IN ULONG index )
 }
 
 /// <summary>
-/// Get page hardware PTE
+/// Get page hardware PTE.
 /// Address must be valid, otherwise bug check is imminent
 /// </summary>
 /// <param name="pAddress">Target address</param>
 /// <returns>Found PTE</returns>
 PMMPTE GetPTEForVA( IN PVOID pAddress )
 {
-    // Check if large page
-    PMMPTE pPDE = MiGetPdeAddress( pAddress );
-    if (pPDE->u.Hard.LargePage)
-        return pPDE;
+    if (dynData.ver == WINVER_10_AU)
+    {
+        // Check if large page
+        PMMPTE pPDE = (PMMPTE)(((((ULONG_PTR)pAddress >> PDI_SHIFT) << PTE_SHIFT) & 0x3FFFFFF8ull) + dynData.DYN_PDE_BASE);
+        if (pPDE->u.Hard.LargePage)
+            return pPDE;
 
-    return MiGetPteAddress( pAddress );
+        return (PMMPTE)(((((ULONG_PTR)pAddress >> PTI_SHIFT) << PTE_SHIFT) & 0x7FFFFFFFF8ull) + dynData.DYN_PTE_BASE);
+    }
+    else
+    {
+        // Check if large page
+        PMMPTE pPDE = MiGetPdeAddress( pAddress );
+        if (pPDE->u.Hard.LargePage)
+            return pPDE;
+
+        return MiGetPteAddress( pAddress );
+    }
 }
 
 VOID DpcRoutine( KDPC *pDpc, void *pContext, void *pArg1, void *pArg2 )
