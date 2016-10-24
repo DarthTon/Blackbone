@@ -155,6 +155,7 @@ private:
     CriticalSection& _cs;
 };
 
+#if _MSC_VER >= 1900 
 namespace tuple_detail
 {
     template<typename T, typename F, size_t... Is>
@@ -174,5 +175,5 @@ namespace tuple_detail
         visit_each( from, func, std::index_sequence_for<Ts...>() );
     }
 }
-
+#endif
 }

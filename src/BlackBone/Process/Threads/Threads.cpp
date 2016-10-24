@@ -97,7 +97,7 @@ Thread* ProcessThreads::getMain()
         }
     }
 
-    return pMain;
+    return pMain ? pMain : &_threads[0];
 }
 
 /// <summary>
