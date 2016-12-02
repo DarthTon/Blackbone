@@ -18,3 +18,4 @@ void TestMMapFromMem();
 void TestRemoteCall();
 void TestDriver();
 void TestRemoteMem();
+void TestMultiPtr();

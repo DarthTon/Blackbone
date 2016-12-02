@@ -44,10 +44,10 @@ inline void DoTrace( const Ch* fmt, ... )
     va_end( va_args );
 }
 
-#define BLACBONE_TRACE(fmt, ...) DoTrace(fmt, ##__VA_ARGS__)
+#define BLACKBONE_TRACE(fmt, ...) DoTrace(fmt, ##__VA_ARGS__)
 
 #else
-#define BLACBONE_TRACE(...)
+#define BLACKBONE_TRACE(...)
 #endif
 
 }

@@ -87,8 +87,8 @@ private:
     DynImport( const DynImport& ) = delete;
 
 private:
-    BLACKBONE_API std::unordered_map<std::string, FARPROC> _funcs;     // function database
-    BLACKBONE_API CriticalSection _mapGuard;                           // function database guard
+    std::unordered_map<std::string, FARPROC> _funcs;    // function database
+    CriticalSection _mapGuard;                          // function database guard
 };
 
 // Syntax sugar

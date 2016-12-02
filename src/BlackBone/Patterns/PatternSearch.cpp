@@ -209,9 +209,9 @@ size_t PatternSearch::SearchRemoteWhole( Process& remote, bool useWildcard, uint
             continue;
 
         if (useWildcard)
-            Search( buf, static_cast<size_t>(mbi.RegionSize), out, memptr );
-        else
             Search( wildcard, buf, static_cast<size_t>(mbi.RegionSize), out, memptr );
+        else
+            Search( buf, static_cast<size_t>(mbi.RegionSize), out, memptr );
     }
 
     VirtualFree( buf, 0, MEM_RELEASE );

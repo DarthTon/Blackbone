@@ -74,7 +74,7 @@ NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType m
     if (!_pVEHCode.valid())
         return LastNtStatus();
 
-    BLACBONE_TRACE( "ManualMap: Vectored hander: 0x%p\n", _pVEHCode.ptr() );
+    BLACKBONE_TRACE( "ManualMap: Vectored hander: 0x%p\n", _pVEHCode.ptr() );
 
     asmjit::Label lExit  = a->newLabel();
     asmjit::Label lLoop1 = a->newLabel();

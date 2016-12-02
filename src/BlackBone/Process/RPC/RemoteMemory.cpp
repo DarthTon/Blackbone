@@ -310,12 +310,12 @@ void RemoteMemory::HookThread()
         // Update mapping
         if (opData.allocType == MemVirtualAlloc || opData.allocType == MemMapSection)
         {
-            BLACBONE_TRACE( L"Allocated 0x%x bytes at %p", opData.allocSize, opData.allocAddress );
+            BLACKBONE_TRACE( L"Allocated 0x%x bytes at %p", opData.allocSize, opData.allocAddress );
             Map( opData.allocAddress, opData.allocSize );
         }
         else
         {
-            BLACBONE_TRACE( L"Freed 0x%x bytes at %p", opData.allocSize, opData.allocAddress );
+            BLACKBONE_TRACE( L"Freed 0x%x bytes at %p", opData.allocSize, opData.allocAddress );
             Unmap( opData.allocAddress, opData.allocSize );
         }
     }

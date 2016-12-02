@@ -47,6 +47,7 @@ int main( int /*argc*/, char* /*argv*/[] )
 
     TestPEB( proc );
     TestTEB( proc );
+    TestMultiPtr();
     TestPatterns();
     TestLocalHook();
     TestRemoteCall();

@@ -82,12 +82,13 @@ public:
         buffer( cArray.data(), cArray.size() * sizeof Arg_t );
     }
 
+#if _MSC_VER >= 1900 
     template<typename... Args>
     explicit CustomArgs_t( std::tuple<Args...>&& cTuple )
     {
         tuple_detail::copyTuple( cTuple, _buffer );
     }
-
+#endif
     /// <summary>Gets the size.</summary>
     /// <returns>An size_t.</returns>
     uint64_t size() const {

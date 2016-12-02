@@ -45,7 +45,11 @@ void TestRemoteHook()
     {
         std::wcout << L"Found. Attaching to process " << std::dec << found.front() << std::endl;
 
-        hclass.procTaskMgr.Attach( found.front() );
+        if (!NT_SUCCESS( hclass.procTaskMgr.Attach( found.front() ) ))
+        {
+            std::wcout << L"Failed to attach to taskmgr.exe...\n\n";
+            return;
+        }
 
         if (hclass.procTaskMgr.core().native()->GetWow64Barrier().type == wow_32_64)
         {

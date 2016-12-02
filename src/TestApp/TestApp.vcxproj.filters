@@ -9,6 +9,7 @@
     <ClCompile Include="RemoteMemTest.cpp" />
     <ClCompile Include="LocalHookTest.cpp" />
     <ClCompile Include="PatternTest.cpp" />
+    <ClCompile Include="MultiPtrTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Tests.h" />
