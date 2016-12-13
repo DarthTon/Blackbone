@@ -61,6 +61,13 @@ NTSTATUS BBFileExists( IN PUNICODE_STRING path );
 /// <returns>Status code</returns>
 NTSTATUS BBSearchPattern( IN PCUCHAR pattern, IN UCHAR wildcard, IN ULONG_PTR len, IN const VOID* base, IN ULONG_PTR size, OUT PVOID* ppFound );
 
+/// <summary>
+/// Setup image security cookie
+/// </summary>
+/// <param name="imageBase">Image base</param>
+/// <returns>Status code</returns>
+NTSTATUS BBCreateCookie( IN PVOID imageBase );
+
 //
 // Machine code generation routines
 //
