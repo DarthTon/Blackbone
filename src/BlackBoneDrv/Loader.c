@@ -787,6 +787,10 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
         RtlInsertInvertedFunctionTable((PUCHAR)GetKernelBase( NULL ) + 0x1ED450, imageSection, pNTHeader->OptionalHeader.SizeOfImage );
     }*/
 
+    // Initialize kernel security cookie
+	if (NT_SUCCESS( status ))
+		BBCreateCookie( imageSection );
+    
     // Call entry point
     if (NT_SUCCESS( status ) && pNTHeader->OptionalHeader.AddressOfEntryPoint)
     {
