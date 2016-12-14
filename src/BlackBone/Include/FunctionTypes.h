@@ -218,6 +218,14 @@ typedef NTSTATUS( NTAPI *fnRtlCreateActivationContext )(
     OUT PVOID*  ActCtx
     );
 
+typedef NTSTATUS( NTAPI* fnNtQueueApcThread )(
+    IN HANDLE ThreadHandle,
+    IN PVOID ApcRoutine, /*PKNORMAL_ROUTINE*/
+    IN PVOID NormalContext,
+    IN PVOID SystemArgument1,
+    IN PVOID SystemArgument2
+    );
+
 // RtlImageNtHeader
 typedef PIMAGE_NT_HEADERS( NTAPI* fnRtlImageNtHeader )(
     IN PVOID ModuleAddress

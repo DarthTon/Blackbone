@@ -21,6 +21,7 @@ RemoteExec::RemoteExec( Process& proc )
 {
     LOAD_IMPORT( "NtOpenEvent", L"ntdll.dll" );
     LOAD_IMPORT( "NtCreateEvent", L"ntdll.dll" );
+    LOAD_IMPORT( "NtQueueApcThread", L"ntdll.dll" );
 }
 
 RemoteExec::~RemoteExec()
@@ -137,7 +138,9 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
 #endif
 
     // Execute code in thread context
-    if (QueueUserAPC( _userCode.ptr<PAPCFUNC>(), _hWorkThd.handle(), _userCode.ptr<ULONG_PTR>() ))
+    // TODO: Find out why am I passing pRemoteCode as an argument???
+    auto pRemoteCode = _userCode.ptr<PVOID>();
+    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueueApcThread, _hWorkThd.handle(), pRemoteCode, pRemoteCode, nullptr, nullptr ) ))
     {
         dwResult = WaitForSingleObject( _hWaitEvent, 30 * 1000 /*wait 30s*/ );
         callResult = _userData.Read<uint64_t>( RET_OFFSET, 0 );

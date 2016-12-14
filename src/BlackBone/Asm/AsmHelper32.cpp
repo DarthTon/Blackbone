@@ -37,7 +37,7 @@ void AsmHelper32::GenPrologue( bool switchMode /*= false*/ )
 /// </summary>
 /// <param name="switchMode">Unused</param>
 /// <param name="retSize">Stack change value</param>
-void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= WordSize */ )
+void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= 0xC */ )
 {
     if (retSize == -1)
         retSize = WordSize;
