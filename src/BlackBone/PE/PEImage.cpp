@@ -383,46 +383,14 @@ void PEImage::GetExports( vecExports& exports )
 /// <param name="index">Directory index</param>
 /// <param name="keepRelative">Keep address relative to image base</param>
 /// <returns>Directory address</returns>
-size_t PEImage::DirectoryAddress( int index, bool keepRelative /*= false*/ ) const
+uintptr_t PEImage::DirectoryAddress( int index, AddressType type /*= VA*/ ) const
 {
     // Sanity check
     if (index < 0 || index >= IMAGE_NUMBEROF_DIRECTORY_ENTRIES)
         return 0;
 
-    const IMAGE_DATA_DIRECTORY* idd = _is64 ? _pImageHdr64->OptionalHeader.DataDirectory 
-                                            : _pImageHdr32->OptionalHeader.DataDirectory;
-
-    if (idd[index].VirtualAddress == 0)
-        return 0;
-    else
-        return ResolveRVAToVA( idd[index].VirtualAddress, keepRelative );
-}
-
-/// <summary>
-/// Resolve virtual memory address to physical file offset
-/// </summary>
-/// <param name="Rva">Memory address</param>
-/// <param name="keepRelative">Keep address relative to file start</param>
-/// <returns>Resolved address</returns>
-uintptr_t PEImage::ResolveRVAToVA( uintptr_t Rva, bool keepRelative /*= false*/ ) const
-{
-    if (_isPlainData)
-    {
-        for (auto& sec : _sections)
-        {
-            if (Rva >= sec.VirtualAddress && Rva < sec.VirtualAddress + sec.Misc.VirtualSize)
-            {
-                if (keepRelative)
-                    return  (Rva - sec.VirtualAddress + sec.PointerToRawData);
-                else
-                    return reinterpret_cast<uintptr_t>(_pFileBase) + (Rva - sec.VirtualAddress + sec.PointerToRawData);
-            }
-        }
-
-        return 0;
-    }
-    else
-        return (keepRelative ? Rva : (reinterpret_cast<uintptr_t>(_pFileBase) + Rva));
+    const auto idd = _is64 ? _pImageHdr64->OptionalHeader.DataDirectory  : _pImageHdr32->OptionalHeader.DataDirectory;
+    return idd[index].VirtualAddress == 0 ? 0 : ResolveRVAToVA( idd[index].VirtualAddress, type );
 }
 
 /// <summary>
@@ -440,6 +408,43 @@ size_t PEImage::DirectorySize( int index ) const
     return idd[index].VirtualAddress != 0 ? static_cast<size_t>(idd[index].Size) : 0;
 }
 
+
+/// <summary>
+/// Resolve virtual memory address to physical file offset
+/// </summary>
+/// <param name="Rva">Memory address</param>
+/// <param name="keepRelative">Keep address relative to file start</param>
+/// <returns>Resolved address</returns>
+uintptr_t PEImage::ResolveRVAToVA( uintptr_t Rva, AddressType type /*= VA*/ ) const
+{
+    switch (type)
+    {
+    case blackbone::pe::RVA:
+        return Rva;
+
+    case blackbone::pe::VA:
+    case blackbone::pe::RPA:
+        if (_isPlainData)
+        {
+            for (auto& sec : _sections)
+            {
+                if (Rva >= sec.VirtualAddress && Rva < sec.VirtualAddress + sec.Misc.VirtualSize)
+                    if (type == VA)
+                        return reinterpret_cast<uintptr_t>(_pFileBase) + Rva - sec.VirtualAddress + sec.PointerToRawData;
+                    else
+                        return Rva - sec.VirtualAddress + sec.PointerToRawData;
+            }
+
+            return 0;
+        }
+        else
+            return (type == VA) ? (reinterpret_cast<uintptr_t>(_pFileBase) + Rva) : Rva;
+
+    default:
+        return 0;
+    }
+
+}
 
 /// <summary>
 /// Retrieve image TLS callbacks

@@ -23,6 +23,13 @@ namespace blackbone
 namespace pe
 {
 
+enum AddressType
+{
+    RVA,    // Relative virtual
+    VA,     // Absolute virtual
+    RPA,    // Relative physical
+};
+
 // Relocation block information
 struct RelocData
 {
@@ -150,7 +157,7 @@ public:
     /// <param name="index">Directory index</param>
     /// <param name="keepRelative">Keep address relative to image base</param>
     /// <returns>Directory address</returns>
-    BLACKBONE_API size_t DirectoryAddress( int index, bool keepRelative = false ) const;
+    BLACKBONE_API uintptr_t DirectoryAddress( int index, AddressType type = VA ) const;
 
     /// <summary>
     /// Get data directory size
@@ -163,9 +170,9 @@ public:
     /// Resolve virtual memory address to physical file offset
     /// </summary>
     /// <param name="Rva">Memory address</param>
-    /// <param name="keepRelative">Keep address relative to file start</param>
+    /// <param name="type">Address type to return</param>
     /// <returns>Resolved address</returns>
-    BLACKBONE_API uintptr_t ResolveRVAToVA( uintptr_t Rva, bool keepRelative = false ) const;
+    BLACKBONE_API uintptr_t ResolveRVAToVA( uintptr_t Rva, AddressType type = VA ) const;
 
     /// <summary>
     /// Get image path

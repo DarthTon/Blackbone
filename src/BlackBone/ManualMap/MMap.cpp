@@ -818,16 +818,16 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
     if (!_process.nativeLdr().InsertInvertedFunctionTable( pImage->imgMem.ptr<void*>(), pImage->peImage.imageSize(), safeseh ))
     {
         // Retry with documented method
+        auto expTableRVA = pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXCEPTION, pe::RVA );
         size_t size = pImage->peImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_EXCEPTION );
-        auto pExpTable = reinterpret_cast<PIMAGE_RUNTIME_FUNCTION_ENTRY>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_EXCEPTION ));
 
         // Invoke RtlAddFunctionTable
-        if (pExpTable)
+        if (expTableRVA)
         {
             AsmJitHelper a;
             uint64_t result = 0;
-
-            pImage->pExpTableAddr = REBASE( pExpTable, pImage->peImage.base(), pImage->imgMem.ptr<ptr_t>() );
+          
+            pImage->pExpTableAddr = expTableRVA + pImage->imgMem.ptr<ptr_t>();
             auto pAddTable = _process.modules().GetExport(
                 _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
                 "RtlAddFunctionTable"
@@ -847,9 +847,6 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
             auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
             if (!NT_SUCCESS( status ))
                 return status;
-
-            return (pImage->flags & CreateLdrRef) ? STATUS_SUCCESS :
-                MExcept::CreateVEH( pImage->imgMem.ptr<uintptr_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
         }
         // No exception table
         else

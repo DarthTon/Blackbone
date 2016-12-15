@@ -7,7 +7,6 @@
 // Rebase address
 #define MAKE_PTR(T, pRVA, base)           (T)((ptr_t)pRVA + (ptr_t)base)
 #define REBASE(pRVA, baseOld, baseNew)       ((ptr_t)pRVA - (ptr_t)baseOld + (ptr_t)baseNew)
-#define REBASE2(T, rva, baseOld, baseNew) (T)((uintptr_t)rva - (uintptr_t)baseOld + (uintptr_t)baseNew)
 
 // Field offset info
 #define FIELD_OFFSET2(type, field)  ((LONG)(LONG_PTR)&(((type)0)->field))
