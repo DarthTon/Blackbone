@@ -41,27 +41,7 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
             _wowBarrier.type = wow_32_64;
         else
             _wowBarrier.type = wow_64_32;
-    }
-
-    HMODULE hNtdll = GetModuleHandleW( L"ntdll.dll" );
-    HMODULE hKernel32 = GetModuleHandleW( L"kernel32.dll" );
-    
-    LOAD_IMPORT( "NtQueryInformationProcess",  hNtdll );
-    LOAD_IMPORT( "NtSetInformationProcess",    hNtdll );
-    LOAD_IMPORT( "NtQueryInformationThread",   hNtdll );
-    LOAD_IMPORT( "NtDuplicateObject",          hNtdll );
-    LOAD_IMPORT( "NtQueryObject",              hNtdll );  
-    LOAD_IMPORT( "NtQuerySection",             hNtdll );
-    LOAD_IMPORT( "RtlCreateActivationContext", hNtdll );
-    LOAD_IMPORT( "NtQueryVirtualMemory",       hNtdll );
-    LOAD_IMPORT( "NtCreateThreadEx",           hNtdll );
-    LOAD_IMPORT( "NtLockVirtualMemory",        hNtdll );
-    LOAD_IMPORT( "NtSuspendProcess",           hNtdll );
-    LOAD_IMPORT( "NtResumeProcess",            hNtdll );
-    LOAD_IMPORT( "RtlImageNtHeader",           hNtdll );
-    LOAD_IMPORT( "Wow64GetThreadContext",      hKernel32 );
-    LOAD_IMPORT( "Wow64SetThreadContext",      hKernel32 );
-    LOAD_IMPORT( "Wow64SuspendThread",         hKernel32 );    
+    } 
 }
 
 /*

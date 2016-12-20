@@ -14,12 +14,6 @@ namespace blackbone
 NtLdr::NtLdr( Process& proc )
     : _process( proc )
 {
-    HMODULE hNtdll = GetModuleHandleW( L"ntdll.dll" );
-
-    LOAD_IMPORT( "RtlInitUnicodeString",   hNtdll );
-    LOAD_IMPORT( "RtlHashUnicodeString",   hNtdll );
-    LOAD_IMPORT( "RtlUpcaseUnicodeChar",   hNtdll );
-    LOAD_IMPORT( "RtlEncodeSystemPointer", hNtdll );
 }
 
 NtLdr::~NtLdr(void)

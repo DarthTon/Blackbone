@@ -11,6 +11,7 @@
 #include "../ManualMap/MMap.h"
 
 #include "../Include/NativeStructures.h"
+#include "../Misc/InitOnce.h"
 
 #include <string>
 #include <list>
@@ -212,15 +213,9 @@ public:
     BLACKBONE_API inline NtLdr&           nativeLdr()  { return _nativeLdr;  }  // Native loader routines
 
 private:
-    /// <summary>
-    /// Grant current process arbitrary privilege
-    /// </summary>
-    /// <param name="name">Privilege name</param>
-    /// <returns>Status</returns>
-    NTSTATUS GrantPriviledge( const std::basic_string<TCHAR>& name );
-
     Process(const Process&) = delete;
     Process& operator =(const Process&) = delete;
+
 private:
     ProcessCore     _core;          // Core routines and native subsystem
     ProcessModules  _modules;       // Module management

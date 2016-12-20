@@ -567,6 +567,7 @@
     <ClCompile Include="ManualMap\MMap.cpp" />
     <ClCompile Include="ManualMap\Native\NtLoader.cpp" />
     <ClCompile Include="Misc\DynImport.cpp" />
+    <ClCompile Include="Misc\InitOnce.cpp" />
     <ClCompile Include="Misc\NameResolve.cpp" />
     <ClCompile Include="Misc\Utils.cpp" />
     <ClCompile Include="Patterns\PatternSearch.cpp" />
@@ -661,6 +662,7 @@
     <ClInclude Include="ManualMap\MMap.h" />
     <ClInclude Include="ManualMap\Native\NtLoader.h" />
     <ClInclude Include="Misc\DynImport.h" />
+    <ClInclude Include="Misc\InitOnce.h" />
     <ClInclude Include="Misc\NameResolve.h" />
     <ClInclude Include="Misc\Thunk.hpp" />
     <ClInclude Include="Misc\Trace.hpp" />

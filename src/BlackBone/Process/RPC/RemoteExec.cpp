@@ -19,9 +19,6 @@ RemoteExec::RemoteExec( Process& proc )
     , _hWaitEvent( NULL )
     , _apcPatched( false )
 {
-    LOAD_IMPORT( "NtOpenEvent", L"ntdll.dll" );
-    LOAD_IMPORT( "NtCreateEvent", L"ntdll.dll" );
-    LOAD_IMPORT( "NtQueueApcThread", L"ntdll.dll" );
 }
 
 RemoteExec::~RemoteExec()

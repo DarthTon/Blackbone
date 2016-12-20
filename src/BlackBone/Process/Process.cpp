@@ -20,10 +20,11 @@ Process::Process()
     , _mmap( *this )
     , _nativeLdr( *this )
 {
-    GrantPriviledge( SE_DEBUG_NAME );
-    GrantPriviledge( SE_LOAD_DRIVER_NAME );
+    // Ensure InitOnce is called
+    auto i = g_Initialized;
+    UNREFERENCED_PARAMETER( i );
 
-    NameResolve::Instance().Initialize(); 
+    NameResolve::Instance().Initialize();
 }
 
 Process::~Process(void)
@@ -338,47 +339,6 @@ NTSTATUS Process::EnumHandles( std::vector<HandleInfo>& handles )
 
     VirtualFree( buffer, 0, MEM_RELEASE );
     return status;
-}
-
-
-/// <summary>
-/// Grant current process arbitrary privilege
-/// </summary>
-/// <param name="name">Privilege name</param>
-/// <returns>Status</returns>
-NTSTATUS Process::GrantPriviledge( const std::basic_string<TCHAR>& name )
-{
-    TOKEN_PRIVILEGES Priv, PrivOld;
-    DWORD cbPriv = sizeof(PrivOld);
-    HANDLE hToken;
-
-    if (!OpenThreadToken( GetCurrentThread(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, FALSE, &hToken ))
-    {
-        if (GetLastError() != ERROR_NO_TOKEN)
-            return LastNtStatus();
-
-        if (!OpenProcessToken( GetCurrentProcess(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, &hToken ))
-            return LastNtStatus();
-    }
-
-    Priv.PrivilegeCount = 1;
-    Priv.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-    LookupPrivilegeValue( NULL, name.c_str(), &Priv.Privileges[0].Luid );
-
-    if (!AdjustTokenPrivileges( hToken, FALSE, &Priv, sizeof(Priv), &PrivOld, &cbPriv ))
-    {
-        CloseHandle( hToken );
-        return LastNtStatus();
-    }
-
-    if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
-    {
-        CloseHandle( hToken );
-        return LastNtStatus();
-    }
-    
-    CloseHandle( hToken );
-    return STATUS_SUCCESS;
 }
 
 /// <summary>

@@ -13,12 +13,6 @@ namespace blackbone
 
 NameResolve::NameResolve()
 {
-    HMODULE ntdll = GetModuleHandleW( L"ntdll.dll" );
-
-    LOAD_IMPORT( "NtQuerySystemInformation", ntdll );
-    LOAD_IMPORT( "RtlDosApplyFileIsolationRedirection_Ustr", ntdll );
-    LOAD_IMPORT( "RtlInitUnicodeString", ntdll );
-    LOAD_IMPORT( "RtlFreeUnicodeString", ntdll );
 }
 
 NameResolve::~NameResolve()

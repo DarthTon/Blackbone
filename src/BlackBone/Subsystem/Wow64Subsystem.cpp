@@ -8,13 +8,6 @@ namespace blackbone
 NativeWow64::NativeWow64( HANDLE hProcess )
     : Native( hProcess )
 {
-    HMODULE ntdll32 = GetModuleHandleW( L"Ntdll.dll" );
-
-    LOAD_IMPORT( "NtWow64QueryInformationProcess64", ntdll32 );
-    LOAD_IMPORT( "NtWow64AllocateVirtualMemory64",   ntdll32 );
-    LOAD_IMPORT( "NtWow64QueryVirtualMemory64",      ntdll32 );
-    LOAD_IMPORT( "NtWow64ReadVirtualMemory64",       ntdll32 );
-    LOAD_IMPORT( "NtWow64WriteVirtualMemory64",      ntdll32 );
 }
 
 NativeWow64::~NativeWow64()

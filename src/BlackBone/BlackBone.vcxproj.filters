@@ -192,6 +192,9 @@
     <ClCompile Include="Process\RPC\RemoteLocalHook.cpp">
       <Filter>Process\Remote</Filter>
     </ClCompile>
+    <ClCompile Include="Misc\InitOnce.cpp">
+      <Filter>Misc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
@@ -440,6 +443,9 @@
     </ClInclude>
     <ClInclude Include="Process\MultPtr.hpp">
       <Filter>Process</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc\InitOnce.h">
+      <Filter>Misc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

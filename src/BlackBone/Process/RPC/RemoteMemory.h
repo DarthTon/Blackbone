@@ -156,7 +156,7 @@ private:
     PageContext* _pSharedData = nullptr;    // Hook related data, shared between processes
     ptr_t _targetShare = 0;                 // Address of shared in data in target process
     bool _active = false;                   // Hook thread activity flag
-    bool _hooked[4];                        // Hook state
+    bool _hooked[4] = { 0 };                // Hook state
 };
 
 }
