@@ -138,11 +138,8 @@ typedef struct _MMVAD // Size=120
 {
     MMVAD_SHORT vadShort;
     union ___unnamed715 u2; // Size=4 Offset=64
-    union
-    {
-        struct _SUBSECTION * Subsection; // Size=8 Offset=72
-        struct _MSUBSECTION * MappedSubsection; // Size=8 Offset=72
-    };
+    unsigned long pad0; // Size=4 Offset=68
+    struct _SUBSECTION * Subsection; // Size=8 Offset=72
     struct _MMPTE * FirstPrototypePte; // Size=8 Offset=80
     struct _MMPTE * LastContiguousPte; // Size=8 Offset=88
     struct _LIST_ENTRY ViewLinks; // Size=16 Offset=96

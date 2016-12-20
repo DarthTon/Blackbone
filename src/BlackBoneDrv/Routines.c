@@ -546,7 +546,7 @@ NTSTATUS BBHideVAD( IN PHIDE_VAD pData )
 
     status = PsLookupProcessByProcessId( (HANDLE)pData->pid, &pProcess );
     if (NT_SUCCESS( status ))
-        status = BBProtectVAD( pProcess, pData->base, MM_ZERO_ACCESS );
+        status = BBUnlinkVAD( pProcess, pData->base );
     else
         DPRINT( "BlackBone: %s: PsLookupProcessByProcessId failed with status 0x%X\n", __FUNCTION__, status );
 

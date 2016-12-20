@@ -143,6 +143,36 @@ typedef struct _OBJECT_HEADER // Size=56
     struct _QUAD Body; // Size=8 Offset=48
 } OBJECT_HEADER, *POBJECT_HEADER;
 
+typedef union _EX_FAST_REF // Size=8
+{
+    void * Object;
+    struct
+    {
+        unsigned __int64 RefCnt : 4; 
+    };
+    unsigned __int64 Value;
+} EX_FAST_REF, *PEX_FAST_REF;
+
+typedef struct _CONTROL_AREA // Size=120
+{
+    struct _SEGMENT * Segment;
+    struct _LIST_ENTRY ListHead;
+    unsigned __int64 NumberOfSectionReferences;
+    unsigned __int64 NumberOfPfnReferences; 
+    unsigned __int64 NumberOfMappedViews;
+    unsigned __int64 NumberOfUserReferences;
+    unsigned long f1; 
+    unsigned long f2;
+    EX_FAST_REF FilePointer;
+    // Other fields
+} CONTROL_AREA, *PCONTROL_AREA;
+
+typedef struct _SUBSECTION // Size=56
+{
+    PCONTROL_AREA ControlArea;
+    // Other fields
+} SUBSECTION, *PSUBSECTION;
+
 typedef struct _MEMORY_BASIC_INFORMATION_EX
 {
     PVOID BaseAddress;

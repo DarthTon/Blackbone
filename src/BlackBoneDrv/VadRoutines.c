@@ -54,13 +54,11 @@ ULONG MmProtectToValue[32] =
 NTSTATUS BBProtectVAD( IN PEPROCESS pProcess, IN ULONG_PTR address, IN ULONG prot )
 {
     NTSTATUS status = STATUS_SUCCESS;
-    PMMVAD_SHORT pVad = NULL;
+    PMMVAD_SHORT pVadShort = NULL;
 
-    status = BBFindVAD( pProcess, address, &pVad );
-    if (!NT_SUCCESS( status ))
-        return status;
-
-    pVad->u.VadFlags.Protection = prot;
+    status = BBFindVAD( pProcess, address, &pVadShort );
+    if (NT_SUCCESS( status ))
+        pVadShort->u.VadFlags.Protection = prot;
 
     return status;
 }
@@ -75,15 +73,36 @@ NTSTATUS BBProtectVAD( IN PEPROCESS pProcess, IN ULONG_PTR address, IN ULONG pro
 /// <returns>Status code</returns>
 NTSTATUS BBUnlinkVAD( IN PEPROCESS pProcess, IN ULONG_PTR address )
 {
-    return BBProtectVAD( pProcess, address, MM_ZERO_ACCESS );  
+    NTSTATUS status = STATUS_SUCCESS;
+    PMMVAD_SHORT pVadShort = NULL;
 
-    /*
-#ifdef _WIN81_
-    RtlAvlRemoveNode( (PMM_AVL_TABLE)((PUCHAR)pProcess + dynData.VadRoot), (PMMADDRESS_NODE)pVad );
-#else
-    MiRemoveNode( (PMMADDRESS_NODE)pVad, (PMM_AVL_TABLE)((PUCHAR)pProcess + dynData.VadRoot) );
-#endif
-    */
+    status = BBFindVAD( pProcess, address, &pVadShort );
+    if (!NT_SUCCESS( status ))
+        return status;
+
+    // Erase image name
+    if (pVadShort->u.VadFlags.VadType == VadImageMap)
+    {
+        PMMVAD pVadLong = (PMMVAD)pVadShort;
+        if (pVadLong->Subsection && pVadLong->Subsection->ControlArea && pVadLong->Subsection->ControlArea->FilePointer.Object)
+        {
+            PFILE_OBJECT pFile = (PFILE_OBJECT)(pVadLong->Subsection->ControlArea->FilePointer.Value & ~0xF);
+            pFile->FileName.Buffer[0] = L'\0';
+            pFile->FileName.Length = 0;
+        }
+        else
+            return STATUS_INVALID_ADDRESS;
+    }
+    // Make NO_ACCESS
+    else if (pVadShort->u.VadFlags.VadType == VadDevicePhysicalMemory)
+    {
+        pVadShort->u.VadFlags.Protection = MM_ZERO_ACCESS;
+    }
+    // Invalid VAD type
+    else
+        status = STATUS_INVALID_PARAMETER;
+
+    return status;
 }
 
 #pragma warning(default : 4055)

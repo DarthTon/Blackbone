@@ -3,7 +3,6 @@
 
 #pragma alloc_text(PAGE, MiPromoteNode)
 #pragma alloc_text(PAGE, MiRebalanceNode)
-#pragma alloc_text(PAGE, MiInsertNode)
 #pragma alloc_text(PAGE, MiRemoveNode)
 #pragma alloc_text(PAGE, MiFindNodeOrParent)
 
