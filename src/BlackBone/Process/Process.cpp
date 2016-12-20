@@ -377,6 +377,7 @@ NTSTATUS Process::GrantPriviledge( const std::basic_string<TCHAR>& name )
         return LastNtStatus();
     }
     
+    CloseHandle( hToken );
     return STATUS_SUCCESS;
 }
 

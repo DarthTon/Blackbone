@@ -8,13 +8,6 @@ namespace blackbone
 RemoteMemory::RemoteMemory( Process* process )
     : _process( process )
 {
-    // Generate unique pipe name
-   _pipeName = Utils::RandomANString() +
-        L"_" + std::to_wstring( process->pid() ) +
-        L"_" + std::to_wstring( GetCurrentProcessId() );
-
-   // Setup pipe
-   _hPipe = CreateNamedPipeW( (L"\\\\.\\pipe\\" + _pipeName).c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE, 1, 0, 0, 0, NULL );
 }
 
 
@@ -184,6 +177,13 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
     if (!pTranslated)
         return STATUS_INVALID_ADDRESS;
 
+    // IPC
+    if (_hPipe == NULL)
+    {
+        _pipeName = Utils::RandomANString() + L"_" + std::to_wstring( _process->pid() ) + L"_" + std::to_wstring( GetCurrentProcessId() );
+        _hPipe = CreateNamedPipeW( (L"\\\\.\\pipe\\" + _pipeName).c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE, 1, 0, 0, 0, NULL );
+    }
+
     // Listening thread
     if (_hThread == NULL)
     {
@@ -196,8 +196,7 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
     BuildGenericHookFn( hkType );
 
     // Copy hook
-    memcpy( pTranslated, (uint8_t*)_pSharedData + sizeof( HookData ) * hkType + FIELD_OFFSET( HookData, jump_buf), 
-            sizeof( _pSharedData->hkVirtualAlloc.jump_buf ) );
+    memcpy( pTranslated, (uint8_t*)_pSharedData + sizeof( HookData ) * hkType + FIELD_OFFSET( HookData, jump_buf ), sizeof( _pSharedData->hkVirtualAlloc.jump_buf ) );
     
     _hooked[hkType] = true;
     return STATUS_SUCCESS;
@@ -243,33 +242,30 @@ bool RemoteMemory::RestoreHook( OperationType hkType )
 /// </summary>
 void RemoteMemory::reset()
 {
-    if (!_mapDatabase.empty())
+    _active = false;
+
+    if (_hThread != NULL)
     {
-        _active = false;
+        TerminateThread( _hThread, 0 );
+        _hThread = NULL;
+    }
 
-        if (_hThread != NULL)
-        {
-            TerminateThread( _hThread, 0 );
-            _hThread = NULL;
-        }
+    if (_hPipe != NULL)
+    {
+        CloseHandle( _hPipe );
+        _hPipe = NULL;
+    }
 
-        if (_hPipe != NULL)
-        {
-            CloseHandle( _hPipe );
-            _hPipe = NULL;
-        }
+    for (int i = 0; i < 4; i++)
+        RestoreHook( (OperationType)i );
 
-        for (int i = 0; i < 4; i++)
-            RestoreHook( (OperationType)i );
+    if (!_mapDatabase.empty() && !NT_SUCCESS( Unmap() ))
+    {
+        _mapDatabase.clear();
 
-        if (!NT_SUCCESS( Unmap() ))
-        {
-            _mapDatabase.clear();
-
-            _pSharedData = nullptr;
-            _targetShare = 0;
-            _targetPipe = NULL;
-        }
+        _pSharedData = nullptr;
+        _targetShare = 0;
+        _targetPipe = NULL;
     }
 }
 
