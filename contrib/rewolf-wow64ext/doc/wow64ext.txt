@@ -1,0 +1,180 @@
+--------------------------------------------------------------------------------
+Name....: WOW64Ext Library
+Author..: ReWolf
+Rel.Date: 12.I.2012
+Update..: 18.I.2017
+Version.: 1.0.0.9
+
+
+e.mail..: rewolf@rewolf.pl
+www.....: http://blog.rewolf.pl
+--------------------------------------------------------------------------------
+
+WOW64Ext is a helper  library for x86  programs that  runs under  WOW64 layer on
+x64 versions of Microsoft Windows operating systems. It enables x86 applications
+to read, write  and enumerate memory of a native x64 applications. There is also
+possibility  to call  any x64  function from  64-bits version  of NTDLL  through
+a special function called X64Call(). As a bonus, wow64ext.h contains definitions
+of some  structures that might  be useful for programs  that want to access PEB,
+TEB, TIB etc.
+
+Sample application that uses this library can be found in \sample\ directory, it
+is simple memory dumper.
+
+--------------------------------------------------------------------------------
+
+Functions:
+
+--------------------------------------------------------------------------------
+
+DWORD64 X64Call(DWORD64 func, int argC, ...);
+
+Low level function that can call any x64 API from NTDLL.
+
+func - address of x64 function, can be obtained by GetProcAddress64()
+argC - number of arguments that will be passed to the 'func'
+...  - rest of arguments for 'func', all values should be casted to DWORD64
+
+--------------------------------------------------------------------------------
+
+DWORD64 GetModuleHandle64(wchar_t* lpModuleName);
+
+Behaviour similar to x86 version of GetModuleHandle, but it looks for the module
+name  in the list  of loaded x64  libraries.  Usually x86  processes under WOW64
+layer   have   four  x64  libraries:  ntdll.dll,   wow64.dll,  wow64cpu.dll  and
+wow64win.dll
+
+lpModuleName - unicode string that represents module name
+
+--------------------------------------------------------------------------------
+
+DWORD64 GetProcAddress64(DWORD64 hModule, char* funcName);
+
+Behaviour  similar  to  x86 version of GetProcAddress(), internally it  uses x64
+version of LdrGetProcedureAddress() from NTDLL.
+
+hModule  - base of x64 module
+funcName - function name
+
+--------------------------------------------------------------------------------
+
+SIZE_T VirtualQueryEx64(HANDLE hProcess, DWORD64 lpAddress, 
+                        MEMORY_BASIC_INFORMATION64* lpBuffer, SIZE_T dwLength)
+
+Behaviour  similar to  x86 version of  VirtualQueryEx(), internally it uses  x64
+version of NtQueryVirtualMemory() from NTDLL.
+
+hProcess  - handle of the process, can  be  obtained by  standard x86 version of
+            OpenProcess() function
+lpAddress - base address of the region of pages to be queried
+lpBuffer  - a pointer to a MEMORY_BASIC_INFORMATION64  structure, it  is defined
+            in the standard SDK headers
+dwLength  - size of the buffer pointed to by the lpBuffer parameter
+
+--------------------------------------------------------------------------------
+
+DWORD64 VirtualAllocEx64(HANDLE hProcess, DWORD64 lpAddress, SIZE_T dwSize,
+                         DWORD flAllocationType, DWORD flProtect)
+
+Behaviour  similar to  x86 version of VirtualAllocEx64(), internally it uses x64
+version of NtAllocateVirtualMemory() from NTDLL.
+
+hProcess         - handle  of  the  process,  can  be  obtained  by standard x86
+                   version of OpenProcess() function
+lpAddress        - desired base address of the region that will be allocated
+dwSize           - size of the region that will be allocated
+flAllocationType - type of memory allocation
+flProtect        - memory protection for the region
+
+--------------------------------------------------------------------------------
+
+BOOL VirtualFreeEx64(HANDLE hProcess, DWORD64 lpAddress, SIZE_T dwSize,
+                     DWORD dwFreeType)
+
+Behaviour  similar to  x86 version of  VirtualFreeEx64(), internally it uses x64
+version of NtFreeVirtualMemory() from NTDLL.
+
+hProcess   - handle of the process, can be  obtained by  standard x86 version of
+             OpenProcess() function
+lpAddress  - base address of the memory region to free
+dwSize     - size (in bytes) of the memory region to free
+dwFreeType - type of free operation (MEM_RELEASE, MEM_DECOMMIT)
+
+--------------------------------------------------------------------------------
+
+BOOL VirtualProtectEx64(HANDLE hProcess, DWORD64 lpAddress, SIZE_T dwSize, 
+                        DWORD flNewProtect, DWORD* lpflOldProtect);
+                        
+Behaviour  similar to  x86 version of  VirtualProtectEx64(), internally  it uses
+x64 version of NtProtectVirtualMemory() from NTDLL.                     
+
+hProcess       - handle  of  the  process,  can  be  obtained  by  standard  x86
+                 version of OpenProcess() function
+lpAddress      - base  address  of  the  memory region  that  will  have changed
+                 protection
+dwSize         - size (in  bytes) of  the memory  region that  will have changed
+                 protection
+flNewProtect   - the memory protection option (see MSDN)
+lpflOldProtect - pointer to the variable that receives old protection value
+
+--------------------------------------------------------------------------------
+
+BOOL ReadProcessMemory64(HANDLE hProcess, DWORD64 lpBaseAddress, 
+                         LPVOID lpBuffer, SIZE_T nSize, 
+                         SIZE_T *lpNumberOfBytesRead);
+
+Behaviour similar to x86 version of  ReadProcessMemory(), internally it uses x64
+version of NtReadVirtualMemory() from NTDLL.
+
+hProcess            - handle of  the process,  can be  obtained by  standard x86
+                      version of OpenProcess() function
+lpBaseAddress       - base address of the region that will be read
+lpBuffer            - output memory buffer for the read data
+nSize               - number of bytes to be read
+lpNumberOfBytesRead - pointer to a variable that receives number of read bytes
+
+--------------------------------------------------------------------------------
+
+BOOL WriteProcessMemory64(HANDLE hProcess, DWORD64 lpBaseAddress, 
+                          LPVOID lpBuffer, SIZE_T nSize, 
+                          SIZE_T *lpNumberOfBytesWritten);
+
+Behaviour similar to x86 version of WriteProcessMemory(), internally it uses x64
+version of NtWriteVirtualMemory() from NTDLL.
+
+hProcess            - handle of  the process,  can be  obtained by  standard x86
+                      version of OpenProcess() function
+lpBaseAddress       - base address of the region that will be written
+lpBuffer            - input memory buffer with the data to write
+nSize               - number of bytes that will be written
+lpNumberOfBytesRead - pointer to variable that receives number of written bytes
+
+--------------------------------------------------------------------------------
+
+BOOL GetThreadContext64(HANDLE hThread, _CONTEXT64* lpContext);
+
+Behaviour similar to  x86 version of GetThreadContext(), internally  it uses x64
+version  of  NtGetContextThread()  from NTDLL.  Definition  of _CONTEXT64 can be
+found in wow64ext.h file.
+
+hThread             - handle of  the process,  can be  obtained by  standard x86
+                      version of OpenProcess() function
+lpContext           - A pointer to  a _CONTEXT64  structure  that  will  receive
+                      context data  from  specified  thread. Structure  will  be
+                      filled according to ContextFlags field.
+
+--------------------------------------------------------------------------------
+
+BOOL SetThreadContext64(HANDLE hThread, _CONTEXT64* lpContext);
+
+Behaviour  similar to x86 version of SetThreadContext(), internally  it uses x64
+version  of  NtSetContextThread()  from NTDLL.  Definition  of _CONTEXT64 can be
+found in wow64ext.h file.
+
+hThread             - handle of  the process,  can be  obtained by  standard x86
+                      version of OpenProcess() function
+lpContext           - A pointer to  a _CONTEXT64  structure  that  will be  used
+                      to  fill context  data in specified thread. Structure will
+                      use only fields defined by ContextFlags.
+
+--------------------------------------------------------------------------------

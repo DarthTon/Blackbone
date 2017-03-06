@@ -1,0 +1,14 @@
+*.opensdf
+*.sdf
+*.suo
+*.obj
+*.ilk
+*.db
+*.user
+*.opendb
+*.pdb
+src/Release/*
+src/Debug/*
+sample/*.exe
+sample/*.dll
+sample/*.lib

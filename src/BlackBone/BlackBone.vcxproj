@@ -540,6 +540,7 @@
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86inst.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86operand.cpp" />
     <ClCompile Include="..\..\contrib\AsmJit\x86\x86operand_regs.cpp" />
+    <ClCompile Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.cpp" />
     <ClCompile Include="Asm\AsmHelper32.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|x64'">true</ExcludedFromBuild>
@@ -585,7 +586,6 @@
     <ClCompile Include="Process\Threads\Thread.cpp" />
     <ClCompile Include="Process\Threads\Threads.cpp" />
     <ClCompile Include="Subsystem\NativeSubsystem.cpp" />
-    <ClCompile Include="Subsystem\Wow64Local.cpp" />
     <ClCompile Include="Subsystem\Wow64Subsystem.cpp" />
     <ClCompile Include="Subsystem\x86Subsystem.cpp" />
   </ItemGroup>
@@ -617,6 +617,7 @@
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86cpuinfo.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86inst.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86operand.h" />
+    <ClInclude Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.h" />
     <ClInclude Include="Asm\AsmHelper.h" />
     <ClInclude Include="Asm\AsmHelper32.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
@@ -685,7 +686,6 @@
     <ClInclude Include="Process\Threads\Thread.h" />
     <ClInclude Include="Process\Threads\Threads.h" />
     <ClInclude Include="Subsystem\NativeSubsystem.h" />
-    <ClInclude Include="Subsystem\Wow64Local.h" />
     <ClInclude Include="Subsystem\Wow64Subsystem.h" />
     <ClInclude Include="Subsystem\x86Subsystem.h" />
   </ItemGroup>

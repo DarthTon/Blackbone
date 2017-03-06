@@ -376,7 +376,7 @@ NTSTATUS BBApcInject( IN PINJECT_BUFFER pUserBuf, IN HANDLE pid, IN ULONG initRV
 
     if (NT_SUCCESS( status ))
     {
-        status = BBQueueUserApc( pThread, pUserBuf, NULL, NULL, NULL, TRUE );
+        status = BBQueueUserApc( pThread, pUserBuf->code, NULL, NULL, NULL, TRUE );
 
         // Wait for completion
         if (NT_SUCCESS( status ))

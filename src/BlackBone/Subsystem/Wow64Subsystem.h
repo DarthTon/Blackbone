@@ -1,7 +1,6 @@
 #pragma once
 
 #include "NativeSubsystem.h"
-#include "Wow64Local.h"
 
 namespace blackbone
 {
@@ -164,9 +163,6 @@ public:
     /// <param name="ppeb">Retrieved TEB</param>
     /// <returns>TEB pointer</returns>
     virtual ptr_t getTEB( HANDLE hThread, _TEB64* pteb );
-
-private:
-    Wow64Local _local;     // WOW64 helpers
 };
 
 }

@@ -51,9 +51,6 @@
     <ClCompile Include="Subsystem\NativeSubsystem.cpp">
       <Filter>Subystem</Filter>
     </ClCompile>
-    <ClCompile Include="Subsystem\Wow64Local.cpp">
-      <Filter>Subystem</Filter>
-    </ClCompile>
     <ClCompile Include="Subsystem\Wow64Subsystem.cpp">
       <Filter>Subystem</Filter>
     </ClCompile>
@@ -195,13 +192,13 @@
     <ClCompile Include="Misc\InitOnce.cpp">
       <Filter>Misc</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.cpp">
+      <Filter>Subystem</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
     <ClInclude Include="Subsystem\NativeSubsystem.h">
-      <Filter>Subystem</Filter>
-    </ClInclude>
-    <ClInclude Include="Subsystem\Wow64Local.h">
       <Filter>Subystem</Filter>
     </ClInclude>
     <ClInclude Include="Subsystem\Wow64Subsystem.h">
@@ -446,6 +443,9 @@
     </ClInclude>
     <ClInclude Include="Misc\InitOnce.h">
       <Filter>Misc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.h">
+      <Filter>Subystem</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
