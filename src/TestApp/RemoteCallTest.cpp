@@ -14,8 +14,7 @@ void TestRemoteCall()
     std::wcout << L"Searching for explorer.exe... ";
 
     Process explorer;
-    std::vector<DWORD> found;
-    Process::EnumByName( L"explorer.exe", found );
+    auto found = Process::EnumByName( L"explorer.exe" );
 
     if (found.size() > 0)
     {
@@ -40,14 +39,14 @@ void TestRemoteCall()
         auto hMainMod = explorer.modules().GetMainModule();
         auto pRemote = explorer.modules().GetExport( explorer.modules().GetModule( L"ntdll.dll" ), "NtQueryVirtualMemory" );
 
-        if (hMainMod && pRemote.procAddress)
+        if (hMainMod && pRemote.success())
         {
             std::wcout << L"Found. Executing...\n";
             uint8_t buf[1024] = { 0 };
 
             RemoteFunction<fnNtQueryVirtualMemory> pFN(
                 explorer,
-                pRemote.procAddress,
+                pRemote.result().procAddress,
                 INVALID_HANDLE_VALUE,
                 reinterpret_cast<LPVOID>(hMainMod->baseAddress),
                 MemorySectionName,

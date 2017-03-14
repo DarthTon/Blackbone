@@ -31,9 +31,10 @@ void TestMMap()
 
     eLoadFlags flags = ManualImports | RebaseProcess;
 
-    if (thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", flags, callback ) == 0)
+    auto image = thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", flags, callback );
+    if (!image.success())
     {
-        std::wcout << L"Mapping failed with error 0x" << std::hex << LastNtStatus()
+        std::wcout << L"Mapping failed with error 0x" << std::hex << image.status
                    << L". " << Utils::GetErrorDescription( LastNtStatus() ) << std::endl << std::endl;
     }
     else
@@ -67,9 +68,10 @@ void TestMMapFromMem()
         CloseHandle( hFile );
     }
 
-    if (thisProc.mmap().MapImage( size, buf, false, CreateLdrRef | RebaseProcess | NoDelayLoad ) == 0)
+    auto image = thisProc.mmap().MapImage( size, buf, false, CreateLdrRef | RebaseProcess | NoDelayLoad );
+    if (!image.success())
     {
-        std::wcout << L"Mapping failed with error 0x" << std::hex << LastNtStatus()
+        std::wcout << L"Mapping failed with error 0x" << std::hex << image.status
                    << L". " << Utils::GetErrorDescription( LastNtStatus() ) << std::endl << std::endl;
     }
     else

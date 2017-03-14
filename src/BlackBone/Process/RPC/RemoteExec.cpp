@@ -36,20 +36,20 @@ RemoteExec::~RemoteExec()
 NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult )
 {
     AsmJitHelper a;
-    NTSTATUS dwResult = STATUS_SUCCESS;
+    NTSTATUS status = STATUS_SUCCESS;
 
     // Write code
-    dwResult = CopyCode( pCode, size );
-    if (dwResult != STATUS_SUCCESS)
-        return dwResult;
+    status = CopyCode( pCode, size );
+    if (status != STATUS_SUCCESS)
+        return status;
 
     bool switchMode = (_proc.core().native()->GetWow64Barrier().type == wow_64_32);
     auto pExitThread = _mods.GetExport( _mods.GetModule(
         L"ntdll.dll", LdrList, switchMode ? mt_mod64 : mt_default ),
-        "NtTerminateThread" ).procAddress;
+        "NtTerminateThread" );
 
-    if (pExitThread == 0)
-        return LastNtStatus( STATUS_NOT_FOUND );
+    if (!pExitThread.success())
+        return pExitThread.status;
 
     a.GenPrologue( switchMode );
 
@@ -57,11 +57,10 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
     if(switchMode)
     {
         // Allocate new x64 activation stack
-        auto createActStack = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt_mod64 ),
-                                               "RtlAllocateActivationContextStack" ).procAddress;
-        if (createActStack)
+        auto createActStack = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt_mod64 ), "RtlAllocateActivationContextStack" );
+        if (createActStack.success())
         {
-            a.GenCall( static_cast<uintptr_t>(createActStack), { _userData.ptr<uintptr_t>() + 0x3100 } );
+            a.GenCall( static_cast<uintptr_t>(createActStack.result().procAddress), { _userData.ptr<uintptr_t>() + 0x3100 } );
             a->mov( a->zax, _userData.ptr<uintptr_t>( ) + 0x3100 );
             a->mov( a->zax, a->intptr_ptr( a->zax ) );
 
@@ -71,21 +70,22 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
     }
 
     a.GenCall( _userCode.ptr<uintptr_t>(), { } );
-    a.ExitThreadWithStatus( (uintptr_t)pExitThread, _userData.ptr<uintptr_t>() + INTRET_OFFSET );
+    a.ExitThreadWithStatus( (uintptr_t)pExitThread.result().procAddress, _userData.ptr<uintptr_t>() + INTRET_OFFSET );
     
     // Execute code in newly created thread
     if (_userCode.Write( size, a->getCodeSize(), a->make() ) == STATUS_SUCCESS)
     {
         auto thread = _threads.CreateNew( _userCode.ptr<ptr_t>() + size, _userData.ptr<ptr_t>()/*, HideFromDebug*/ );
-        thread.Resume();
+        if (!thread.success())
+            return thread.status;
 
-        dwResult = thread.Join();
+        status = thread.result().Join();
         callResult = _userData.Read<uint64_t>( INTRET_OFFSET, 0 );
     }
     else
-        dwResult = LastNtStatus();
+        status = LastNtStatus();
 
-    return dwResult;
+    return status;
 }
 
 /// <summary>
@@ -263,9 +263,11 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
 DWORD RemoteExec::ExecDirect( ptr_t pCode, ptr_t arg )
 {
     auto thread = _threads.CreateNew( pCode, arg/*, HideFromDebug*/ );
+    if (!thread.success())
+        return thread.status;
 
-    thread.Join();
-    return thread.ExitCode();
+    thread.result().Join();
+    return thread.result().ExitCode();
 }
 
 /// <summary>
@@ -290,17 +292,41 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool bThread /*= true*/, bool bEvent 
     // Allocate environment codecave
     //
     if (!_workerCode.valid())
-        _workerCode = _memory.Allocate( 0x1000 );
+    {
+        auto mem = _memory.Allocate( 0x1000 );
+        if (!mem.success())
+            return mem.status;
+
+        _workerCode = std::move( mem.result() );
+    }
 
     if (!_userData.valid())
-        _userData = _memory.Allocate( 0x4000, PAGE_READWRITE );
+    {
+        auto mem = _memory.Allocate( 0x4000, PAGE_READWRITE );
+        if (!mem.success())
+            return mem.status;
+
+        _userData = std::move( mem.result() );
+    }
 
     if (!_userCode.valid())
-        _userCode = _memory.Allocate( 0x1000 );
+    {
+        auto mem = _memory.Allocate( 0x1000 );
+        if (!mem.success())
+            return mem.status;
+
+        _userCode = std::move( mem.result() );
+    }
 
     // Create RPC thread
     if (bThread)
-        thdID = CreateWorkerThread();
+    {
+        auto thd = CreateWorkerThread();
+        if (!thd.success())
+            return thd.status;
+
+        thdID = thd.result();
+    }
 
     // Create RPC sync event
     if (bEvent)
@@ -311,12 +337,9 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool bThread /*= true*/, bool bEvent 
         }
         else
         {
-            status = LastNtStatus( STATUS_NOT_SUPPORTED );
+            status = STATUS_NOT_SUPPORTED;
         }
     }
-   
-    if (bThread && thdID == 0)
-        status = LastNtStatus();
 
     return status;
 }
@@ -325,7 +348,7 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool bThread /*= true*/, bool bEvent 
 /// Create worker RPC thread
 /// </summary>
 /// <returns>Thread ID</returns>
-DWORD RemoteExec::CreateWorkerThread()
+call_result_t<DWORD> RemoteExec::CreateWorkerThread()
 {
     AsmJitHelper a;
     asmjit::Label l_loop = a->newLabel();
@@ -345,11 +368,10 @@ DWORD RemoteExec::CreateWorkerThread()
             a->and_( a->zsp, -16 );
 
             // Allocate new x64 activation stack
-            auto createActStack = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt ),
-                                                   "RtlAllocateActivationContextStack" ).procAddress;
-            if(createActStack)
+            auto createActStack = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt ), "RtlAllocateActivationContextStack" );
+            if(createActStack.success())
             {
-                a.GenCall( static_cast<uintptr_t>(createActStack), { _userData.ptr<uintptr_t>() + 0x3000 } );
+                a.GenCall( static_cast<uintptr_t>(createActStack.result().procAddress), { _userData.ptr<uintptr_t>() + 0x3000 } );
                 a->mov( a->zax, _userData.ptr<uintptr_t>() + 0x3000 );
                 a->mov( a->zax, a->intptr_ptr( a->zax ) );
 
@@ -359,10 +381,10 @@ DWORD RemoteExec::CreateWorkerThread()
         }          
 
         auto ntdll = _mods.GetModule( L"ntdll.dll", Sections, mt );
-        auto proc = _mods.GetExport( ntdll, "NtDelayExecution" ).procAddress;
-        auto pExitThread = _mods.GetExport( ntdll, "NtTerminateThread" ).procAddress;
-        if (proc == 0 || pExitThread == 0)
-            return 0;
+        auto proc = _mods.GetExport( ntdll, "NtDelayExecution" );
+        auto pExitThread = _mods.GetExport( ntdll, "NtTerminateThread" );
+        if (!proc.success() || !pExitThread.success())
+            return proc.status ? proc.status : pExitThread.status;
 
         /*
             for(;;)
@@ -371,10 +393,10 @@ DWORD RemoteExec::CreateWorkerThread()
             ExitThread(SetEvent(m_hWaitEvent));
         */
         a->bind( l_loop );
-        a.GenCall( static_cast<uintptr_t>(proc), { TRUE, _workerCode.ptr<uintptr_t>() } );
+        a.GenCall( static_cast<uintptr_t>(proc.result().procAddress), { TRUE, _workerCode.ptr<uintptr_t>() } );
         a->jmp( l_loop );
 
-        a.ExitThreadWithStatus( (uintptr_t)pExitThread, _userData.ptr<uintptr_t>() );
+        a.ExitThreadWithStatus( (uintptr_t)pExitThread.result().procAddress, _userData.ptr<uintptr_t>() );
 
         // Write code into process
         LARGE_INTEGER liDelay = { { 0 } };
@@ -383,10 +405,14 @@ DWORD RemoteExec::CreateWorkerThread()
         _workerCode.Write( 0, liDelay );
         _workerCode.Write( sizeof(LARGE_INTEGER), a->getCodeSize(), a->make() );
 
-        _hWorkThd = _threads.CreateNew( _workerCode.ptr<uintptr_t>() + sizeof(LARGE_INTEGER), _userData.ptr<size_t>()/*, HideFromDebug*/ );
+        auto thd = _threads.CreateNew( _workerCode.ptr<uintptr_t>() + sizeof( LARGE_INTEGER ), _userData.ptr<size_t>()/*, HideFromDebug*/ );
+        if (!thd.success())
+            return thd.status;
+
+        _hWorkThd = std::move( thd.result() );
     }
 
-    return _hWorkThd.id();
+    return std::make_optional( _hWorkThd.id() );
 }
 
 
@@ -430,22 +456,22 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         obAttr.Length = sizeof(obAttr);
         obAttr.SecurityDescriptor = pDescriptor;
 
-        auto pOpenEvent = _mods.GetExport( _mods.GetModule( L"ntdll.dll", Sections, mt ), "NtOpenEvent" ).procAddress;
-        if (pOpenEvent == 0)
-            return false;
+        auto pOpenEvent = _mods.GetExport( _mods.GetModule( L"ntdll.dll", Sections, mt ), "NtOpenEvent" );
+        if (!pOpenEvent.success())
+            return pOpenEvent.status;
 
         status = SAFE_NATIVE_CALL( NtCreateEvent, &_hWaitEvent, EVENT_ALL_ACCESS, &obAttr, 0, static_cast<BOOLEAN>(FALSE) );
         if(pDescriptor)
             LocalFree( pDescriptor );
 
         if (!NT_SUCCESS( status ))
-            return LastNtStatus( status );
+            return status;
 
         ustr.Buffer = reinterpret_cast<PWSTR>(_userData.ptr<uintptr_t>() + ARGS_OFFSET + sizeof( obAttr ) + sizeof( ustr ));
         obAttr.ObjectName = reinterpret_cast<PUNICODE_STRING>(_userData.ptr<uintptr_t>() + ARGS_OFFSET + sizeof(obAttr));
         obAttr.SecurityDescriptor = nullptr;
 
-        a.GenCall( static_cast<uintptr_t>(pOpenEvent), {
+        a.GenCall( static_cast<uintptr_t>(pOpenEvent.result().procAddress), {
             _userData.ptr<uintptr_t>() + EVENT_OFFSET, EVENT_MODIFY_STATE | SYNCHRONIZE,
             _userData.ptr<uintptr_t>() + ARGS_OFFSET } );
 
@@ -459,13 +485,13 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         status |= _userData.Write( ARGS_OFFSET + sizeof(obAttr), ustr );
         status |= _userData.Write( ARGS_OFFSET + sizeof(obAttr) + sizeof(ustr), len, pEventName );
         if (!NT_SUCCESS( status ))
-            return LastNtStatus( status );
+            return status;
 
         ExecInNewThread( a->make(), a->getCodeSize(), dwResult );
         status = _userData.Read<NTSTATUS>( ERR_OFFSET, -1 );
     }
 
-    return LastNtStatus( status );
+    return status;
 }
 
 /// <summary>
@@ -476,8 +502,8 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
 /// <param name="args">Function arguments</param>
 /// <param name="cc">Calling convention</param>
 /// <param name="retType">Return type</param>
-/// <returns>true on success</returns>
-bool RemoteExec::PrepareCallAssembly( 
+/// <returns>Status code</returns>
+NTSTATUS RemoteExec::PrepareCallAssembly( 
     AsmHelperBase& a, 
     const void* pfn,
     std::vector<AsmVariant>& args,
@@ -489,10 +515,7 @@ bool RemoteExec::PrepareCallAssembly(
 
     // Invalid calling convention
     if (cc < cc_cdecl || cc > cc_fastcall)
-    {
-        LastNtStatus( STATUS_INVALID_PARAMETER_3 );
-        return false;
-    }
+        return STATUS_INVALID_PARAMETER_3;
 
     // Copy structures and strings
     for (auto& arg : args)
@@ -537,7 +560,7 @@ bool RemoteExec::PrepareCallAssembly(
     AddReturnWithEvent( a, mt_default, retType );
     a.GenEpilogue();
 
-    return true;
+    return STATUS_SUCCESS;
 }
 
 /// <summary>
@@ -549,17 +572,23 @@ bool RemoteExec::PrepareCallAssembly(
 NTSTATUS RemoteExec::CopyCode( PVOID pCode, size_t size )
 {
     if (!_userCode.valid())
-        _userCode = _memory.Allocate( size );
+    {
+        auto mem = _memory.Allocate( size );
+        if (!mem.success())
+            return mem.status;
+
+        _userCode = std::move( mem.result() );
+    }
 
     // Reallocate for larger code
     if (size > _userCode.size())
-        if ((_userCode.Realloc(size)) == 0)
-            return LastNtStatus();
+    {
+        auto res = _userCode.Realloc( size );
+        if (!res.success())
+            return res.status;
+    }
 
-    if (_userCode.Write( 0, size, pCode ) != STATUS_SUCCESS)
-        return LastNtStatus();
-
-    return STATUS_SUCCESS;
+    return _userCode.Write( 0, size, pCode );
 }
 
 /// <summary>
@@ -578,11 +607,18 @@ void RemoteExec::AddReturnWithEvent(
 {
     // Allocate block if missing
     if (!_userData.valid())
-        _userData = _memory.Allocate( 0x4000, PAGE_READWRITE );
+    {
+        auto mem = _memory.Allocate( 0x4000, PAGE_READWRITE );
+        if (!mem.success())
+            return;
+
+        _userData = std::move( mem.result() );
+    }
 
     uintptr_t ptr = _userData.ptr<size_t>();
     auto pSetEvent = _proc.modules().GetExport( _proc.modules().GetModule( L"ntdll.dll", LdrList, mt ), "NtSetEvent" );
-    a.SaveRetValAndSignalEvent( (uintptr_t)pSetEvent.procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
+    if(pSetEvent.success())
+        a.SaveRetValAndSignalEvent( (uintptr_t)pSetEvent.result().procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
 }
 
 

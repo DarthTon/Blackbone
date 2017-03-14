@@ -106,7 +106,7 @@ inline NTSTATUS LastNtStatus()
 /// </summary>
 /// <param name="status">The status.</param>
 /// <returns></returns>
-inline NTSTATUS LastNtStatus( NTSTATUS status )
+inline NTSTATUS SetLastNtStatus( NTSTATUS status )
 {
     return *(NTSTATUS*)((unsigned char*)NtCurrentTeb() + LAST_STATUS_OFS) = status;
 }

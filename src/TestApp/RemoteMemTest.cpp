@@ -4,12 +4,11 @@
 void TestRemoteMem()
 {
     Process proc;
-    std::vector<DWORD> procIDs;
     NTSTATUS status = STATUS_SUCCESS;
 
     std::wcout << L"Remote memory mapping test\r\n";
 
-    Process::EnumByName( L"explorer.exe", procIDs );
+    auto procIDs = Process::EnumByName( L"explorer.exe" );
 
     if (procIDs.empty())
     {

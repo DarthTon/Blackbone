@@ -192,10 +192,9 @@ public:
     /// <summary>
     /// Enumerate valid memory regions
     /// </summary>
-    /// <param name="results">Found regions</param>
     /// <param name="includeFree">If true - non-allocated regions will be included in list</param>
-    /// <returns>Number of regions found</returns>
-    BLACKBONE_API size_t EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree = false );
+    /// <returns>Found regions</returns>>
+    BLACKBONE_API std::vector<MEMORY_BASIC_INFORMATION64> EnumRegions( bool includeFree = false );
 
     /// <summary>
     /// Enumerate process modules

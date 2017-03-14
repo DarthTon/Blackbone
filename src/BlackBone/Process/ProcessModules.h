@@ -2,6 +2,7 @@
 
 #include "../Config.h"
 #include "../Include/Winheaders.h"
+#include "../Include/CallResult.h"
 #include "../PE/PEImage.h"
 #include "../Misc/Utils.h"
 
@@ -116,7 +117,7 @@ public:
     /// <param name="name_ord">Function name or ordinal</param>
     /// <param name="baseModule">Import module name. Only used to resolve ApiSchema during manual map.</param>
     /// <returns>Export info. If failed procAddress field is 0</returns>
-    BLACKBONE_API exportData GetExport( const ModuleData* hMod, const char* name_ord, const wchar_t* baseModule = L"" );
+    BLACKBONE_API call_result_t<exportData> GetExport( const ModuleData* hMod, const char* name_ord, const wchar_t* baseModule = L"" );
 
     /// <summary>
     /// Inject image into target process
@@ -150,7 +151,7 @@ public:
     /// </summary>
     /// <param name="hMod">Module to unload</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool Unload( const ModuleData* hMod );
+    BLACKBONE_API NTSTATUS Unload( const ModuleData* hMod );
 
     /// <summary>
     /// Unlink module from most loader structures

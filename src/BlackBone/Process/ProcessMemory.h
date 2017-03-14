@@ -24,7 +24,7 @@ public:
     /// <param name="desired">Desired base address of new block</param>
     /// <param name="desired">false if caller will be responsible for block deallocation</param>
     /// <returns>Memory block. If failed - returned block will be invalid</returns>
-    BLACKBONE_API MemBlock Allocate( size_t size, DWORD protection = PAGE_EXECUTE_READWRITE, ptr_t desired = 0, bool own = true );
+    BLACKBONE_API call_result_t<MemBlock> Allocate( size_t size, DWORD protection = PAGE_EXECUTE_READWRITE, ptr_t desired = 0, bool own = true );
 
     /// <summary>
     /// Free memory
@@ -103,11 +103,11 @@ public:
     /// <param name="dwAddress">Address to read from</param>
     /// <returns>Read data</returns>
     template<class T>
-    inline T Read( ptr_t dwAddress )
+    inline call_result_t<T> Read( ptr_t dwAddress )
     {
         T res; 
-        LastNtStatus( Read( dwAddress, sizeof( T ), &res ) );
-        return res;
+        auto status = Read( dwAddress, sizeof( T ), &res );
+        return call_result_t<T>( res, status );
     };
 
     /// <summary>
@@ -116,11 +116,11 @@ public:
     /// <param name="adrList">Base address + list of offsets</param>
     /// <returns>Read data</returns>
     template<class T>
-    inline T Read( std::vector<ptr_t>&& adrList )
+    inline call_result_t<T> Read( std::vector<ptr_t>&& adrList )
     {
         T res;
-        LastNtStatus( Read( std::forward<std::vector<ptr_t>>( adrList ), sizeof( T ), &res ) );
-        return res;
+        auto status = Read( std::forward<std::vector<ptr_t>>( adrList ), sizeof( T ), &res );
+        return call_result_t<T>( res, status );
     }
 
     /// <summary>
@@ -174,10 +174,9 @@ public:
     /// <summary>
     /// Enumerate valid memory regions
     /// </summary>
-    /// <param name="results">Found regions</param>
     /// <param name="includeFree">If true - non-allocated regions will be included in list</param>
-    /// <returns>Number of regions found</returns>
-    BLACKBONE_API size_t EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree = false );
+    /// <returns>Found regions</returns>
+    BLACKBONE_API std::vector<MEMORY_BASIC_INFORMATION64> EnumRegions( bool includeFree = false );
 
     BLACKBONE_API inline class ProcessCore& core() { return _core; }
     BLACKBONE_API inline class Process* process()  { return _process; }

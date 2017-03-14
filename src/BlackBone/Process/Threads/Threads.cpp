@@ -25,18 +25,23 @@ ProcessThreads::~ProcessThreads()
 /// <param name="arg">Thread argument.</param>
 /// <param name="flags">Thread creation flags</param>
 /// <returns>New thread object</returns>
-Thread ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg, enum CreateThreadFlags flags /*= NoThreadFlags*/ )
+call_result_t<Thread> ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg, enum CreateThreadFlags flags /*= NoThreadFlags*/ )
 {
     HANDLE hThd = NULL;
-    if (!NT_SUCCESS( _core.native()->CreateRemoteThreadT( hThd, threadProc, arg, flags, THREAD_ALL_ACCESS ) ))
+    auto status = _core.native()->CreateRemoteThreadT( hThd, threadProc, arg, flags, THREAD_ALL_ACCESS );
+    if (!NT_SUCCESS( status ))
     {
         // Ensure full thread access
-        if (NT_SUCCESS( _core.native()->CreateRemoteThreadT( hThd, threadProc, arg, flags, THREAD_QUERY_LIMITED_INFORMATION ) ))
+        status = _core.native()->CreateRemoteThreadT( hThd, threadProc, arg, flags, THREAD_QUERY_LIMITED_INFORMATION );
+        if (NT_SUCCESS( status ))
         {
             if (Driver().loaded())
-                Driver().PromoteHandle( GetCurrentProcessId(), hThd, THREAD_ALL_ACCESS );
+                status = Driver().PromoteHandle( GetCurrentProcessId(), hThd, THREAD_ALL_ACCESS );
         }
     }
+
+    if (!NT_SUCCESS( status ))
+        return status;
 
     return Thread( hThd, &_core );
 }

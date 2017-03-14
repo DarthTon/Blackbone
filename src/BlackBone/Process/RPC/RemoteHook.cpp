@@ -102,7 +102,7 @@ NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, con
     HookData data = { { 0 } };
 
     // Store old byte
-    data.oldByte = _memory.Read<uint8_t>( ptr );
+    data.oldByte = _memory.Read<uint8_t>( ptr ).result();
     data.type = type;
     data.onExecute.freeFn = newFn;
     data.onExecute.classFn.classPtr = pClass;
@@ -115,7 +115,7 @@ NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, con
         // Set for single thread
         if (pThread != nullptr)
         {
-            data.hwbp_idx = pThread->AddHWBP( ptr, hwbp_execute, hwbp_1 );
+            data.hwbp_idx = pThread->AddHWBP( ptr, hwbp_execute, hwbp_1 ).result( -1 );
             if (data.hwbp_idx == -1)
                 return STATUS_NO_MORE_ENTRIES;
         }

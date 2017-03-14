@@ -241,7 +241,7 @@ private:
 
         // Add breakpoint to every thread
         for (auto& thd : thisProc.threads().getAll())
-            this->_hwbpIdx[thd.id()] = thd.AddHWBP( reinterpret_cast<ptr_t>(this->_original), hwbp_execute, hwbp_1 );
+            this->_hwbpIdx[thd.id()] = thd.AddHWBP( reinterpret_cast<ptr_t>(this->_original), hwbp_execute, hwbp_1 ).result();
     
         return this->_hooked = true;
     }

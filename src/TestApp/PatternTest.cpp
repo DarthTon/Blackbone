@@ -4,12 +4,11 @@
 void TestPatterns()
 {
     Process explorer;
-    std::vector<DWORD> procs;
     std::vector<ptr_t> results;
 
     std::wcout << L"Remote pattern match test. Using 'explorer.exe as a target'\n";
 
-    Process::EnumByName( L"explorer.exe", procs );
+    auto procs = Process::EnumByName( L"explorer.exe" );
 
     if (!procs.empty())
     {

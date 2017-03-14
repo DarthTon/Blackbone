@@ -447,5 +447,8 @@
     <ClInclude Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.h">
       <Filter>Subystem</Filter>
     </ClInclude>
+    <ClInclude Include="Include\CallResult.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

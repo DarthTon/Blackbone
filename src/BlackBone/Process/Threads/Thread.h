@@ -3,6 +3,7 @@
 #include "../../Config.h"
 #include "../../Include/Winheaders.h"
 #include "../../Include/NativeStructures.h"
+#include "../../Include/CallResult.h"
 #include "../../Include/Types.h"
 
 #include <memory>
@@ -225,7 +226,7 @@ public:
     /// <param name="type">Breakpoint type(read/write/execute)</param>
     /// <param name="length">Number of bytes to include into breakpoint</param>
     /// <returns>Index of used breakpoint; -1 if failed</returns>
-    BLACKBONE_API int AddHWBP( ptr_t addr, HWBPType type, HWBPLength length );
+    BLACKBONE_API call_result_t<int> AddHWBP( ptr_t addr, HWBPType type, HWBPLength length );
 
     /// <summary>
     /// Remove existing hardware breakpoint

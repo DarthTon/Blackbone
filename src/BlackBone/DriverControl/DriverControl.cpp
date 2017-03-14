@@ -83,7 +83,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
     if (!NT_SUCCESS( _loadStatus ))
     {
         BLACKBONE_TRACE( L"Failed to load driver %ls. Status 0x%X", path.c_str(), _loadStatus );
-        return LastNtStatus( _loadStatus );
+        return _loadStatus;
     }
 
     _hDriver = CreateFileW( 

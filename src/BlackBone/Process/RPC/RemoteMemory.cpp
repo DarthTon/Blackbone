@@ -172,7 +172,7 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
     auto& modules = _process->modules();
 
     // Local and remote proc address
-    pProc = modules.GetExport( modules.GetModule( L"ntdll.dll" ), procNames[hkType] ).procAddress;
+    pProc = modules.GetExport( modules.GetModule( L"ntdll.dll" ), procNames[hkType] ).result( exportData() ).procAddress;
     pTranslated = (uint8_t*)TranslateAddress( pProc );
     if (!pTranslated)
         return STATUS_INVALID_ADDRESS;
@@ -220,7 +220,7 @@ bool RemoteMemory::RestoreHook( OperationType hkType )
     auto& modules = _process->modules();
 
     // Local and remote proc address
-    pProc = modules.GetExport( modules.GetModule( L"ntdll.dll" ), procNames[hkType] ).procAddress;
+    pProc = modules.GetExport( modules.GetModule( L"ntdll.dll" ), procNames[hkType] ).result( exportData() ).procAddress;
     pTranslated = (uint8_t*)TranslateAddress( pProc );
     if (!pTranslated)
         return false;
@@ -341,9 +341,9 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
 
     auto& modules = _process->modules();
 
-    auto pEnterCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlEnterCriticalSection" ).procAddress;
-    auto pLeaveCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlLeaveCriticalSection" ).procAddress;
-    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).procAddress;
+    auto pEnterCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlEnterCriticalSection" ).result( exportData() ).procAddress;
+    auto pLeaveCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlLeaveCriticalSection" ).result( exportData() ).procAddress;
+    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).result( exportData() ).procAddress;
 
     a.GenPrologue();
     a.EnableX64CallStack( false );
@@ -465,9 +465,9 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
 
     auto& modules = _process->modules();
 
-    auto pEnterCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlEnterCriticalSection" ).procAddress;
-    auto pLeaveCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlLeaveCriticalSection" ).procAddress;
-    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).procAddress;
+    auto pEnterCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlEnterCriticalSection" ).result( exportData() ).procAddress;
+    auto pLeaveCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlLeaveCriticalSection" ).result( exportData() ).procAddress;
+    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).result( exportData() ).procAddress;
 
     a.GenPrologue();
     a->sub( asmjit::host::esp, sa.getTotalSize() );

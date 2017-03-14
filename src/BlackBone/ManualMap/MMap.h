@@ -197,7 +197,7 @@ public:
     /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
     /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info </returns>
-    BLACKBONE_API const ModuleData* MapImage(
+    BLACKBONE_API call_result_t<const ModuleData*> MapImage(
         const std::wstring& path,
         eLoadFlags flags = NoFlags,
         MapCallback mapCallback = nullptr,
@@ -215,7 +215,7 @@ public:
     /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
     /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info</returns>
-    BLACKBONE_API const ModuleData* MapImage(
+    BLACKBONE_API call_result_t<const ModuleData*> MapImage(
         size_t size, void* buffer,
         bool asImage = false,
         eLoadFlags flags = NoFlags,
@@ -253,7 +253,7 @@ private:
     /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
     /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info</returns>
-    const ModuleData* MapImageInternal(
+    call_result_t<const ModuleData*> MapImageInternal(
         const std::wstring& path,
         void* buffer, size_t size,
         bool asImage = false,
@@ -276,7 +276,7 @@ private:
     /// <param name="path">Image path</param>
     /// <param name="flags">Mapping flags</param>
     /// <returns>Module info</returns>
-    const ModuleData* FindOrMapModule(
+    call_result_t<const ModuleData*> FindOrMapModule(
         const std::wstring& path,
         void* buffer, size_t size, bool asImage,
         eLoadFlags flags = NoFlags
@@ -314,7 +314,7 @@ private:
     /// </summary>
     /// <param name="pImage">image data</param>
     /// <returns>true on success</returns>
-    bool RelocateImage( ImageContext* pImage );
+    NTSTATUS RelocateImage( ImageContext* pImage );
 
     /// <summary>
     /// Resolves image import or delayed image import
@@ -386,7 +386,7 @@ private:
     /// <param name="pImage">Currently mapped image data</param>
     /// <param name="path">Dependency path</param>
     /// <returns></returns>
-    const ModuleData* FindOrMapDependency( ImageContext* pImage, std::wstring& path );
+    call_result_t<const ModuleData*> FindOrMapDependency( ImageContext* pImage, std::wstring& path );
 
     /// <summary>
     /// Transform section characteristics into memory protection flags

@@ -35,8 +35,7 @@ void TestRemoteHook()
     };
 
     HookClass hclass;
-    std::vector<DWORD> found;
-    Process::EnumByName( L"taskmgr.exe", found );
+    auto found = Process::EnumByName( L"taskmgr.exe" );
 
     std::wcout << L"Function hooking test\n";
     std::wcout << L"Searching for taskmgr.exe... ";
@@ -65,12 +64,12 @@ void TestRemoteHook()
             "NtOpenProcess"
             );
 
-        if (pHookFn.procAddress != 0)
+        if (pHookFn.success())
         {
             std::wcout << L"Found. Hooking...\n";
 
             // Hook and wait some time.
-            auto status = hclass.procTaskMgr.hooks().Apply( RemoteHook::hwbp, pHookFn.procAddress, &HookClass::HookFn, hclass );
+            auto status = hclass.procTaskMgr.hooks().Apply( RemoteHook::hwbp, pHookFn.result().procAddress, &HookClass::HookFn, hclass );
             if (NT_SUCCESS( status ))
             {
                 std::wcout << L"Hooked successfully. Try to terminate TestApp.exe from taskmgr now.\n";

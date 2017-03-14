@@ -130,7 +130,7 @@ private:
     /// Create worker RPC thread
     /// </summary>
     /// <returns>Thread ID</returns>
-    DWORD CreateWorkerThread();
+    call_result_t<DWORD> CreateWorkerThread();
 
     /// <summary>
     /// Create event to synchronize APC procedures
@@ -155,8 +155,8 @@ private:
     /// <param name="args">Function arguments</param>
     /// <param name="cc">Calling convention</param>
     /// <param name="retType">Return type</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool PrepareCallAssembly(
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS PrepareCallAssembly(
         AsmHelperBase& a, 
         const void* pfn,
         std::vector<blackbone::AsmVariant>& args,

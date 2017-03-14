@@ -213,7 +213,7 @@ bool Thread::Join( int timeout /*= INFINITE*/ )
 /// <param name="type">Breakpoint type(read/write/execute)</param>
 /// <param name="length">Number of bytes to include into breakpoint</param>
 /// <returns>Index of used breakpoint; -1 if failed</returns>
-int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
+call_result_t<int> Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
 {
     _CONTEXT64 context64 = { 0 };
     _CONTEXT32 context32 = { 0 };
@@ -223,7 +223,7 @@ int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
     bool res = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
     auto pDR7 = use64 ? reinterpret_cast<regDR7*>(&context64.Dr7) : reinterpret_cast<regDR7*>(&context32.Dr7);
     if (!res)
-        return -1;
+        return LastNtStatus();
 
     // Check if HWBP is already present
     for (int i = 0; i < 4; i++)
@@ -238,10 +238,7 @@ int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
 
     // If all 4 registers are occupied - error
     if (freeIdx < 0)
-    {
-        LastNtStatus( STATUS_NO_MORE_ENTRIES );
-        return -1;
-    }
+        return STATUS_NO_MORE_ENTRIES;
 
     // Enable corresponding HWBP and local BP flag
 
@@ -254,7 +251,7 @@ int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
 
     // Write values to registers
     res = use64 ? SetContext( context64, true ) : SetContext( context32, true );
-    return res ? freeIdx : -1;
+    return res ? call_result_t<int>( freeIdx ) : call_result_t<int>( std::nullopt, LastNtStatus() );
 }
 
 /// <summary>

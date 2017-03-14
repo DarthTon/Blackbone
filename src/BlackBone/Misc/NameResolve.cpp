@@ -71,15 +71,15 @@ bool blackbone::NameResolve::InitializeP()
         wchar_t dllName[MAX_PATH] = { 0 };
 
         pSetMap->apiName( pDescriptor, dllName );
-        std::transform( dllName, dllName + MAX_PATH, dllName, ::tolower );
+        std::transform( dllName, dllName + MAX_PATH, dllName, ::towlower );
 
         T3 pHostData = pSetMap->valArray( pDescriptor );
 
         for (DWORD j = 0; j < pHostData->Count; j++)
         { 
             T4 pHost = pHostData->entry( pSetMap, j );
-            std::wstring hostName( reinterpret_cast<wchar_t*>(reinterpret_cast<uint8_t*>(pSetMap)+pHost->ValueOffset),
-                                   pHost->ValueLength / sizeof(wchar_t) );
+            std::wstring hostName( reinterpret_cast<wchar_t*>(reinterpret_cast<uint8_t*>(pSetMap) + pHost->ValueOffset), 
+                pHost->ValueLength / sizeof( wchar_t ) );
 
             if (!hostName.empty())
                 vhosts.push_back( hostName );
@@ -113,7 +113,8 @@ NTSTATUS NameResolve::ResolvePath(
     wchar_t tmpPath[4096] = { 0 };
     std::wstring completePath;
 
-    std::transform( path.begin(), path.end(), path.begin(), ::tolower );
+    //std::transform( path.begin(), path.end(), path.begin(), ::towlower );
+    path = Utils::ToLower( path );
 
     // Leave only file name
     std::wstring filename = Utils::StripPath( path );
@@ -145,22 +146,22 @@ NTSTATUS NameResolve::ResolvePath(
             path = sys_path + path;
         }
         
-        return LastNtStatus( STATUS_SUCCESS );
+        return STATUS_SUCCESS;
     }
 
     if (flags & ApiSchemaOnly)
-        return LastNtStatus( STATUS_NOT_FOUND );
+        return STATUS_NOT_FOUND;
 
     // SxS redirection
     if (ProbeSxSRedirect( path, actx ) == STATUS_SUCCESS)
-        return LastNtStatus( STATUS_SUCCESS );
+        return STATUS_SUCCESS;
 
     if (flags & NoSearch)
-        return LastNtStatus( STATUS_NOT_FOUND );
+        return STATUS_NOT_FOUND;
 
     // Already a full-qualified name
     if (Utils::FileExists( path ))
-        return LastNtStatus( STATUS_SUCCESS );
+        return STATUS_SUCCESS;
 
     //
     // Perform search accordingly to Windows Image loader search order 
@@ -284,7 +285,7 @@ NTSTATUS NameResolve::ResolvePath(
         }
     }
 
-    return LastNtStatus( STATUS_NOT_FOUND );
+    return STATUS_NOT_FOUND;
 }
 
 
@@ -337,7 +338,7 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
             SAFE_CALL( RtlFreeUnicodeString, &DllName2);
     }
 
-    return LastNtStatus( status );
+    return status;
 }
 
 /// <summary>

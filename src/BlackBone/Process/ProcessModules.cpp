@@ -228,16 +228,13 @@ void ProcessModules::GetManualModules( ProcessModules::mapModules& mods )
 /// <param name="name_ord">Function name or ordinal</param>
 /// <param name="baseModule">Import module name. Only used to resolve ApiSchema during manual map.</param>
 /// <returns>Export info. If failed procAddress field is 0</returns>
-exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_ord, const wchar_t* baseModule /*= L""*/ )
+call_result_t<exportData> ProcessModules::GetExport( const ModuleData* hMod, const char* name_ord, const wchar_t* baseModule /*= L""*/ )
 {
     exportData data;
 
     /// Invalid module
     if (hMod == nullptr || hMod->baseAddress == 0)
-    {  
-        LastNtStatus( STATUS_INVALID_PARAMETER_1 );
-        return data;
-    }
+        return STATUS_INVALID_PARAMETER_1;
     
     std::unique_ptr<IMAGE_EXPORT_DIRECTORY, decltype(&free)> expData( nullptr, &free );
 
@@ -251,12 +248,12 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
     _memory.Read( hMod->baseAddress, sizeof(hdrDos), &hdrDos );
 
     if (hdrDos.e_magic != IMAGE_DOS_SIGNATURE)
-        return data;
+        return STATUS_INVALID_IMAGE_NOT_MZ;
 
     _memory.Read( hMod->baseAddress + hdrDos.e_lfanew, sizeof(IMAGE_NT_HEADERS64), &hdrNt32 );
 
     if (phdrNt32->Signature != IMAGE_NT_SIGNATURE)
-        return data;
+        return STATUS_INVALID_IMAGE_FORMAT;
 
     if (phdrNt32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC)
         expBase = phdrNt32->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
@@ -398,7 +395,11 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
 
     // Image path
     UNICODE_STRING ustr = { 0 };
-    auto modName = _memory.Allocate( 0x1000, PAGE_READWRITE );
+    auto mem = _memory.Allocate( 0x1000, PAGE_READWRITE );
+    if (!mem.success())
+        return nullptr;
+
+    auto modName = std::move( mem.result() );
 
     ustr.Buffer = reinterpret_cast<PWSTR>(modName.ptr<uintptr_t>() + sizeof( ustr ));
     ustr.Length = static_cast<USHORT>(path.size() * sizeof( wchar_t ));
@@ -409,12 +410,12 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
 
     // Image and process have same processor architecture
     bool sameArch = (img.mType() == mt_mod64 && _core.isWow64() == false) || (img.mType() == mt_mod32 && _core.isWow64() == true);
-    auto pLoadLibrary = GetExport( GetModule( L"kernel32.dll", LdrList, img.mType() ), "LoadLibraryW" ).procAddress;
+    auto pLoadLibrary = GetExport( GetModule( L"kernel32.dll", LdrList, img.mType() ), "LoadLibraryW" ).result( exportData() ).procAddress;
 
     // Can't generate code through WOW64 barrier
     if ((barrier.type != wow_32_64 && img.mType() == mt_mod64) || (barrier.type == wow_32_32 || barrier.type == wow_64_64))
     {
-        auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" ).procAddress;
+        auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" ).result( exportData() ).procAddress;
         if (pLdrLoadDll == 0)
         {
             if (pStatus)
@@ -464,19 +465,16 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
 /// </summary>
 /// <param name="hMod">Module to unload</param>
 /// <returns>true on success</returns>
-bool ProcessModules::Unload( const ModuleData* hMod )
+NTSTATUS ProcessModules::Unload( const ModuleData* hMod )
 {
     // Module not present or is manually mapped
     if (hMod == nullptr ||  hMod->manual || !ValidateModule( hMod->baseAddress ))
-    {
-        LastNtStatus( STATUS_NOT_FOUND );
-        return false;
-    }
+        return STATUS_NOT_FOUND;
 
     // Unload routine
     auto pUnload = GetExport( GetModule( L"ntdll.dll", LdrList, hMod->type ), "LdrUnloadDll" );
-    if (pUnload.procAddress == 0)
-        return false;
+    if (!pUnload.success())
+        return pUnload.status;
 
     // Special case for unloading 64 bit modules from WOW64 process
     if (_proc.core().isWow64() && hMod->type == mt_mod64)
@@ -485,13 +483,13 @@ bool ProcessModules::Unload( const ModuleData* hMod )
         
         AsmJitHelper a;
 
-        a.GenCall( static_cast<uintptr_t>(pUnload.procAddress), { static_cast<uintptr_t>(hMod->baseAddress) } );
+        a.GenCall( static_cast<uintptr_t>(pUnload.result().procAddress), { static_cast<uintptr_t>(hMod->baseAddress) } );
         a->ret();
 
         _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
     }
     else
-        _proc.remote().ExecDirect( pUnload.procAddress, hMod->baseAddress );
+        _proc.remote().ExecDirect( pUnload.result().procAddress, hMod->baseAddress );
 
     // Remove module from cache
     _modules.erase( std::make_pair( hMod->name, hMod->type ) );
@@ -606,7 +604,11 @@ bool ProcessModules::InjectPureIL(
     tmp.erase( idx );
     std::wstring ClassName = tmp;
 
-    auto address = _memory.Allocate( 0x10000 );
+    auto mem = _memory.Allocate( 0x10000 );
+    if (!mem.success())
+        return false;
+
+    auto address = mem.result();
 
     uintptr_t offset = 4;
 
@@ -666,7 +668,7 @@ bool ProcessModules::InjectPureIL(
     }
 
     // CLRCreateInstance address
-    uintptr_t CreateInstanceAddress = (uintptr_t)GetExport( pMscoree, "CLRCreateInstance" ).procAddress;
+    uintptr_t CreateInstanceAddress = (uintptr_t)GetExport( pMscoree, "CLRCreateInstance" ).result( exportData() ).procAddress;
 
     // Scary assembler code incoming!
     AsmJitHelper a;
@@ -708,7 +710,7 @@ bool ProcessModules::InjectPureIL(
     a->xor_( a->zsi, a->zsi );
 
     // CLRCreateInstance()
-    a.GenCall( (uintptr_t)CreateInstanceAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
+    a.GenCall( CreateInstanceAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
     // success?
     a->test( a->zax, a->zax );
     a->jnz( L_Error1 );

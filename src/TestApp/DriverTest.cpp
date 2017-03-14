@@ -4,9 +4,8 @@
 void TestDriver()
 {
     Process proc, thisProc;
-    std::vector<DWORD> procIDs;
-    Process::EnumByName( L"explorer.exe", procIDs );
-
+    auto procIDs = Process::EnumByName( L"explorer.exe" );
+   
     std::wcout << L"Driver functionality test\n";
 
     if (procIDs.empty())

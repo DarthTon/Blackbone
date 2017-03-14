@@ -180,12 +180,12 @@ NTSTATUS NativeWow64::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t a
     }
     else*/
     {
-        LastNtStatus( STATUS_SUCCESS );
+        SetLastNtStatus( STATUS_SUCCESS );
 
         static DWORD64 NtCreateThreadEx = GetProcAddress64( getNTDLL64(), "NtCreateThreadEx" );
 
         if (NtCreateThreadEx == 0)
-            return LastNtStatus( STATUS_ORDINAL_NOT_FOUND );
+            return STATUS_ORDINAL_NOT_FOUND;
 
         // hThread can't be used directly because x64Call will zero stack space near variable
         DWORD64 hThd2 = NULL;
@@ -217,7 +217,7 @@ NTSTATUS NativeWow64::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     }
     else
     {
-        LastNtStatus( STATUS_SUCCESS );
+        SetLastNtStatus( STATUS_SUCCESS );
         GetThreadContext( hThread, reinterpret_cast<PCONTEXT>(&ctx) );
         return LastNtStatus();
     }
@@ -254,7 +254,7 @@ NTSTATUS NativeWow64::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     }
     else
     {
-        LastNtStatus( STATUS_SUCCESS );
+        SetLastNtStatus( STATUS_SUCCESS );
         SetThreadContext( hThread, reinterpret_cast<const CONTEXT*>(&ctx) );
         return LastNtStatus();
     }
@@ -354,7 +354,7 @@ ptr_t NativeWow64::getTEB( HANDLE hThread, _TEB64* pteb )
 
     if (ntQit == 0)
     {
-        LastNtStatus( STATUS_ORDINAL_NOT_FOUND );
+        SetLastNtStatus( STATUS_ORDINAL_NOT_FOUND );
         return 0;
     }
 

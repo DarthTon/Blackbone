@@ -60,10 +60,8 @@ Native::~Native()
 /// <returns>Status code</returns>
 NTSTATUS Native::VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect )
 {
-    LastNtStatus( STATUS_SUCCESS );
-    lpAddress = reinterpret_cast<ptr_t>
-        (VirtualAllocEx( _hProcess, reinterpret_cast<LPVOID>(lpAddress), dwSize, flAllocationType, flProtect ));
-
+    SetLastNtStatus( STATUS_SUCCESS );
+    lpAddress = reinterpret_cast<ptr_t>(VirtualAllocEx( _hProcess, reinterpret_cast<LPVOID>(lpAddress), dwSize, flAllocationType, flProtect ));
     return LastNtStatus();
 }
 
@@ -77,7 +75,7 @@ NTSTATUS Native::VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAlloc
 /// <returns>Status code</returns>
 NTSTATUS Native::VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType )
 {
-    LastNtStatus( STATUS_SUCCESS );
+    SetLastNtStatus( STATUS_SUCCESS );
     VirtualFreeEx( _hProcess, reinterpret_cast<LPVOID>(lpAddress), dwSize, dwFreeType );
     return LastNtStatus();
 }
@@ -90,7 +88,7 @@ NTSTATUS Native::VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeTyp
 /// <returns>Status code</returns>
 NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 lpBuffer )
 {
-    LastNtStatus( STATUS_SUCCESS );
+    SetLastNtStatus( STATUS_SUCCESS );
     VirtualQueryEx(
         _hProcess, reinterpret_cast<LPCVOID>(lpAddress),
         reinterpret_cast<PMEMORY_BASIC_INFORMATION>(lpBuffer),
@@ -110,8 +108,7 @@ NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, MEMORY_INFORMATION_CLASS info
 {
     SIZE_T retLen = 0;
 
-    LastNtStatus( STATUS_SUCCESS );
-    
+    SetLastNtStatus( STATUS_SUCCESS );   
     return SAFE_NATIVE_CALL(
         NtQueryVirtualMemory, _hProcess, reinterpret_cast<LPVOID>(lpAddress),
         infoClass, lpBuffer, bufSize, &retLen
@@ -132,8 +129,7 @@ NTSTATUS Native::VirtualProtectExT( ptr_t lpAddress, DWORD64 dwSize, DWORD flPro
     if (!flOld)
         flOld = &junk;
 
-    LastNtStatus( STATUS_SUCCESS );
-
+    SetLastNtStatus( STATUS_SUCCESS );
     VirtualProtectEx( _hProcess, reinterpret_cast<LPVOID>(lpAddress), static_cast<SIZE_T>(dwSize), flProtect, flOld );
 
     return LastNtStatus();
@@ -149,7 +145,7 @@ NTSTATUS Native::VirtualProtectExT( ptr_t lpAddress, DWORD64 dwSize, DWORD flPro
 /// <returns>Status code</returns>
 NTSTATUS Native::ReadProcessMemoryT( ptr_t lpBaseAddress, LPVOID lpBuffer, size_t nSize, DWORD64 *lpBytes /*= nullptr */ )
 {
-    LastNtStatus( STATUS_SUCCESS );
+    SetLastNtStatus( STATUS_SUCCESS );
     ReadProcessMemory( _hProcess, reinterpret_cast<LPVOID>(lpBaseAddress), lpBuffer, nSize, reinterpret_cast<SIZE_T*>(lpBytes) );
     return LastNtStatus();
 }
@@ -164,7 +160,7 @@ NTSTATUS Native::ReadProcessMemoryT( ptr_t lpBaseAddress, LPVOID lpBuffer, size_
 /// <returns>Status code</returns>
 NTSTATUS Native::WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer, size_t nSize, DWORD64 *lpBytes /*= nullptr */ )
 {
-    LastNtStatus( STATUS_SUCCESS );
+    SetLastNtStatus( STATUS_SUCCESS );
     WriteProcessMemory( _hProcess, reinterpret_cast<LPVOID>(lpBaseAddress), lpBuffer, nSize, reinterpret_cast<SIZE_T*>(lpBytes) );
     return LastNtStatus();
 }
@@ -205,7 +201,7 @@ NTSTATUS Native::SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, u
 /// <returns>Status code</returns>
 NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access /*= THREAD_ALL_ACCESS*/ )
 {
-    LastNtStatus( STATUS_SUCCESS );
+    SetLastNtStatus( STATUS_SUCCESS );
     NTSTATUS status = 0; 
     auto pCreateThread = GET_IMPORT( NtCreateThreadEx );
 
@@ -247,7 +243,7 @@ NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, C
 /// <returns>Status code</returns>
 NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT64& ctx )
 {
-    LastNtStatus( STATUS_SUCCESS );
+    SetLastNtStatus( STATUS_SUCCESS );
     GetThreadContext( hThread, reinterpret_cast<PCONTEXT>(&ctx) );
     return LastNtStatus();
 }
@@ -267,7 +263,7 @@ NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     }
     else
     {
-        LastNtStatus( STATUS_SUCCESS );        
+        SetLastNtStatus( STATUS_SUCCESS );
         SAFE_CALL( Wow64GetThreadContext, hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx) );
         return LastNtStatus();
     }
@@ -281,7 +277,7 @@ NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
 /// <returns>Status code</returns>
 NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx )
 {
-    LastNtStatus( STATUS_SUCCESS );
+    SetLastNtStatus( STATUS_SUCCESS );
     SetThreadContext( hThread, reinterpret_cast<PCONTEXT>(&ctx) );
     return LastNtStatus();
 }
@@ -301,7 +297,7 @@ NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     }
     else
     {
-        LastNtStatus( STATUS_SUCCESS );
+        SetLastNtStatus( STATUS_SUCCESS );
         SAFE_CALL( Wow64SetThreadContext, hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx));
         return LastNtStatus();
     }
@@ -390,14 +386,12 @@ ptr_t Native::getTEB( HANDLE hThread, _TEB64* pteb )
 /// <summary>
 /// Enumerate valid memory regions
 /// </summary>
-/// <param name="results">Found regions</param>
 /// <param name="includeFree">If true - non-allocated regions will be included in list</param>
-/// <returns>Number of regions found</returns>
-size_t Native::EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool includeFree /*= false*/ )
+/// <returns>Found regions</returns>
+std::vector<MEMORY_BASIC_INFORMATION64> Native::EnumRegions( bool includeFree /*= false*/ )
 {
     MEMORY_BASIC_INFORMATION64 mbi = { 0 };
-
-    results.clear();
+    std::vector<MEMORY_BASIC_INFORMATION64> results;
 
     for (ptr_t memptr = minAddr(); memptr < maxAddr(); memptr = mbi.BaseAddress + mbi.RegionSize)
     {
@@ -413,7 +407,7 @@ size_t Native::EnumRegions( std::list<MEMORY_BASIC_INFORMATION64>& results, bool
             results.emplace_back( mbi );
     }
 
-    return results.size();
+    return results;
 }
 
 /// <summary>
@@ -466,7 +460,7 @@ size_t Native::EnumSections( listModules& result )
     MEMORY_BASIC_INFORMATION64 mbi = { 0 };
     ptr_t lastBase = 0;
 
-    result.clear( );
+    result.clear();
 
     for (ptr_t memptr = minAddr(); memptr < maxAddr(); memptr = mbi.BaseAddress + mbi.RegionSize)
     {

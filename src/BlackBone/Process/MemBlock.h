@@ -3,10 +3,10 @@
 #include "../Include/Winheaders.h"
 #include "../Include/Macro.h"
 #include "../Include/Types.h"
+#include "../Include/CallResult.h"
 
 #include <stdint.h>
-#include <map>
-#include <set>
+#include <memory>
 
 namespace blackbone
 {
@@ -39,7 +39,48 @@ inline DWORD CastProtection( DWORD prot, bool bDEP )
 class MemBlock
 {
 public:
+    class MemBlockImpl
+    {
+        friend class MemBlock;
 
+    public:
+        MemBlockImpl() = default;
+
+        /// <summary>
+        /// MemBlock_p ctor
+        /// </summary>
+        /// <param name="mem">Process memory routines</param>
+        /// <param name="ptr">Memory address</param>
+        /// <param name="size">Block size</param>
+        /// <param name="prot">Memory protection</param>
+        /// <param name="own">true if caller will be responsible for block deallocation</param>
+        MemBlockImpl( class ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own = true, bool physical = false );
+
+        ~MemBlockImpl()
+        {
+            if (_own)
+                Free();
+        }
+
+        /// <summary>
+        /// Free memory
+        /// </summary>
+        /// <param name="size">Size of memory chunk to free. If 0 - whole block is freed</param>
+        NTSTATUS Free( size_t size = 0 );
+
+    private:
+        ptr_t  _ptr = 0;                // Raw memory pointer
+        size_t _size = 0;               // Region size
+        DWORD  _protection = 0;         // Region protection
+        bool   _own = true;             // Memory will be freed in destructor
+        bool   _physical = false;       // Memory allocated as direct physical
+        class ProcessMemory* _memory;   // Target process routines
+    }; 
+
+public:
+    /// <summary>
+    /// MemBlock ctor
+    /// </summary>
     BLACKBONE_API MemBlock();
 
     /// <summary>
@@ -58,16 +99,7 @@ public:
     /// <param name="size">Block size</param>
     /// <param name="prot">Memory protection</param>
     /// <param name="own">true if caller will be responsible for block deallocation</param>
-    BLACKBONE_API MemBlock( 
-        class ProcessMemory* mem, 
-        ptr_t ptr, 
-        size_t size, 
-        DWORD prot,
-        bool own = true, 
-        bool physical = false 
-        );
-
-    BLACKBONE_API ~MemBlock();
+    BLACKBONE_API MemBlock( class ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own = true, bool physical = false );
 
     /// <summary>
     /// Allocate new memory block
@@ -78,8 +110,8 @@ public:
     /// <param name="protection">Win32 Memory protection flags</param>
     /// <param name="own">false if caller will be responsible for block deallocation</param>
     /// <returns>Memory block. If failed - returned block will be invalid</returns>
-    BLACKBONE_API static MemBlock Allocate(
-    class ProcessMemory& process,
+    BLACKBONE_API static call_result_t<MemBlock> Allocate(
+        class ProcessMemory& process,
         size_t size,
         ptr_t desired = 0,
         DWORD protection = PAGE_EXECUTE_READWRITE,
@@ -93,7 +125,7 @@ public:
     /// <param name="desired">Desired base address of new block</param>
     /// <param name="protection">Memory protection</param>
     /// <returns>New block address</returns>
-    BLACKBONE_API ptr_t Realloc( size_t size, ptr_t desired = 0, DWORD protection = PAGE_EXECUTE_READWRITE );
+    BLACKBONE_API call_result_t<ptr_t> Realloc( size_t size, ptr_t desired = 0, DWORD protection = PAGE_EXECUTE_READWRITE );
 
     /// <summary>
     /// Change memory protection
@@ -179,59 +211,40 @@ public:
     /// <summary>
     /// Memory will not be deallocated upon object destruction
     /// </summary>
-    BLACKBONE_API inline void Release() { _own = false; }
+    BLACKBONE_API inline void Release() { if (_pImpl) _pImpl->_own = false; }
 
     /// <summary>
     /// Get memory pointer
     /// </summary>
     /// <returns>Memory pointer</returns>
     template< typename T = ptr_t >
-    inline T ptr() const { return (T)_ptr; }
+    inline T ptr() const { return _pImpl ? (T)_pImpl->_ptr : T( 0 ); }
 
     /// <summary>
     /// Get block size
     /// </summary>
     /// <returns>Block size</returns>
-    BLACKBONE_API inline size_t size() const { return _size; }
+    BLACKBONE_API inline size_t size() const { return _pImpl ? _pImpl->_size : 0; }
 
     /// <summary>
     /// Get block memory protection
     /// </summary>
     /// <returns>Memory protection flags</returns>
-    BLACKBONE_API inline DWORD  protection() const { return _protection; }
+    BLACKBONE_API inline DWORD  protection() const { return _pImpl ? _pImpl->_protection : 0; }
 
     /// <summary>
     /// Validate memory block
     /// <returns>true if memory pointer isn't 0</returns>
-    BLACKBONE_API inline bool valid() const { return (_memory != nullptr && _ptr != 0); }
+    BLACKBONE_API inline bool valid() const { return( _pImpl.get() != nullptr && _pImpl->_ptr != 0); }
 
     /// <summary>
     /// Get memory pointer
     /// </summary>
     /// <returns>Memory pointer</returns>
-    BLACKBONE_API inline operator ptr_t() const  { return _ptr; }
-
-    BLACKBONE_API MemBlock& operator =(const MemBlock& other)
-    {
-        _memory = other._memory;
-        _ptr = other._ptr;
-        _size = other._size;
-        _protection = other._protection;
-        _own = true;
-
-        // Transfer memory ownership
-        const_cast<MemBlock&>(other).Release();
-
-        return *this;
-    }
+    BLACKBONE_API inline operator ptr_t() const  { return _pImpl ? _pImpl->_ptr : 0; }
 
 private:
-    ptr_t  _ptr = 0;                // Raw memory pointer
-    size_t _size = 0;               // Region size
-    DWORD  _protection = 0;         // Region protection
-    bool   _own = true;             // Memory will be freed in destructor
-    bool   _physical = false;       // Memory allocated as direct physical
-    class ProcessMemory* _memory;   // Target process routines
+    std::shared_ptr<MemBlockImpl> _pImpl;
 };
 
 }

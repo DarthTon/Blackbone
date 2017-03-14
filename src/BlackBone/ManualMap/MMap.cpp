@@ -31,7 +31,7 @@ MMap::~MMap(void)
 /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
 /// <param name="context">User-supplied callback context</param>
 /// <returns>Mapped image info </returns>
-const ModuleData* MMap::MapImage(
+call_result_t<const ModuleData*> MMap::MapImage(
     const std::wstring& path,
     eLoadFlags flags /*= NoFlags*/,
     MapCallback mapCallback /*= nullptr*/,
@@ -52,7 +52,7 @@ const ModuleData* MMap::MapImage(
 /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
 /// <param name="context">User-supplied callback context</param>
 /// <returns>Mapped image info</returns>
-const ModuleData* MMap::MapImage(
+call_result_t<const ModuleData*> MMap::MapImage(
     size_t size, void* buffer,
     bool asImage /*= false*/,
     eLoadFlags flags /*= NoFlags*/,
@@ -79,7 +79,7 @@ const ModuleData* MMap::MapImage(
 /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
 /// <param name="context">User-supplied callback context</param>
 /// <returns>Mapped image info</returns>
-const ModuleData* MMap::MapImageInternal(
+call_result_t<const ModuleData*> MMap::MapImageInternal(
     const std::wstring& path,
     void* buffer, size_t size,
     bool asImage /*= false*/,
@@ -94,10 +94,11 @@ const ModuleData* MMap::MapImageInternal(
         return hMod;
 
     // Prepare target process
-    if (!NT_SUCCESS( _process.remote().CreateRPCEnvironment() ))
+    auto status = _process.remote().CreateRPCEnvironment();
+    if (!NT_SUCCESS( status ))
     {
         Cleanup();
-        return nullptr;
+        return status;
     }
 
     // No need to support exceptions if DEP is disabled
@@ -116,34 +117,38 @@ const ModuleData* MMap::MapImageInternal(
 
     // Map module and all dependencies
     auto mod = FindOrMapModule( path, buffer, size, asImage, flags );
-    if (mod == nullptr)
+    if (!mod.success())
     {
-        NTSTATUS tmp = LastNtStatus();
         Cleanup();
-        LastNtStatus( tmp );
-        return nullptr;
+        return mod.status;
     }
 
     // Change process base module address if needed
     if (flags & RebaseProcess && !_images.empty() && _images.rbegin()->get()->peImage.isExe())
     {
-        BLACKBONE_TRACE( L"ManualMap: Rebasing process to address 0x%p", static_cast<uintptr_t>(mod->baseAddress) );
+        BLACKBONE_TRACE( L"ManualMap: Rebasing process to address 0x%p", static_cast<uintptr_t>(mod.result()->baseAddress) );
 
         // Managed path fix
         if (_images.rbegin()->get()->peImage.pureIL() && !path.empty())
-            FixManagedPath( _process.memory().Read<uintptr_t>( _process.core().peb() + 2 * WordSize ), path );
+        {
+            auto mpath = _process.memory().Read<uintptr_t>( _process.core().peb() + 2 * WordSize );
+            if (!mpath.success())
+                return mpath.status;
+
+            FixManagedPath( mpath.result(), path );
+        }
 
         // PEB64
         _process.memory().Write( 
             _process.core().peb64() + FIELD_OFFSET( _PEB64, ImageBaseAddress ),
-            sizeof( uint64_t ), &mod->baseAddress
+            sizeof( uint64_t ), &mod.result()->baseAddress
             );
 
         //PEB32
         if(_process.core().isWow64())
             _process.memory().Write(
                 _process.core().peb32() + FIELD_OFFSET( _PEB32, ImageBaseAddress ),
-                sizeof( uint32_t ), &mod->baseAddress
+                sizeof( uint32_t ), &mod.result()->baseAddress
                 );
     }
 
@@ -216,7 +221,7 @@ void MMap::FixManagedPath( uintptr_t base, const std::wstring &path )
         // Get PEB loader entry
         for (auto head = static_cast<DWORD_PTR>(ldr.InLoadOrderModuleList.Flink);
             head != (peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<DWORD_PTR>, InLoadOrderModuleList ));
-            head = _process.memory().Read<DWORD_PTR>( head ))
+            head = _process.memory().Read<DWORD_PTR>( head ).result( 0 ))
         {
             _LDR_DATA_TABLE_ENTRY_BASE<DWORD_PTR> localdata = { { 0 } };
 
@@ -245,7 +250,7 @@ void MMap::FixManagedPath( uintptr_t base, const std::wstring &path )
 /// <param name="asImage">If set to true - buffer has image memory layout</param>
 /// <param name="flags">Mapping flags</param>
 /// <returns>Module info</returns>
-const ModuleData* MMap::FindOrMapModule(
+call_result_t<const ModuleData*> MMap::FindOrMapModule(
     const std::wstring& path,
     void* buffer, size_t size, bool asImage,
     eLoadFlags flags /*= NoFlags*/ 
@@ -262,10 +267,9 @@ const ModuleData* MMap::FindOrMapModule(
     status = buffer ? pImage->peImage.Load( buffer, size, !asImage ) : pImage->peImage.Load( path, flags & NoSxS ? true : false );
     if (!NT_SUCCESS( status ))
     {
-        LastNtStatus( status );
         BLACKBONE_TRACE( L"ManualMap: Failed to load image '%ls'/0x%p. Status 0x%X", path.c_str(), buffer, status );
         pImage->peImage.Release();
-        return nullptr;
+        return status;
     }
 
     // Check if already loaded
@@ -314,20 +318,26 @@ const ModuleData* MMap::FindOrMapModule(
         else
         {
             //flags &= ~HideVAD;
-            BLACKBONE_TRACE( L"ManualMap: Failed to allocate physical memory for image, status 0x%d", status );
+            BLACKBONE_TRACE( L"ManualMap: Failed to allocate physical memory for image, status 0x%X", status );
             pImage->peImage.Release();
             return nullptr;
         }
     }
 
     // Allocate normally if something went wrong
-    if (pImage->imgMem == 0)
-        pImage->imgMem = _process.memory().Allocate( pImage->peImage.imageSize(), PAGE_EXECUTE_READWRITE, pImage->peImage.imageBase() );
+    if (!pImage->imgMem.valid())
+    {
+        auto mem = _process.memory().Allocate( pImage->peImage.imageSize(), PAGE_EXECUTE_READWRITE, pImage->peImage.imageBase() );
+        if (!mem.success())
+        {
+            BLACKBONE_TRACE( L"ManualMap: Failed to allocate memory for image, status 0x%X", status );
+            return nullptr;
+        }
+
+        pImage->imgMem = std::move( mem.result() );
+    }
 
     BLACKBONE_TRACE( L"ManualMap: Image base allocated at 0x%p", pImage->imgMem.ptr<uintptr_t>() );
-
-    if (!pImage->imgMem.valid())
-        return nullptr;
 
     // Create Activation context for SxS
     if (pImage->peImage.manifestID() == 0)
@@ -337,7 +347,7 @@ const ModuleData* MMap::FindOrMapModule(
         CreateActx( pImage->peImage.manifestFile(), pImage->peImage.manifestID(), !pImage->peImage.noPhysFile() );
 
     // Core image mapping operations
-    if (!CopyImage( pImage.get() ) || !RelocateImage( pImage.get() ))
+    if (!CopyImage( pImage.get() ) || !NT_SUCCESS( RelocateImage( pImage.get() ) ))
     {
         pImage->peImage.Release();
         return nullptr;
@@ -578,7 +588,7 @@ bool MMap::ProtectImageMemory( ImageContext* pImage )
 /// </summary>
 /// <param name="pImage">image data</param>
 /// <returns>true on success</returns>
-bool MMap::RelocateImage( ImageContext* pImage )
+NTSTATUS MMap::RelocateImage( ImageContext* pImage )
 {
     BLACKBONE_TRACE( L"ManualMap: Relocating image '%ls'", pImage->FilePath.c_str() );
 
@@ -589,8 +599,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
     if (Delta == 0)
     {
         BLACKBONE_TRACE( L"ManualMap: No need for relocation" );
-        LastNtStatus( STATUS_SUCCESS );
-        return true;
+        return STATUS_SUCCESS;
     }
 
     auto start = pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_BASERELOC );
@@ -601,8 +610,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
     {
         // TODO: return proper error code
         BLACKBONE_TRACE( L"ManualMap: Can't relocate image, no relocation data" );
-        LastNtStatus( STATUS_IMAGE_NOT_AT_BASE );
-        return false;
+        return STATUS_IMAGE_NOT_AT_BASE;
     }
 
     while ((uintptr_t)fixrec < end && fixrec->BlockSize)
@@ -642,8 +650,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
             {
                 // TODO: support for all remaining relocations
                 BLACKBONE_TRACE( L"ManualMap: Abnormal relocation type %d. Aborting", fixtype );
-                LastNtStatus( STATUS_INVALID_IMAGE_FORMAT );
-                return false;
+                return STATUS_INVALID_IMAGE_FORMAT;
             }
         }
 
@@ -651,7 +658,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
         fixrec = reinterpret_cast<pe::RelocData*>(reinterpret_cast<uintptr_t>(fixrec) + fixrec->BlockSize);
     }
 
-    return true;
+    return STATUS_SUCCESS;
 }
 
 /// <summary>
@@ -660,7 +667,7 @@ bool MMap::RelocateImage( ImageContext* pImage )
 /// <param name="pImage">Currently napped image data</param>
 /// <param name="path">Dependency path</param>
 /// <returns></returns>
-const ModuleData* MMap::FindOrMapDependency( ImageContext* pImage, std::wstring& path )
+call_result_t<const ModuleData*> MMap::FindOrMapDependency( ImageContext* pImage, std::wstring& path )
 {
     // Already loaded
     auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType(), pImage->FileName.c_str() );
@@ -705,8 +712,7 @@ const ModuleData* MMap::FindOrMapDependency( ImageContext* pImage, std::wstring&
     // Aborted by user
     else
     {
-        LastNtStatus( STATUS_REQUEST_CANCELED );
-        return nullptr;
+        return STATUS_REQUEST_CANCELED;
     }
 };
 
@@ -729,53 +735,57 @@ bool MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
 
         // Load dependency if needed
         auto hMod = FindOrMapDependency( pImage, wstrDll );
-        if (!hMod)
+        if (!hMod.success())
         {
-            // TODO: Add error code
-            BLACKBONE_TRACE( L"ManualMap: Failed to load dependency '%ls'. Status = 0x%x", wstrDll.c_str(), LastNtStatus() );
+            BLACKBONE_TRACE( L"ManualMap: Failed to load dependency '%ls'. Status = 0x%x", wstrDll.c_str(), hMod.status );
             return false;
         }
 
         for (auto& importFn : importMod.second)
         {
-            exportData expData;
+            call_result_t<exportData> expData;
 
             if (importFn.importByOrd)
-                expData = _process.modules().GetExport( hMod, reinterpret_cast<const char*>(importFn.importOrdinal) );
+                expData = _process.modules().GetExport( hMod.result(), reinterpret_cast<const char*>(importFn.importOrdinal) );
             else
-                expData = _process.modules().GetExport( hMod, importFn.importName.c_str() );
+                expData = _process.modules().GetExport( hMod.result(), importFn.importName.c_str() );
+
+            if (!expData.success())
+            {
+                BLACKBONE_TRACE( L"ManualMap: Failed to get function from dependency '%ls'. Status = 0x%x", wstrDll.c_str(), expData.status );
+                return false;
+            }
 
             // Still forwarded, load missing modules
-            while (expData.procAddress && expData.isForwarded)
+            while (expData.result().procAddress && expData.result().isForwarded)
             {
-                std::wstring wdllpath = expData.forwardModule;
+                std::wstring wdllpath = expData.result().forwardModule;
 
                 // Ensure module is loaded
                 auto hFwdMod = FindOrMapDependency( pImage, wdllpath );
-                if (!hFwdMod)
+                if (!hFwdMod.success())
                 {
                     // TODO: Add error code
-                    BLACKBONE_TRACE( L"ManualMap: Failed to load forwarded dependency '%ls'. Status = 0x%x", wstrDll.c_str(), LastNtStatus() );
+                    BLACKBONE_TRACE( L"ManualMap: Failed to load forwarded dependency '%ls'. Status = 0x%x", wstrDll.c_str(), hFwdMod.status );
                     return false;
                 }
 
-                if (expData.forwardByOrd)
-                    expData = _process.modules().GetExport( hFwdMod, reinterpret_cast<const char*>(expData.forwardOrdinal), wdllpath.c_str() );
+                if (expData.result().forwardByOrd)
+                    expData = _process.modules().GetExport( hFwdMod.result(), reinterpret_cast<const char*>(expData.result().forwardOrdinal), wdllpath.c_str() );
                 else
-                    expData = _process.modules().GetExport( hFwdMod, expData.forwardName.c_str(), wdllpath.c_str() );
+                    expData = _process.modules().GetExport( hFwdMod.result(), expData.result().forwardName.c_str(), wdllpath.c_str() );
             }
 
             // Failed to resolve import
-            if (expData.procAddress == 0)
+            if (expData.result().procAddress == 0)
             {
-                LastNtStatus( STATUS_ORDINAL_NOT_FOUND );
+                SetLastNtStatus( expData.status );
 
                 if (importFn.importByOrd)
-                    BLACKBONE_TRACE( L"ManualMap: Failed to get import #%d from image '%ls'", 
-                                    importFn.importOrdinal, wstrDll.c_str() );
+                    BLACKBONE_TRACE( L"ManualMap: Failed to get import #%d from image '%ls'", importFn.importOrdinal, wstrDll.c_str() );
                 else
-                    BLACKBONE_TRACE( L"ManualMap: Failed to get import '%ls' from image '%ls'",
-                                    Utils::AnsiToWstring(importFn.importName).c_str(), wstrDll.c_str() );
+                    BLACKBONE_TRACE( L"ManualMap: Failed to get import '%ls' from image '%ls'", Utils::AnsiToWstring( importFn.importName ).c_str(), wstrDll.c_str() );
+
                 return false;
             }
 
@@ -783,17 +793,16 @@ bool MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
 
             if (pImage->flags & HideVAD)
             {
-                uintptr_t address = static_cast<uintptr_t>(expData.procAddress);
+                uintptr_t address = static_cast<uintptr_t>(expData.result().procAddress);
                 status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + importFn.ptrRVA, sizeof( address ), &address );
             }
             else
-                status = pImage->imgMem.Write( importFn.ptrRVA, static_cast<uintptr_t>(expData.procAddress) );
+                status = pImage->imgMem.Write( importFn.ptrRVA, static_cast<uintptr_t>(expData.result().procAddress) );
 
             // Write function address
             if (!NT_SUCCESS( status ))
             {
-                BLACKBONE_TRACE( L"ManualMap: Failed to write import function address at offset 0x%x. Status = 0x%x",
-                                importFn.ptrRVA, status );
+                BLACKBONE_TRACE( L"ManualMap: Failed to write import function address at offset 0x%x. Status = 0x%X", importFn.ptrRVA, status );
                 return false;
             }
         }
@@ -833,9 +842,12 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
                 "RtlAddFunctionTable"
             );
 
+            if (!pAddTable.success())
+                return pAddTable.status;
+
             a.GenPrologue();
             a.GenCall(
-                static_cast<uintptr_t>(pAddTable.procAddress), {
+                static_cast<uintptr_t>(pAddTable.result().procAddress), {
                 pImage->pExpTableAddr,
                 size / sizeof( IMAGE_RUNTIME_FUNCTION_ENTRY ),
                 pImage->imgMem.ptr<uintptr_t>() }
@@ -886,9 +898,12 @@ NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
             "RtlDeleteFunctionTable"
             );
 
+        if (!pRemoveTable.success())
+            return pRemoveTable.status;
+
         a.GenPrologue();
         // RtlDeleteFunctionTable(pExpTable);
-        a.GenCall( static_cast<uintptr_t>(pRemoveTable.procAddress), { pImage->pExpTableAddr } );
+        a.GenCall( static_cast<uintptr_t>(pRemoveTable.result().procAddress), { pImage->pExpTableAddr } );
         _process.remote().AddReturnWithEvent( a );
         a.GenEpilogue();
 
@@ -999,11 +1014,11 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomAr
     a.GenPrologue();
 
     // ActivateActCtx
-    if (_pAContext.valid() && pActivateActx.procAddress)
+    if (_pAContext.valid() && pActivateActx.success())
     {
         a->mov( a->zax, _pAContext.ptr<uintptr_t>() );
         a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
-        a.GenCall( static_cast<uintptr_t>( pActivateActx.procAddress ), { 0, a->zax, _pAContext.ptr<uintptr_t>() + sizeof( HANDLE ) } );
+        a.GenCall( static_cast<uintptr_t>( pActivateActx.result().procAddress ), { 0, a->zax, _pAContext.ptr<uintptr_t>() + sizeof( HANDLE ) } );
     }
 
     // Prepare custom arguments
@@ -1011,9 +1026,12 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomAr
     if (pCustomArgs)
     {
         auto memBuf = _process.memory().Allocate( static_cast<size_t>(pCustomArgs->size()) + sizeof( uint64_t ), PAGE_EXECUTE_READWRITE, 0, false );
-        memBuf.Write( 0, pCustomArgs->size() );
-        memBuf.Write( sizeof( uint64_t ), static_cast<size_t>(pCustomArgs->size()), pCustomArgs->data() );
-        customArgumentsAddress = static_cast<uintptr_t>( memBuf.ptr() );
+        if (!memBuf.success())
+            return true;
+
+        memBuf.result().Write( 0, pCustomArgs->size() );
+        memBuf.result().Write( sizeof( uint64_t ), static_cast<size_t>(pCustomArgs->size()), pCustomArgs->data() );
+        customArgumentsAddress = static_cast<uintptr_t>(memBuf.result().ptr());
     }
 
     // Function order
@@ -1059,11 +1077,11 @@ bool MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomAr
     }
 
     // DeactivateActCtx
-    if (_pAContext.valid() && pDeactivateeActx.procAddress)
+    if (_pAContext.valid() && pDeactivateeActx.success())
     {
         a->mov( a->zax, _pAContext.ptr<uintptr_t>() + sizeof( HANDLE ) );
         a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
-        a.GenCall( static_cast<uintptr_t>( pDeactivateeActx.procAddress ), { 0, a->zax } );
+        a.GenCall( static_cast<uintptr_t>( pDeactivateeActx.result().procAddress ), { 0, a->zax } );
     }
 
     _process.remote().AddReturnWithEvent( a, pImage->peImage.mType() );
@@ -1093,7 +1111,11 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
     uint64_t result = 0;
     ACTCTXW act = { 0 };
 
-    _pAContext = _process.memory().Allocate( 512, PAGE_READWRITE );
+    auto mem = _process.memory().Allocate( 512, PAGE_READWRITE );
+    if (!mem.success())
+        return false;
+
+    _pAContext = std::move( mem.result() );
     
     act.cbSize = sizeof(act);
     act.lpSource = reinterpret_cast<LPCWSTR>(_pAContext.ptr<uintptr_t>() + sizeof( HANDLE ) + sizeof( act ));
@@ -1107,7 +1129,7 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
 
     bool switchMode = (_process.core().native()->GetWow64Barrier().type == wow_64_32);
     auto pCreateActx = _process.modules().GetExport( _process.modules().GetModule( L"kernel32.dll" ), "CreateActCtxW" );
-    if (pCreateActx.procAddress == 0)
+    if (!pCreateActx.success())
     {
         BLACKBONE_TRACE( L"ManualMap: Failed to create activation context for image '%ls'. 'CreateActCtxW' is absent", path.c_str() );
         return false;
@@ -1125,7 +1147,7 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
         act32.lpResourceName = id ;
 
         a->push( _pAContext.ptr<uint32_t>() + static_cast<uint32_t>(sizeof( HANDLE )) );
-        a->mov( asmjit::host::eax, static_cast<uint32_t>(pCreateActx.procAddress) );
+        a->mov( asmjit::host::eax, static_cast<uint32_t>(pCreateActx.result().procAddress) );
         a->call( a->zax );
         a->mov( asmjit::host::edx, _pAContext.ptr<uint32_t>() );
         //a->mov( asmjit::host::dword_ptr( asmjit::host::edx ), asmjit::host::eax );
@@ -1134,7 +1156,7 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
         auto pTermThd = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll" ), "NtTerminateThread" );
         a->push( a->zax );
         a->push( uint32_t( 0 ) );
-        a->mov( asmjit::host::eax, static_cast<uint32_t>(pTermThd.procAddress) );
+        a->mov( asmjit::host::eax, static_cast<uint32_t>(pTermThd.result().procAddress) );
         a->call( a->zax );
         a->ret( 4 );
         
@@ -1143,16 +1165,19 @@ bool MMap::CreateActx( const std::wstring& path, int id /*= 2 */, bool asImage /
         _pAContext.Write( sizeof(HANDLE) + sizeof(act32), (path.length() + 1) * sizeof(wchar_t), path.c_str() );
 
         auto pCode = _process.memory().Allocate( 0x1000 );
-        pCode.Write( 0, a->getCodeSize(), a->make() );
+        if (!pCode.success())
+            return false;
 
-        result = _process.remote().ExecDirect( pCode.ptr<ptr_t>(), _pAContext.ptr<size_t>() + sizeof(HANDLE) );
+        pCode.result().Write( 0, a->getCodeSize(), a->make() );
+
+        result = _process.remote().ExecDirect( pCode.result().ptr<ptr_t>(), _pAContext.ptr<size_t>() + sizeof(HANDLE) );
     }
     // Native way
     else
     {
         a.GenPrologue();
 
-        a.GenCall( static_cast<uintptr_t>(pCreateActx.procAddress), { _pAContext.ptr<uintptr_t>() + sizeof(HANDLE) } );
+        a.GenCall( static_cast<uintptr_t>(pCreateActx.result().procAddress), { _pAContext.ptr<uintptr_t>() + sizeof(HANDLE) } );
 
         a->mov( a->zdx, _pAContext.ptr<uintptr_t>() );
         a->mov( a->intptr_ptr( a->zdx ), a->zax );
