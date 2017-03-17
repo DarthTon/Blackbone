@@ -140,7 +140,7 @@ NTSTATUS ProcessMemory::Read( std::vector<ptr_t>&& adrList, size_t dwSize, PVOID
     if(adrList.size() == 1)
         return Read( adrList.front(), dwSize, pResult, handleHoles );
 
-    bool wow64 = _core.native()->GetWow64Barrier().targetWow64;
+    bool wow64 = _process->barrier().targetWow64;
     ptr_t ptr = wow64 ? Read<uint32_t>( adrList[0] ).result( 0 ) : Read<ptr_t>( adrList[0] ).result( 0 );
 
     for (size_t i = 1; i < adrList.size() - 1; i++)
@@ -175,7 +175,7 @@ NTSTATUS ProcessMemory::Write( std::vector<ptr_t>&& adrList, size_t dwSize, cons
     if (adrList.size() == 1)
         return Write( adrList.front(), dwSize, pData );
 
-    bool wow64 = _core.native()->GetWow64Barrier().targetWow64;
+    bool wow64 = _process->barrier().targetWow64;
     ptr_t ptr = wow64 ? Read<uint32_t>( adrList[0] ).result( 0 ) : Read<ptr_t>( adrList[0] ).result( 0 );
 
     for (size_t i = 1; i < adrList.size() - 1; i++)

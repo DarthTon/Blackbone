@@ -251,7 +251,7 @@ call_result_t<int> Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length
 
     // Write values to registers
     res = use64 ? SetContext( context64, true ) : SetContext( context32, true );
-    return res ? call_result_t<int>( freeIdx ) : call_result_t<int>( std::nullopt, LastNtStatus() );
+    return res ? call_result_t<int>( freeIdx ) : call_result_t<int>( LastNtStatus() );
 }
 
 /// <summary>

@@ -44,13 +44,14 @@ void TestRemoteHook()
     {
         std::wcout << L"Found. Attaching to process " << std::dec << found.front() << std::endl;
 
-        if (!NT_SUCCESS( hclass.procTaskMgr.Attach( found.front() ) ))
+        auto status = hclass.procTaskMgr.Attach( found.front() );
+        if (!NT_SUCCESS( status ))
         {
-            std::wcout << L"Failed to attach to taskmgr.exe...\n\n";
+            std::wcout << L"Failed to attach to taskmgr.exe. Status 0x" << std::hex << status << std::endl << std::endl;
             return;
         }
 
-        if (hclass.procTaskMgr.core().native()->GetWow64Barrier().type == wow_32_64)
+        if (hclass.procTaskMgr.barrier().type == wow_32_64)
         {
             std::wcout << L"Can't hook functions inside x64 process from x86 one, aborting\n\n";
             return;
@@ -59,24 +60,20 @@ void TestRemoteHook()
         std::wcout << L"Searching for NtOpenProcess... ";
 
         // Get function
-        auto pHookFn = hclass.procTaskMgr.modules().GetExport(
-            hclass.procTaskMgr.modules().GetModule( L"ntdll.dll" ), 
-            "NtOpenProcess"
-            );
-
-        if (pHookFn.success())
+        auto pHookFn = hclass.procTaskMgr.modules().GetExport( hclass.procTaskMgr.modules().GetModule( L"ntdll.dll" ), "NtOpenProcess" );
+        if (pHookFn)
         {
             std::wcout << L"Found. Hooking...\n";
 
             // Hook and wait some time.
-            auto status = hclass.procTaskMgr.hooks().Apply( RemoteHook::hwbp, pHookFn.result().procAddress, &HookClass::HookFn, hclass );
+            status = hclass.procTaskMgr.hooks().Apply( RemoteHook::hwbp, pHookFn->procAddress, &HookClass::HookFn, hclass );
             if (NT_SUCCESS( status ))
             {
                 std::wcout << L"Hooked successfully. Try to terminate TestApp.exe from taskmgr now.\n";
                 Sleep( 20000 );
             }
             else
-                std::wcout << L"Failed to install hook. Status" << std::hex << status << "\n";
+                std::wcout << L"Failed to install hook. Status 0x" << std::hex << status << std::endl;
         }
         else
             std::wcout << L"Not found, aborting\n";

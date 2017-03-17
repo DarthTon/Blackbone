@@ -5,11 +5,6 @@
 
 namespace blackbone
 {
-
-MemBlock::MemBlock()
-{
-}
-
 /// <summary>
 /// MemBlock ctor
 /// </summary>
@@ -73,20 +68,21 @@ MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, bool own /*= true*/ )
 /// <returns>Memory block. If failed - returned block will be invalid</returns>
 call_result_t<MemBlock> MemBlock::Allocate( ProcessMemory& process, size_t size, ptr_t desired /*= 0*/, DWORD protection /*= PAGE_EXECUTE_READWRITE */, bool own /*= true*/ )
 {
-    NTSTATUS status = STATUS_SUCCESS;
     ptr_t desired64 = desired;
     DWORD newProt = CastProtection( protection, process.core().DEP() );
     
-    if (status = process.core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, newProt ), !NT_SUCCESS( status ))
+    NTSTATUS status = process.core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, newProt );
+    if (!NT_SUCCESS( status ))
     {
         desired64 = 0;
-        if (status = process.core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, newProt ), NT_SUCCESS( status ))
+        status = process.core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, newProt );
+        if (NT_SUCCESS( status ))
             return call_result_t<MemBlock>( MemBlock( &process, desired64, size, protection, own ), STATUS_IMAGE_NOT_AT_BASE );
         else
             return status;
     }
 
-    return std::make_optional( MemBlock( &process, desired64, size, protection, own ) );
+    return MemBlock( &process, desired64, size, protection, own );
 }
 
 /// <summary>

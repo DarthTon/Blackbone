@@ -41,7 +41,7 @@ ProcessModules::~ProcessModules()
 /// <param name="type">Module type. 32 bit or 64 bit</param>
 /// <param name="search">Saerch type.</param>
 /// <returns>Module data. nullptr if not found</returns>
-const ModuleData* ProcessModules::GetModule(
+ModuleDataPtr ProcessModules::GetModule(
     const std::wstring& name,
     eModSeachType search /*= LdrList*/,
     eModType type /*= mt_default*/
@@ -58,7 +58,7 @@ const ModuleData* ProcessModules::GetModule(
 /// <param name="type">Module type. 32 bit or 64 bit</param>
 /// <param name="baseModule">Import module name. Used only to resolve ApiSchema during manual map</param>
 /// <returns>Module data. nullptr if not found</returns>
-const ModuleData* ProcessModules::GetModule(
+ModuleDataPtr ProcessModules::GetModule(
     std::wstring& name,
     eModSeachType search /*= LdrList*/,
     eModType type /*= mt_default*/,
@@ -69,26 +69,20 @@ const ModuleData* ProcessModules::GetModule(
 
     // Detect module type
     if (type == mt_default)
-        type = _core.native()->GetWow64Barrier().targetWow64 ? mt_mod32 : mt_mod64;
+        type = _proc.barrier().targetWow64 ? mt_mod32 : mt_mod64;
 
     CSLock lck( _modGuard );
 
     auto key = std::make_pair( name, type );
 
     // Fast lookup
-    if (_modules.count( key ) && (_modules[key].manual || ValidateModule( _modules[key].baseAddress )))
-        return &_modules[key];
+    if (_modules.count( key ) && (_modules[key]->manual || ValidateModule( _modules[key]->baseAddress )))
+        return _modules[key];
 
-    // Enum all process modules
-    Native::listModules modules;
-    _core.native()->EnumModules( modules, search, type );
-    
-    // Update local cache
-    for (auto& mod : modules)
-        _modules.emplace( std::make_pair( std::make_pair( mod.name, mod.type ), mod ) );
+    UpdateModuleCache( search, type );
 
     if (_modules.count( key ))
-        return &_modules[key];
+        return _modules[key];
 
     return nullptr;
 }
@@ -101,7 +95,7 @@ const ModuleData* ProcessModules::GetModule(
 /// <param name="type">Module type. 32 bit or 64 bit</param>
 /// <param name="search">Saerch type</param>
 /// <returns>Module data. nullptr if not found</returns>
-const ModuleData* ProcessModules::GetModule(
+ModuleDataPtr ProcessModules::GetModule(
     module_t modBase,
     bool strict /*= true*/,
     eModSeachType search /*= LdrList*/,
@@ -110,35 +104,29 @@ const ModuleData* ProcessModules::GetModule(
 {
     // Detect module type
     if (type == mt_default)
-        type = _core.native()->GetWow64Barrier().targetWow64 ? mt_mod32 : mt_mod64;
+        type = _proc.barrier().targetWow64 ? mt_mod32 : mt_mod64;
 
     CSLock lck( _modGuard );
 
     auto compFn = [modBase, strict]( const mapModules::value_type& val )
     { 
         if (strict)
-            return (val.second.baseAddress == modBase);
+            return (val.second->baseAddress == modBase);
         else
-            return (modBase >= val.second.baseAddress && modBase < val.second.baseAddress + val.second.size);
+            return (modBase >= val.second->baseAddress && modBase < val.second->baseAddress + val.second->size);
     };
 
-    auto iter = std::find_if( _modules.begin( ), _modules.end( ), compFn );
+    auto iter = std::find_if( _modules.begin(), _modules.end(), compFn );
 
     if (iter != _modules.end())
-        return &iter->second;
+        return iter->second;
 
-    // Enum all process modules
-    Native::listModules modules;
-    _core.native()->EnumModules( modules, search, type );
-
-    // Update local cache
-    for (auto& mod : modules)
-        _modules.emplace( std::make_pair( std::make_pair( mod.name, mod.type ), mod ) );
+    UpdateModuleCache( search , type );
 
     iter = std::find_if( _modules.begin(), _modules.end(), compFn );
 
     if (iter != _modules.end())
-        return &iter->second;
+        return iter->second;
     else
         return nullptr;
 }
@@ -147,9 +135,9 @@ const ModuleData* ProcessModules::GetModule(
 /// Get process main module
 /// </summary>
 /// <returns>Module data. nullptr if not found</returns>
-const ModuleData* ProcessModules::GetMainModule()
+ModuleDataPtr ProcessModules::GetMainModule()
 {
-    if (_core.native()->GetWow64Barrier().x86OS)
+    if (_proc.barrier().x86OS)
     {
         _PEB32 peb = { { { 0 } } };
         if (_proc.core().peb32( &peb ) == 0)
@@ -174,36 +162,24 @@ const ModuleData* ProcessModules::GetMainModule()
 /// <returns>Module list</returns>
 const ProcessModules::mapModules& ProcessModules::GetAllModules( eModSeachType search /*= LdrList*/ )
 {
-    Native::listModules modules, modules2;
     eModType mt = _core.isWow64() ? mt_mod32 : mt_mod64;
-
-    _core.native()->EnumModules( modules, search, mt );
-
     CSLock lck( _modGuard );
 
     // Remove non-manual modules
     for (auto iter = _modules.begin(); iter != _modules.end();)
     {
-        if (!iter->second.manual) 
+        if (!iter->second->manual) 
             _modules.erase( iter++ );
         else 
             ++iter;
     }
 
-    // Update local cache
-    for (auto& mod : modules)
-        _modules.emplace( std::make_pair( std::make_pair( mod.name, mod.type ), mod ) );
+    UpdateModuleCache( search, mt );
 
     // Do additional search in case of loader lists
     // This, however won't search for 32 bit modules in native x64 process
     if (search == LdrList && mt == mt_mod32)
-    {
-        _core.native()->EnumModules( modules2, search, mt_mod64 );
-
-        // Update local cache
-        for (auto& mod : modules2)
-            _modules.emplace( std::make_pair( std::make_pair( mod.name, mod.type ), mod ) );
-    }
+        UpdateModuleCache( search, mt_mod64 );
 
     return _modules;
 }
@@ -211,14 +187,17 @@ const ProcessModules::mapModules& ProcessModules::GetAllModules( eModSeachType s
 /// <summary>
 /// Get list of manually mapped modules
 /// </summary>
-/// <param name="mods">List of modules</param>
-void ProcessModules::GetManualModules( ProcessModules::mapModules& mods )
+/// <returns>List of modules</returns>
+ProcessModules::mapModules ProcessModules::GetManualModules()
 {
-    mods.clear();
+    ProcessModules::mapModules mods;
+    std::copy_if( 
+        _modules.begin(), _modules.end(), 
+        std::inserter( mods, mods.end() ), 
+        []( const auto& mod ) { return mod.second->manual; } 
+    );
 
-    for (auto& mod: _modules)
-        if (mod.second.manual)
-            mods.emplace( mod );
+    return mods;
 }
 
 /// <summary>
@@ -228,7 +207,7 @@ void ProcessModules::GetManualModules( ProcessModules::mapModules& mods )
 /// <param name="name_ord">Function name or ordinal</param>
 /// <param name="baseModule">Import module name. Only used to resolve ApiSchema during manual map.</param>
 /// <returns>Export info. If failed procAddress field is 0</returns>
-call_result_t<exportData> ProcessModules::GetExport( const ModuleData* hMod, const char* name_ord, const wchar_t* baseModule /*= L""*/ )
+call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, const char* name_ord, const wchar_t* baseModule /*= L""*/ )
 {
     exportData data;
 
@@ -371,12 +350,11 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleData* hMod, con
 /// <param name="path">Full-qualified image path</param>
 /// <param name="pStatus">Injection status code</param>
 /// <returns>Module info. nullptr if failed</returns>
-const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pStatus /*= nullptr*/ )
+call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
 {
     NTSTATUS status = STATUS_SUCCESS;
-    const ModuleData* mod = nullptr;
+    ModuleDataPtr mod;
     ptr_t res = 0;
-    auto& barrier = _core.native()->GetWow64Barrier();
     
     AsmJitHelper a;
     pe::PEImage img;
@@ -385,19 +363,14 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
     img.Release();
 
     // Already loaded
-    if ((mod = GetModule( path, LdrList, img.mType() )) != nullptr)
-    {
-        if (pStatus)
-            *pStatus = STATUS_IMAGE_ALREADY_LOADED;
-
-        return mod;
-    }
+    if (mod = GetModule( path, LdrList, img.mType() ))
+        return call_result_t<ModuleDataPtr>( mod, STATUS_IMAGE_ALREADY_LOADED );
 
     // Image path
     UNICODE_STRING ustr = { 0 };
     auto mem = _memory.Allocate( 0x1000, PAGE_READWRITE );
-    if (!mem.success())
-        return nullptr;
+    if (!mem)
+        return mem.status;
 
     auto modName = std::move( mem.result() );
 
@@ -410,19 +383,15 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
 
     // Image and process have same processor architecture
     bool sameArch = (img.mType() == mt_mod64 && _core.isWow64() == false) || (img.mType() == mt_mod32 && _core.isWow64() == true);
-    auto pLoadLibrary = GetExport( GetModule( L"kernel32.dll", LdrList, img.mType() ), "LoadLibraryW" ).result( exportData() ).procAddress;
+    auto pLoadLibrary = GetExport( GetModule( L"kernel32.dll", LdrList, img.mType() ), "LoadLibraryW" );
 
     // Can't generate code through WOW64 barrier
-    if ((barrier.type != wow_32_64 && img.mType() == mt_mod64) || (barrier.type == wow_32_32 || barrier.type == wow_64_64))
+    if ((_proc.barrier().type != wow_32_64 && img.mType() == mt_mod64) || 
+        (_proc.barrier().type == wow_32_32 || _proc.barrier().type == wow_64_64))
     {
-        auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" ).result( exportData() ).procAddress;
-        if (pLdrLoadDll == 0)
-        {
-            if (pStatus)
-                *pStatus = STATUS_ORDINAL_NOT_FOUND;
-
-            return nullptr;
-        }
+        auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" );
+        if (!pLdrLoadDll)
+            return pLdrLoadDll.status;
 
         // Patch LdrFindOrMapDll to enable kernel32.dll loading
         #ifdef USE64
@@ -434,16 +403,16 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
             if (patchBase != 0)
             {
                 DWORD flOld = 0;
-                _memory.Protect( patchBase, 6, PAGE_EXECUTE_READWRITE, &flOld );
-                _memory.Write( patchBase, sizeof(patch), patch );
-                _memory.Protect( patchBase, 6, flOld, nullptr );
+                _memory.Protect( patchBase, sizeof( patch ), PAGE_EXECUTE_READWRITE, &flOld );
+                _memory.Write( patchBase, sizeof( patch ), patch );
+                _memory.Protect( patchBase, sizeof( patch ), flOld, nullptr );
             }
 
             _ldrPatched = true;
         }
         #endif
 
-        a.GenCall( (uintptr_t)pLdrLoadDll, { 0, 0, modName.ptr<uintptr_t>(), modName.ptr<uintptr_t>() + 0x800 } );
+        a.GenCall( (uintptr_t)pLdrLoadDll->procAddress, { 0, 0, modName.ptr<uintptr_t>(), modName.ptr<uintptr_t>() + 0x800 } );
         a->ret();
 
         status = _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
@@ -451,13 +420,13 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
             status = static_cast<NTSTATUS>(res);
     }
     // Try to use LoadLibrary if possible
-    else if (pLoadLibrary != 0 && sameArch)
-        status = _proc.remote().ExecDirect( pLoadLibrary, modName.ptr() + sizeof( ustr ) );
+    else if (pLoadLibrary && sameArch)
+        status = _proc.remote().ExecDirect( pLoadLibrary->procAddress, modName.ptr() + sizeof( ustr ) );
 
-    if (pStatus)
-        *pStatus = status;
+    if (!NT_SUCCESS( status ))
+        return status;
 
-    return (res == STATUS_SUCCESS) ? GetModule( path, LdrList, img.mType() ) : nullptr;
+    return GetModule( path, LdrList, img.mType() );
 }
 
 /// <summary>
@@ -465,15 +434,15 @@ const ModuleData* ProcessModules::Inject( const std::wstring& path, NTSTATUS* pS
 /// </summary>
 /// <param name="hMod">Module to unload</param>
 /// <returns>true on success</returns>
-NTSTATUS ProcessModules::Unload( const ModuleData* hMod )
+NTSTATUS ProcessModules::Unload( const ModuleDataPtr& hMod )
 {
     // Module not present or is manually mapped
-    if (hMod == nullptr ||  hMod->manual || !ValidateModule( hMod->baseAddress ))
+    if (hMod->manual || !ValidateModule( hMod->baseAddress ))
         return STATUS_NOT_FOUND;
 
     // Unload routine
     auto pUnload = GetExport( GetModule( L"ntdll.dll", LdrList, hMod->type ), "LdrUnloadDll" );
-    if (!pUnload.success())
+    if (!pUnload)
         return pUnload.status;
 
     // Special case for unloading 64 bit modules from WOW64 process
@@ -483,13 +452,13 @@ NTSTATUS ProcessModules::Unload( const ModuleData* hMod )
         
         AsmJitHelper a;
 
-        a.GenCall( static_cast<uintptr_t>(pUnload.result().procAddress), { static_cast<uintptr_t>(hMod->baseAddress) } );
+        a.GenCall( static_cast<uintptr_t>(pUnload->procAddress), { static_cast<uintptr_t>(hMod->baseAddress) } );
         a->ret();
 
         _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
     }
     else
-        _proc.remote().ExecDirect( pUnload.result().procAddress, hMod->baseAddress );
+        _proc.remote().ExecDirect( pUnload->procAddress, hMod->baseAddress );
 
     // Remove module from cache
     _modules.erase( std::make_pair( hMod->name, hMod->type ) );
@@ -502,7 +471,7 @@ NTSTATUS ProcessModules::Unload( const ModuleData* hMod )
 /// </summary>
 /// <param name="mod">Module to unlink</param>
 /// <returns>true on success</returns>
-bool ProcessModules::Unlink( const ModuleData* mod )
+bool ProcessModules::Unlink( const ModuleDataPtr& mod )
 {
     return _proc.nativeLdr().Unlink( mod->baseAddress, mod->name, mod->type );
 }
@@ -535,7 +504,7 @@ bool ProcessModules::ValidateModule( module_t base )
 /// <param name="size">Module size</param>
 /// <param name="mt">Module type. 32 bit or 64 bit</param>
 /// <returns>Module info</returns>
-const ModuleData* ProcessModules::AddManualModule( const std::wstring& FilePath, module_t base, size_t size, eModType mt )
+ModuleDataPtr ProcessModules::AddManualModule( const std::wstring& FilePath, module_t base, size_t size, eModType mt )
 {
     ModuleData module;
 
@@ -547,9 +516,9 @@ const ModuleData* ProcessModules::AddManualModule( const std::wstring& FilePath,
     module.type = mt;
 
     auto key = std::make_pair( module.name, module.type );
-    _modules.emplace( std::make_pair( key, module ) );
+    _modules.emplace( std::make_pair( key, std::make_shared<const ModuleData>( module ) ) );
 
-    return &_modules.find( key )->second;
+    return _modules.find( key )->second;
 }
 
 /// <summary>
@@ -565,10 +534,10 @@ void ProcessModules::RemoveManualModule( const std::wstring& filename, eModType 
         _modules.erase( key );
 }
 
-// DWORD alignment
-inline size_t DWAlign( size_t offset )
+void ProcessModules::UpdateModuleCache( eModSeachType search, eModType type )
 {
-    return offset % sizeof( size_t ) == 0 ? offset : offset + (sizeof( size_t ) - offset % sizeof( size_t ));
+    for (const auto& mod : _core.native()->EnumModules( search, type ))
+        _modules.emplace( std::make_pair( std::make_pair( mod->name, mod->type ), mod ) );
 }
 
 
@@ -605,7 +574,7 @@ bool ProcessModules::InjectPureIL(
     std::wstring ClassName = tmp;
 
     auto mem = _memory.Allocate( 0x10000 );
-    if (!mem.success())
+    if (!mem)
         return false;
 
     auto address = mem.result();
@@ -619,6 +588,12 @@ bool ProcessModules::InjectPureIL(
 
     uintptr_t* ofstArr[] = { &address_VersionString, &address_netAssemblyDll, &address_netAssemblyClass,
                           &address_netAssemblyMethod, &address_netAssemblyArgs };
+
+    // DWORD alignment
+    auto DWAlign = []( size_t offset )
+    {
+        return offset % sizeof( size_t ) == 0 ? offset : offset + (sizeof( size_t ) - offset % sizeof( size_t ));
+    };
 
     // Write strings
     for (int i = 0; i < ARRAYSIZE( strArr ); i++)
@@ -668,7 +643,9 @@ bool ProcessModules::InjectPureIL(
     }
 
     // CLRCreateInstance address
-    uintptr_t CreateInstanceAddress = (uintptr_t)GetExport( pMscoree, "CLRCreateInstance" ).result( exportData() ).procAddress;
+    auto pfnCreateInstance = GetExport( pMscoree.result(), "CLRCreateInstance" );
+    if (!pfnCreateInstance)
+        return false;
 
     // Scary assembler code incoming!
     AsmJitHelper a;
@@ -710,7 +687,7 @@ bool ProcessModules::InjectPureIL(
     a->xor_( a->zsi, a->zsi );
 
     // CLRCreateInstance()
-    a.GenCall( CreateInstanceAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
+    a.GenCall( (uintptr_t)pfnCreateInstance->procAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
     // success?
     a->test( a->zax, a->zax );
     a->jnz( L_Error1 );

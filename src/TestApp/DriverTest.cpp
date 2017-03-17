@@ -117,7 +117,7 @@ void TestDriver()
             std::cout << "TestDriver: IOCTL_BLACKBONE_ENUM_REGIONS succeeded\r\n";
     }
     else
-        std::cout << "TestDriver: Failed to load driver. Status 0x" << std::hex << LastNtStatus() << "\r\n";
+        std::cout << "TestDriver: Failed to load driver. Status 0x" << std::hex << Driver().status() << "\r\n";
 
     std::cout << "\r\n";
 }

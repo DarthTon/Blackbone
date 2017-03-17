@@ -31,9 +31,6 @@
     <Filter Include="AsmJit\Helpers">
       <UniqueIdentifier>{e856edb5-6e81-44c0-a687-1901b1cc2c3d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Subystem">
-      <UniqueIdentifier>{7eb59189-daeb-47d1-9fa8-c9e246b22039}</UniqueIdentifier>
-    </Filter>
     <Filter Include="LocalHook">
       <UniqueIdentifier>{d8e1ddde-63c1-40a4-b8c6-5285e4fad4ba}</UniqueIdentifier>
     </Filter>
@@ -46,16 +43,19 @@
     <Filter Include="Process\Remote">
       <UniqueIdentifier>{f688ae04-991b-40b2-9243-89e38275be42}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Subsystem">
+      <UniqueIdentifier>{7eb59189-daeb-47d1-9fa8-c9e246b22039}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Subsystem\NativeSubsystem.cpp">
-      <Filter>Subystem</Filter>
+      <Filter>Subsystem</Filter>
     </ClCompile>
     <ClCompile Include="Subsystem\Wow64Subsystem.cpp">
-      <Filter>Subystem</Filter>
+      <Filter>Subsystem</Filter>
     </ClCompile>
     <ClCompile Include="Subsystem\x86Subsystem.cpp">
-      <Filter>Subystem</Filter>
+      <Filter>Subsystem</Filter>
     </ClCompile>
     <ClCompile Include="Process\MemBlock.cpp">
       <Filter>Process</Filter>
@@ -193,19 +193,19 @@
       <Filter>Misc</Filter>
     </ClCompile>
     <ClCompile Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.cpp">
-      <Filter>Subystem</Filter>
+      <Filter>Subsystem</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
     <ClInclude Include="Subsystem\NativeSubsystem.h">
-      <Filter>Subystem</Filter>
+      <Filter>Subsystem</Filter>
     </ClInclude>
     <ClInclude Include="Subsystem\Wow64Subsystem.h">
-      <Filter>Subystem</Filter>
+      <Filter>Subsystem</Filter>
     </ClInclude>
     <ClInclude Include="Subsystem\x86Subsystem.h">
-      <Filter>Subystem</Filter>
+      <Filter>Subsystem</Filter>
     </ClInclude>
     <ClInclude Include="Process\MemBlock.h">
       <Filter>Process</Filter>
@@ -445,7 +445,7 @@
       <Filter>Misc</Filter>
     </ClInclude>
     <ClInclude Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.h">
-      <Filter>Subystem</Filter>
+      <Filter>Subsystem</Filter>
     </ClInclude>
     <ClInclude Include="Include\CallResult.h">
       <Filter>Include</Filter>

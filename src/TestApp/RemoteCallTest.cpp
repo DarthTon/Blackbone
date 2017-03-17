@@ -20,13 +20,14 @@ void TestRemoteCall()
     {
         std::wcout << L"Found. Attaching to process " << std::dec << found.front() << std::endl;
 
-        if (explorer.Attach( found.front() ) != STATUS_SUCCESS)
+        NTSTATUS status = explorer.Attach( found.front() );
+        if (!NT_SUCCESS( status ))
         {
-            std::wcout << L"Can't attach to process, status code " << LastNtStatus() << " aborting\n\n";
+            std::wcout << L"Can't attach to process, status code " << status << " aborting\n\n";
             return;
         }
 
-        auto barrier = explorer.core().native()->GetWow64Barrier().type;
+        auto barrier = explorer.barrier().type;
 
         if (barrier != wow_32_32 && barrier != wow_64_64)
         {
@@ -39,14 +40,14 @@ void TestRemoteCall()
         auto hMainMod = explorer.modules().GetMainModule();
         auto pRemote = explorer.modules().GetExport( explorer.modules().GetModule( L"ntdll.dll" ), "NtQueryVirtualMemory" );
 
-        if (hMainMod && pRemote.success())
+        if (hMainMod && pRemote)
         {
             std::wcout << L"Found. Executing...\n";
             uint8_t buf[1024] = { 0 };
 
             RemoteFunction<fnNtQueryVirtualMemory> pFN(
                 explorer,
-                pRemote.result().procAddress,
+                pRemote->procAddress,
                 INVALID_HANDLE_VALUE,
                 reinterpret_cast<LPVOID>(hMainMod->baseAddress),
                 MemorySectionName,

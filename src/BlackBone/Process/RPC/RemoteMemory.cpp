@@ -161,7 +161,7 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
         return STATUS_NONE_MAPPED;
 
     // Cross-architecture code generation isn't supported yet
-    auto barrier = _process->core().native()->GetWow64Barrier().type;
+    auto barrier = _process->barrier().type;
     if (barrier != wow_32_32 && barrier != wow_64_64)
         return STATUS_CONTEXT_MISMATCH;
 
@@ -171,7 +171,7 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
 
     auto& modules = _process->modules();
 
-    // Local and remote proc address
+    // Local and remote process address
     pProc = modules.GetExport( modules.GetModule( L"ntdll.dll" ), procNames[hkType] ).result( exportData() ).procAddress;
     pTranslated = (uint8_t*)TranslateAddress( pProc );
     if (!pTranslated)
@@ -341,9 +341,9 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
 
     auto& modules = _process->modules();
 
-    auto pEnterCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlEnterCriticalSection" ).result( exportData() ).procAddress;
-    auto pLeaveCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlLeaveCriticalSection" ).result( exportData() ).procAddress;
-    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).result( exportData() ).procAddress;
+    auto pEnterCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlEnterCriticalSection" ).result( exportData() );
+    auto pLeaveCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlLeaveCriticalSection" ).result( exportData() );
+    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).result( exportData() );
 
     a.GenPrologue();
     a.EnableX64CallStack( false );
@@ -372,7 +372,7 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     }
 
     // RtlEnterCriticalSection
-    a.GenCall( pEnterCS, { _targetShare + FIELD_OFFSET( PageContext, csLock ) } );
+    a.GenCall( (uintptr_t)pEnterCS.procAddress, { _targetShare + FIELD_OFFSET( PageContext, csLock ) } );
 
     // Storage pointer
     a->lea( asmjit::host::rdx, data );
@@ -405,10 +405,10 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     // Operation type
     a->mov( asmjit::host::dword_ptr( asmjit::host::rdx, FIELD_OFFSET( OperationData, allocType ) ), opType );
 
-    a.GenCall( pWrite, { (uint64_t)_targetPipe, &data, sizeof( OperationData ), &junk, 0 } );
+    a.GenCall( (uintptr_t)pWrite.procAddress, { (uint64_t)_targetPipe, &data, sizeof( OperationData ), &junk, 0 } );
 
     // RtlEnterCriticalSection
-    a.GenCall( pLeaveCS, { _targetShare + FIELD_OFFSET( PageContext, csLock ) } );
+    a.GenCall( (uintptr_t)pLeaveCS.procAddress, { _targetShare + FIELD_OFFSET( PageContext, csLock ) } );
 
     // Ignore return value
     a->xor_( asmjit::host::rax, asmjit::host::rax );

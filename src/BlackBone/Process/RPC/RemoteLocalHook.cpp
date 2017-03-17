@@ -22,7 +22,7 @@ NTSTATUS RemoteLocalHook::AllocateMem( ptr_t /*address*/, size_t codeSize )
     auto size = Align( codeSize, pagesize ) + Align( sizeof( _ctx ), pagesize );
 
     auto allocation = _process.memory().Allocate( size, PAGE_EXECUTE_READWRITE );
-    if (!allocation.success())
+    if (!allocation)
         return allocation.status;
 
     _hookData   = std::move( allocation.result() );

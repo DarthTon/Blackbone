@@ -5,6 +5,7 @@
 
 #include <stdint.h>
 #include <string>
+#include <memory>
 
 namespace blackbone
 {
@@ -73,6 +74,8 @@ struct ModuleData
         return baseAddress < other.baseAddress;
     }
 };
+
+typedef std::shared_ptr<const ModuleData> ModuleDataPtr;
 
 // Wow64 register helper
 union reg64

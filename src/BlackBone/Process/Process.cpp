@@ -165,8 +165,8 @@ NTSTATUS Process::Detach()
 NTSTATUS Process::EnsureInit()
 {
     auto pProc = _modules.GetExport( _modules.GetModule( L"ntdll.dll", blackbone::Sections ), "NtYieldExecution" );
-    if (pProc.success())
-        return _remote.ExecDirect( pProc.result().procAddress, 0 );
+    if (pProc)
+        return _remote.ExecDirect( pProc->procAddress, 0 );
 
     return STATUS_NOT_FOUND;
 }

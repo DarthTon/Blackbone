@@ -81,7 +81,7 @@ public:
     /// <summary>
     /// MemBlock ctor
     /// </summary>
-    BLACKBONE_API MemBlock();
+    BLACKBONE_API MemBlock() = default;
 
     /// <summary>
     /// MemBlock ctor

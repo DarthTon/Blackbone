@@ -49,7 +49,7 @@ NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType m
     if (!_pModTable.valid())
     {
         auto mem = _proc.memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
-        if (!mem.success())
+        if (!mem)
             return mem.status;
 
         _pModTable = std::move( mem.result() );
@@ -151,7 +151,7 @@ NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType m
 
     // VEH codecave
     auto mem = _proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
-    if (!mem.success())
+    if (!mem)
         return mem.status;
 
     _pVEHCode = std::move( mem.result() );
@@ -189,13 +189,13 @@ NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType m
     }
 
     auto pDecode = mods.GetExport( mods.GetModule( L"ntdll.dll", Sections, mt ), "RtlDecodeSystemPointer" );
-    if (!pDecode.success())
+    if (!pDecode)
         return pDecode.status;
 
     // Write handler data into target process
     if ( !NT_SUCCESS( _pVEHCode.Write( 0, fnSize, pFunc ) ) ||
          !NT_SUCCESS( _pVEHCode.Write( dataOfs, _proc.nativeLdr().LdrpInvertedFunctionTable() ) ) ||
-         !NT_SUCCESS( _pVEHCode.Write( code_ofs, static_cast<uintptr_t>(pDecode.result().procAddress) ) ) ||
+         !NT_SUCCESS( _pVEHCode.Write( code_ofs, static_cast<uintptr_t>(pDecode->procAddress) ) ) ||
          !NT_SUCCESS( _pVEHCode.Write( code_ofs2, _proc.nativeLdr().LdrProtectMrdata() ) ))
     {
         _pVEHCode.Free();
@@ -205,13 +205,13 @@ NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType m
 #endif
     // AddVectoredExceptionHandler(0, pHandler);
     auto pAddHandler = mods.GetExport( mods.GetModule( L"ntdll.dll", Sections, mt ), "RtlAddVectoredExceptionHandler" );
-    if (!pAddHandler.success())
+    if (!pAddHandler)
         return pAddHandler.status;
 
     a->reset();
     a.GenPrologue();
 
-    a.GenCall( static_cast<uintptr_t>(pAddHandler.result().procAddress), { 0, _pVEHCode.ptr<uintptr_t>() } );
+    a.GenCall( static_cast<uintptr_t>(pAddHandler->procAddress), { 0, _pVEHCode.ptr<uintptr_t>() } );
 
     _proc.remote().AddReturnWithEvent( a, mt );
     a.GenEpilogue();
@@ -234,13 +234,13 @@ NTSTATUS MExcept::RemoveVEH( bool partial )
 
     auto& mods = _proc.modules();
     auto pRemoveHandler = mods.GetExport( mods.GetModule( L"ntdll.dll" ), "RtlRemoveVectoredExceptionHandler" );
-    if (!pRemoveHandler.success())
+    if (!pRemoveHandler)
         return pRemoveHandler.status;
 
     a.GenPrologue();
 
     // RemoveVectoredExceptionHandler(pHandler);
-    a.GenCall( static_cast<uintptr_t>(pRemoveHandler.result().procAddress), { _hVEH } );
+    a.GenCall( static_cast<uintptr_t>(pRemoveHandler->procAddress), { _hVEH } );
 
     _proc.remote().AddReturnWithEvent( a );
     a.GenEpilogue();

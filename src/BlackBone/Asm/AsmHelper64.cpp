@@ -145,7 +145,7 @@ void AsmHelper64::SaveRetValAndSignalEvent(
         _assembler.mov( asmjit::host::dword_ptr( asmjit::host::rcx ), asmjit::host::rax );
 
     // Save last NT status
-    SetTebPtr();
+    _assembler.mov( asmjit::host::rdx, asmjit::host::dword_ptr_abs( 0x30 ).setSegment( asmjit::host::gs ) );    // TEB ptr
     _assembler.add( asmjit::host::rdx, LAST_STATUS_OFS );
     _assembler.mov( asmjit::host::rdx, asmjit::host::dword_ptr( asmjit::host::rdx ) );
     _assembler.mov( asmjit::host::rax, lastStatusPtr );

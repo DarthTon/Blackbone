@@ -211,6 +211,9 @@ public:
     BLACKBONE_API inline MMap&            mmap()       { return _mmap;       }  // Manual module mapping
     BLACKBONE_API inline NtLdr&           nativeLdr()  { return _nativeLdr;  }  // Native loader routines
 
+    // Sugar
+    BLACKBONE_API inline const Wow64Barrier& barrier() const { return _core._native->GetWow64Barrier(); }
+
 private:
     Process(const Process&) = delete;
     Process& operator =(const Process&) = delete;

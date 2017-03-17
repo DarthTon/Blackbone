@@ -58,7 +58,6 @@ namespace blackbone
         virtual void GenCall( const AsmVariant&, const std::vector<AsmVariant>& args, eCalligConvention cc = cc_stdcall ) = 0;
         virtual void ExitThreadWithStatus( uintptr_t pExitThread, uintptr_t resultPtr ) = 0;
         virtual void SaveRetValAndSignalEvent( uintptr_t pSetEvent, uintptr_t ResultPtr, uintptr_t EventPtr, uintptr_t errPtr, eReturnType rtype = rt_int32 ) = 0;
-        virtual void SetTebPtr() = 0;
         virtual void EnableX64CallStack( bool state ) = 0;
 
         /// <summary>

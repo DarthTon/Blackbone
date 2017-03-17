@@ -416,12 +416,11 @@ std::vector<MEMORY_BASIC_INFORMATION64> Native::EnumRegions( bool includeFree /*
 /// <param name="result">Found modules</param>
 /// <returns>Module count</returns>
 template<typename T>
-size_t Native::EnumModulesT( Native::listModules& result )
+std::vector<ModuleDataPtr> Native::EnumModulesT()
 {
     typename _PEB_T2<T>::type peb = { { { 0 } } };
     _PEB_LDR_DATA2<T> ldr = { 0 };
-
-    result.clear();
+    std::vector<ModuleDataPtr> result;
 
     if (getPEB( &peb ) != 0 && ReadProcessMemoryT( peb.Ldr, &ldr, sizeof(ldr), 0 ) == STATUS_SUCCESS)
     {
@@ -443,11 +442,11 @@ size_t Native::EnumModulesT( Native::listModules& result )
             data.manual = false;
             data.type = std::is_same<T, DWORD>::value ? mt_mod32 : mt_mod64;
 
-            result.emplace_back( data );
+            result.emplace_back( std::make_shared<const ModuleData>( data ) );
         }
     }
 
-    return result.size();
+    return result;
 }
 
 /// <summary>
@@ -455,12 +454,11 @@ size_t Native::EnumModulesT( Native::listModules& result )
 /// </summary>
 /// <param name="result">Found modules</param>
 /// <returns>Sections count</returns>
-size_t Native::EnumSections( listModules& result )
+std::vector<ModuleDataPtr> Native::EnumSections()
 {
     MEMORY_BASIC_INFORMATION64 mbi = { 0 };
     ptr_t lastBase = 0;
-
-    result.clear();
+    std::vector<ModuleDataPtr> result;
 
     for (ptr_t memptr = minAddr(); memptr < maxAddr(); memptr = mbi.BaseAddress + mbi.RegionSize)
     {
@@ -535,13 +533,13 @@ size_t Native::EnumSections( listModules& result )
             data.baseAddress = mbi.AllocationBase;
             data.manual = false;
 
-            result.emplace_back( data );
+            result.emplace_back( std::make_shared<const ModuleData>( data ) );
         }
 
         lastBase = mbi.AllocationBase;
     }
 
-    return result.size();
+    return result;
 }
 
 /// <summary>
@@ -549,13 +547,12 @@ size_t Native::EnumSections( listModules& result )
 /// </summary>
 /// <param name="result">Found modules</param>
 /// <returns>Sections count</returns>
-size_t Native::EnumPEHeaders( listModules& result )
+std::vector<ModuleDataPtr> Native::EnumPEHeaders()
 {
     MEMORY_BASIC_INFORMATION64 mbi = { 0 };
     uint8_t buf[0x1000];
     ptr_t lastBase = 0;
-
-    result.clear();
+    std::vector<ModuleDataPtr> result;
 
     for (ptr_t memptr = minAddr(); memptr < maxAddr(); memptr = mbi.BaseAddress + mbi.RegionSize)
     {
@@ -630,12 +627,12 @@ size_t Native::EnumPEHeaders( listModules& result )
             data.name = data.fullPath;
         }
 
-        result.emplace_back( data );
+        result.emplace_back( std::make_shared<const ModuleData>( data ) );
 
         lastBase = mbi.AllocationBase;
     }
 
-    return result.size();
+    return result;
 }
 
 /// <summary>
@@ -644,7 +641,7 @@ size_t Native::EnumPEHeaders( listModules& result )
 /// <param name="result">Found modules</param>
 /// <param name="mtype">Module type: x86 or x64</param>
 /// <returns>Module count</returns>
-size_t Native::EnumModules( listModules& result, eModSeachType search/*= LdrList*/, eModType mtype /*= mt_default */ )
+std::vector<ModuleDataPtr> Native::EnumModules( eModSeachType search/*= LdrList*/, eModType mtype /*= mt_default */ )
 {
     if (search == LdrList)
     {
@@ -652,18 +649,18 @@ size_t Native::EnumModules( listModules& result, eModSeachType search/*= LdrList
         if (mtype == mt_default)
             mtype = _wowBarrier.targetWow64 ? mt_mod32 : mt_mod64;
 
-        return (mtype == mt_mod32) ? EnumModulesT<DWORD>( result ) : EnumModulesT<DWORD64>( result );
+        return (mtype == mt_mod32) ? EnumModulesT<DWORD>() : EnumModulesT<DWORD64>();
     }
     else if(search == Sections)
     {
-        return EnumSections( result );
+        return EnumSections();
     }
     else if(search == PEHeaders)
     {
-        return EnumPEHeaders( result );
+        return EnumPEHeaders();
     }
 
-    return 0;
+    return std::vector<ModuleDataPtr>();
 }
 
 

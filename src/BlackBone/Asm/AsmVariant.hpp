@@ -142,7 +142,7 @@ namespace blackbone
 
         // Pass argument by value case
         // Real RValue reference types are not supported because of ambiguity
-        #pragma warning(disable : 4127)
+        #pragma warning(disable : 4127)     // Still waiting for constexpr-if...
         template <typename T>
         AsmVariant( T&& val )
             : AsmVariant( dataStruct, sizeof(T), reinterpret_cast<uintptr_t>(&val) )

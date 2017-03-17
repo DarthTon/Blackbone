@@ -64,15 +64,6 @@ public:
     /// <param name="">Unused</param>
     virtual void EnableX64CallStack( bool ) { }
 
-    /// <summary>
-    /// Move TEB pointer into edx
-    /// </summary>
-    virtual void SetTebPtr()
-    {
-        // mov edx, fs:[0x18]   
-        _assembler.mov( asmjit::host::edx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );
-    }
-
 private:
     AsmHelper32( const AsmHelper32& ) = delete;
     AsmHelper32& operator = (const AsmHelper32&) = delete;

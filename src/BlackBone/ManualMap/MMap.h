@@ -197,7 +197,7 @@ public:
     /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
     /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info </returns>
-    BLACKBONE_API call_result_t<const ModuleData*> MapImage(
+    BLACKBONE_API call_result_t<ModuleDataPtr> MapImage(
         const std::wstring& path,
         eLoadFlags flags = NoFlags,
         MapCallback mapCallback = nullptr,
@@ -215,7 +215,7 @@ public:
     /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
     /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info</returns>
-    BLACKBONE_API call_result_t<const ModuleData*> MapImage(
+    BLACKBONE_API call_result_t<ModuleDataPtr> MapImage(
         size_t size, void* buffer,
         bool asImage = false,
         eLoadFlags flags = NoFlags,
@@ -227,8 +227,8 @@ public:
     /// <summary>
     /// Unmap all manually mapped modules
     /// </summary>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool UnmapAllModules();
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS UnmapAllModules();
 
     /// <summary>
     /// Remove any traces from remote process
@@ -253,7 +253,7 @@ private:
     /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
     /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info</returns>
-    call_result_t<const ModuleData*> MapImageInternal(
+    call_result_t<ModuleDataPtr> MapImageInternal(
         const std::wstring& path,
         void* buffer, size_t size,
         bool asImage = false,
@@ -276,7 +276,7 @@ private:
     /// <param name="path">Image path</param>
     /// <param name="flags">Mapping flags</param>
     /// <returns>Module info</returns>
-    call_result_t<const ModuleData*> FindOrMapModule(
+    call_result_t<ModuleDataPtr> FindOrMapModule(
         const std::wstring& path,
         void* buffer, size_t size, bool asImage,
         eLoadFlags flags = NoFlags
@@ -292,22 +292,22 @@ private:
     /// DLL_PROCESS_DETACH
     /// DLL_THREAD_DETTACH
     /// </param>
-    /// <returns>true on success</returns>
-    bool RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomArgs_t* pCustomArgs_t = nullptr );
+    /// <returns>DllMain result</returns>
+    call_result_t<uint64_t> RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomArgs_t* pCustomArgs_t = nullptr );
 
     /// <summary>
     /// Copies image into target process
     /// </summary>
     /// <param name="pImage">Image data</param>
-    /// <returns>true on success</returns>
-    bool CopyImage( ImageContext* pImage );
+    /// <returns>Status code</returns>
+    NTSTATUS CopyImage( ImageContext* pImage );
 
     /// <summary>
     /// Adjust image memory protection
     /// </summary>
     /// <param name="pImage">image data</param>
-    /// <returns>true on success</returns>
-    bool ProtectImageMemory( ImageContext* pImage );
+    /// <returns>Status code</returns>
+    NTSTATUS ProtectImageMemory( ImageContext* pImage );
 
     /// <summary>
     ///  Fix relocations if image wasn't loaded at base address
@@ -321,21 +321,21 @@ private:
     /// </summary>
     /// <param name="pImage">Image data</param>
     /// <param name="useDelayed">Resolve delayed import instead</param>
-    /// <returns>true on success</returns>
-    bool ResolveImport( ImageContext* pImage, bool useDelayed = false );
+    /// <returns>Status code</returns>
+    NTSTATUS ResolveImport( ImageContext* pImage, bool useDelayed = false );
 
     /// <summary>
     /// Resolve static TLS storage
     /// </summary>
     /// <param name="pImage">image data</param>
-    /// <returns>true on success</returns>
-    bool InitStaticTLS( ImageContext* pImage );
+    /// <returns>Status code</returns>
+    NTSTATUS InitStaticTLS( ImageContext* pImage );
 
     /// <summary>
     /// Set custom exception handler to bypass SafeSEH under DEP 
     /// </summary>
     /// <param name="pImage">image data</param>
-    /// <returns>true on success</returns>
+    /// <returns>Status code</returns>
     NTSTATUS EnableExceptions( ImageContext* pImage );
 
     /// <summary>
@@ -356,14 +356,14 @@ private:
     /// <param name="id">Manifest resource id</param>
     /// <param name="asImage">if true - 'path' points to a valid PE file, otherwise - 'path' points to separate manifest file</param>
     /// <returns>true on success</returns>
-    bool CreateActx( const std::wstring& path, int id = 2, bool asImage = true );
+    NTSTATUS CreateActx( const std::wstring& path, int id = 2, bool asImage = true );
 
     /// <summary>
     /// Calculate and set security cookie
     /// </summary>
     /// <param name="pImage">image data</param>
-    /// <returns>true on success</returns>
-    bool InitializeCookie( ImageContext* pImage );
+    /// <returns>Status code</returns>
+    NTSTATUS InitializeCookie( ImageContext* pImage );
 
     /// <summary>
     /// Hide memory VAD node
@@ -386,7 +386,7 @@ private:
     /// <param name="pImage">Currently mapped image data</param>
     /// <param name="path">Dependency path</param>
     /// <returns></returns>
-    call_result_t<const ModuleData*> FindOrMapDependency( ImageContext* pImage, std::wstring& path );
+    call_result_t<ModuleDataPtr> FindOrMapDependency( ImageContext* pImage, std::wstring& path );
 
     /// <summary>
     /// Transform section characteristics into memory protection flags

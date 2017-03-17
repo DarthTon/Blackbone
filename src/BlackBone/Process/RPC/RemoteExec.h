@@ -94,6 +94,16 @@ public:
         );
 
     /// <summary>
+    /// Save value in rax to user buffer
+    /// </summary>
+    /// <param name="a">Target assembly helper</param>
+    BLACKBONE_API inline void SaveCallResult( AsmHelperBase& a, uint32_t retOffset = RET_OFFSET )
+    {
+        a->mov( a->zdx, _userData.ptr<uintptr_t>() + retOffset );
+        a->mov( asmjit::host::dword_ptr( a->zdx ), a->zax );
+    }
+
+    /// <summary>
     /// Retrieve last NTSTATUS code
     /// </summary>
     /// <returns></returns>

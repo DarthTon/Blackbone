@@ -27,9 +27,6 @@ ENUM_OPS(CreateThreadFlags)
 class Native
 {
 public:
-    typedef std::list<ModuleData> listModules;
-
-public:
     BLACKBONE_API Native( HANDLE hProcess, bool x86OS = false );
     BLACKBONE_API ~Native();
 
@@ -202,7 +199,7 @@ public:
     /// <param name="result">Found modules</param>
     /// <param name="mtype">Module type: x86 or x64</param>
     /// <returns>Module count</returns>
-    BLACKBONE_API size_t EnumModules( listModules& result, eModSeachType search = LdrList, eModType mtype = mt_default );
+    BLACKBONE_API std::vector<ModuleDataPtr> EnumModules( eModSeachType search = LdrList, eModType mtype = mt_default );
 
     /// <summary>
     /// Get lowest possible valid address value
@@ -229,21 +226,21 @@ private:
     /// <param name="result">Found modules</param>
     /// <returns>Module count</returns>
     template<typename T>
-    size_t EnumModulesT( Native::listModules& result );
+    std::vector<ModuleDataPtr> EnumModulesT();
 
     /// <summary>
     /// Enum process section objects
     /// </summary>
     /// <param name="result">Found modules</param>
     /// <returns>Sections count</returns>
-    size_t EnumSections( listModules& result );
+    std::vector<ModuleDataPtr> EnumSections();
 
     /// <summary>
     /// Enum pages containing valid PE headers
     /// </summary>
     /// <param name="result">Found modules</param>
     /// <returns>Sections count</returns>
-    size_t EnumPEHeaders( listModules& result );
+    std::vector<ModuleDataPtr> EnumPEHeaders();
 
 protected:
     HANDLE _hProcess;           // Process handle

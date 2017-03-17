@@ -34,6 +34,38 @@ bool NtLdr::Init()
 
     ScanPatterns();
     _nodeMap.clear();
+
+    //
+    // Report errors
+    // 
+#ifndef BLACBONE_NO_TRACE
+    auto barrier = _process.barrier().type;
+    if (_LdrpHashTable == 0)
+        BLACKBONE_TRACE( "NativeLdr: LdrpHashTable not found" );
+    if (IsWindows8OrGreater() && _LdrpModuleIndexBase == 0)
+        BLACKBONE_TRACE( "NativeLdr: LdrpModuleIndexBase not found" );
+    if (_LdrHeapBase == 0 && (barrier == wow_32_32 || barrier == wow_64_64))
+        BLACKBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
+    if (_LdrpHandleTlsData == 0)
+        BLACKBONE_TRACE( "NativeLdr: LdrpHandleTlsData not found" );
+#ifdef USE64
+    if (IsWindows7OrGreater() && !IsWindows8OrGreater())
+    {
+        if (_LdrKernel32PatchAddress == 0)
+            BLACKBONE_TRACE( "NativeLdr: LdrKernel32PatchAddress not found" );
+        if (_APC64PatchAddress == 0)
+            BLACKBONE_TRACE( "NativeLdr: APC64PatchAddress not found" );
+    }
+#else
+    if (_LdrpInvertedFunctionTable == 0)
+        BLACKBONE_TRACE( "NativeLdr: LdrpInvertedFunctionTable not found" );
+    if (_RtlInsertInvertedFunctionTable == 0)
+        BLACKBONE_TRACE( "NativeLdr: RtlInsertInvertedFunctionTable not found" );
+    if (IsWindows8Point1OrGreater() && _LdrProtectMrdata == 0)
+        BLACKBONE_TRACE( "NativeLdr: LdrProtectMrdata not found" );
+#endif
+#endif
+
     return true;
 }
 
@@ -126,11 +158,11 @@ T* NtLdr::SetNode( T* ptr, void* pModule )
         m_memory.ExecInWorkerThread(a->make(), a->getCodeSize(), (size_t&)ptr);*/
 
         auto mem = _process.memory().Allocate( sizeof( T ), PAGE_READWRITE, 0, false );
-        if (!mem.success())
+        if (!mem)
             return nullptr;
 
-        ptr = mem.result().ptr<T*>();
-        mem.result().Write( FIELD_OFFSET2( T*, DllBase ), pModule );
+        ptr = mem->ptr<T*>();
+        mem->Write( FIELD_OFFSET2( T*, DllBase ), pModule );
     }
 
     return ptr;
@@ -154,7 +186,7 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
         return false;
 
     // Manually add TLS table
-    if ((wxp || _process.core().native()->GetWow64Barrier().type == wow_64_32) && pTls != nullptr)
+    if ((wxp || _process.barrier().type == wow_64_32) && pTls != nullptr)
     {
         ptr_t pTeb = 0;
         if (wxp)
@@ -163,7 +195,7 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
             pTeb = _process.remote().getWorker()->teb( static_cast<_TEB64*>(nullptr) );
 
         auto mem = _process.memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
-        if (!mem.success())
+        if (!mem)
             return false;
 
         auto tlsStore = std::move( mem.result() );
@@ -273,12 +305,10 @@ bool NtLdr::InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, boo
 
         // Allocate memory for 512 possible handlers
         auto mem = memory.Allocate( sizeof( DWORD ) * 0x200, PAGE_READWRITE, 0, false );
-        if (!mem.success())
+        if (!mem)
             return false;
 
-        auto block = mem.result();
-        pImgEntry = block.ptr<decltype(pImgEntry)>();
-
+        pImgEntry = mem->ptr<decltype(pImgEntry)>();
         auto pEncoded = EncodeSystemPointer( pImgEntry );
 
         // m_LdrpInvertedFunctionTable->Entries[i].ExceptionDirectory
@@ -327,23 +357,23 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
 
     // Allocate space for Unicode string
     auto mem = _process.memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
-    if (!mem.success())
+    if (!mem)
         return nullptr;
 
     auto StringBuf = std::move( mem.result() );
 
-    eModType mt = _process.core().native()->GetWow64Barrier().sourceWow64 ? mt_mod32 : mt_mod64;
+    eModType mt = _process.barrier().sourceWow64 ? mt_mod32 : mt_mod64;
 
     auto RtlAllocateHeap = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, mt ), "RtlAllocateHeap" );
 
-    if (_LdrHeapBase && RtlAllocateHeap.success())
+    if (_LdrHeapBase && RtlAllocateHeap)
     {
         //
         // HeapAlloc(LdrHeap, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
         //
         a.GenPrologue();
 
-        a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap.result().procAddress), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W8 ) } );
+        a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap->procAddress), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W8 ) } );
         _process.remote().AddReturnWithEvent( a, mt );
         a.GenEpilogue();
 
@@ -354,10 +384,10 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
     else
     {
         mem = _process.memory().Allocate( sizeof( _LDR_DATA_TABLE_ENTRY_W8 ), PAGE_READWRITE, 0, false );
-        if (!mem.success())
+        if (!mem)
             return nullptr;
 
-        pEntry = mem.result().ptr<_LDR_DATA_TABLE_ENTRY_W8*>();
+        pEntry = mem->ptr<_LDR_DATA_TABLE_ENTRY_W8*>();
     }
 
     if(pEntry)
@@ -371,7 +401,7 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
             //
             a.GenPrologue();
 
-            a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap.result().procAddress), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DDAG_NODE ) } );
+            a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap->procAddress), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DDAG_NODE ) } );
 
             _process.remote().AddReturnWithEvent( a, mt );
             a.GenEpilogue();
@@ -382,10 +412,10 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node(
         else
         {
             mem = _process.memory().Allocate( sizeof( _LDR_DDAG_NODE ), PAGE_READWRITE, 0, false );
-            if (!mem.success())
+            if (!mem)
                 return nullptr;
 
-            pDdagNode = mem.result().ptr<_LDR_DDAG_NODE*>();
+            pDdagNode = mem->ptr<_LDR_DDAG_NODE*>();
         }  
 
         if(pDdagNode)
@@ -473,22 +503,22 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node(
 
     // Allocate space for Unicode string
     auto mem = _process.memory().Allocate( MAX_PATH, PAGE_READWRITE, 0, false );
-    if (!mem.success())
+    if (!mem)
         return nullptr;
 
     auto StringBuf = std::move( mem.result() );
 
-    eModType mt = _process.core().native()->GetWow64Barrier().sourceWow64 ? mt_mod32 : mt_mod64;
+    eModType mt = _process.barrier().sourceWow64 ? mt_mod32 : mt_mod64;
     auto RtlAllocateHeap = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, mt ), "RtlAllocateHeap" );
 
-    if (_LdrHeapBase && RtlAllocateHeap.success())
+    if (_LdrHeapBase && RtlAllocateHeap)
     {
         //
         // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
         //
         a.GenPrologue();
 
-        a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap.result().procAddress), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W7 ) } );
+        a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap->procAddress), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W7 ) } );
 
         _process.remote().AddReturnWithEvent( a, mt );
         a.GenEpilogue();
@@ -499,10 +529,10 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node(
     else
     {
         mem = _process.memory().Allocate( sizeof( _LDR_DATA_TABLE_ENTRY_W7 ), PAGE_READWRITE, 0, false );
-        if (!mem.success())
+        if (!mem)
             return nullptr;
 
-        pEntry = mem.result().ptr<_LDR_DATA_TABLE_ENTRY_W7*>();
+        pEntry = mem->ptr<_LDR_DATA_TABLE_ENTRY_W7*>();
     }
 
     if(pEntry)
@@ -560,7 +590,7 @@ void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, uintptr_t modBase )
     // Win8 module tree
     //
     auto root = _process.memory().Read<uintptr_t>( _LdrpModuleIndexBase );
-    if (!root.success())
+    if (!root)
         return;
 
     _LDR_DATA_TABLE_ENTRY_W8 *pLdrNode = CONTAINING_RECORD( root.result(), _LDR_DATA_TABLE_ENTRY_W8, BaseAddressIndexNode );
@@ -612,14 +642,14 @@ void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, uintptr_t modBase )
     AsmJitHelper a;
     uint64_t result = 0;
 
-    eModType mt = _process.core().native()->GetWow64Barrier().sourceWow64 ? mt_mod32 : mt_mod64;
+    eModType mt = _process.barrier().sourceWow64 ? mt_mod32 : mt_mod64;
 
     auto RtlRbInsertNodeEx = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, mt ), "RtlRbInsertNodeEx" );
-    if (!RtlRbInsertNodeEx.success())
+    if (!RtlRbInsertNodeEx)
         return;
 
     a.GenPrologue();
-    a.GenCall( static_cast<uintptr_t>(RtlRbInsertNodeEx.result().procAddress), { _LdrpModuleIndexBase,
+    a.GenCall( static_cast<uintptr_t>(RtlRbInsertNodeEx->procAddress), { _LdrpModuleIndexBase,
                                                                                   GET_FIELD_PTR( pLdrNode, BaseAddressIndexNode ), 
                                                                                   static_cast<uintptr_t>(bRight), GET_FIELD_PTR( pNode, BaseAddressIndexNode ) } );
     _process.remote().AddReturnWithEvent( a, mt );
@@ -668,7 +698,7 @@ void NtLdr::InsertHashNode( uintptr_t pNodeLink, ULONG hash )
     {
         // LrpHashTable record
         auto pHashList = _process.memory().Read<uintptr_t>( _LdrpHashTable + sizeof(LIST_ENTRY)*(hash & 0x1F) );
-        if(pHashList.success())
+        if(pHashList)
             InsertTailList( pHashList.result(), pNodeLink );
     }
 }
@@ -1092,35 +1122,6 @@ bool NtLdr::ScanPatterns( )
     #endif
     }
 
-    //
-    // Report errors
-    // 
-#ifndef BLACBONE_NO_TRACE
-    if (_LdrpHashTable == 0)
-        BLACKBONE_TRACE( "NativeLdr: LdrpHashTable not found" );
-    if (IsWindows8OrGreater() && _LdrpModuleIndexBase == 0)
-        BLACKBONE_TRACE( "NativeLdr: LdrpModuleIndexBase not found" );
-    if (_LdrHeapBase == 0)
-        BLACKBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
-    if (_LdrpHandleTlsData == 0)
-        BLACKBONE_TRACE( "NativeLdr: LdrpHandleTlsData not found" );
-#ifdef USE64
-    if (IsWindows7OrGreater() && !IsWindows8OrGreater())
-    {
-        if (_LdrKernel32PatchAddress == 0)
-            BLACKBONE_TRACE( "NativeLdr: LdrKernel32PatchAddress not found" );
-        if (_APC64PatchAddress == 0)
-            BLACKBONE_TRACE( "NativeLdr: APC64PatchAddress not found" );
-    }
-#else
-    if (_LdrpInvertedFunctionTable == 0)
-        BLACKBONE_TRACE( "NativeLdr: LdrpInvertedFunctionTable not found" );
-    if (_RtlInsertInvertedFunctionTable == 0)
-        BLACKBONE_TRACE( "NativeLdr: RtlInsertInvertedFunctionTable not found" );
-    if (IsWindows8Point1OrGreater() && _LdrProtectMrdata == 0)
-        BLACKBONE_TRACE( "NativeLdr: LdrProtectMrdata not found" );
-#endif
-#endif
     return true;
 }
 
@@ -1133,7 +1134,6 @@ bool NtLdr::FindLdrHeap()
 {
     int32_t retries = 10;
     PEB_T Peb = { 0 };
-    MEMORY_BASIC_INFORMATION64 mbi = { 0 };
 
     _process.core().peb( &Peb );
     for (; Peb.Ldr == 0 && retries > 0; retries--, Sleep( 10 ))
@@ -1142,11 +1142,12 @@ bool NtLdr::FindLdrHeap()
     if (Peb.Ldr)
     {
         auto Ldr = _process.memory().Read<PEB_LDR_DATA_T>( Peb.Ldr );
-        if (!Ldr.success())
+        if (!Ldr)
             return Ldr.status;
 
-        auto NtdllEntry = CONTAINING_RECORD( Ldr.result().InMemoryOrderModuleList.Flink, LDR_DATA_TABLE_ENTRY_BASE_T, InMemoryOrderLinks );
-        if (_process.core().native()->VirtualQueryExT( reinterpret_cast<ptr_t>(NtdllEntry), &mbi ) == STATUS_SUCCESS)
+        MEMORY_BASIC_INFORMATION64 mbi = { 0 };
+        auto NtdllEntry = CONTAINING_RECORD( Ldr->InMemoryOrderModuleList.Flink, LDR_DATA_TABLE_ENTRY_BASE_T, InMemoryOrderLinks );
+        if (NT_SUCCESS( _process.core().native()->VirtualQueryExT( reinterpret_cast<ptr_t>(NtdllEntry), &mbi ) ))
         {
             _LdrHeapBase = static_cast<uintptr_t>(mbi.AllocationBase);
             return true;
@@ -1172,11 +1173,9 @@ bool NtLdr::Unlink( ptr_t baseAddress, const std::wstring& name, eModType type )
     else
         ldrEntry = UnlinkFromLdr<DWORD64>( baseAddress, name );
 
-    auto barrier = _process.core().native()->GetWow64Barrier();
-
     // Unlink from graph
     // TODO: Unlink from _LdrpMappingInfoIndex. Still can't decide if it is required.
-    if ((barrier.type == wow_32_32 || barrier.type == wow_64_64) && ldrEntry && IsWindows8OrGreater())
+    if ((_process.barrier().type == wow_32_32 || _process.barrier().type == wow_64_64) && ldrEntry && IsWindows8OrGreater())
         UnlinkTreeNode( ldrEntry );
 
     return ldrEntry != 0;
@@ -1314,11 +1313,11 @@ ptr_t NtLdr::UnlinkTreeNode( ptr_t ldrEntry )
     uint64_t result = 0;
 
     auto RtlRbRemoveNode = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll" ), "RtlRbRemoveNode" );
-    if (!RtlRbRemoveNode.success())
+    if (!RtlRbRemoveNode)
         return RtlRbRemoveNode.status;
 
     a.GenPrologue();
-    a.GenCall( static_cast<uintptr_t>(RtlRbRemoveNode.result().procAddress),
+    a.GenCall( static_cast<uintptr_t>(RtlRbRemoveNode->procAddress),
     { 
         _LdrpModuleIndexBase, 
         static_cast<uintptr_t>(ldrEntry)

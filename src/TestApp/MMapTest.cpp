@@ -29,13 +29,11 @@ void TestMMap()
     std::wcout << L"Manual image mapping test\n";
     std::wcout << L"Trying to map C:\\windows\\system32\\calc.exe into current process\n";
 
-    eLoadFlags flags = ManualImports | RebaseProcess;
-
-    auto image = thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", flags, callback );
-    if (!image.success())
+    auto image = thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", ManualImports | RebaseProcess, callback );
+    if (!image)
     {
         std::wcout << L"Mapping failed with error 0x" << std::hex << image.status
-                   << L". " << Utils::GetErrorDescription( LastNtStatus() ) << std::endl << std::endl;
+                   << L". " << Utils::GetErrorDescription( image.status ) << std::endl << std::endl;
     }
     else
         std::wcout << L"Successfully mapped, unmapping\n";
@@ -69,10 +67,10 @@ void TestMMapFromMem()
     }
 
     auto image = thisProc.mmap().MapImage( size, buf, false, CreateLdrRef | RebaseProcess | NoDelayLoad );
-    if (!image.success())
+    if (!image)
     {
         std::wcout << L"Mapping failed with error 0x" << std::hex << image.status
-                   << L". " << Utils::GetErrorDescription( LastNtStatus() ) << std::endl << std::endl;
+                   << L". " << Utils::GetErrorDescription( image.status ) << std::endl << std::endl;
     }
     else
         std::wcout << L"Successfully mapped, unmapping\n";
