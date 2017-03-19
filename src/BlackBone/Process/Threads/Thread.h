@@ -94,7 +94,6 @@ class Thread
 public:
     BLACKBONE_API Thread( DWORD id, class ProcessCore* hProcess, DWORD access = DEFAULT_ACCESS_T );
     BLACKBONE_API Thread( HANDLE handle, class ProcessCore* hProcess );
-    BLACKBONE_API Thread( const Thread& other );
     BLACKBONE_API ~Thread();
 
     /// <summary>
@@ -247,21 +246,12 @@ public:
     /// </summary>
     BLACKBONE_API void Close();
 
-    BLACKBONE_API inline bool operator ==(const Thread& other) { return (_id == other._id); }
-
-    BLACKBONE_API Thread& operator =(const Thread& other)
-    {
-        _id = other._id;
-        _core = other._core;
-        _handle = other._handle;
-
-        // Transfer handle ownership
-        other._owner = false;
-
-        return *this;
-    }
+    BLACKBONE_API inline bool operator ==( const Thread& other ) { return (_id == other._id); }
 
 private:
+    Thread( const Thread& ) = delete;
+    Thread& operator =( const Thread& ) = delete;
+
     /// <summary>
     /// GetThreadId support for XP
     /// </summary>
@@ -274,7 +264,8 @@ private:
 
     DWORD _id = 0;                      // Thread ID
     HANDLE _handle = NULL;              // Thread handle
-    mutable bool _owner = true;         // Class owns a handle
 };
+
+typedef std::shared_ptr<Thread> ThreadPtr;
 
 }

@@ -84,7 +84,7 @@ void RemoteHook::EndDebug()
 /// <param name="pClass">Class reference.</param>
 /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
 /// <returns>Status code</returns>
-NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass /*= nullptr*/, Thread* pThread /*= nullptr*/ )
+NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass /*= nullptr*/, ThreadPtr pThread /*= nullptr*/ )
 {
     NTSTATUS status = EnsureDebug();
     if (!NT_SUCCESS( status ))
@@ -122,9 +122,8 @@ NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, con
         // Set for all threads
         else
         {
-            auto& threads = _memory.process()->threads().getAll();     
-            for (auto& thread : threads)
-                thread.AddHWBP( ptr, hwbp_execute, hwbp_1 );
+            for (auto& thread : _memory.process()->threads().getAll())
+                thread->AddHWBP( ptr, hwbp_execute, hwbp_1 );
         }
     }
     // Write int3
@@ -206,7 +205,7 @@ void RemoteHook::Restore( const HookData &hook, uint64_t ptr )
         {
             auto& threads = _memory.process()->threads().getAll();
             for (auto& thread : threads)
-                thread.RemoveHWBP( ptr );
+                thread->RemoveHWBP( ptr );
         }
     }
     // Restore original byte

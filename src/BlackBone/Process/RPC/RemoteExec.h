@@ -69,7 +69,7 @@ public:
     /// <param name="callResult">Execution result</param>
     /// <param name="thd">Target thread</param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callResult, Thread& thread );
+    BLACKBONE_API NTSTATUS ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callResult, ThreadPtr& thread );
 
     /// <summary>
     /// Create new thread with specified entry point and argument
@@ -121,7 +121,7 @@ public:
     /// Get worker thread
     /// </summary>
     /// <returns></returns>
-    BLACKBONE_API inline Thread* getWorker() { return &_hWorkThd; }
+    BLACKBONE_API inline ThreadPtr getWorker() { return _hWorkThd; }
 
     /// <summary>
     /// Ge memory routines
@@ -182,17 +182,17 @@ private:
     /// <param name="result">Retrieved result</param>
     /// <returns>true on success</returns>
     template<typename T>
-    inline bool GetCallResult( T& result )
+    inline NTSTATUS GetCallResult( T& result )
     { 
         if (sizeof(T) > sizeof(uint64_t))
         {
             if (std::is_reference<T>::value)
-                return _userData.Read( _userData.Read<uintptr_t>( RET_OFFSET, 0 ), sizeof(T), (PVOID)&result ) == STATUS_SUCCESS;
+                return _userData.Read( _userData.Read<uintptr_t>( RET_OFFSET, 0 ), sizeof( T ), (PVOID)&result );
             else
-                return _userData.Read( ARGS_OFFSET, sizeof(T), (PVOID)&result ) == STATUS_SUCCESS;
+                return _userData.Read( ARGS_OFFSET, sizeof(T), (PVOID)&result );
         }
         else
-            return _userData.Read( RET_OFFSET, sizeof(T), (PVOID)&result ) == STATUS_SUCCESS;
+            return _userData.Read( RET_OFFSET, sizeof(T), (PVOID)&result );
     }
 #pragma warning(default : 4127)
 
@@ -206,12 +206,12 @@ private:
     class ProcessMemory&  _memory;
     class ProcessThreads& _threads;
 
-    Thread   _hWorkThd;         // Worker thread handle
-    HANDLE   _hWaitEvent;       // APC sync event handle
-    MemBlock _workerCode;       // Worker thread address space
-    MemBlock _userCode;         // Codecave for code execution
-    MemBlock _userData;         // Region to store copied structures and strings
-    bool     _apcPatched;       // KiUserApcDispatcher was patched
+    ThreadPtr _hWorkThd;        // Worker thread handle
+    HANDLE    _hWaitEvent;      // APC sync event handle
+    MemBlock  _workerCode;      // Worker thread address space
+    MemBlock  _userCode;        // Codecave for code execution
+    MemBlock  _userData;        // Region to store copied structures and strings
+    bool      _apcPatched;      // KiUserApcDispatcher was patched
 };
 
 

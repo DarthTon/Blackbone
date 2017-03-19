@@ -56,14 +56,12 @@ void TestRemoteCall()
                 reinterpret_cast<PSIZE_T>(0)
                 );
 
-            decltype(pFN)::ReturnType result;
-
             pFN.setArg( 3, AsmVariant( buf, sizeof(buf) ) );
-            pFN.Call( result );
+            auto result = pFN.Call().result( STATUS_UNSUCCESSFUL );
 
             wchar_t* pStr = (wchar_t*)(buf + sizeof(UNICODE_STRING));
 
-            std::wcout << L"Call result " << result << L" . Module path " << pStr << std::endl;
+            std::wcout << L"Call result 0x" << std::hex << result << std::dec << L" . Module path " << pStr << std::endl;
         }
         else
             std::wcout << L"Not found, aborting\n";

@@ -41,18 +41,21 @@ protected:
     /// <param name="contextThread">Execution thread</param>
     /// <returns>Call status</returns>
     template<typename T>
-    NTSTATUS Call( T& result, std::vector<AsmVariant>& args, Thread* contextThread = nullptr )
+    call_result_t<T> Call( std::vector<AsmVariant>& args, ThreadPtr contextThread = nullptr )
     {
-        uint64_t result2 = 0;
+        T result;
+        uint64_t tmpResult = 0;
+        NTSTATUS status = STATUS_SUCCESS;
         AsmJitHelper a;
 
         // Ensure RPC environment exists
-        if (!NT_SUCCESS( _process.remote().CreateRPCEnvironment( contextThread == _process.remote().getWorker(), contextThread != nullptr ) ))
-            return LastNtStatus();
+        status = _process.remote().CreateRPCEnvironment( contextThread == _process.remote().getWorker(), contextThread != nullptr );
+        if (!NT_SUCCESS( status ))
+            return call_result_t<T>( result, status );
 
         // FPU check
-        bool isFloat  = std::is_same<T, float>::value;
-        bool isDouble = std::is_same<T, double>::value || std::is_same<T, long double>::value;
+        constexpr bool isFloat  = std::is_same<T, float>::value;
+        constexpr bool isDouble = std::is_same<T, double>::value || std::is_same<T, long double>::value;
 
         // Deduce return type
         eReturnType retType = rt_int32;
@@ -71,17 +74,18 @@ protected:
         _process.remote().PrepareCallAssembly( a, pfnNew, args, _callConv, retType );
 
         // Choose execution thread
-        if (contextThread == nullptr)
-            _process.remote().ExecInNewThread( a->make(), a->getCodeSize(), result2 );
-        else if (*contextThread == _process.remote()._hWorkThd)
-            _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result2 );
+        if (!contextThread)
+            status = _process.remote().ExecInNewThread( a->make(), a->getCodeSize(), tmpResult );
+        else if (contextThread == _process.remote()._hWorkThd)
+            status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), tmpResult );
         else
-            _process.remote().ExecInAnyThread( a->make(), a->getCodeSize(), result2, *contextThread );
+            status = _process.remote().ExecInAnyThread( a->make(), a->getCodeSize(), tmpResult, contextThread );
 
         // Get function return value
-        _process.remote().GetCallResult( result );
+        if (!NT_SUCCESS( status ) || !NT_SUCCESS( status = _process.remote().GetCallResult( result ) ))
+            return call_result_t<T>( result, status );
 
-        return STATUS_SUCCESS;
+        return call_result_t<T>( result, STATUS_SUCCESS );
     }
 
 #pragma warning(default : 4127)
@@ -172,11 +176,11 @@ public: \
         : RemoteFuncBase<R( CALL_OPT* )(Args...)>( proc, reinterpret_cast<typename RemoteFuncBase<R( CALL_OPT* )(Args...)>::type>(ptr), CALL_DEF ) \
         , FuncArguments<Args...>( proc, std::forward<Args>(args)... ) { } \
         \
-    inline NTSTATUS Call( ReturnType& result, Thread* contextThread = nullptr ) \
+    inline call_result_t<ReturnType> Call( ThreadPtr contextThread = nullptr ) \
     { \
-        NTSTATUS status = RemoteFuncBase<R( CALL_OPT* )(Args...)>::Call( result, FuncArguments<Args...>::getArgsRaw(), contextThread ); \
+        auto r = RemoteFuncBase<R( CALL_OPT* )(Args...)>::Call<ReturnType>( FuncArguments<Args...>::getArgsRaw(), contextThread ); \
         FuncArguments<Args...>::updateArgs( ); \
-        return status; \
+        return r; \
     } \
 }
 
@@ -209,11 +213,11 @@ public:
         : RemoteFuncBase( proc, reinterpret_cast<typename RemoteFuncBase::type>(ptr), cc_thiscall )
         , FuncArguments( proc, pClass, args... ) { }
         
-    inline NTSTATUS Call( R& result, Thread* contextThread = nullptr )
+    inline call_result_t<R> Call( ThreadPtr contextThread = nullptr )
     {
-        NTSTATUS status = RemoteFuncBase<R( C::* )(C*, Args...)>::Call( result, getArgsRaw(), contextThread );
+        auto r = RemoteFuncBase<R( C::* )(C*, Args...)>::Call<R>( getArgsRaw(), contextThread );
         FuncArguments<C*, Args...>::updateArgs();
-        return status;
+        return r;
     } 
 };
 

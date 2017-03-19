@@ -9,7 +9,7 @@ namespace blackbone
 Thread::Thread( DWORD id, ProcessCore* core, DWORD access /*= DEFAULT_ACCESS*/ )
     : _core( core )
     , _id( id )
-    , _handle( OpenThread( access , FALSE, id ) )
+    , _handle( OpenThread( access, FALSE, id ) )
 {  
 }
 
@@ -18,14 +18,6 @@ Thread::Thread( HANDLE handle, ProcessCore* core )
     , _handle( handle )
 {
     _id = (handle != NULL ? GetThreadIdT( handle ) : 0);
-}
-
-Thread::Thread( const Thread& other )
-    : _core( other._core )
-    , _id( other._id )
-    , _handle( other._handle )
-{
-    other._owner = false;
 }
 
 Thread::~Thread()
@@ -363,7 +355,7 @@ uint64_t Thread::execTime()
 /// </summary>
 void Thread::Close()
 {
-    if (_owner && _handle)
+    if (_handle && _handle != INVALID_HANDLE_VALUE)
     {
         CloseHandle( _handle );
         _handle = NULL;

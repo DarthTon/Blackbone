@@ -15,7 +15,7 @@ RemoteExec::RemoteExec( Process& proc )
     , _mods( _proc.modules() )
     , _memory( _proc.memory() )
     , _threads( _proc.threads() )
-    , _hWorkThd( (DWORD)0, &_memory.core() )
+    , _hWorkThd( new Thread( (DWORD)0, &_memory.core() ) )
     , _hWaitEvent( NULL )
     , _apcPatched( false )
 {
@@ -78,7 +78,7 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
     auto thread = _threads.CreateNew( _userCode.ptr<ptr_t>() + size, _userData.ptr<ptr_t>()/*, HideFromDebug*/ );
     if (!thread)
         return thread.status;
-    if (!thread->Join())
+    if (!thread.result()->Join())
         return LastNtStatus();
 
     callResult = _userData.Read<uint64_t>( INTRET_OFFSET, 0 );
@@ -134,7 +134,7 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
     // Execute code in thread context
     // TODO: Find out why am I passing pRemoteCode as an argument???
     auto pRemoteCode = _userCode.ptr<PVOID>();
-    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueueApcThread, _hWorkThd.handle(), pRemoteCode, pRemoteCode, nullptr, nullptr ) ))
+    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueueApcThread, _hWorkThd->handle(), pRemoteCode, pRemoteCode, nullptr, nullptr ) ))
     {
         dwResult = WaitForSingleObject( _hWaitEvent, 30 * 1000 /*wait 30s*/ );
         callResult = _userData.Read<uint64_t>( RET_OFFSET, 0 );
@@ -156,7 +156,7 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
 /// <param name="callResult">Execution result</param>
 /// <param name="thd">Target thread</param>
 /// <returns>Status</returns>
-NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callResult, Thread& thd )
+NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callResult, ThreadPtr& thd )
 {
     NTSTATUS dwResult = STATUS_SUCCESS;
     CONTEXT_T ctx;
@@ -172,10 +172,10 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     if (_hWaitEvent)
         ResetEvent( _hWaitEvent );
 
-    if (!thd.Suspend())
+    if (!thd->Suspend())
         return LastNtStatus();
 
-    if (thd.GetContext( ctx, CONTEXT_ALL, true ))
+    if (thd->GetContext( ctx, CONTEXT_ALL, true ))
     {
         AsmJitHelper a;
 
@@ -230,7 +230,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         {
             ctx.NIP = _userCode.ptr<uintptr_t>() + size;
 
-            if (!thd.SetContext( ctx, true ))
+            if (!thd->SetContext( ctx, true ))
                 dwResult = LastNtStatus();
         }
         else
@@ -239,7 +239,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     else
         dwResult = LastNtStatus();
 
-    thd.Resume();
+    thd->Resume();
 
     if (dwResult == STATUS_SUCCESS)
     {
@@ -263,8 +263,8 @@ DWORD RemoteExec::ExecDirect( ptr_t pCode, ptr_t arg )
     if (!thread)
         return thread.status;
 
-    thread->Join();
-    return thread->ExitCode();
+    thread.result()->Join();
+    return thread.result()->ExitCode();
 }
 
 /// <summary>
@@ -353,7 +353,7 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
     //
     // Create execution thread
     //
-    if(!_hWorkThd.valid())
+    if(!_hWorkThd->valid())
     {
         eModType mt = mt_default;
         if (_proc.barrier().type == wow_64_32)
@@ -409,7 +409,7 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
         _hWorkThd = std::move( thd.result() );
     }
 
-    return _hWorkThd.id();
+    return _hWorkThd->id();
 }
 
 
@@ -634,11 +634,11 @@ void RemoteExec::TerminateWorker()
     }
 
     // Stop thread
-    if(_hWorkThd.valid())
+    if(_hWorkThd->valid())
     {
-        _hWorkThd.Terminate();
-        _hWorkThd.Join();
-        _hWorkThd.Close();
+        _hWorkThd->Terminate();
+        _hWorkThd->Join();
+        _hWorkThd->Close();
         _workerCode.Free();
     }
 }

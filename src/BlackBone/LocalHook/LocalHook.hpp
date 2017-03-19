@@ -124,7 +124,7 @@ public:
                     thisProc.Attach( GetCurrentProcessId() );
 
                     for (auto& thd : thisProc.threads().getAll())
-                        thd.RemoveHWBP( reinterpret_cast<ptr_t>(this->_original) );
+                        thd->RemoveHWBP( reinterpret_cast<ptr_t>(this->_original) );
 
                     this->_hwbpIdx.clear();
                 }
@@ -241,7 +241,7 @@ private:
 
         // Add breakpoint to every thread
         for (auto& thd : thisProc.threads().getAll())
-            this->_hwbpIdx[thd.id()] = thd.AddHWBP( reinterpret_cast<ptr_t>(this->_original), hwbp_execute, hwbp_1 ).result();
+            this->_hwbpIdx[thd->id()] = thd->AddHWBP( reinterpret_cast<ptr_t>(this->_original), hwbp_execute, hwbp_1 ).result();
     
         return this->_hooked = true;
     }

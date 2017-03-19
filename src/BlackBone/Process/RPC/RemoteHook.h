@@ -80,7 +80,7 @@ public:
     /// <param name="newFn">Callback</param>
     /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API inline NTSTATUS Apply( eHookType type, uint64_t ptr, fnCallback newFn, Thread* pThread = nullptr )
+    BLACKBONE_API inline NTSTATUS Apply( eHookType type, uint64_t ptr, fnCallback newFn, ThreadPtr pThread = nullptr )
     {
         return ApplyP( type, ptr, newFn, nullptr, pThread );
     }
@@ -110,7 +110,7 @@ public:
     /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
     /// <returns>true on success</returns>
     template<typename C>
-    inline NTSTATUS Apply( eHookType type, uint64_t ptr, void(C::* newFn)(RemoteContext& ctx), const C& classRef, Thread* pThread = nullptr )
+    inline NTSTATUS Apply( eHookType type, uint64_t ptr, void(C::* newFn)(RemoteContext& ctx), const C& classRef, ThreadPtr pThread = nullptr )
     {
         return ApplyP( type, ptr, brutal_cast<fnCallback>(newFn), &classRef, pThread );
     }
@@ -152,7 +152,7 @@ private:
     /// <param name="pClass">Class reference.</param>
     /// <param name="pThread">Thread to hook. Valid only for HWBP</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API NTSTATUS ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass = nullptr, Thread* pThread = nullptr );
+    BLACKBONE_API NTSTATUS ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, const void* pClass = nullptr, ThreadPtr pThread = nullptr );
 
     /// <summary>
     /// Hook function return
