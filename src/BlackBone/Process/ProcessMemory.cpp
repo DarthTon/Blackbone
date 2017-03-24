@@ -82,11 +82,8 @@ NTSTATUS ProcessMemory::Protect( ptr_t pAddr, size_t size, DWORD flProtect, DWOR
 NTSTATUS ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, bool handleHoles /*= false*/ )
 {
     DWORD64 dwRead = 0;
-
     if (dwAddress == 0)
         return STATUS_INVALID_ADDRESS;
-
-    SetLastNtStatus( STATUS_SUCCESS );
 
     // Simple read
     if (!handleHoles)
@@ -109,13 +106,15 @@ NTSTATUS ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, boo
 
             uint64_t region_ptr = memptr - dwAddress;
 
-            if (_core.native()->ReadProcessMemoryT( mbi.BaseAddress,
+            auto status = _core.native()->ReadProcessMemoryT(
+                mbi.BaseAddress,
                 reinterpret_cast<uint8_t*>(pResult) + region_ptr,
                 static_cast<size_t>(mbi.RegionSize),
-                &dwRead ) != STATUS_SUCCESS)
-            {
-                return LastNtStatus();
-            }
+                &dwRead
+            );
+
+            if (!NT_SUCCESS( status ))
+                return status;
         }
     }
 

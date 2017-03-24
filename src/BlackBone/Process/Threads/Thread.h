@@ -170,8 +170,8 @@ public:
     /// <param name="ctx">Returned context</param>
     /// <param name="flags">Context flags.</param>
     /// <param name="dontSuspend">true if thread shouldn't be suspended before retrieving context</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool GetContext( _CONTEXT32& ctx, DWORD flags = CONTEXT_ALL, bool dontSuspend = false );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS GetContext( _CONTEXT32& ctx, DWORD flags = CONTEXT_ALL, bool dontSuspend = false );
 
     /// <summary>
     /// Get native thread context
@@ -179,31 +179,31 @@ public:
     /// <param name="ctx">Returned context</param>
     /// <param name="flags">Context flags.</param>
     /// <param name="dontSuspend">true if thread shouldn't be suspended before retrieving context</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool GetContext( _CONTEXT64& ctx, DWORD flags = CONTEXT64_ALL, bool dontSuspend = false );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS GetContext( _CONTEXT64& ctx, DWORD flags = CONTEXT64_ALL, bool dontSuspend = false );
 
     /// <summary>
     /// Set WOW64 thread context
     /// </summary>
     /// <param name="ctx">Context to set</param>
     /// <param name="dontSuspend">true if thread shouldn't be suspended before retrieving context</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool SetContext( _CONTEXT32& ctx, bool dontSuspend = false );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS SetContext( _CONTEXT32& ctx, bool dontSuspend = false );
 
     /// <summary>
     /// Set native thread context
     /// </summary>
     /// <param name="ctx">Context to set</param>
     /// <param name="dontSuspend">true if thread shouldn't be suspended before retrieving context</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool SetContext( _CONTEXT64& ctx, bool dontSuspend = false );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS SetContext( _CONTEXT64& ctx, bool dontSuspend = false );
 
     /// <summary>
     /// Terminate thread
     /// </summary>
     /// <param name="code">Exit code</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool Terminate( DWORD code = 0 );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS Terminate( DWORD code = 0 );
 
     /// <summary>
     /// Join thread
@@ -231,15 +231,15 @@ public:
     /// Remove existing hardware breakpoint
     /// </summary>
     /// <param name="idx">Breakpoint index</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool RemoveHWBP( int idx );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS RemoveHWBP( int idx );
 
     /// <summary>
     /// Remove existing hardware breakpoint
     /// </summary>
     /// <param name="ptr">Breakpoint address</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool RemoveHWBP( ptr_t ptr );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS RemoveHWBP( ptr_t ptr );
 
     /// <summary>
     /// Close handle

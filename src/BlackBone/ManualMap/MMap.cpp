@@ -410,16 +410,18 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
         }
     }
 
-    // Unlink image from VAD list
-    if (flags & HideVAD && !NT_SUCCESS( status = ConcealVad( pImage->imgMem ) ))
+    // Initialize security cookie
+    if (!NT_SUCCESS ( status = InitializeCookie( pImage.get() ) ))
     {
+        BLACKBONE_TRACE( L"ManualMap: Failed to initialize cookie for image %ls", pImage->FileName.c_str() );
+
         pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return status;
     }
 
-    // Initialize security cookie
-    if (!NT_SUCCESS ( status = InitializeCookie( pImage.get() ) ))
+    // Unlink image from VAD list
+    if (flags & HideVAD && !NT_SUCCESS( status = ConcealVad( pImage->imgMem ) ))
     {
         pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );

@@ -180,10 +180,7 @@ NTSTATUS NativeWow64::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t a
     }
     else*/
     {
-        SetLastNtStatus( STATUS_SUCCESS );
-
         static DWORD64 NtCreateThreadEx = GetProcAddress64( getNTDLL64(), "NtCreateThreadEx" );
-
         if (NtCreateThreadEx == 0)
             return STATUS_ORDINAL_NOT_FOUND;
 

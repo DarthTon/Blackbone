@@ -158,16 +158,16 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
 /// <returns>Status</returns>
 NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callResult, ThreadPtr& thd )
 {
-    NTSTATUS dwResult = STATUS_SUCCESS;
+    NTSTATUS status = STATUS_SUCCESS;
     CONTEXT_T ctx;
 
     // Prepare for remote exec
-    CreateRPCEnvironment( false, true );
+    if (!NT_SUCCESS( status = CreateRPCEnvironment( false, true ) ))
+        return status;
 
     // Write code
-    dwResult = CopyCode( pCode, size );
-    if (dwResult != STATUS_SUCCESS)
-        return dwResult;
+    if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
+        return status;
 
     if (_hWaitEvent)
         ResetEvent( _hWaitEvent );
@@ -175,7 +175,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     if (!thd->Suspend())
         return LastNtStatus();
 
-    if (thd->GetContext( ctx, CONTEXT_ALL, true ))
+    if (!NT_SUCCESS( status = thd->GetContext( ctx, CONTEXT_ALL, true ) ))
     {
         AsmJitHelper a;
 
@@ -226,28 +226,22 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         a->ret();
     #endif
 
-        if (_userCode.Write( size, a->getCodeSize(), a->make() ) == STATUS_SUCCESS)
+        if (NT_SUCCESS( status = _userCode.Write( size, a->getCodeSize(), a->make() ) ))
         {
             ctx.NIP = _userCode.ptr<uintptr_t>() + size;
-
-            if (!thd->SetContext( ctx, true ))
-                dwResult = LastNtStatus();
+            status = thd->SetContext( ctx, true );
         }
-        else
-            dwResult = LastNtStatus();
     }
-    else
-        dwResult = LastNtStatus();
 
     thd->Resume();
 
-    if (dwResult == STATUS_SUCCESS)
+    if (NT_SUCCESS( status ))
     {
         WaitForSingleObject( _hWaitEvent, INFINITE );
         callResult = _userData.Read<uintptr_t>( INTRET_OFFSET, 0 );
     }
 
-    return dwResult;
+    return status;
 }
 
 
