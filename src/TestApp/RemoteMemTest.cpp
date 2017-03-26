@@ -1,48 +1,37 @@
 #include "Tests.h"
 #include "../BlackBoneDrv/BlackBoneDef.h"
 
-void TestRemoteMem()
+TEST_CASE( "08. Driver remote memory" )
 {
     Process proc;
-    NTSTATUS status = STATUS_SUCCESS;
 
-    std::wcout << L"Remote memory mapping test\r\n";
-
-    auto procIDs = Process::EnumByName( L"explorer.exe" );
-
-    if (procIDs.empty())
-    {
-        std::cout << "TestRemoteMem: Can't find any explorer.exe process for tests\r\n\r\n";
-        return;
-    }
-
-    proc.Attach( procIDs.front() );
-    
-    status = proc.memory().Map( false );
+    std::wcout << L"Remote memory mapping test" << std::endl;
+    NTSTATUS status = Driver().EnsureLoaded();
     if (!NT_SUCCESS( status ))
     {
-        std::cout << "TestRemoteMem: Process address space mapping failed with status 0x" << std::hex << status << "\r\n\r\n";
+        WARN( "Failed to load driver, testing aborted" );
+        CHECK( status == STATUS_OBJECT_NAME_NOT_FOUND );
         return;
     }
+
+    REQUIRE_NT_SUCCESS( proc.Attach( L"explorer.exe" ) );
+    REQUIRE_NT_SUCCESS( status = proc.memory().Map( false ) );
     
     // Translate main module base address
     auto addr = proc.modules().GetMainModule()->baseAddress;
     auto translated = proc.memory().TranslateAddress( addr );
+    CHECK( translated != 0 );
 
-    std::cout << "TestRemoteMem: Translated " << std::hex << addr << " --> " << translated << "\r\n";
+    CHECK_NT_SUCCESS( status = proc.memory().SetupHook( RemoteMemory::MemVirtualAlloc ) );
+    CHECK_NT_SUCCESS( status = proc.memory().SetupHook( RemoteMemory::MemVirtualFree ) );
+    CHECK_NT_SUCCESS( status = proc.memory().SetupHook( RemoteMemory::MemMapSection ) );
+    CHECK_NT_SUCCESS( status = proc.memory().SetupHook( RemoteMemory::MemUnmapSection ) );
 
-    status |= proc.memory().SetupHook( RemoteMemory::MemVirtualAlloc );
-    status |= proc.memory().SetupHook( RemoteMemory::MemVirtualFree );
-    status |= proc.memory().SetupHook( RemoteMemory::MemMapSection );
-    status |= proc.memory().SetupHook( RemoteMemory::MemUnmapSection );
-
-    if (!NT_SUCCESS( status ))
-        std::cout << "TestRemoteMem: Failed to install one of the memory hooks\r\n";
-    else
+    if (NT_SUCCESS( status ))
     {
-        std::cout << "TestRemoteMem: Hooks installed, pausing for 10s\r\n";
+        std::wcout << L"TestRemoteMem: Hooks installed, pausing for 10s" << std::endl;
         Sleep( 10000 );
     }
 
-    std::cout << "\r\n";
+    std::cout << std::endl;
 }

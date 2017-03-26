@@ -4,71 +4,54 @@
 #include "Tests.h"
 #include "../BlackBone/Process/RPC/RemoteFunction.hpp"
 #endif
+
 /*
     Get explorer.exe path
 */
-void TestRemoteCall()
+TEST_CASE( "04. Remote function call" )
 {
 #ifdef COMPILER_MSVC
-    std::wcout << L"\r\nRemote function call test\n";
-    std::wcout << L"Searching for explorer.exe... ";
+    std::wcout << L"Remote function call test inside 'explorer.exe'" << std::endl;
 
     Process explorer;
-    auto found = Process::EnumByName( L"explorer.exe" );
+    REQUIRE_NT_SUCCESS( explorer.Attach( L"explorer.exe" ) );
 
-    if (found.size() > 0)
+    auto barrier = explorer.barrier().type;
+    bool validArch = (barrier == wow_64_64 || barrier == wow_32_32);
+    if (!validArch)
     {
-        std::wcout << L"Found. Attaching to process " << std::dec << found.front() << std::endl;
-
-        NTSTATUS status = explorer.Attach( found.front() );
-        if (!NT_SUCCESS( status ))
-        {
-            std::wcout << L"Can't attach to process, status code " << status << " aborting\n\n";
-            return;
-        }
-
-        auto barrier = explorer.barrier().type;
-
-        if (barrier != wow_32_32 && barrier != wow_64_64)
-        {
-            std::wcout << L"Can't execute call through WOW64 barrier, aborting\n\n";
-            return;
-        }
-
-        std::wcout << L"Searching for NtQueryVirtualMemory... ";
-
-        auto hMainMod = explorer.modules().GetMainModule();
-        auto pRemote = explorer.modules().GetExport( explorer.modules().GetModule( L"ntdll.dll" ), "NtQueryVirtualMemory" );
-
-        if (hMainMod && pRemote)
-        {
-            std::wcout << L"Found. Executing...\n";
-            uint8_t buf[1024] = { 0 };
-
-            RemoteFunction<fnNtQueryVirtualMemory> pFN(
-                explorer,
-                pRemote->procAddress,
-                INVALID_HANDLE_VALUE,
-                reinterpret_cast<LPVOID>(hMainMod->baseAddress),
-                MemorySectionName,
-                reinterpret_cast<LPVOID>(buf),
-                static_cast<SIZE_T>(sizeof( buf )),
-                reinterpret_cast<PSIZE_T>(0)
-                );
-
-            pFN.setArg( 3, AsmVariant( buf, sizeof(buf) ) );
-            auto result = pFN.Call().result( STATUS_UNSUCCESSFUL );
-
-            wchar_t* pStr = (wchar_t*)(buf + sizeof(UNICODE_STRING));
-
-            std::wcout << L"Call result 0x" << std::hex << result << std::dec << L" . Module path " << pStr << std::endl;
-        }
-        else
-            std::wcout << L"Not found, aborting\n";
+        WARN( "Can't call function through WOW64 barrier" );
+        return;
     }
-    else
-        std::wcout << L"Not found, aborting\n";
+    //std::wcout << L"Searching for NtQueryVirtualMemory... ";
 
-    std::wcout << std::endl;
+    auto hMainMod = explorer.modules().GetMainModule();
+    auto pRemote = explorer.modules().GetExport( explorer.modules().GetModule( L"ntdll.dll" ), "NtQueryVirtualMemory" );
+
+    REQUIRE( hMainMod );
+    REQUIRE( pRemote );
+
+    //std::wcout << L"Found. Executing...\n";
+    uint8_t buf[1024] = { 0 };
+
+    RemoteFunction<fnNtQueryVirtualMemory> pFN(
+        explorer,
+        pRemote->procAddress,
+        INVALID_HANDLE_VALUE,
+        reinterpret_cast<LPVOID>(hMainMod->baseAddress),
+        MemorySectionName,
+        reinterpret_cast<LPVOID>(buf),
+        static_cast<SIZE_T>(sizeof( buf )),
+        reinterpret_cast<PSIZE_T>(0)
+    );
+
+    pFN.setArg( 3, AsmVariant( buf, sizeof( buf ) ) );
+    auto result = pFN.Call();
+    REQUIRE_NT_SUCCESS( result.status );
+
+    std::wstring name( (wchar_t*)(buf + sizeof( UNICODE_STRING )) );
+    CHECK( name.find( L"explorer.exe" ) != name.npos );
+
+    //std::wcout << L"Call result 0x" << std::hex << result << std::dec << L" . Module path " << pStr << std::endl;
 #endif // COMPILER_MSVC
 }

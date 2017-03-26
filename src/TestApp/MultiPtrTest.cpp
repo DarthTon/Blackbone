@@ -32,43 +32,63 @@ struct s3
     s2* pS2 = new s2();
 };
 
-s3* pS3 = new s3();
-
 // stupid C3865 : "'__thiscall' : can only be used on native member functions", even for a type declaration
 typedef int( __fastcall* pfnClass )(s_end* _this, void* zdx);
 
-void TestMultiPtr()
+//void TestMultiPtr()
+TEST_CASE( "02. Multi-level pointer" )
 {
-     Process proc;
-    proc.Attach( GetCurrentProcessId() );
+    std::unique_ptr<s3> pS3( new s3() );
+    REQUIRE( pS3 != nullptr );
 
-    std::wcout << L"Local and remote multi-level pointers test" << std::endl;
+    Process proc;
+    REQUIRE_NT_SUCCESS( proc.Attach( GetCurrentProcessId() ) );
 
-    uintptr_t ps3 = (uintptr_t)&pS3;
     auto orig = pS3->pS2->pS1->pEnd->fval;
+    REQUIRE( orig == Approx( 12.0f ) );
+    REQUIRE( pS3->pS2->pS1->pEnd->fn3() == (pS3->pS2->pS1->pEnd->ival + static_cast<int>(pS3->pS2->pS1->pEnd->fval)) );
 
-    multi_ptr<s_end*> struct_ptr( ps3, { off[0], off[1], off[2] } );
-    multi_ptr<pfnClass> func_ptr( ps3, { off[0], off[1], off[2], 0, 2 * sizeof( pfnClass ) } );
-    multi_ptr<float> float_ptr( ps3, { off[0], off[1], off[2], FIELD_OFFSET( s_end, fval ) } );
-
-    s_end* pEnd = struct_ptr;
-    *float_ptr = 15.7f;
-
-    std::wcout << L"multi_ptr: s_end : " << (pEnd == pS3->pS2->pS1->pEnd) << std::endl;
-    std::wcout << L"multi_ptr: s_end::fn3 result: " << (func_ptr( pEnd, nullptr )) << std::endl;
-    std::wcout << L"multi_ptr: changed val : " << orig << L" -> " << pS3->pS2->pS1->pEnd->fval << std::endl;
-
-    multi_ptr_ex<s_end*> ptr_ex( &proc, ps3, { off[0], off[1], off[2] } );
-    if (auto pVal_ex = ptr_ex.get())
+    SECTION( "Local pointers" )
     {
-        orig = pVal_ex->fval;
-        pVal_ex->fval = 25.0;
-        ptr_ex.commit();
-        pVal_ex = ptr_ex.get();
-        std::wcout << L"multi_ptr_ex: changed val : " << orig << L" -> " << pVal_ex->fval << std::endl;
-    }
-    else
-        std::wcout << L"multi_ptr_ex failed" << std::endl;
+        std::wcout << L"Local multi-level pointers" << std::endl;
 
-    std::wcout << std::endl;
+        auto ppS3 = pS3.get();
+        uintptr_t ps3 = (uintptr_t)&ppS3;
+
+        multi_ptr<s_end*> struct_ptr( ps3, { off[0], off[1], off[2] } );
+        multi_ptr<pfnClass> func_ptr( ps3, { off[0], off[1], off[2], 0, 2 * sizeof( pfnClass ) } );
+        multi_ptr<float> float_ptr( ps3, { off[0], off[1], off[2], FIELD_OFFSET( s_end, fval ) } );
+
+        s_end* pEnd = struct_ptr;
+
+        CHECK( pEnd == pS3->pS2->pS1->pEnd );
+        WHEN( "Float value changed" )
+        {
+            const float newVal = 15.7f;
+            *float_ptr = 15.7f;
+            CHECK( pEnd->fval == Approx( newVal ) );
+        }
+
+        CHECK( func_ptr( pEnd, nullptr ) == (pEnd->ival + static_cast<int>(pEnd->fval)) );
+    }
+  
+    SECTION( "Remote pointers" )
+    {
+        std::wcout << L"Remote multi-level pointer" << std::endl;
+        auto ppS3 = pS3.get();
+
+        const float newVal = 25.0f;
+
+        multi_ptr_ex<s_end*> ptr_ex( &proc, (uintptr_t)&ppS3, { off[0], off[1], off[2] } );
+        auto pVal_ex = ptr_ex.get();
+        REQUIRE( pVal_ex != nullptr );
+        REQUIRE( pVal_ex->fval != 0 );
+
+        pVal_ex->fval = 25.0;
+        CHECK( ptr_ex.commit() == STATUS_SUCCESS );
+        pVal_ex = ptr_ex.get();
+
+        REQUIRE( pVal_ex != nullptr );
+        CHECK( pVal_ex->fval == Approx( newVal ) );
+    }
 }

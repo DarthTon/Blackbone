@@ -621,6 +621,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\contrib\Catch\catch.hpp" />
     <ClInclude Include="Tests.h" />
   </ItemGroup>
   <ItemGroup>

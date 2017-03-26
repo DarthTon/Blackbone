@@ -26,8 +26,8 @@ void TestMMap()
         return LoadData( MT_Default, Ldr_None );
     };
 
-    std::wcout << L"Manual image mapping test\n";
-    std::wcout << L"Trying to map C:\\windows\\system32\\calc.exe into current process\n";
+    std::wcout << L"Manual image mapping test" << std::endl;
+    std::wcout << L"Trying to map C:\\windows\\system32\\calc.exe into current process" << std::endl;
 
     auto image = thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", ManualImports | RebaseProcess, callback );
     if (!image)
@@ -52,8 +52,8 @@ void TestMMapFromMem()
     void* buf = nullptr;
     auto size = 0;
 
-    std::wcout << L"Manual image mapping from buffer test\n";
-    std::wcout << L"Trying to map C:\\windows\\system32\\cmd.exe into current process\n";
+    std::wcout << L"Manual image mapping from buffer test" << std::endl;
+    std::wcout << L"Trying to map C:\\windows\\system32\\cmd.exe into current process" << std::endl;
 
     // Get image context
     HANDLE hFile = CreateFileW( L"C:\\windows\\system32\\cmd.exe", FILE_GENERIC_READ, 0x7, 0, OPEN_EXISTING, 0, 0 );

@@ -63,6 +63,9 @@ NTSTATUS Process::Attach( HANDLE hProc )
     auto status = _core.Open( hProc );
     if (NT_SUCCESS( status ))
     {
+        if (!valid())
+            return STATUS_INVALID_HANDLE;
+
         _nativeLdr.Init();
         _remote.CreateRPCEnvironment( false, false );
     }
