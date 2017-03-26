@@ -1,7 +1,7 @@
 #include "Tests.h"
 #include "../BlackBone/Patterns/PatternSearch.h"
 
-TEST_CASE( "3. Patterns" )
+TEST_CASE( "03. Patterns" )
 {
     Process explorer;
 
