@@ -46,6 +46,8 @@ namespace blackbone
     template <typename T>
     struct _UNICODE_STRING_T
     {
+        typedef T type;
+
         WORD Length;
         WORD MaximumLength;
         T Buffer;

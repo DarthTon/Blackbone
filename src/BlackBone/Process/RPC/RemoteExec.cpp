@@ -32,25 +32,25 @@ RemoteExec::~RemoteExec()
 /// <param name="pCode">Code to execute</param>
 /// <param name="size">Code size</param>
 /// <param name="callResult">Code return value</param>
+/// <param name="forceModeSwitch">If true - switch wow64 thread to long mode upon creation</param>
 /// <returns>Status</returns>
-NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult )
+NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult, bool forceModeSwitch /*= true*/ )
 {
-    AsmJitHelper a;
     NTSTATUS status = STATUS_SUCCESS;
 
     // Write code
     if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
         return status;
 
-    bool switchMode = (_proc.barrier().type == wow_64_32);
-    auto pExitThread = _mods.GetExport( _mods.GetModule(
-        L"ntdll.dll", LdrList, switchMode ? mt_mod64 : mt_default ),
-        "NtTerminateThread" );
-
+    bool switchMode = forceModeSwitch ? (_proc.barrier().type == wow_64_32) : false;
+    auto pExitThread = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, switchMode ? mt_mod64 : mt_default ), "NtTerminateThread" );
     if (!pExitThread)
         return pExitThread.status;
 
-    a.GenPrologue( switchMode );
+    auto a = switchMode ? AsmFactory::GetAssembler( AsmFactory::asm64 ) 
+                        : AsmFactory::GetAssembler( _proc.barrier().targetWow64 );
+
+    a->GenPrologue( switchMode );
 
     // Prepare thread to run in x64 mode
     if(switchMode)
@@ -59,20 +59,20 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
         auto createActStack = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt_mod64 ), "RtlAllocateActivationContextStack" );
         if (createActStack)
         {
-            a.GenCall( static_cast<uintptr_t>(createActStack->procAddress), { _userData.ptr<uintptr_t>() + 0x3100 } );
-            a->mov( a->zax, _userData.ptr<uintptr_t>( ) + 0x3100 );
-            a->mov( a->zax, a->intptr_ptr( a->zax ) );
+            a->GenCall( static_cast<uintptr_t>(createActStack->procAddress), { _userData.ptr<uintptr_t>() + 0x3100 } );
+            (*a)->mov( (*a)->zax, _userData.ptr<uintptr_t>( ) + 0x3100 );
+            (*a)->mov( (*a)->zax, (*a)->intptr_ptr( (*a)->zax ) );
 
-            a->mov( asmjit::host::edx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );
-            a->mov( a->intptr_ptr( a->zdx, 0x2C8 ), a->zax );
+            (*a)->mov( (*a)->zdx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );
+            (*a)->mov( (*a)->intptr_ptr( (*a)->zdx, 0x2C8 ), (*a)->zax );
         }
     }
 
-    a.GenCall( _userCode.ptr<uintptr_t>(), { } );
-    a.ExitThreadWithStatus( (uintptr_t)pExitThread->procAddress, _userData.ptr<uintptr_t>() + INTRET_OFFSET );
+    a->GenCall( _userCode.ptr<uintptr_t>(), { } );
+    a->ExitThreadWithStatus( (uintptr_t)pExitThread->procAddress, _userData.ptr<uintptr_t>() + INTRET_OFFSET );
     
     // Execute code in newly created thread
-    if (!NT_SUCCESS( status = _userCode.Write( size, a->getCodeSize(), a->make() ) ))
+    if (!NT_SUCCESS( status = _userCode.Write( size, (*a)->getCodeSize(), (*a)->make() ) ))
         return status;
 
     auto thread = _threads.CreateNew( _userCode.ptr<ptr_t>() + size, _userData.ptr<ptr_t>()/*, HideFromDebug*/ );

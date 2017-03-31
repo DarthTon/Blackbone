@@ -49,8 +49,9 @@ public:
     /// <param name="pCode">Code to execute</param>
     /// <param name="size">Code size</param>
     /// <param name="callResult">Code return value</param>
+    /// <param name="forceModeSwitch">If true - switch wow64 thread to long mode upon creation</param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult );
+    BLACKBONE_API NTSTATUS ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult, bool forceModeSwitch = true );
 
     /// <summary>
     /// Execute code in context of our worker thread

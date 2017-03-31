@@ -354,10 +354,9 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
 {
     NTSTATUS status = STATUS_SUCCESS;
     ModuleDataPtr mod;
-    ptr_t res = 0;
-    
-    AsmJitHelper a;
     pe::PEImage img;
+    uint32_t ustrSize = 0;
+    ptr_t res = 0;    
 
     img.Load( path, true );
     img.Release();
@@ -367,61 +366,79 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
         return call_result_t<ModuleDataPtr>( mod, STATUS_IMAGE_ALREADY_LOADED );
 
     // Image path
-    UNICODE_STRING ustr = { 0 };
-    auto mem = _memory.Allocate( 0x1000, PAGE_READWRITE );
-    if (!mem)
-        return mem.status;
+    auto modName = _memory.Allocate( 0x1000, PAGE_READWRITE );
+    if (!modName)
+        return modName.status;
 
-    auto modName = std::move( mem.result() );
+    // Write dll name into target process
+    auto fillDllName = [&modName, &path]( auto& ustr )
+    {
+        ustr.Buffer = modName->ptr<std::decay<decltype(ustr)>::type::type>() + sizeof( ustr );
+        ustr.MaximumLength = ustr.Length = static_cast<USHORT>(path.size() * sizeof( wchar_t ));
 
-    ustr.Buffer = reinterpret_cast<PWSTR>(modName.ptr<uintptr_t>() + sizeof( ustr ));
-    ustr.Length = static_cast<USHORT>(path.size() * sizeof( wchar_t ));
-    ustr.MaximumLength = ustr.Length;
+        modName->Write( 0, ustr );
+        modName->Write( sizeof( ustr ), path.size() * sizeof( wchar_t ), path.c_str() );
+    };
 
-    modName.Write( 0, ustr );
-    modName.Write( sizeof( ustr ), path.size() * sizeof( wchar_t ), path.c_str() );
+
+    if (img.mType() == mt_mod32)
+    {
+        _UNICODE_STRING_T<DWORD32> ustr = { 0 };
+        ustrSize = sizeof( ustr );
+        fillDllName( ustr );
+    }
+    else if (img.mType() == mt_mod64)
+    {
+        _UNICODE_STRING_T<DWORD64> ustr = { 0 };
+        ustrSize = sizeof( ustr );
+        fillDllName( ustr );
+    }
+    else
+        return STATUS_INVALID_IMAGE_FORMAT;
 
     // Image and process have same processor architecture
     bool sameArch = (img.mType() == mt_mod64 && _core.isWow64() == false) || (img.mType() == mt_mod32 && _core.isWow64() == true);
     auto pLoadLibrary = GetExport( GetModule( L"kernel32.dll", LdrList, img.mType() ), "LoadLibraryW" );
 
-    // Can't generate code through WOW64 barrier
-    if ((_proc.barrier().type != wow_32_64 && img.mType() == mt_mod64) || 
-        (_proc.barrier().type == wow_32_32 || _proc.barrier().type == wow_64_64))
+    // Can't inject 32bit dll into native process
+    if (!_proc.barrier().targetWow64 && img.mType() == mt_mod32)
+        return STATUS_IMAGE_MACHINE_TYPE_MISMATCH;
+
+    auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" );
+    if (!pLdrLoadDll)
+        return pLdrLoadDll.status;
+
+    // Patch LdrFindOrMapDll to enable kernel32.dll loading
+#ifdef USE64
+    if (!_ldrPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
     {
-        auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" );
-        if (!pLdrLoadDll)
-            return pLdrLoadDll.status;
+        uint8_t patch[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+        auto patchBase = _proc.nativeLdr().LdrKernel32PatchAddress();
 
-        // Patch LdrFindOrMapDll to enable kernel32.dll loading
-        #ifdef USE64
-        if (!_ldrPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
+        if (patchBase != 0)
         {
-            uint8_t patch[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-            auto patchBase = _proc.nativeLdr().LdrKernel32PatchAddress();
-
-            if (patchBase != 0)
-            {
-                DWORD flOld = 0;
-                _memory.Protect( patchBase, sizeof( patch ), PAGE_EXECUTE_READWRITE, &flOld );
-                _memory.Write( patchBase, sizeof( patch ), patch );
-                _memory.Protect( patchBase, sizeof( patch ), flOld, nullptr );
-            }
-
-            _ldrPatched = true;
+            DWORD flOld = 0;
+            _memory.Protect( patchBase, sizeof( patch ), PAGE_EXECUTE_READWRITE, &flOld );
+            _memory.Write( patchBase, sizeof( patch ), patch );
+            _memory.Protect( patchBase, sizeof( patch ), flOld, nullptr );
         }
-        #endif
 
-        a.GenCall( (uintptr_t)pLdrLoadDll->procAddress, { 0, 0, modName.ptr<uintptr_t>(), modName.ptr<uintptr_t>() + 0x800 } );
-        a->ret();
-
-        status = _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
-        if (NT_SUCCESS( status ))
-            status = static_cast<NTSTATUS>(res);
+        _ldrPatched = true;
     }
-    // Try to use LoadLibrary if possible
-    else if (pLoadLibrary && sameArch)
-        status = _proc.remote().ExecDirect( pLoadLibrary->procAddress, modName.ptr() + sizeof( ustr ) );
+#endif
+
+    auto a = AsmFactory::GetAssembler( img.mType() );
+
+    a->GenCall( (uintptr_t)pLdrLoadDll->procAddress, { 0, 0, modName->ptr<uintptr_t>(), modName->ptr<uintptr_t>() + 0x800 } );
+    (*a)->ret();
+
+    status = _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, false );
+    if (NT_SUCCESS( status ))
+        status = static_cast<NTSTATUS>(res);
+
+    // Retry with LoadLibrary if possible
+    if (!NT_SUCCESS( status ) && pLoadLibrary && sameArch)
+        status = _proc.remote().ExecDirect( pLoadLibrary->procAddress, modName->ptr() + ustrSize );
 
     if (!NT_SUCCESS( status ))
         return status;
