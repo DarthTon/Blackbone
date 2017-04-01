@@ -1,9 +1,7 @@
 cmake_minimum_required (VERSION 2.8)
-project (BlackBone)
+project (BlackBoneLib)
 
 include_directories(../../Contrib)
-
-add_definitions(-DBLACKBONE_STATIC)
 
 ##########################################################
 set(SOURCE_ASMJIT   ../../contrib/asmjit/base/assembler.cpp
@@ -68,10 +66,10 @@ set(SOURCE_HELPERS  Asm/AsmHelper32.cpp
                     Asm/AsmHelper64.cpp
                     Asm/LDasm.c)
                     
-set(HEADER_HELPERS  Asm/AsmHelper.h
+set(HEADER_HELPERS  Asm/AsmFactory.h
                     Asm/AsmHelper32.h
                     Asm/AsmHelper64.h
-                    Asm/AsmHelperBase.h
+                    Asm/IAsmHelper.h
                     Asm/AsmStack.hpp
                     Asm/AsmVariant.hpp
                     Asm/LDasm.h)
@@ -130,10 +128,12 @@ source_group(ManualMap FILES ${ManualMap})
 
 ##########################################################
 set(SOURCE_MISC     Misc/DynImport.cpp
+                    Misc/InitOnce.cpp
                     Misc/NameResolve.cpp
                     Misc/Utils.cpp)
                     
 set(HEADER_MISC     Misc/DynImport.h
+                    Misc/InitOnce.h
                     Misc/NameResolve.h
                     Misc/Thunk.hpp
                     Misc/Trace.hpp
@@ -197,14 +197,14 @@ source_group(Process\\Threads FILES ${Threads})
 
 ##########################################################
 set(SOURCE_SUB      Subsystem/NativeSubsystem.cpp
-                    Subsystem/Wow64Local.cpp
                     Subsystem/Wow64Subsystem.cpp
-                    Subsystem/x86Subsystem.cpp)
+                    Subsystem/x86Subsystem.cpp
+                    ../../contrib/rewolf-wow64ext/src/wow64ext.cpp)
                     
 set(HEADER_SUB      Subsystem/NativeSubsystem.h
-                    Subsystem/Wow64Local.h
                     Subsystem/Wow64Subsystem.h
-                    Subsystem/x86Subsystem.h)
+                    Subsystem/x86Subsystem.h
+                    ../../contrib/rewolf-wow64ext/src/wow64ext.h)
                     
 FILE(GLOB Subsystem ${SOURCE_SUB} ${HEADER_SUB})
 source_group(Subsystem FILES ${Subsystem})

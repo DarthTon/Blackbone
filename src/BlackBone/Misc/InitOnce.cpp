@@ -16,8 +16,8 @@ public:
     {
         if(!_done)
         {
-            GrantPriviledge( SE_DEBUG_NAME );
-            GrantPriviledge( SE_LOAD_DRIVER_NAME );
+            GrantPriviledge( L"SeDebugPrivilege" );
+            GrantPriviledge( L"SeLoadDriverPrivilege" );
             LoadFuncs();
             _done = true;
         }
