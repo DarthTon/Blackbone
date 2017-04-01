@@ -14,17 +14,25 @@
 namespace blackbone
 {
 
-typedef std::unique_ptr<AsmHelperBase> AsmHelperPtr;
+typedef std::unique_ptr<IAsmHelper> AsmHelperPtr;
 
+/// <summary>
+/// Get suitable asm generator
+/// </summary>
 class AsmFactory
 {
 public:
     enum eAsmArch
     {
-        asm32,
-        asm64
+        asm32,      // x86
+        asm64       // x86_64
     };
 
+    /// <summary>
+    /// Get suitable asm generator
+    /// </summary>
+    /// <param name="arch">Desired CPU architecture</param>
+    /// <returns>AsmHelperBase interface</returns>
     static AsmHelperPtr GetAssembler( eAsmArch arch )
     {
         switch (arch)
@@ -38,6 +46,11 @@ public:
         }
     }
 
+    /// <summary>
+    /// Get suitable asm generator
+    /// </summary>
+    /// <param name="mt">Desired PE module architecture</param>
+    /// <returns>AsmHelperBase interface</returns>
     static AsmHelperPtr GetAssembler( eModType mt )
     {
         if (mt == mt_default)
@@ -54,12 +67,31 @@ public:
         }
     }
 
+    /// <summary>
+    /// Get suitable asm generator
+    /// </summary>
+    /// <param name="wow64process">Target process CPU architecture</param>
+    /// <returns>AsmHelperBase interface</returns>
     static AsmHelperPtr GetAssembler( bool wow64process )
     {
         if (wow64process)
             return GetAssembler( asm32 );
         else
             return GetAssembler( asm64 );
+    }
+
+
+    /// <summary>
+    /// Get default asm generator
+    /// </summary>
+    /// <returns></returns>
+    static AsmHelperPtr GetAssembler()
+    {
+#ifdef USE64
+        return std::make_unique<AsmHelper64>();
+#else
+        return std::make_unique<AsmHelper32>();
+#endif
     }
 };
 

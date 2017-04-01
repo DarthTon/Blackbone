@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Include/Winheaders.h"
-#include "../../Asm/AsmHelper.h"
+#include "../../Asm/AsmFactory.h"
 #include "../Threads/Threads.h"
 #include "../MemBlock.h"
 
@@ -19,9 +19,6 @@ namespace blackbone
 
 class RemoteExec
 {
-    template<typename Fn>
-    friend class RemoteFuncBase;
-
     typedef std::vector<AsmVariant> vecArgs;
 
 public:
@@ -49,9 +46,13 @@ public:
     /// <param name="pCode">Code to execute</param>
     /// <param name="size">Code size</param>
     /// <param name="callResult">Code return value</param>
-    /// <param name="forceModeSwitch">If true - switch wow64 thread to long mode upon creation</param>
+    /// <param name="modeSwitch">Switch wow64 thread to long mode upon creation</param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult, bool forceModeSwitch = true );
+    BLACKBONE_API NTSTATUS ExecInNewThread(
+        PVOID pCode, size_t size, 
+        uint64_t& callResult, 
+        eThreadModeSwitch modeSwitch = AutoSwitch 
+        );
 
     /// <summary>
     /// Execute code in context of our worker thread
@@ -81,6 +82,23 @@ public:
     BLACKBONE_API DWORD ExecDirect( ptr_t pCode, ptr_t arg );
 
     /// <summary>
+    /// Generate assembly code for remote call.
+    /// </summary>
+    /// <param name="a">Underlying assembler object</param>
+    /// <param name="pfn">Remote function pointer</param>
+    /// <param name="args">Function arguments</param>
+    /// <param name="cc">Calling convention</param>
+    /// <param name="retType">Return type</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS PrepareCallAssembly(
+        IAsmHelper& a,
+        ptr_t pfn,
+        std::vector<blackbone::AsmVariant>& args,
+        eCalligConvention cc,
+        eReturnType retType
+    );
+
+    /// <summary>
     /// Generate return from function with event synchronization
     /// </summary>
     /// <param name="a">Target assembly helper</param>
@@ -88,7 +106,7 @@ public:
     /// <param name="retType">Function return type</param>
     /// <param name="retOffset">Return value offset</param>
     BLACKBONE_API void AddReturnWithEvent(
-        AsmHelperBase& a,
+        IAsmHelper& a,
         eModType mt = mt_default, 
         eReturnType retType = rt_int32,
         uint32_t retOffset = RET_OFFSET 
@@ -98,11 +116,32 @@ public:
     /// Save value in rax to user buffer
     /// </summary>
     /// <param name="a">Target assembly helper</param>
-    BLACKBONE_API inline void SaveCallResult( AsmHelperBase& a, uint32_t retOffset = RET_OFFSET )
+    BLACKBONE_API inline void SaveCallResult( IAsmHelper& a, uint32_t retOffset = RET_OFFSET )
     {
         a->mov( a->zdx, _userData.ptr<uintptr_t>() + retOffset );
         a->mov( asmjit::host::dword_ptr( a->zdx ), a->zax );
     }
+
+#pragma warning(disable : 4127)
+    /// <summary>
+    /// Retrieve call result
+    /// </summary>
+    /// <param name="result">Retrieved result</param>
+    /// <returns>true on success</returns>
+    template<typename T>
+    inline NTSTATUS GetCallResult( T& result )
+    {
+        if (sizeof( T ) > sizeof( uint64_t ))
+        {
+            if (std::is_reference<T>::value)
+                return _userData.Read( _userData.Read<uintptr_t>( RET_OFFSET, 0 ), sizeof( T ), (PVOID)&result );
+            else
+                return _userData.Read( ARGS_OFFSET, sizeof( T ), (PVOID)&result );
+        }
+        else
+            return _userData.Read( RET_OFFSET, sizeof( T ), (PVOID)&result );
+    }
+#pragma warning(default : 4127)
 
     /// <summary>
     /// Retrieve last NTSTATUS code
@@ -157,45 +196,6 @@ private:
     /// <param name="size">Code size</param>
     /// <returns>Status</returns>
     NTSTATUS CopyCode( PVOID pCode, size_t size );
-
-    /// <summary>
-    /// Generate assembly code for remote call.
-    /// </summary>
-    /// <param name="a">Underlying assembler object</param>
-    /// <param name="pfn">Remote function pointer</param>
-    /// <param name="args">Function arguments</param>
-    /// <param name="cc">Calling convention</param>
-    /// <param name="retType">Return type</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS PrepareCallAssembly(
-        AsmHelperBase& a, 
-        const void* pfn,
-        std::vector<blackbone::AsmVariant>& args,
-        eCalligConvention cc,
-        eReturnType retType
-        );
-
-#pragma warning(disable : 4127)
-
-    /// <summary>
-    /// Retrieve call result
-    /// </summary>
-    /// <param name="result">Retrieved result</param>
-    /// <returns>true on success</returns>
-    template<typename T>
-    inline NTSTATUS GetCallResult( T& result )
-    { 
-        if (sizeof(T) > sizeof(uint64_t))
-        {
-            if (std::is_reference<T>::value)
-                return _userData.Read( _userData.Read<uintptr_t>( RET_OFFSET, 0 ), sizeof( T ), (PVOID)&result );
-            else
-                return _userData.Read( ARGS_OFFSET, sizeof(T), (PVOID)&result );
-        }
-        else
-            return _userData.Read( RET_OFFSET, sizeof(T), (PVOID)&result );
-    }
-#pragma warning(default : 4127)
 
     RemoteExec( const RemoteExec& ) = delete;
     RemoteExec& operator =(const RemoteExec&) = delete;

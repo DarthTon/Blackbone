@@ -54,6 +54,14 @@ enum eModSeachType
     PEHeaders,      // Scan for PE headers in memory
 };
 
+// Switch created wow64 thread to long mode
+enum eThreadModeSwitch
+{
+    NoSwitch,       // Never switch
+    ForceSwitch,    // Always switch
+    AutoSwitch      // Switch depending on wow64 barrier
+};
+
 // Module info
 struct ModuleData
 {

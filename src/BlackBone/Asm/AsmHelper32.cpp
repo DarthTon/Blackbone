@@ -7,7 +7,7 @@ namespace blackbone
 {
 
 AsmHelper32::AsmHelper32( )
-    : AsmHelperBase( asmjit::kArchX86 )
+    : IAsmHelper( asmjit::kArchX86 )
 {
 }
 
@@ -23,7 +23,7 @@ void AsmHelper32::GenPrologue( bool switchMode /*= false*/ )
 {
     if(switchMode == true)
     {
-        AsmHelperBase::SwitchTo64();
+        IAsmHelper::SwitchTo64();
     }
     else
     {
@@ -44,7 +44,7 @@ void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= 0xC
 
     if (switchMode == true)
     {
-        AsmHelperBase::SwitchTo86();
+        IAsmHelper::SwitchTo86();
     }
     else
     {
@@ -61,7 +61,7 @@ void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= 0xC
 /// <param name="pFN">Function pointer</param>
 /// <param name="args">Function arguments</param>
 /// <param name="cc">Calling convention</param>
-void AsmHelper32::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>& args, eCalligConvention cc /*= CC_stdcall*/ )
+void AsmHelper32::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVariant>& args, eCalligConvention cc /*= CC_stdcall*/ )
 {
     std::set<int> passedIdx;
 
@@ -87,6 +87,7 @@ void AsmHelper32::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
     // Direct pointer
     if(pFN.type == AsmVariant::imm)
     {
+        assert( pFN.imm_val64 <= std::numeric_limits<uint32_t>::max() );
         _assembler.mov( asmjit::host::eax, pFN.imm_val );
         _assembler.call( asmjit::host::eax );
     }
@@ -123,7 +124,7 @@ void AsmHelper32::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
 /// </summary>
 /// <param name="pExitThread">NtTerminateThread address</param>
 /// <param name="resultPtr">Memry where eax value will be saved</param>
-void AsmHelper32::ExitThreadWithStatus( uintptr_t pExitThread, uintptr_t resultPtr )
+void AsmHelper32::ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr )
 {
     if (resultPtr != 0)
     {
@@ -196,6 +197,7 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
 
     case AsmVariant::imm:
     case AsmVariant::structRet:
+        // TODO: resolve 64bit imm values instead of ignoring high bits
         PushArgp( arg.imm_val, regidx );
         break;
 
@@ -207,7 +209,7 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
     case AsmVariant::dataStruct:
         {
             // Ensure stack remain aligned on word size
-            size_t realSize = (arg.size < WordSize) ? WordSize : arg.size;
+            size_t realSize = Align( arg.size, WordSize );
             _assembler.sub( asmjit::host::esp, realSize );
             _assembler.mov( asmjit::host::esi, arg.new_imm_val );
             _assembler.mov( asmjit::host::edi, asmjit::host::esp);

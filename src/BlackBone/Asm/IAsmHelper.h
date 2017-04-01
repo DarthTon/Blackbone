@@ -45,18 +45,18 @@ namespace blackbone
     /// <summary>
     /// Assembly generation helper
     /// </summary>
-    class AsmHelperBase
+    class IAsmHelper
     {
     public:
-        BLACKBONE_API AsmHelperBase( uint32_t arch = asmjit::kArchHost ) 
+        BLACKBONE_API IAsmHelper( uint32_t arch = asmjit::kArchHost ) 
             : _assembler( &_runtime, arch ) { }
 
-        virtual ~AsmHelperBase() { }
+        virtual ~IAsmHelper() { }
 
         virtual void GenPrologue( bool switchMode = false ) = 0;
         virtual void GenEpilogue( bool switchMode = false, int retSize = -1) = 0;
-        virtual void GenCall( const AsmVariant&, const std::vector<AsmVariant>& args, eCalligConvention cc = cc_stdcall ) = 0;
-        virtual void ExitThreadWithStatus( uintptr_t pExitThread, uintptr_t resultPtr ) = 0;
+        virtual void GenCall( const AsmFunctionPtr&, const std::vector<AsmVariant>& args, eCalligConvention cc = cc_stdcall ) = 0;
+        virtual void ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr ) = 0;
         virtual void SaveRetValAndSignalEvent( uintptr_t pSetEvent, uintptr_t ResultPtr, uintptr_t EventPtr, uintptr_t errPtr, eReturnType rtype = rt_int32 ) = 0;
         virtual void EnableX64CallStack( bool state ) = 0;
 
@@ -91,8 +91,8 @@ namespace blackbone
         BLACKBONE_API inline asmjit::X86Assembler* operator ->() { return &_assembler; }
 
     private:
-        AsmHelperBase( const AsmHelperBase& ) = delete;
-        AsmHelperBase& operator =(const AsmHelperBase&) = delete;
+        IAsmHelper( const IAsmHelper& ) = delete;
+        IAsmHelper& operator =(const IAsmHelper&) = delete;
 
     protected:
         asmjit::JitRuntime _runtime;

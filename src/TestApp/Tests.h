@@ -1,5 +1,4 @@
 #pragma once
-#define CATCH_CONFIG_FAST_COMPILE 
 #include <Catch/catch.hpp>
 #include "../BlackBone/Config.h"
 #include "../BlackBone/Process/Process.h"

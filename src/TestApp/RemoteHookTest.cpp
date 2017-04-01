@@ -1,3 +1,4 @@
+#define CATCH_CONFIG_FAST_COMPILE
 #include "../BlackBone/Config.h"
 #include "Tests.h"
 

@@ -37,7 +37,7 @@ public:
     /// <returns>true on success</returns>
     bool Hook( void** ppVtable, int index, hktype hkPtr, bool copyVtable = false, int vtableLen = 0 )
     {
-        AsmJitHelper jmpToHook;
+        auto jmpToHook = AsmFactory::GetAssembler();
 
         //_order = CallOrder::HookFirst;
         //_retType = ReturnMethod::UseOriginal;
@@ -54,15 +54,15 @@ public:
         // Construct jump to hook handler
 #ifdef USE64
         // mov gs:[0x28], this
-        jmpToHook->mov( asmjit::host::rax, (uint64_t)this );
-        jmpToHook->mov( asmjit::host::qword_ptr_abs( 0x28 ).setSegment( asmjit::host::gs ), asmjit::host::rax );
+        (*jmpToHook)->mov( asmjit::host::rax, (uint64_t)this );
+        (*jmpToHook)->mov( asmjit::host::qword_ptr_abs( 0x28 ).setSegment( asmjit::host::gs ), asmjit::host::rax );
 #else
         // mov fs:[0x14], this
-        jmpToHook->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ), (uint32_t)this );
+        (*jmpToHook)->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ), (uint32_t)this );
 #endif // USE64
 
-        jmpToHook->jmp( (asmjit::Ptr)this->_internalHandler );
-        jmpToHook->relocCode( this->_buf );
+        (*jmpToHook)->jmp( (asmjit::Ptr)this->_internalHandler );
+        (*jmpToHook)->relocCode( this->_buf );
 
         // Modify VTable copy
         if (copyVtable)

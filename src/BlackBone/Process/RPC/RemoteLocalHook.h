@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Config.h"
-#include "../../Asm/AsmHelper.h"
+#include "../../Asm/AsmFactory.h"
 #include "../../Include/Types.h"
 #include "../MemBlock.h"
 

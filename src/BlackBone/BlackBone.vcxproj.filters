@@ -324,13 +324,7 @@
     <ClInclude Include="Asm\AsmHelper64.h">
       <Filter>AsmJit\Helpers</Filter>
     </ClInclude>
-    <ClInclude Include="Asm\AsmHelper.h">
-      <Filter>AsmJit\Helpers</Filter>
-    </ClInclude>
     <ClInclude Include="Asm\AsmHelper32.h">
-      <Filter>AsmJit\Helpers</Filter>
-    </ClInclude>
-    <ClInclude Include="Asm\AsmHelperBase.h">
       <Filter>AsmJit\Helpers</Filter>
     </ClInclude>
     <ClInclude Include="Asm\AsmVariant.hpp">
@@ -449,6 +443,12 @@
     </ClInclude>
     <ClInclude Include="Include\CallResult.h">
       <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Asm\IAsmHelper.h">
+      <Filter>AsmJit\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="Asm\AsmFactory.h">
+      <Filter>AsmJit\Helpers</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

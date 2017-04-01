@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AsmHelperBase.h"
+#include "IAsmHelper.h"
 
 namespace blackbone
 {
@@ -8,7 +8,7 @@ namespace blackbone
 /// <summary>
 /// 32 bit assembler helper
 /// </summary>
-class AsmHelper32 : public AsmHelperBase
+class AsmHelper32 : public IAsmHelper
 {
 public:
     BLACKBONE_API AsmHelper32( );
@@ -33,14 +33,14 @@ public:
     /// <param name="pFN">Function pointer</param>
     /// <param name="args">Function arguments</param>
     /// <param name="cc">Calling convention</param>
-    virtual void GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>& args, eCalligConvention cc = cc_stdcall );
+    virtual void GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVariant>& args, eCalligConvention cc = cc_stdcall );
 
     /// <summary>
     /// Save eax value and terminate current thread
     /// </summary>
     /// <param name="pExitThread">NtTerminateThread address</param>
     /// <param name="resultPtr">Memry where eax value will be saved</param>
-    virtual void ExitThreadWithStatus( uintptr_t pExitThread, uintptr_t resultPtr );
+    virtual void ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr );
 
     /// <summary>
     /// Save return value and signal thread return event

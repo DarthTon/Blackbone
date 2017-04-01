@@ -1,6 +1,7 @@
 #include "../BlackBone/Config.h"
 
 #ifdef COMPILER_MSVC
+#define CATCH_CONFIG_FAST_COMPILE
 #include "Tests.h"
 #include "../BlackBone/Process/RPC/RemoteFunction.hpp"
 #endif
@@ -34,19 +35,19 @@ TEST_CASE( "04. Remote function call" )
     //std::wcout << L"Found. Executing...\n";
     uint8_t buf[1024] = { 0 };
 
-    RemoteFunction<fnNtQueryVirtualMemory> pFN(
-        explorer,
-        pRemote->procAddress,
+    RemoteFunction<fnNtQueryVirtualMemory> pFN( explorer, pRemote->procAddress );
+
+    decltype(pFN)::CallArguments args(
         INVALID_HANDLE_VALUE,
         reinterpret_cast<LPVOID>(hMainMod->baseAddress),
         MemorySectionName,
         reinterpret_cast<LPVOID>(buf),
         static_cast<SIZE_T>(sizeof( buf )),
         reinterpret_cast<PSIZE_T>(0)
-    );
+        );
 
-    pFN.setArg( 3, AsmVariant( buf, sizeof( buf ) ) );
-    auto result = pFN.Call();
+    args.set( 3, AsmVariant( buf, sizeof( buf ) ) );
+    auto result = pFN.Call( args );
     REQUIRE_NT_SUCCESS( result.status );
 
     std::wstring name( (wchar_t*)(buf + sizeof( UNICODE_STRING )) );

@@ -2,7 +2,7 @@
 
 #include "../Config.h"
 #include "../Include/Winheaders.h"
-#include "../Asm/AsmHelper.h"
+#include "../Asm/AsmFactory.h"
 #include "../Asm/LDasm.h"
 #include "../Include/Macro.h"
 

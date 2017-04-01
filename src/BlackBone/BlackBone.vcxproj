@@ -669,7 +669,7 @@
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86inst.h" />
     <ClInclude Include="..\..\contrib\AsmJit\x86\x86operand.h" />
     <ClInclude Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.h" />
-    <ClInclude Include="Asm\AsmHelper.h" />
+    <ClInclude Include="Asm\AsmFactory.h" />
     <ClInclude Include="Asm\AsmHelper32.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|x64'">true</ExcludedFromBuild>
@@ -686,7 +686,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release(XP)|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release(DLL)|Win32'">true</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="Asm\AsmHelperBase.h" />
+    <ClInclude Include="Asm\IAsmHelper.h" />
     <ClInclude Include="Asm\AsmStack.hpp" />
     <ClInclude Include="Asm\AsmVariant.hpp" />
     <ClInclude Include="Asm\LDasm.h" />

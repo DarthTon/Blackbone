@@ -32,23 +32,39 @@ RemoteExec::~RemoteExec()
 /// <param name="pCode">Code to execute</param>
 /// <param name="size">Code size</param>
 /// <param name="callResult">Code return value</param>
-/// <param name="forceModeSwitch">If true - switch wow64 thread to long mode upon creation</param>
+/// <param name="modeSwitch">Switch wow64 thread to long mode upon creation</param>
 /// <returns>Status</returns>
-NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callResult, bool forceModeSwitch /*= true*/ )
+NTSTATUS RemoteExec::ExecInNewThread(
+    PVOID pCode, size_t size,
+    uint64_t& callResult,
+    eThreadModeSwitch modeSwitch /*= AutoSwitch*/
+    )
 {
     NTSTATUS status = STATUS_SUCCESS;
+    CreateRPCEnvironment( false, false );
 
     // Write code
     if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
         return status;
 
-    bool switchMode = forceModeSwitch ? (_proc.barrier().type == wow_64_32) : false;
+    bool switchMode = false;
+    switch (modeSwitch)
+    {
+    case blackbone::ForceSwitch:
+        switchMode = true;
+        break;
+
+    case blackbone::AutoSwitch:
+        switchMode = _proc.barrier().type == wow_64_32;
+        break;
+    }
+
     auto pExitThread = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, switchMode ? mt_mod64 : mt_default ), "NtTerminateThread" );
     if (!pExitThread)
         return pExitThread.status;
 
     auto a = switchMode ? AsmFactory::GetAssembler( AsmFactory::asm64 ) 
-                        : AsmFactory::GetAssembler( _proc.barrier().targetWow64 );
+                        : AsmFactory::GetAssembler( _proc.core().isWow64() );
 
     a->GenPrologue( switchMode );
 
@@ -59,23 +75,24 @@ NTSTATUS RemoteExec::ExecInNewThread( PVOID pCode, size_t size, uint64_t& callRe
         auto createActStack = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt_mod64 ), "RtlAllocateActivationContextStack" );
         if (createActStack)
         {
-            a->GenCall( static_cast<uintptr_t>(createActStack->procAddress), { _userData.ptr<uintptr_t>() + 0x3100 } );
-            (*a)->mov( (*a)->zax, _userData.ptr<uintptr_t>( ) + 0x3100 );
+            a->GenCall( createActStack->procAddress, { _userData.ptr() + 0x3100 } );
+
+            (*a)->mov( (*a)->zax, _userData.ptr() + 0x3100 );
             (*a)->mov( (*a)->zax, (*a)->intptr_ptr( (*a)->zax ) );
 
-            (*a)->mov( (*a)->zdx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );
+            (*a)->mov( (*a)->zdx, asmjit::host::dword_ptr_abs( 0x30 ).setSegment( asmjit::host::gs ) );
             (*a)->mov( (*a)->intptr_ptr( (*a)->zdx, 0x2C8 ), (*a)->zax );
         }
     }
 
-    a->GenCall( _userCode.ptr<uintptr_t>(), { } );
-    a->ExitThreadWithStatus( (uintptr_t)pExitThread->procAddress, _userData.ptr<uintptr_t>() + INTRET_OFFSET );
+    a->GenCall( _userCode.ptr(), { } );
+    a->ExitThreadWithStatus( pExitThread->procAddress, _userData.ptr() + INTRET_OFFSET );
     
     // Execute code in newly created thread
     if (!NT_SUCCESS( status = _userCode.Write( size, (*a)->getCodeSize(), (*a)->make() ) ))
         return status;
 
-    auto thread = _threads.CreateNew( _userCode.ptr<ptr_t>() + size, _userData.ptr<ptr_t>()/*, HideFromDebug*/ );
+    auto thread = _threads.CreateNew( _userCode.ptr() + size, _userData.ptr()/*, HideFromDebug*/ );
     if (!thread)
         return thread.status;
     if (!thread.result()->Join())
@@ -497,8 +514,8 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
 /// <param name="retType">Return type</param>
 /// <returns>Status code</returns>
 NTSTATUS RemoteExec::PrepareCallAssembly( 
-    AsmHelperBase& a, 
-    const void* pfn,
+    IAsmHelper& a, 
+    ptr_t pfn,
     std::vector<AsmVariant>& args,
     eCalligConvention cc,
     eReturnType retType
@@ -513,6 +530,15 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
     // Copy structures and strings
     for (auto& arg : args)
     {
+        // Transform 64 bit imm values
+        if (arg.type == AsmVariant::imm && arg.size > sizeof( uint32_t ) && a.assembler()->getArch() == asmjit::kArchX86)
+        {
+            arg.type = AsmVariant::dataStruct;
+            arg.buf.reset( new uint8_t[arg.size] );
+            memcpy( arg.buf.get(), &arg.imm_val64, arg.size );
+            arg.imm_val64 = reinterpret_cast<uint64_t>(arg.buf.get());
+        }
+
         if (arg.type == AsmVariant::dataStruct || arg.type == AsmVariant::dataPtr)
         {
             _userData.Write( data_offset, arg.size, reinterpret_cast<const void*>(arg.imm_val) );
@@ -592,7 +618,7 @@ NTSTATUS RemoteExec::CopyCode( PVOID pCode, size_t size )
 /// <param name="retType">Function return type</param>
 /// <param name="retOffset">Return value offset</param>
 void RemoteExec::AddReturnWithEvent(
-    AsmHelperBase& a,
+    IAsmHelper& a,
     eModType mt /*= mt_default*/,
     eReturnType retType /*= rt_int32 */,
     uint32_t retOffset /*= RET_OFFSET*/ 

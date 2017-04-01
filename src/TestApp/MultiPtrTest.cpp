@@ -1,3 +1,4 @@
+#define CATCH_CONFIG_FAST_COMPILE
 #include "Tests.h"
 #include "../BlackBone/Process/MultPtr.hpp"
 #include "../BlackBone/Asm/LDasm.h"

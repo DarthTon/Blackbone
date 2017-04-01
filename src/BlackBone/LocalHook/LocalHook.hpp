@@ -146,19 +146,20 @@ private:
     /// <returns>true on success</returns>
     bool HookInline()
     {
-        AsmJitHelper jmpToHook, jmpToThunk; 
+        auto jmpToHook  = AsmFactory::GetAssembler();
+        auto jmpToThunk = AsmFactory::GetAssembler();
 
         //
         // Construct jump to thunk
         //
 #ifdef USE64
-        jmpToThunk->mov( asmjit::host::rax, (uint64_t)this->_buf );
-        jmpToThunk->jmp( asmjit::host::rax );
+        (*jmpToThunk)->mov( asmjit::host::rax, (uint64_t)this->_buf );
+        (*jmpToThunk)->jmp( asmjit::host::rax );
 
-        this->_origSize = jmpToThunk->getCodeSize( );
+        this->_origSize = (*jmpToThunk)->getCodeSize();
 #else
-        jmpToThunk->jmp( (asmjit::Ptr)this->_buf );
-        this->_origSize = jmpToThunk->getCodeSize();
+        (*jmpToThunk)->jmp( (asmjit::Ptr)this->_buf );
+        this->_origSize = (*jmpToThunk)->getCodeSize();
 #endif
         
         DetourBase::CopyOldCode( (uint8_t*)this->_original );
@@ -166,18 +167,18 @@ private:
         // Construct jump to hook handler
 #ifdef USE64
         // mov gs:[0x28], this
-        jmpToHook->mov( asmjit::host::rax, (uint64_t)this );
-        jmpToHook->mov( asmjit::host::qword_ptr_abs( 0x28 ).setSegment( asmjit::host::gs ), asmjit::host::rax );
+        (*jmpToHook)->mov( asmjit::host::rax, (uint64_t)this );
+        (*jmpToHook)->mov( asmjit::host::qword_ptr_abs( 0x28 ).setSegment( asmjit::host::gs ), asmjit::host::rax );
 #else
         // mov fs:[0x14], this
-        jmpToHook->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ) , (uint32_t)this );
+        (*jmpToHook)->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ) , (uint32_t)this );
 #endif // USE64
 
-        jmpToHook->jmp( (asmjit::Ptr)&HookHandler<Fn, C>::Handler );
-        jmpToHook->relocCode( this->_buf );
+        (*jmpToHook)->jmp( (asmjit::Ptr)&HookHandler<Fn, C>::Handler );
+        (*jmpToHook)->relocCode( this->_buf );
 
-        jmpToThunk->setBaseAddress( (uintptr_t)this->_original );
-        auto codeSize = jmpToThunk->relocCode( this->_newCode );
+        (*jmpToThunk)->setBaseAddress( (uintptr_t)this->_original );
+        auto codeSize = (*jmpToThunk)->relocCode( this->_newCode );
 
         DWORD flOld = 0;
         if (!VirtualProtect( this->_original, codeSize, PAGE_EXECUTE_READWRITE, &flOld ))

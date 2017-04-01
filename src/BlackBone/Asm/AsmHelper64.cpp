@@ -6,7 +6,7 @@ namespace blackbone
 {
 
 AsmHelper64::AsmHelper64( )
-    : AsmHelperBase( asmjit::kArchX64 )
+    : IAsmHelper( asmjit::kArchX64 )
     ,_stackEnabled( true )
 {
 }
@@ -69,7 +69,7 @@ void AsmHelper64::GenEpilogue( bool switchMode /*= false*/, int retSize /*= 0*/ 
 /// <param name="pFN">Function pointer</param>
 /// <param name="args">Function arguments</param>
 /// <param name="cc">Ignored</param>
-void AsmHelper64::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>& args, eCalligConvention /*cc = CC_stdcall*/ )
+void AsmHelper64::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVariant>& args, eCalligConvention /*cc = CC_stdcall*/ )
 {
     //
     // reserve stack size (0x28 - minimal size for 4 registers and return address)
@@ -89,7 +89,7 @@ void AsmHelper64::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
 
     if (pFN.type == AsmVariant::imm)
     {
-        _assembler.mov( asmjit::host::rax, pFN.imm_val );
+        _assembler.mov( asmjit::host::rax, pFN.imm_val64 );
         _assembler.call( asmjit::host::rax );
     }
     else if (pFN.type == AsmVariant::reg)
@@ -108,7 +108,7 @@ void AsmHelper64::GenCall( const AsmVariant& pFN, const std::vector<AsmVariant>&
 /// </summary>
 /// <param name="pExitThread">NtTerminateThread address</param>
 /// <param name="resultPtr">Memry where rax value will be saved</param>
-void AsmHelper64::ExitThreadWithStatus( uintptr_t pExitThread, uintptr_t resultPtr )
+void AsmHelper64::ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr )
 {
     if (resultPtr != 0)
     {
@@ -184,7 +184,7 @@ void AsmHelper64::PushArg( const AsmVariant& arg, size_t index )
 
     case AsmVariant::imm:
     case AsmVariant::structRet:
-        PushArgp( arg.imm_val, index );
+        PushArgp( arg.imm_val64, index );
         break;
 
     case AsmVariant::dataPtr:

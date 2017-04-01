@@ -4,7 +4,7 @@
 #include "RPC/RemoteExec.h"
 #include "../Misc/NameResolve.h"
 #include "../Misc/Utils.h"
-#include "../Asm/AsmHelper.h"
+#include "../Asm/AsmFactory.h"
 
 #include <memory>
 #include <type_traits>
@@ -380,7 +380,6 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
         modName->Write( sizeof( ustr ), path.size() * sizeof( wchar_t ), path.c_str() );
     };
 
-
     if (img.mType() == mt_mod32)
     {
         _UNICODE_STRING_T<DWORD32> ustr = { 0 };
@@ -401,16 +400,19 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
     auto pLoadLibrary = GetExport( GetModule( L"kernel32.dll", LdrList, img.mType() ), "LoadLibraryW" );
 
     // Can't inject 32bit dll into native process
-    if (!_proc.barrier().targetWow64 && img.mType() == mt_mod32)
+    if (!_proc.core().isWow64() && img.mType() == mt_mod32)
         return STATUS_IMAGE_MACHINE_TYPE_MISMATCH;
+
+    auto switchMode = NoSwitch;
+    if (_proc.core().isWow64() && img.mType() == mt_mod64)
+        switchMode = ForceSwitch;
 
     auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" );
     if (!pLdrLoadDll)
         return pLdrLoadDll.status;
 
     // Patch LdrFindOrMapDll to enable kernel32.dll loading
-#ifdef USE64
-    if (!_ldrPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
+    if (switchMode == ForceSwitch && !_ldrPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
     {
         uint8_t patch[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
         auto patchBase = _proc.nativeLdr().LdrKernel32PatchAddress();
@@ -425,14 +427,13 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
 
         _ldrPatched = true;
     }
-#endif
 
     auto a = AsmFactory::GetAssembler( img.mType() );
 
-    a->GenCall( (uintptr_t)pLdrLoadDll->procAddress, { 0, 0, modName->ptr<uintptr_t>(), modName->ptr<uintptr_t>() + 0x800 } );
+    a->GenCall( pLdrLoadDll->procAddress, { 0, 0, modName->ptr(), modName->ptr() + 0x800 } );
     (*a)->ret();
 
-    status = _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, false );
+    status = _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, switchMode );
     if (NT_SUCCESS( status ))
         status = static_cast<NTSTATUS>(res);
 
@@ -463,23 +464,20 @@ NTSTATUS ProcessModules::Unload( const ModuleDataPtr& hMod )
         return pUnload.status;
 
     // Special case for unloading 64 bit modules from WOW64 process
+    auto threadSwitch = NoSwitch;
     if (_proc.core().isWow64() && hMod->type == mt_mod64)
-    {
-        uint64_t res = 0;
-        
-        AsmJitHelper a;
+        threadSwitch = ForceSwitch;
 
-        a.GenCall( static_cast<uintptr_t>(pUnload->procAddress), { static_cast<uintptr_t>(hMod->baseAddress) } );
-        a->ret();
+    uint64_t res = 0;
+    auto a = AsmFactory::GetAssembler( hMod->type );
 
-        _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res );
-    }
-    else
-        _proc.remote().ExecDirect( pUnload->procAddress, hMod->baseAddress );
+    a->GenCall( pUnload->procAddress, { hMod->baseAddress } );
+    (*a)->ret();
+
+    _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, threadSwitch );
 
     // Remove module from cache
     _modules.erase( std::make_pair( hMod->name, hMod->type ) );
-
     return true;
 }
 
