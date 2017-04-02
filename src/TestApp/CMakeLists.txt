@@ -3,12 +3,11 @@ project (TestApp)
 
 include_directories(../../Contrib)
 
-add_definitions(-DBLACKBONE_STATIC)
-
 add_executable(TestApp  TestApp.cpp 
                         DriverTest.cpp 
                         LocalHookTest.cpp 
-                        MMapTest.cpp 
+                        MMapTest.cpp
+                        MultiPtrTest.cpp
                         PatternTest.cpp 
                         RemoteCallTest.cpp 
                         RemoteHookTest.cpp 

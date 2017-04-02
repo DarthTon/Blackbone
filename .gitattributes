@@ -61,4 +61,3 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
-*.sys filter=lfs diff=lfs merge=lfs -crlf
