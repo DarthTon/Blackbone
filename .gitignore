@@ -79,3 +79,4 @@ GeneratedFiles*/
 *.idb
 *.opendb
 *.db
+*.sqlite
