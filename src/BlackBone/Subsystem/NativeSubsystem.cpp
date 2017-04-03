@@ -567,7 +567,7 @@ size_t Native::EnumPEHeaders( listModules& result )
     {
         auto status = VirtualQueryExT( memptr, &mbi );
 
-        if (status == STATUS_INVALID_PARAMETER || status == STATUS_ACCESS_DENIED)
+        if (status == STATUS_INVALID_PARAMETER || status == STATUS_ACCESS_DENIED || status == STATUS_PROCESS_IS_TERMINATING)
             break;
         else if (status != STATUS_SUCCESS)
             continue;
