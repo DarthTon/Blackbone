@@ -128,7 +128,7 @@ NTSTATUS Thread::GetContext( _CONTEXT64& ctx, DWORD flags /*= CONTEXT64_ALL*/, b
 
     if (dontSuspend || Suspend())
     {
-        status = (_core->native()->GetThreadContextT( _handle, ctx ) == STATUS_SUCCESS);
+        status = _core->native()->GetThreadContextT( _handle, ctx );
         if (!dontSuspend)
             Resume();
     }

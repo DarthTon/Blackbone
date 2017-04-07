@@ -200,7 +200,7 @@ struct AsmVariant
         float     imm_float_val;
     };
 
-    uintptr_t new_imm_val = 0;      // Replaced immediate value for dataPtr type
+    uint64_t new_imm_val = 0;       // Replaced immediate value for dataPtr type
     std::shared_ptr<uint8_t> buf;   // Value buffer
 };
 

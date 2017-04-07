@@ -49,10 +49,10 @@ public:
     /// <param name="errPtr">Error code memory location</param>
     /// <param name="rtype">Return type</param>
     virtual void SaveRetValAndSignalEvent( 
-        uintptr_t pSetEvent,
-        uintptr_t ResultPtr,
-        uintptr_t EventPtr,
-        uintptr_t lastStatusPtr,
+        uint64_t pSetEvent,
+        uint64_t ResultPtr,
+        uint64_t EventPtr,
+        uint64_t lastStatusPtr,
         eReturnType rtype = rt_int32
         );
 
@@ -74,7 +74,7 @@ private:
     /// </summary>
     /// <param name="arg">Argument.</param>
     /// <param name="regidx">Push type(register or stack)</param>
-    void PushArg( const AsmVariant& arg, size_t index );
+    void PushArg( const AsmVariant& arg, int32_t index );
 
     /// <summary>
     /// Push function argument
@@ -83,7 +83,7 @@ private:
     /// <param name="index">Argument index</param>
     /// <param name="fpu">true if argument is a floating point value</param>
     template<typename _Type>
-    void PushArgp( const _Type& arg, size_t index, bool fpu = false );
+    void PushArgp( const _Type& arg, int32_t index, bool fpu = false );
 
 private:
     bool _stackEnabled;     // if true - GenCall will allocate shadow stack space

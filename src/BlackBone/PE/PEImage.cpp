@@ -233,7 +233,7 @@ NTSTATUS PEImage::Parse( void* pImageBase /*= nullptr*/ )
 
     // Sections
     for (int i = 0; i < _pImageHdr32->FileHeader.NumberOfSections; ++i, ++pSection)
-        _sections.push_back( *pSection );
+        _sections.emplace_back( *pSection );
 
     return STATUS_SUCCESS;
 }

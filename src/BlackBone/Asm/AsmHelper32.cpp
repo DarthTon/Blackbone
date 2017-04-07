@@ -40,7 +40,7 @@ void AsmHelper32::GenPrologue( bool switchMode /*= false*/ )
 void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= 0xC */ )
 {
     if (retSize == -1)
-        retSize = WordSize;
+        retSize = sizeof( uint32_t );
 
     if (switchMode == true)
     {
@@ -150,10 +150,10 @@ void AsmHelper32::ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr
 /// <param name="errPtr">Error code memory location</param>
 /// <param name="rtype">Return type</param>
 void AsmHelper32::SaveRetValAndSignalEvent( 
-    uintptr_t pSetEvent,
-    uintptr_t ResultPtr,
-    uintptr_t EventPtr,
-    uintptr_t errPtr,
+    uint64_t pSetEvent,
+    uint64_t ResultPtr,
+    uint64_t EventPtr,
+    uint64_t errPtr,
     eReturnType rtype /*= rt_int32*/ 
     )
 {
@@ -209,7 +209,7 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
     case AsmVariant::dataStruct:
         {
             // Ensure stack remain aligned on word size
-            size_t realSize = Align( arg.size, WordSize );
+            size_t realSize = Align( arg.size, sizeof( uint32_t ) );
             _assembler.sub( asmjit::host::esp, realSize );
             _assembler.mov( asmjit::host::esi, arg.new_imm_val );
             _assembler.mov( asmjit::host::edi, asmjit::host::esp);

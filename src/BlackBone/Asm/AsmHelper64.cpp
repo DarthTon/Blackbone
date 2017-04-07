@@ -32,10 +32,10 @@ void AsmHelper64::GenPrologue( bool switchMode /*= false*/ )
     }
     else
     {
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 1 * WordSize ), asmjit::host::rcx );
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 2 * WordSize ), asmjit::host::rdx );
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 3 * WordSize ), asmjit::host::r8 );
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 4 * WordSize ), asmjit::host::r9 );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 1 * sizeof( uint64_t ) ), asmjit::host::rcx );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 2 * sizeof( uint64_t ) ), asmjit::host::rdx );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 3 * sizeof( uint64_t ) ), asmjit::host::r8 );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 4 * sizeof( uint64_t ) ), asmjit::host::r9 );
     }
 }
 
@@ -54,10 +54,10 @@ void AsmHelper64::GenEpilogue( bool switchMode /*= false*/, int retSize /*= 0*/ 
     }
     else
     {
-        _assembler.mov( asmjit::host::rcx, asmjit::host::qword_ptr( asmjit::host::rsp, 1 * WordSize ) );
-        _assembler.mov( asmjit::host::rdx, asmjit::host::qword_ptr( asmjit::host::rsp, 2 * WordSize ) );
-        _assembler.mov( asmjit::host::r8, asmjit::host::qword_ptr( asmjit::host::rsp, 3 * WordSize ) );
-        _assembler.mov( asmjit::host::r9, asmjit::host::qword_ptr( asmjit::host::rsp, 4 * WordSize ) );
+        _assembler.mov( asmjit::host::rcx, asmjit::host::qword_ptr( asmjit::host::rsp, 1 * sizeof( uint64_t ) ) );
+        _assembler.mov( asmjit::host::rdx, asmjit::host::qword_ptr( asmjit::host::rsp, 2 * sizeof( uint64_t ) ) );
+        _assembler.mov( asmjit::host::r8,  asmjit::host::qword_ptr( asmjit::host::rsp, 3 * sizeof( uint64_t ) ) );
+        _assembler.mov( asmjit::host::r9,  asmjit::host::qword_ptr( asmjit::host::rsp, 4 * sizeof( uint64_t ) ) );
     }
 
     _assembler.ret();
@@ -75,7 +75,7 @@ void AsmHelper64::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVaria
     // reserve stack size (0x28 - minimal size for 4 registers and return address)
     // after call, stack must be aligned on 16 bytes boundary
     //
-    size_t rsp_dif = (args.size() > 4) ? args.size() * WordSize : 0x28;
+    size_t rsp_dif = (args.size() > 4) ? args.size() * sizeof( uint64_t ) : 0x28;
 
     // align on (16 bytes - sizeof(return address))
     rsp_dif = Align( rsp_dif, 0x10 );
@@ -84,7 +84,7 @@ void AsmHelper64::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVaria
         _assembler.sub( asmjit::host::rsp, rsp_dif + 8 );
 
     // Set args
-    for (size_t i = 0; i < args.size(); i++)
+    for (int32_t i = 0; i < static_cast<int32_t>(args.size()); i++)
         PushArg( args[i], i );
 
     if (pFN.type == AsmVariant::imm)
@@ -131,10 +131,10 @@ void AsmHelper64::ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr
 /// <param name="errPtr">Error code memory location</param>
 /// <param name="rtype">Return type</param>
 void AsmHelper64::SaveRetValAndSignalEvent( 
-    uintptr_t pSetEvent,
-    uintptr_t ResultPtr,
-    uintptr_t EventPtr,
-    uintptr_t lastStatusPtr,
+    uint64_t pSetEvent,
+    uint64_t ResultPtr,
+    uint64_t EventPtr,
+    uint64_t lastStatusPtr,
     eReturnType rtype /*= rt_int32*/ 
     )
 {
@@ -177,7 +177,7 @@ void AsmHelper64::EnableX64CallStack( bool state )
 /// </summary>
 /// <param name="arg">Argument.</param>
 /// <param name="regidx">Push type(register or stack)</param>
-void AsmHelper64::PushArg( const AsmVariant& arg, size_t index )
+void AsmHelper64::PushArg( const AsmVariant& arg, int32_t index )
 {
     switch (arg.type)
     {
@@ -226,7 +226,7 @@ void AsmHelper64::PushArg( const AsmVariant& arg, size_t index )
 /// <param name="index">Argument index</param>
 /// <param name="fpu">true if argument is a floating point value</param>
 template<typename _Type>
-void AsmHelper64::PushArgp( const _Type& arg, size_t index, bool fpu /*= false*/ )
+void AsmHelper64::PushArgp( const _Type& arg, int32_t index, bool fpu /*= false*/ )
 {
     static const asmjit::GpReg regs[] = { asmjit::host::rcx, asmjit::host::rdx, asmjit::host::r8, asmjit::host::r9 };
     static const asmjit::XmmReg xregs[] = { asmjit::host::xmm0, asmjit::host::xmm1, asmjit::host::xmm2, asmjit::host::xmm3 };
@@ -247,7 +247,7 @@ void AsmHelper64::PushArgp( const _Type& arg, size_t index, bool fpu /*= false*/
     else
     {
         _assembler.mov( asmjit::host::rax, arg );
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, static_cast<int32_t>(index)* WordSize ), asmjit::host::rax );
+        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, index * sizeof( uint64_t ) ), asmjit::host::rax );
     }
 }
 

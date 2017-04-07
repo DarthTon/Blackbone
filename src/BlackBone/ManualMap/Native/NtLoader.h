@@ -55,8 +55,8 @@ public:
     /// </summary>
     /// <param name="pModule">Module base address</param>
     /// <param name="pTls">TLS directory of target image</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls );
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls );
 
     /// <summary>
     /// Create module record in LdrpInvertedFunctionTable

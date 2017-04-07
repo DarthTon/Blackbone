@@ -24,7 +24,6 @@ TEST_CASE( "04. Remote function call" )
         WARN( "Can't call function through WOW64 barrier" );
         return;
     }
-    //std::wcout << L"Searching for NtQueryVirtualMemory... ";
 
     auto hMainMod = explorer.modules().GetMainModule();
     auto pRemote = explorer.modules().GetExport( explorer.modules().GetModule( L"ntdll.dll" ), "NtQueryVirtualMemory" );
@@ -36,12 +35,11 @@ TEST_CASE( "04. Remote function call" )
     uint8_t buf[1024] = { 0 };
 
     RemoteFunction<fnNtQueryVirtualMemory> pFN( explorer, pRemote->procAddress );
-
     decltype(pFN)::CallArguments args(
         INVALID_HANDLE_VALUE,
-        reinterpret_cast<LPVOID>(hMainMod->baseAddress),
+        reinterpret_cast<PVOID>(hMainMod->baseAddress),
         MemorySectionName,
-        reinterpret_cast<LPVOID>(buf),
+        reinterpret_cast<PVOID>(buf),
         static_cast<SIZE_T>(sizeof( buf )),
         reinterpret_cast<PSIZE_T>(0)
         );
@@ -49,10 +47,9 @@ TEST_CASE( "04. Remote function call" )
     args.set( 3, AsmVariant( buf, sizeof( buf ) ) );
     auto result = pFN.Call( args );
     REQUIRE_NT_SUCCESS( result.status );
+    REQUIRE_NT_SUCCESS( result.result() );
 
     std::wstring name( (wchar_t*)(buf + sizeof( UNICODE_STRING )) );
     CHECK( name.find( L"explorer.exe" ) != name.npos );
-
-    //std::wcout << L"Call result 0x" << std::hex << result << std::dec << L" . Module path " << pStr << std::endl;
 #endif // COMPILER_MSVC
 }

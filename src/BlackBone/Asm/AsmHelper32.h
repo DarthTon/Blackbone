@@ -51,10 +51,10 @@ public:
     /// <param name="errPtr">Error code memory location</param>
     /// <param name="rtype">Return type</param>
     virtual void SaveRetValAndSignalEvent( 
-        uintptr_t pSetEvent,
-        uintptr_t ResultPtr,
-        uintptr_t EventPtr,
-        uintptr_t errPtr,
+        uint64_t pSetEvent,
+        uint64_t ResultPtr,
+        uint64_t EventPtr,
+        uint64_t errPtr,
         eReturnType rtype = rt_int32
         );
 

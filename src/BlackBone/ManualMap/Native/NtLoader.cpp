@@ -173,13 +173,11 @@ T* NtLdr::SetNode( T* ptr, void* pModule )
 /// </summary>
 /// <param name="pModule">Module base address</param>
 /// <param name="pTls">TLS directory of target image</param>
-/// <returns>true on success</returns>
-bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
+/// <returns>Status code</returns>
+NTSTATUS NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
 {
     bool wxp = IsWindowsXPOrGreater() && !IsWindowsVistaOrGreater();
-
-    void* pNode = _nodeMap.count( reinterpret_cast<HMODULE>(pModule) ) ? 
-        _nodeMap[reinterpret_cast<HMODULE>(pModule)] : nullptr;
+    void* pNode = _nodeMap.count( reinterpret_cast<HMODULE>(pModule) ) ? _nodeMap[reinterpret_cast<HMODULE>(pModule)] : nullptr;
 
     // Allocate appropriate structure
     if ((pNode = SetNode( reinterpret_cast<PLDR_DATA_TABLE_ENTRY>(pNode), pModule )) == nullptr)
@@ -196,7 +194,7 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
 
         auto mem = _process.memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
         if (!mem)
-            return false;
+            return mem.status;
 
         auto tlsStore = std::move( mem.result() );
 
@@ -216,11 +214,11 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
         else
             _process.memory().Write( pTeb + FIELD_OFFSET( _TEB64, ThreadLocalStoragePointer ), tlsStore.ptr<DWORD64>() );
 
-        return true;
+        return STATUS_SUCCESS;
     }
 
     // Use native method
-    if(_LdrpHandleTlsData)
+    if (_LdrpHandleTlsData)
     {
         AsmJitHelper a;
         uint64_t result = 0;
@@ -230,12 +228,14 @@ bool NtLdr::AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls )
         _process.remote().AddReturnWithEvent( a );
         a.GenEpilogue();
 
-        _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-    }
-    else 
-        return false;
+        auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
+        if (!NT_SUCCESS( status ))
+            return status;
 
-    return true;
+        return static_cast<NTSTATUS>(result);
+    }
+    else
+        return STATUS_ORDINAL_NOT_FOUND;
 }
 
 /// <summary>

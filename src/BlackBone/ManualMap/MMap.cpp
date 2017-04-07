@@ -273,10 +273,6 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     pImage->FileName = Utils::StripPath( pImage->FilePath );
     pImage->flags = flags;
 
-    // Check if already loaded
-    if (auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType() ))
-        return hMod;
-
     // Load and parse image
     status = buffer ? pImage->peImage.Load( buffer, size, !asImage ) : pImage->peImage.Load( path, flags & NoSxS ? true : false );
     if (!NT_SUCCESS( status ))
@@ -284,6 +280,21 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
         BLACKBONE_TRACE( L"ManualMap: Failed to load image '%ls'/0x%p. Status 0x%X", path.c_str(), buffer, status );
         pImage->peImage.Release();
         return status;
+    }
+
+    // Check if already loaded
+    if (auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType() ))
+    {
+        pImage->peImage.Release();
+        return hMod;
+    }
+
+    // Check architecture
+    if (pImage->peImage.mType() == mt_mod32 && !_process.core().isWow64())
+    {
+        BLACKBONE_TRACE( L"ManualMap: Can't map x86 dll '%ls' into native x64 process", path.c_str() );
+        pImage->peImage.Release();
+        return STATUS_IMAGE_MACHINE_TYPE_MISMATCH;
     }
 
     BLACKBONE_TRACE( L"ManualMap: Loading new image '%ls'", path.c_str() );
@@ -375,11 +386,19 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     }
 
     auto mt = pImage->peImage.mType();
+    PVOID fsRedirection = reinterpret_cast<PVOID>(0xDEADBEEF);
+
+    // Handle x64 system32 dlls for wow64 process
+    if (_process.modules().GetManualModules().empty() && mt == mt_mod64 && _process.barrier().sourceWow64)
+        Wow64DisableWow64FsRedirection( &fsRedirection );
+
     auto pMod = _process.modules().AddManualModule( pImage->FilePath, pImage->imgMem.ptr<module_t>(), pImage->imgMem.size(), mt );
 
     // Import
     if (!NT_SUCCESS(status = ResolveImport( pImage.get() )))
     {
+        if(fsRedirection != reinterpret_cast<PVOID>(0xDEADBEEF))
+            Wow64RevertWow64FsRedirection ( fsRedirection );
         pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return status;
@@ -388,10 +407,15 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     // Delayed import
     if (!(flags & NoDelayLoad) && !NT_SUCCESS( status = ResolveImport( pImage.get(), true ) ))
     {
+        if (fsRedirection != reinterpret_cast<PVOID>(0xDEADBEEF))
+            Wow64RevertWow64FsRedirection ( fsRedirection );
         pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return status;
     }
+
+    if (fsRedirection != reinterpret_cast<PVOID>(0xDEADBEEF))
+        Wow64RevertWow64FsRedirection ( fsRedirection );
 
     // Apply proper memory protection for sections
     if (!(flags & HideVAD))
@@ -403,7 +427,6 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
         if (!NT_SUCCESS( status = EnableExceptions( pImage.get() ) ) && status != STATUS_NOT_FOUND)
         {
             BLACKBONE_TRACE( L"ManualMap: Failed to enable exception handling for image %ls", pImage->FileName.c_str() );
-
             pImage->peImage.Release();
             _process.modules().RemoveManualModule( pImage->FileName, mt );
             return status;
@@ -414,7 +437,6 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     if (!NT_SUCCESS ( status = InitializeCookie( pImage.get() ) ))
     {
         BLACKBONE_TRACE( L"ManualMap: Failed to initialize cookie for image %ls", pImage->FileName.c_str() );
-
         pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return status;
@@ -456,6 +478,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     // Static TLS data
     if (!(flags & NoTLS) && !NT_SUCCESS( status = InitStaticTLS( pImage.get() ) ))
     {
+        BLACKBONE_TRACE( L"ManualMap: Failed to initialize static TLS for image %ls, status 0x%X", pImage->FileName.c_str(), status );
         pImage->peImage.Release();
         _process.modules().RemoveManualModule( pImage->FileName, mt );
         return status;
@@ -809,7 +832,6 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
                 auto hFwdMod = FindOrMapDependency( pImage, wdllpath );
                 if (!hFwdMod)
                 {
-                    // TODO: Add error code
                     BLACKBONE_TRACE( L"ManualMap: Failed to load forwarded dependency '%ls'. Status 0x%x", wstrDll.c_str(), hFwdMod.status );
                     return hFwdMod.status;
                 }
@@ -821,7 +843,7 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
             }
 
             // Failed to resolve import
-            if (expData->procAddress == 0)
+            if (!expData)
             {
                 if (importFn.importByOrd)
                     BLACKBONE_TRACE( L"ManualMap: Failed to get import #%d from image '%ls'", importFn.importOrdinal, wstrDll.c_str() );
@@ -928,39 +950,40 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
 NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
 {
     BLACKBONE_TRACE( L"ManualMap: Disabling exception support for image '%ls'", pImage->FileName.c_str() );
+    bool partial = false;
 
-#ifdef USE64
-    if (pImage->pExpTableAddr)
+    if (pImage->peImage.mType() == mt_mod64)
     {
-        AsmJitHelper a;
+        if (!pImage->pExpTableAddr)
+            return STATUS_NOT_FOUND;
+
+        auto a = AsmFactory::GetAssembler( pImage->peImage.mType() );
         uint64_t result = 0;
 
         auto pRemoveTable = _process.modules().GetExport(
             _process.modules().GetModule( L"ntdll.dll", LdrList, pImage->peImage.mType() ),
             "RtlDeleteFunctionTable"
-            );
+        );
 
         if (!pRemoveTable)
             return pRemoveTable.status;
 
-        a.GenPrologue();
+        a->GenPrologue();
         // RtlDeleteFunctionTable(pExpTable);
-        a.GenCall( static_cast<uintptr_t>(pRemoveTable->procAddress), { pImage->pExpTableAddr } );
-        _process.remote().AddReturnWithEvent( a );
-        a.GenEpilogue();
+        a->GenCall(pRemoveTable->procAddress, { pImage->pExpTableAddr } );
+        _process.remote().AddReturnWithEvent( *a );
+        a->GenEpilogue();
 
-        auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
+        auto status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
         if (!NT_SUCCESS( status ))
             return status;
 
-        return MExcept::RemoveVEH( (pImage->flags & CreateLdrRef) != 0 );
+        partial = (pImage->flags & CreateLdrRef) != 0;
     }
     else
-        return STATUS_NOT_FOUND;
-#else
-    return MExcept::RemoveVEH( (pImage->flags & PartialExcept) != 0 );
+        partial = (pImage->flags & PartialExcept) != 0;
 
-#endif
+    return MExcept::RemoveVEH( partial, pImage->peImage.mType() );
 }
 
 /// <summary>
@@ -977,10 +1000,7 @@ NTSTATUS MMap::InitStaticTLS( ImageContext* pImage )
     if (pTls && pTls->AddressOfIndex)
     {
         BLACKBONE_TRACE( L"ManualMap: Performing static TLS initialization for image '%ls'", pImage->FileName.c_str() );
-
-        // TODO: proper error code
-        if (!_process.nativeLdr().AddStaticTLSEntry( pImage->imgMem.ptr<void*>(), pRebasedTls ))
-            return STATUS_UNSUCCESSFUL;
+        return _process.nativeLdr().AddStaticTLSEntry( pImage->imgMem.ptr<void*>(), pRebasedTls );
     }
 
     return STATUS_SUCCESS;

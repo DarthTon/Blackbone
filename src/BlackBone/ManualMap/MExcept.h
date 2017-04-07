@@ -54,8 +54,9 @@ protected:
     /// Removes VEH from target process
     /// </summary>
     /// <param name="partial">Partial exception support</param>
+    /// <param name="mt">Mosule type</param>
     /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS RemoveVEH( bool partial );
+    BLACKBONE_API NTSTATUS RemoveVEH( bool partial, eModType mt );
 
     /// <summary>
     /// Reset data
@@ -70,7 +71,7 @@ private:
     class Process& _proc;   // Underlying process
     MemBlock  _pVEHCode;    // VEH function codecave
     MemBlock  _pModTable;   // x64 module address range table
-    uintptr_t _hVEH = 0;    // VEH handle
+    uint64_t  _hVEH = 0;    // VEH handle
 };
 
 }

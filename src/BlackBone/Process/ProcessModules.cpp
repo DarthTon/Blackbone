@@ -292,7 +292,7 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, 
                 OrdIndex = static_cast<WORD>(pAddressOfOrds[i]);
             }
             else
-                return data;
+                return call_result_t<exportData>( data, STATUS_NOT_FOUND );
 
             if ((reinterpret_cast<uintptr_t>(name_ord) <= 0xFFFF && (WORD)((uintptr_t)name_ord) == (OrdIndex + pExpData->Base)) ||
                  (reinterpret_cast<uintptr_t>(name_ord) > 0xFFFF && strcmp( pName, name_ord ) == 0))
@@ -323,10 +323,11 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, 
                     else
                         data.forwardName = strName;
 
+                    // Check if forward mod is loaded
                     auto mt = (phdrNt32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) ? mt_mod32 : mt_mod64;
                     auto hChainMod = GetModule( wDll, LdrList, mt, baseModule );
                     if (hChainMod == nullptr)
-                        return data;
+                        return call_result_t<exportData>( data, STATUS_SOME_NOT_MAPPED );
 
                     // Import by ordinal
                     if (data.forwardByOrd)
@@ -336,12 +337,12 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, 
                         return GetExport( hChainMod, strName.c_str(), wDll.c_str() );
                 }
 
-                break;
+                return data;
             }
         }
     }
 
-    return data;
+    return STATUS_NOT_FOUND;
 }
 
 /// <summary>
