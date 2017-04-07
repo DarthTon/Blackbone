@@ -831,8 +831,73 @@ bool NtLdr::ScanPatterns( )
     if(pStart == nullptr)
         return false;
 
+    // Win10 update 2
+    if (IsWindows10CreatorsOrGreater())
+    {
+#ifdef USE64
+        // LdrpHandleTlsData
+        // 74 33 44 8D 43 09
+        PatternSearch ps( "\x74\x33\x44\x8d\x43\x09" );
+        ps.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+        {
+            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x43);
+            foundData.clear();
+        }
+
+        // RtlInsertInvertedFunctionTable
+        // 8B FA 49 8D 43 20
+        PatternSearch ps2( "\x8b\xfa\x49\x8d\x43\x20" );
+        ps2.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+        {
+            _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(foundData.front() - 0x10);
+            foundData.clear();
+        }
+
+        // RtlpInsertInvertedFunctionTableEntry
+        // 49 8B E8 48 8B FA 0F 84
+        PatternSearch ps3( "\x49\x8b\xe8\x48\x8b\xfa\x0f\x84" );
+        ps3.Search( pStart, scanSize, foundData );
+        if (!foundData.empty())
+            _LdrpInvertedFunctionTable = *reinterpret_cast<int32_t*>(foundData.front() - 0xF + 2) + (foundData.front() - 0xF + 6);
+#else
+        // RtlInsertInvertedFunctionTable
+        // 8D 45 F0 89 55 F8 50 8D 55 F4
+        PatternSearch ps1( "\x8d\x45\xf0\x89\x55\xf8\x50\x8d\x55\xf4" );
+        ps1.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+        {
+            _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
+            _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x4C);
+            foundData.clear();
+        }
+
+        // LdrpHandleTlsData
+        // 8B C1 8D 4D BC 51
+        PatternSearch ps2( "\x8b\xc1\x8d\x4d\xbc\x51" );
+        ps2.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+        {
+            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x18);
+            foundData.clear();
+        }
+
+        // LdrProtectMrdata
+        // 75 24 85 F6 75 08 
+        PatternSearch ps3( "\x75\x24\x85\xf6\x75\x08" );
+        ps3.Search( pStart, scanSize, foundData );
+
+        if (!foundData.empty())
+            _LdrProtectMrdata = static_cast<uintptr_t>(foundData.front() - 0x1C);
+#endif
+    }
     // Win 8.1 and later
-    if (IsWindows8Point1OrGreater())
+    else if (IsWindows8Point1OrGreater())
     {
     #ifdef USE64
         // LdrpHandleTlsData
