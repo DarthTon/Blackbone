@@ -261,7 +261,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
     #elif defined (_WIN10_)
-        if (ver_short != WINVER_10 && ver_short != WINVER_10_AU)
+        if (ver_short != WINVER_10 && ver_short != WINVER_10_AU && ver_short != WINVER_10_CU)
             return STATUS_NOT_SUPPORTED;
     #endif
 
@@ -331,7 +331,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->ExRemoveTable -= 0x5E;
                 break;
 
-            // Windows 10, build 14393/10586
+            // Windows 10, build 15063/14393/10586
             case WINVER_10:
 				if (verInfo.dwBuildNumber == 10586)
 				{
@@ -359,6 +359,24 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
 					pData->NtTermThdIndex   = 0x53;
 					pData->PrevMode         = 0x232;
 					pData->ExitStatus       = 0x6F0;
+					pData->MiAllocPage      = 0;
+					if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable)))
+						pData->ExRemoveTable -= 0x60;
+
+                    status = BBLocatePageTables( pData );
+					break;
+				}
+                else if (verInfo.dwBuildNumber == 15063)
+				{
+                    pData->ver              = WINVER_10_CU;
+					pData->KExecOpt         = 0x0;
+					pData->Protection       = 0x0;
+					pData->ObjTable         = 0x0;
+					pData->VadRoot          = 0x620;
+					pData->NtCreateThdIndex = 0x0;
+					pData->NtTermThdIndex   = 0x0;
+					pData->PrevMode         = 0x0;
+					pData->ExitStatus       = 0x0;
 					pData->MiAllocPage      = 0;
 					if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable)))
 						pData->ExRemoveTable -= 0x60;
@@ -401,8 +419,16 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
     if (pMmGetPhysicalAddress)
     {
         PUCHAR pMiGetPhysicalAddress = *(PLONG)(pMmGetPhysicalAddress + 0xE + 1) + pMmGetPhysicalAddress + 0xE + 5;
-        pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x49 + 2);
-        pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x56 + 2);
+        if (pData->ver >= WINVER_10_CU)
+        {
+            pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x43 + 2);
+            pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x50 + 2);
+        }
+        else
+        {
+            pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x49 + 2);
+            pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x56 + 2);
+        }
         return STATUS_SUCCESS;
     }
 
