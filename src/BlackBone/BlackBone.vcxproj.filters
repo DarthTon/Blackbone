@@ -90,9 +90,6 @@
     <ClCompile Include="Patterns\PatternSearch.cpp">
       <Filter>Patterns</Filter>
     </ClCompile>
-    <ClCompile Include="Misc\DynImport.cpp">
-      <Filter>Misc</Filter>
-    </ClCompile>
     <ClCompile Include="Misc\NameResolve.cpp">
       <Filter>Misc</Filter>
     </ClCompile>
@@ -194,6 +191,9 @@
     </ClCompile>
     <ClCompile Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.cpp">
       <Filter>Subsystem</Filter>
+    </ClCompile>
+    <ClCompile Include="Misc\PattrernLoader.cpp">
+      <Filter>Misc</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -449,6 +449,9 @@
     </ClInclude>
     <ClInclude Include="Asm\AsmFactory.h">
       <Filter>AsmJit\Helpers</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc\PattrernLoader.h">
+      <Filter>Misc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

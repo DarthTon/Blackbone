@@ -74,7 +74,7 @@ private:
 private:
     class ProcessCore& _core;           // Core process functions
     std::vector<ThreadPtr> _threads;    // Process thread snapshot
-    std::mutex _lock;                   // Update lock
+    CriticalSection _lock;              // Update lock
 };
 
 }

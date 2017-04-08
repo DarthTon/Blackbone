@@ -131,7 +131,7 @@ TEST_CASE( "05. Local hooks" )
 
     REQUIRE( det.Hook( &CloseHandle, &MyMook::hkCloseHandle, &mh, HookType::HWBP ) );
     REQUIRE( det2.Hook( &TestFastcall, &hkTestFastcall, HookType::Inline ) );
-    REQUIRE( det3.Hook( ptr, &::hkTest, HookType::Inline ) );
+    REQUIRE( det3.Hook( ptr, &::hkTest, HookType::Int3 ) );
     REQUIRE( det4.Hook( (void**)&testClass, 0, &MyMook::hkVFunc, &mh ) );
 
     int a = args[0];

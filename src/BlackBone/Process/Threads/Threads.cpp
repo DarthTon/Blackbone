@@ -43,7 +43,7 @@ call_result_t<ThreadPtr> ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg,
     if (!NT_SUCCESS( status ))
         return status;
 
-    std::lock_guard<std::mutex> lg( _lock );
+    CSLock lg( _lock );
     _threads.emplace_back( new Thread( hThd, &_core ) );
     return _threads.back();
 }
@@ -75,7 +75,7 @@ std::vector<ThreadPtr>& ProcessThreads::getAll( bool dontUpdate /*= false*/ )
             if (tEntry.th32OwnerProcessID != _core.pid())
                 continue;
 
-            std::lock_guard<std::mutex> lg( _lock );
+            CSLock lg( _lock );
             _threads.emplace_back( new Thread( tEntry.th32ThreadID, &_core ) );
         }
 

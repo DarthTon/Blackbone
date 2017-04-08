@@ -2,6 +2,7 @@
 #include "../Include/Winheaders.h"
 #include "../Include/Macro.h"
 #include "DynImport.h"
+#include "PattrernLoader.h"
 
 #include <string>
 #include <cassert>
@@ -19,6 +20,10 @@ public:
             GrantPriviledge( L"SeDebugPrivilege" );
             GrantPriviledge( L"SeLoadDriverPrivilege" );
             LoadFuncs();
+
+            g_PatternLoader.reset( new PatternLoader );
+            g_PatternLoader->DoSearch();
+
             _done = true;
         }
 
@@ -115,7 +120,8 @@ private:
     static bool _done;
 };
 
+std::unique_ptr<PatternLoader> g_PatternLoader;
+
 bool InitOnce::_done = false;
 const bool g_Initialized = InitOnce::Exec();
-
 }

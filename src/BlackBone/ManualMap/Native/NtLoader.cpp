@@ -1,10 +1,10 @@
 #include "NtLoader.h"
 #include "../../Process/Process.h"
-#include "../../Patterns/PatternSearch.h"
-#include "../../Misc/Utils.h"
 #include "../../Include/Macro.h"
+#include "../../Misc/Utils.h"
 #include "../../Misc/DynImport.h"
 #include "../../Misc/trace.hpp"
+#include "../../Misc/PattrernLoader.h"
 
 #include "../contrib/VersionHelpers.h"
 
@@ -35,9 +35,7 @@ bool NtLdr::Init()
     ScanPatterns();
     _nodeMap.clear();
 
-    //
     // Report errors
-    // 
 #ifndef BLACBONE_NO_TRACE
     auto barrier = _process.barrier().type;
     if (_LdrpHashTable == 0)
@@ -46,24 +44,6 @@ bool NtLdr::Init()
         BLACKBONE_TRACE( "NativeLdr: LdrpModuleIndexBase not found" );
     if (_LdrHeapBase == 0 && (barrier == wow_32_32 || barrier == wow_64_64))
         BLACKBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
-    if (_LdrpHandleTlsData == 0)
-        BLACKBONE_TRACE( "NativeLdr: LdrpHandleTlsData not found" );
-#ifdef USE64
-    if (IsWindows7OrGreater() && !IsWindows8OrGreater())
-    {
-        if (_LdrKernel32PatchAddress == 0)
-            BLACKBONE_TRACE( "NativeLdr: LdrKernel32PatchAddress not found" );
-        if (_APC64PatchAddress == 0)
-            BLACKBONE_TRACE( "NativeLdr: APC64PatchAddress not found" );
-    }
-#else
-    if (_LdrpInvertedFunctionTable == 0)
-        BLACKBONE_TRACE( "NativeLdr: LdrpInvertedFunctionTable not found" );
-    if (_RtlInsertInvertedFunctionTable == 0)
-        BLACKBONE_TRACE( "NativeLdr: RtlInsertInvertedFunctionTable not found" );
-    if (IsWindows8Point1OrGreater() && _LdrProtectMrdata == 0)
-        BLACKBONE_TRACE( "NativeLdr: LdrProtectMrdata not found" );
-#endif
 #endif
 
     return true;
@@ -752,15 +732,14 @@ ULONG NtLdr::HashString( const std::wstring& str )
 /// Find LdrpHashTable[] variable
 /// </summary>
 /// <returns>true on success</returns>
-bool NtLdr::FindLdrpHashTable( )
+bool NtLdr::FindLdrpHashTable()
 {
     PEB_LDR_DATA_T *Ldr = 
         reinterpret_cast<PEB_LDR_DATA_T*>(
         reinterpret_cast<PEB_T*>(
         reinterpret_cast<TEB_T*>(NtCurrentTeb())->ProcessEnvironmentBlock)->Ldr);
 
-    LDR_DATA_TABLE_ENTRY_BASE_T *Ntdll = CONTAINING_RECORD( Ldr->InInitializationOrderModuleList.Flink,
-                                                            LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
+    auto Ntdll = CONTAINING_RECORD( Ldr->InInitializationOrderModuleList.Flink, LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
 
     ULONG NtdllHashIndex = HashString( reinterpret_cast<wchar_t*>(Ntdll->BaseDllName.Buffer) ) & 0x1F;
 
@@ -768,26 +747,21 @@ bool NtLdr::FindLdrpHashTable( )
     ULONG_PTR NtdllEndAddress = NtdllBase + Ntdll->SizeOfImage - 1;
 
     // scan hash list to the head (head is located within ntdll)
-    bool bHeadFound = false;
-    PLIST_ENTRY pNtdllHashHead = NULL;
+    PLIST_ENTRY pNtdllHashHead = nullptr;
 
-    for (PLIST_ENTRY e = reinterpret_cast<PLIST_ENTRY>(Ntdll->HashLinks.Flink);
-          e != reinterpret_cast<PLIST_ENTRY>(&Ntdll->HashLinks);
-          e = e->Flink)
+    for (auto e = reinterpret_cast<PLIST_ENTRY>(Ntdll->HashLinks.Flink); e != reinterpret_cast<PLIST_ENTRY>(&Ntdll->HashLinks); e = e->Flink)
     {
-        if (reinterpret_cast<ULONG_PTR>(e) >= NtdllBase && 
-            reinterpret_cast<ULONG_PTR>(e) < NtdllEndAddress)
+        if (reinterpret_cast<ULONG_PTR>(e) >= NtdllBase && reinterpret_cast<ULONG_PTR>(e) < NtdllEndAddress)
         {
-            bHeadFound = true;
             pNtdllHashHead = e;
             break;
         }
     }
 
-    if (bHeadFound)
+    if (pNtdllHashHead != nullptr)
         _LdrpHashTable = reinterpret_cast<uintptr_t>(pNtdllHashHead - NtdllHashIndex);
 
-   return bHeadFound;
+    return _LdrpHashTable != 0;
 }
 
 
@@ -795,16 +769,15 @@ bool NtLdr::FindLdrpHashTable( )
 /// Find LdrpModuleIndex variable under win8
 /// </summary>
 /// <returns>true on success</returns>
-bool NtLdr::FindLdrpModuleIndexBase( )
+bool NtLdr::FindLdrpModuleIndexBase()
 {
     PEB_T* pPeb = reinterpret_cast<PEB_T*>(reinterpret_cast<TEB_T*>(NtCurrentTeb())->ProcessEnvironmentBlock);
 
     if(pPeb)
     {
         PRTL_BALANCED_NODE lastNode = 0;
-        PEB_LDR_DATA_T* Ldr = reinterpret_cast<PEB_LDR_DATA_T*>(pPeb->Ldr);
-        _LDR_DATA_TABLE_ENTRY_W8 *Ntdll = CONTAINING_RECORD( Ldr->InInitializationOrderModuleList.Flink, 
-                                                             _LDR_DATA_TABLE_ENTRY_W8, InInitializationOrderLinks );
+        auto Ldr = reinterpret_cast<PEB_LDR_DATA_T*>(pPeb->Ldr);
+        auto Ntdll = CONTAINING_RECORD( Ldr->InInitializationOrderModuleList.Flink, _LDR_DATA_TABLE_ENTRY_W8, InInitializationOrderLinks );
 
         PRTL_BALANCED_NODE pNode = &Ntdll->BaseAddressIndexNode;
 
@@ -851,275 +824,23 @@ bool NtLdr::FindLdrpModuleIndexBase( )
 /// <returns>true on success</returns>
 bool NtLdr::ScanPatterns( )
 {
-    std::vector<ptr_t> foundData;
-    pe::PEImage ntdll;
-    void* pStart  = nullptr;
-    size_t scanSize = 0;
+    auto& data = g_PatternLoader->data();
 
-    HMODULE hNtdll = GetModuleHandleW( L"ntdll.dll" );
-    ntdll.Parse( hNtdll );
+    _LdrKernel32PatchAddress = static_cast<uintptr_t>(data.LdrKernel32PatchAddress);
+    _APC64PatchAddress = static_cast<uintptr_t>(data.APC64PatchAddress);
+    _LdrProtectMrdata = static_cast<uintptr_t>(data.LdrProtectMrdata);
 
-    // Find ntdll code section
-    for (auto& section : ntdll.sections())
+    if (_process.core().isWow64())
     {
-        if (_stricmp( reinterpret_cast<LPCSTR>(section.Name), ".text" ) == 0)
-        {
-            pStart = reinterpret_cast<void*>(reinterpret_cast<size_t>(hNtdll) + section.VirtualAddress);
-            scanSize = section.Misc.VirtualSize;
-
-            break;
-        }
+        _LdrpHandleTlsData = static_cast<uintptr_t>(data.LdrpHandleTlsData32);
+        _LdrpInvertedFunctionTable = static_cast<uintptr_t>(data.LdrpInvertedFunctionTable32);
+        _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(data.RtlInsertInvertedFunctionTable32);
     }
-
-    // Code section not found
-    if(pStart == nullptr)
-        return false;
-
-    // Win10 update 2
-    if (IsWindows10CreatorsOrGreater())
+    else
     {
-#ifdef USE64
-        // LdrpHandleTlsData
-        // 74 33 44 8D 43 09
-        PatternSearch ps( "\x74\x33\x44\x8d\x43\x09" );
-        ps.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x43);
-            foundData.clear();
-        }
-
-        // RtlInsertInvertedFunctionTable
-        // 8B FA 49 8D 43 20
-        PatternSearch ps2( "\x8b\xfa\x49\x8d\x43\x20" );
-        ps2.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(foundData.front() - 0x10);
-            foundData.clear();
-        }
-
-        // RtlpInsertInvertedFunctionTableEntry
-        // 49 8B E8 48 8B FA 0F 84
-        PatternSearch ps3( "\x49\x8b\xe8\x48\x8b\xfa\x0f\x84" );
-        ps3.Search( pStart, scanSize, foundData );
-        if (!foundData.empty())
-            _LdrpInvertedFunctionTable = *reinterpret_cast<int32_t*>(foundData.front() - 0xF + 2) + (foundData.front() - 0xF + 6);
-#else
-        // RtlInsertInvertedFunctionTable
-        // 8D 45 F0 89 55 F8 50 8D 55 F4
-        PatternSearch ps1( "\x8d\x45\xf0\x89\x55\xf8\x50\x8d\x55\xf4" );
-        ps1.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
-            _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x4C);
-            foundData.clear();
-        }
-
-        // LdrpHandleTlsData
-        // 8B C1 8D 4D BC 51
-        PatternSearch ps2( "\x8b\xc1\x8d\x4d\xbc\x51" );
-        ps2.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x18);
-            foundData.clear();
-        }
-
-        // LdrProtectMrdata
-        // 75 24 85 F6 75 08 
-        PatternSearch ps3( "\x75\x24\x85\xf6\x75\x08" );
-        ps3.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-            _LdrProtectMrdata = static_cast<uintptr_t>(foundData.front() - 0x1C);
-#endif
-    }
-    // Win 8.1 and later
-    else if (IsWindows8Point1OrGreater())
-    {
-    #ifdef USE64
-        // LdrpHandleTlsData
-        // 44 8D 43 09 4C 8D 4C 24 38
-        PatternSearch ps( "\x44\x8d\x43\x09\x4c\x8d\x4c\x24\x38" );
-        ps.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x43);
-            foundData.clear();
-        }
-
-        // RtlInsertInvertedFunctionTable
-        // 8B C3 2B D3 48 8D 48 01
-        PatternSearch ps2( "\x8B\xC3\x2B\xD3\x48\x8D\x48\x01" );
-        ps2.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(foundData.front() - 0x84);
-            if (IsWindows10OrGreater())
-                _LdrpInvertedFunctionTable = *reinterpret_cast<int32_t*>(foundData.front() - 0x27 + 3) + (foundData.front() - 0x27 + 7);
-        }
-    #else
-        // RtlInsertInvertedFunctionTable
-        // 53 56 57 8B DA 8B F9 50 
-        PatternSearch ps1( "\x53\x56\x57\x8b\xda\x8b\xf9\x50" );
-        ps1.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front() - 0xB);
-
-            if (IsWindows10OrGreater())
-                _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x22);
-            else
-                _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x23);
-
-            foundData.clear();
-        }
-        // Rescan using old pattern
-        else
-        {
-            // RtlInsertInvertedFunctionTable
-            // 8D 45 F4 89 55 F8 50 8D 55 FC
-            PatternSearch ps12( "\x8d\x45\xf4\x89\x55\xf8\x50\x8d\x55\xfc" );
-            ps12.Search( pStart, scanSize, foundData );
-
-            if (!foundData.empty())
-            {
-                _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(foundData.front() - 0xB);
-                _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x1D);
-                foundData.clear();
-            }
-        }
-
-        // LdrpHandleTlsData
-        // 8D 45 ?? 50 6A 09 6A 01 8B C1
-        PatternSearch ps2( "\x8d\x45\xcc\x50\x6a\x09\x6a\x01\x8b\xc1" );
-        ps2.Search( 0xCC, pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x18);
-            foundData.clear();
-        }
-
-        // LdrProtectMrdata
-        // 83 7D 08 00 8B 35    
-        PatternSearch ps3( "\x83\x7d\x08\x00\x8b\x35", 6 );
-        ps3.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-            _LdrProtectMrdata = static_cast<uintptr_t>(foundData.front() - 0x12);
-    #endif
-    }
-    // Win 8
-    else if (IsWindows8OrGreater())
-    {
-    #ifdef USE64
-        // LdrpHandleTlsData
-        // 48 8B 79 30 45 8D 66 01
-        PatternSearch ps( "\x48\x8b\x79\x30\x45\x8d\x66\x01" );
-        ps.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x49);
-    #else
-        // RtlInsertInvertedFunctionTable
-        // 8B FF 55 8B EC 51 51 53 57 8B 7D 08 8D
-        PatternSearch ps1( "\x8b\xff\x55\x8b\xec\x51\x51\x53\x57\x8b\x7d\x08\x8d" );
-        ps1.Search( pStart, scanSize, foundData );
-
-        if(!foundData.empty())
-        {
-            _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(foundData.front());
-            _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(_RtlInsertInvertedFunctionTable + 0x26);
-            foundData.clear();
-        }
-
-        // LdrpHandleTlsData
-        // 8B 45 08 89 45 A0
-        PatternSearch ps2( "\x8b\x45\x08\x89\x45\xa0" );
-        ps2.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0xC);
-    #endif
-    }
-    // Win 7
-    else if(IsWindows7OrGreater())
-    {
-    #ifdef USE64
-        // LdrpHandleTlsData
-        // 41 B8 09 00 00 00 48 8D 44 24 38
-        PatternSearch ps1( "\x41\xb8\x09\x00\x00\x00\x48\x8d\x44\x24\x38", 11 );
-        ps1.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x27);
-            foundData.clear();            
-        }
-
-        // LdrpFindOrMapDll patch address
-        // 48 8D 8C 24 98 00 00 00 41 b0 01
-        PatternSearch ps2( "\x48\x8D\x8C\x24\x98\x00\x00\x00\x41\xb0\x01", 11 );
-        ps2.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _LdrKernel32PatchAddress = static_cast<uintptr_t>(foundData.front() + 0x12);
-            foundData.clear();            
-        }
-
-        // KiUserApcDispatcher patch address
-        // 48 8B 4C 24 18 48 8B C1 4C
-        PatternSearch ps3( "\x48\x8b\x4c\x24\x18\x48\x8b\xc1\x4c");
-        ps3.Search( pStart, scanSize, foundData );
-
-        if (!foundData.empty())
-        {
-            _APC64PatchAddress = static_cast<uintptr_t>(foundData.front());
-            foundData.clear();            
-        }
-    #else
-        // RtlInsertInvertedFunctionTable
-        // 8B FF 55 8B EC 56 68
-        PatternSearch ps1( "\x8b\xff\x55\x8b\xec\x56\x68" );
-        ps1.Search( pStart, scanSize, foundData);
-
-        if(!foundData.empty())
-        {
-            _RtlInsertInvertedFunctionTable = static_cast<size_t>(foundData.front( ));
-            foundData.clear();
-        }
-
-        // RtlLookupFunctionTable + 0x11
-        // 89 5D E0 38
-        PatternSearch ps2( "\x89\x5D\xE0\x38" );
-        ps2.Search( pStart, scanSize, foundData );
-                
-        if(!foundData.empty())
-        {
-            _LdrpInvertedFunctionTable = *reinterpret_cast<uintptr_t*>(foundData.front() + 0x1B);
-            foundData.clear();
-        }
-
-        // LdrpHandleTlsData
-        // 74 20 8D 45 D4 50 6A 09 
-        PatternSearch ps3( "\x74\x20\x8d\x45\xd4\x50\x6a\x09" );
-        ps3.Search( pStart, scanSize, foundData );
-
-        if(!foundData.empty())
-            _LdrpHandleTlsData = static_cast<uintptr_t>(foundData.front() - 0x14);
-
-    #endif
+        _LdrpHandleTlsData = static_cast<uintptr_t>(data.LdrpHandleTlsData64);
+        _LdrpInvertedFunctionTable = static_cast<uintptr_t>(data.LdrpInvertedFunctionTable64);
+        _RtlInsertInvertedFunctionTable = static_cast<uintptr_t>(data.RtlInsertInvertedFunctionTable64);
     }
 
     return true;

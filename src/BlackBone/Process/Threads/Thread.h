@@ -5,6 +5,7 @@
 #include "../../Include/NativeStructures.h"
 #include "../../Include/CallResult.h"
 #include "../../Include/Types.h"
+#include "../../Misc/Utils.h"
 
 #include <memory>
 
