@@ -276,13 +276,27 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
 
         _memory.Read( hMod->baseAddress + expBase, expSize, pExpData );
 
-        WORD *pAddressOfOrds = reinterpret_cast<WORD*> (
+        // Fix invalid directory size
+        if (expSize <= sizeof( IMAGE_EXPORT_DIRECTORY ))
+        {
+            // New size should take care of max number of present names (max name length is assumed to be 255 chars)
+            expSize = static_cast<DWORD>(
+                pExpData->AddressOfNameOrdinals - expBase 
+                + max( pExpData->NumberOfFunctions, pExpData->NumberOfNames ) * 255
+                );
+
+            expData.reset( reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(malloc( expSize )) );
+            pExpData = expData.get();
+            _memory.Read( hMod->baseAddress + expBase, expSize, pExpData );
+        }
+
+        WORD* pAddressOfOrds = reinterpret_cast<WORD*>(
             pExpData->AddressOfNameOrdinals + reinterpret_cast<uintptr_t>(pExpData) - expBase);
 
-        DWORD *pAddressOfNames = reinterpret_cast<DWORD*>(
+        DWORD* pAddressOfNames = reinterpret_cast<DWORD*>(
             pExpData->AddressOfNames + reinterpret_cast<uintptr_t>(pExpData) - expBase);
 
-        DWORD *pAddressOfFuncs = reinterpret_cast<DWORD*>(
+        DWORD* pAddressOfFuncs = reinterpret_cast<DWORD*>(
             pExpData->AddressOfFunctions + reinterpret_cast<uintptr_t>(pExpData) - expBase);
 
         for (DWORD i = 0; i < pExpData->NumberOfFunctions; ++i)
