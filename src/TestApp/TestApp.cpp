@@ -1,4 +1,5 @@
 #include "Tests.h"
+#include <stdio.h>
 
 /*
 */
@@ -45,7 +46,7 @@ int main( int /*argc*/, char* /*argv*/[] )
     Process proc;
     proc.Attach( GetCurrentProcessId() );
 
-    TestPEB( proc );
+ /*   TestPEB( proc );
     TestTEB( proc );
     TestMultiPtr();
     TestPatterns();
@@ -53,8 +54,8 @@ int main( int /*argc*/, char* /*argv*/[] )
     TestRemoteCall();
     TestRemoteHook();
     TestDriver();
-    TestRemoteMem();
+    TestRemoteMem();*/
     TestMMap();
-    
+	getchar();
     return 0;
 }
