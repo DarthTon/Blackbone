@@ -277,13 +277,13 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
         _memory.Read( hMod->baseAddress + expBase, expSize, pExpData );
 
         WORD *pAddressOfOrds = reinterpret_cast<WORD*> (
-            pExpData->AddressOfNameOrdinals + reinterpret_cast<uintptr_t>(pExpData) - expBase);
+            pExpData->AddressOfNameOrdinals + hMod->baseAddress);
 
         DWORD *pAddressOfNames = reinterpret_cast<DWORD*>(
-            pExpData->AddressOfNames + reinterpret_cast<uintptr_t>(pExpData) - expBase);
+            pExpData->AddressOfNames + hMod->baseAddress);
 
         DWORD *pAddressOfFuncs = reinterpret_cast<DWORD*>(
-            pExpData->AddressOfFunctions + reinterpret_cast<uintptr_t>(pExpData) - expBase);
+            pExpData->AddressOfFunctions + hMod->baseAddress);
 
         for (DWORD i = 0; i < pExpData->NumberOfFunctions; ++i)
         {
@@ -298,7 +298,7 @@ exportData ProcessModules::GetExport( const ModuleData* hMod, const char* name_o
             // Find by name
             else if (reinterpret_cast<uintptr_t>(name_ord) > 0xFFFF && i < pExpData->NumberOfNames)
             {
-                pName = (char*)(pAddressOfNames[i] + reinterpret_cast<uintptr_t>(pExpData) - expBase);
+                pName = (char*)(pAddressOfNames[i] + hMod->baseAddress);
                 OrdIndex = static_cast<WORD>(pAddressOfOrds[i]);
             }
             else

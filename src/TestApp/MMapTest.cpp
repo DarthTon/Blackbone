@@ -26,18 +26,24 @@ void TestMMap()
         return LoadData( MT_Default, Ldr_None );
     };
 
+	//Test.dll is a .Net dll, which targets 64 bit. It can be downloaded from https://drive.google.com/open?id=0ByvbwOgGvJ04R0pBTUdtOHA5OHc
     std::wcout << L"Manual image mapping test\n";
-    std::wcout << L"Trying to map C:\\windows\\system32\\calc.exe into current process\n";
+    std::wcout << L"Trying to map Test.dll into current process\n";
 
     eLoadFlags flags = ManualImports | RebaseProcess;
 
-    if (thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", flags, callback ) == 0)
+    if (thisProc.mmap().MapImage( L"C:\\Test.dll", flags, callback ) == 0)
     {
         std::wcout << L"Mapping failed with error 0x" << std::hex << LastNtStatus()
                    << L". " << Utils::GetErrorDescription( LastNtStatus() ) << std::endl << std::endl;
     }
     else
         std::wcout << L"Successfully mapped, unmapping\n";
+
+
+	auto hMainMod = thisProc.modules().GetMainModule();
+	auto test = thisProc.modules().GetModule(L"Test.dll"); 
+	auto pRemote = thisProc.modules().GetExport(test, "RunMe");
 
     thisProc.mmap().UnmapAllModules();
 }
