@@ -1,4 +1,5 @@
 #include "Remap.h"
+#include "Utils.h"
 #include <Ntstrsafe.h>
 
 RTL_AVL_TABLE g_ProcessPageTables;      // Mapping table
@@ -686,7 +687,6 @@ NTSTATUS BBMapMemory( IN PMAP_MEMORY pRemap, OUT PPROCESS_MAP_ENTRY* ppEntry )
     PROCESS_MAP_ENTRY processEntry = { 0 };
     PPROCESS_MAP_ENTRY pFoundEntry = NULL;
     BOOLEAN newEntry = FALSE;
-    LARGE_INTEGER timeout = { 0 };
 
     // Sanity checks
     // Can't remap self
@@ -707,7 +707,7 @@ NTSTATUS BBMapMemory( IN PMAP_MEMORY pRemap, OUT PPROCESS_MAP_ENTRY* ppEntry )
     }
 
     // Process in signaled state, abort any operations
-    if (KeWaitForSingleObject( pProcess, Executive, KernelMode, FALSE, &timeout ) == STATUS_WAIT_0)
+    if (BBCheckProcessTermination( pProcess ))
     {
         DPRINT( "BlackBone: %s: Process %u is terminating. Abort\n", __FUNCTION__, processEntry.target.pid );
 
@@ -815,7 +815,6 @@ NTSTATUS BBMapMemoryRegion( IN PMAP_MEMORY_REGION pRegion, OUT PMAP_MEMORY_REGIO
     BOOLEAN alreadyExists = FALSE;
     ULONG_PTR removedBase = 0;
     ULONG removedSize = 0;
-    LARGE_INTEGER timeout = { 0 };
 
     // Don't allow remapping of kernel addresses
     if (pRegion->base >= (ULONGLONG)MM_HIGHEST_USER_ADDRESS || pRegion->base + pRegion->size > (ULONGLONG)MM_HIGHEST_USER_ADDRESS)
@@ -842,7 +841,7 @@ NTSTATUS BBMapMemoryRegion( IN PMAP_MEMORY_REGION pRegion, OUT PMAP_MEMORY_REGIO
     }
 
     // Process in signaled state, abort any operations
-    if (KeWaitForSingleObject( pProcess, Executive, KernelMode, FALSE, &timeout ) == STATUS_WAIT_0)
+    if (BBCheckProcessTermination( pProcess ))
     {
         DPRINT( "BlackBone: %s: Process %u is terminating. Abort\n", __FUNCTION__, processEntry.target.pid );
 
@@ -995,7 +994,6 @@ NTSTATUS BBUnmapMemoryRegion( IN PUNMAP_MEMORY_REGION pRegion )
     PPROCESS_MAP_ENTRY pFoundEntry = NULL;
     PMAP_ENTRY pPageEntry = NULL;
     PEPROCESS pProcess = NULL;
-    LARGE_INTEGER timeout = { 0 };
     ULONG pageCount = ADDRESS_AND_SIZE_TO_SPAN_PAGES(pRegion->base, pRegion->size);
 
     // Sanity check
@@ -1013,7 +1011,7 @@ NTSTATUS BBUnmapMemoryRegion( IN PUNMAP_MEMORY_REGION pRegion )
     }
 
     // Process in signaled state, abort any operations
-    if (KeWaitForSingleObject( pProcess, Executive, KernelMode, FALSE, &timeout ) == STATUS_WAIT_0)
+    if (BBCheckProcessTermination( pProcess ))
     {
         DPRINT( "BlackBone: %s: Process %u is terminating. Abort\n", __FUNCTION__, pRegion->pid );
 
@@ -1107,8 +1105,6 @@ VOID BBCleanupPageList( IN BOOLEAN attached, IN PLIST_ENTRY pList )
 /// <returns>Status code</returns>
 NTSTATUS BBSafeHandleClose( IN PEPROCESS pProcess, IN HANDLE handle, IN KPROCESSOR_MODE mode )
 {
-    LARGE_INTEGER timeout = { 0 };
-
     ASSERT( pProcess != NULL );
     if (pProcess == NULL)
         return STATUS_INVALID_PARAMETER;
@@ -1117,7 +1113,7 @@ NTSTATUS BBSafeHandleClose( IN PEPROCESS pProcess, IN HANDLE handle, IN KPROCESS
     // If process is in signaled state, ObjectTable is already NULL
     // Thus is will lead to crash in ObCloseHandle->ExpLookupHandleTableEntry
     //
-    if (KeWaitForSingleObject( pProcess, Executive, KernelMode, FALSE, &timeout ) == STATUS_WAIT_0)
+    if (BBCheckProcessTermination( pProcess ))
         return STATUS_PROCESS_IS_TERMINATING;
 
     return ObCloseHandle( handle, mode );

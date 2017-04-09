@@ -68,6 +68,13 @@ NTSTATUS BBSearchPattern( IN PCUCHAR pattern, IN UCHAR wildcard, IN ULONG_PTR le
 /// <returns>Status code</returns>
 NTSTATUS BBCreateCookie( IN PVOID imageBase );
 
+/// <summary>
+/// Check if process is terminating
+/// </summary>
+/// <param name="imageBase">Process</param>
+/// <returns>If TRUE - terminating</returns>
+BOOLEAN BBCheckProcessTermination( PEPROCESS pProcess );
+
 //
 // Machine code generation routines
 //

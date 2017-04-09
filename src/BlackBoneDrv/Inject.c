@@ -1,6 +1,7 @@
 #include "Private.h"
 #include "Routines.h"
 #include "Loader.h"
+#include "Utils.h"
 #include <Ntstrsafe.h>
 
 #define CALL_COMPLETE   0xC0371E7E
@@ -56,13 +57,11 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
         PVOID LdrLoadDll = NULL;
         PVOID systemBuffer = NULL;
         BOOLEAN isWow64 = (PsGetProcessWow64Process( pProcess ) != NULL) ? TRUE : FALSE;
-        LARGE_INTEGER procTimeout = { 0 };
 
         // Process in signaled state, abort any operations
-        if (KeWaitForSingleObject( pProcess, Executive, KernelMode, FALSE, &procTimeout ) == STATUS_WAIT_0)
+        if (BBCheckProcessTermination( PsGetCurrentProcess() ))
         {
             DPRINT( "BlackBone: %s: Process %u is terminating. Abort\n", __FUNCTION__, pData->pid );
-
             if (pProcess)
                 ObDereferenceObject( pProcess );
 
@@ -109,8 +108,7 @@ NTSTATUS BBInjectDll( IN PINJECT_DLL pData )
                     );
             }
             __except (EXCEPTION_EXECUTE_HANDLER){
-                DPRINT( "BlackBone: %s: Fatal exception in BBMapUserImage. Exception code 0x%x\n", 
-                        __FUNCTION__, GetExceptionCode() );
+                DPRINT( "BlackBone: %s: Fatal exception in BBMapUserImage. Exception code 0x%x\n", __FUNCTION__, GetExceptionCode() );
             }
 
             KeUnstackDetachProcess( &apc );
@@ -384,11 +382,23 @@ NTSTATUS BBApcInject( IN PINJECT_BUFFER pUserBuf, IN HANDLE pid, IN ULONG initRV
             LARGE_INTEGER interval = { 0 };
             interval.QuadPart = -(5LL * 10 * 1000);
 
-            for (ULONG i = 0; pUserBuf->complete != CALL_COMPLETE && i < 10000; i++)
-                KeDelayExecutionThread( KernelMode, FALSE, &interval );
+            for (ULONG i = 0; i < 10000; i++)
+            {
+                if (BBCheckProcessTermination( PsGetCurrentProcess() ) || PsIsThreadTerminating( pThread ))
+                {
+                    status = STATUS_PROCESS_IS_TERMINATING;
+                    break;
+                }
+
+                if(pUserBuf->complete == CALL_COMPLETE)
+                    break;
+
+                if (!NT_SUCCESS( status = KeDelayExecutionThread( KernelMode, FALSE, &interval ) ))
+                    break;
+            }
 
             // Call init routine
-            if (pUserBuf->module != 0 && initRVA != 0)
+            if (NT_SUCCESS( status ) && pUserBuf->module != 0 && initRVA != 0)
             {
                 RtlCopyMemory( (PUCHAR)pUserBuf->buffer, InitArg, sizeof( pUserBuf->buffer ) );
                 BBQueueUserApc( pThread, (PUCHAR)pUserBuf->module + initRVA, pUserBuf->buffer, NULL, NULL, TRUE );
@@ -397,8 +407,8 @@ NTSTATUS BBApcInject( IN PINJECT_BUFFER pUserBuf, IN HANDLE pid, IN ULONG initRV
                 interval.QuadPart = -(100LL * 10 * 1000);
                 KeDelayExecutionThread( KernelMode, FALSE, &interval );
             }
-            else if (pUserBuf->module == 0)
-                DPRINT( "BlackBone: %s: Module base = 0. Aborting\n", __FUNCTION__ );
+            else
+                DPRINT( "BlackBone: %s: APC injection abnormal termination, status 0x%X\n", __FUNCTION__, status );
         }
     }
     else

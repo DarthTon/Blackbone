@@ -224,6 +224,17 @@ NTSTATUS BBSearchPattern( IN PCUCHAR pattern, IN UCHAR wildcard, IN ULONG_PTR le
     return STATUS_NOT_FOUND;
 }
 
+/// <summary>
+/// Check if process is terminating
+/// </summary>
+/// <param name="imageBase">Process</param>
+/// <returns>If TRUE - terminating</returns>
+BOOLEAN BBCheckProcessTermination( PEPROCESS pProcess )
+{
+    LARGE_INTEGER zeroTime = { 0 };
+    return KeWaitForSingleObject( pProcess, Executive, KernelMode, FALSE, &zeroTime ) == STATUS_WAIT_0;
+}
+
 ULONG GenPrologue32( IN PUCHAR pBuf )
 {
     *pBuf = 0x55;

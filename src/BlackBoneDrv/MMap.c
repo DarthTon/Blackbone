@@ -80,7 +80,8 @@ NTSTATUS BBResolveSxS( IN PMMAP_CONTEXT pContext, IN PUNICODE_STRING name, OUT P
 /// </summary>
 /// <param name="pContext">Map context</param>
 /// <param name="noTLS">If TRUE - TLS callbacks will no be invoked</param>
-void BBCallInitializers( IN PMMAP_CONTEXT pContext, IN BOOLEAN noTLS );
+/// <returns>Status code</returns>
+NTSTATUS BBCallInitializers( IN PMMAP_CONTEXT pContext, IN BOOLEAN noTLS );
 
 /// <summary>
 /// Call TLS callbacks
@@ -295,11 +296,11 @@ NTSTATUS BBMapUserImage(
     if (NT_SUCCESS( status ))
     {
         __try{
-            BBCallInitializers( &context, (flags & KNoTLS) != 0 );
+            status = BBCallInitializers( &context, (flags & KNoTLS) != 0 );
         }
         __except (EXCEPTION_EXECUTE_HANDLER) {
-            DPRINT( "BlackBone: %s: Exception during initialization phase.Exception code 0x%X\n", __FUNCTION__, GetExceptionCode() );
-            status = STATUS_UNHANDLED_EXCEPTION;
+            status = GetExceptionCode();
+            DPRINT( "BlackBone: %s: Exception during initialization phase.Exception code 0x%X\n", __FUNCTION__, status );
         }
     }
 
@@ -318,7 +319,8 @@ NTSTATUS BBMapUserImage(
     // Event
     if (context.pSync)
         ObDereferenceObject( context.pSync );
-    if (context.hSync)
+
+    if (context.hSync && !BBCheckProcessTermination( PsGetCurrentProcess() ))
         ZwClose( context.hSync );
 
     // Worker thread
@@ -1194,7 +1196,8 @@ skip:
 /// </summary>
 /// <param name="pContext">Map context</param>
 /// <param name="noTLS">If TRUE - TLS callbacks will no be invoked</param>
-void BBCallInitializers( IN PMMAP_CONTEXT pContext, IN BOOLEAN noTLS )
+/// <returns>Status code</returns>
+NTSTATUS BBCallInitializers( IN PMMAP_CONTEXT pContext, IN BOOLEAN noTLS )
 {
     for (PLIST_ENTRY pListEntry = pContext->modules.Flink; pListEntry != &pContext->modules; pListEntry = pListEntry->Flink)
     {
@@ -1209,10 +1212,18 @@ void BBCallInitializers( IN PMMAP_CONTEXT pContext, IN BOOLEAN noTLS )
         if (noTLS == FALSE)
             BBCallTlsInitializers( pContext, pEntry->baseAddress );
 
+        NTSTATUS status = STATUS_SUCCESS;
         if (HEADER_VAL_T( pHeaders, AddressOfEntryPoint ))
         {
             PUCHAR entrypoint = pEntry->baseAddress + HEADER_VAL_T( pHeaders, AddressOfEntryPoint );
-            BBCallRoutine( FALSE, pContext, entrypoint, 3, pEntry->baseAddress, (PVOID)1, NULL );
+            status = BBCallRoutine( FALSE, pContext, entrypoint, 3, pEntry->baseAddress, (PVOID)1, NULL );
+        }
+
+        // Check if process is terminating
+        if (status != STATUS_SUCCESS && BBCheckProcessTermination( PsGetCurrentProcess() ))
+        {
+            DPRINT( "BlackBone: %s: Process is terminating, map aborted\n", __FUNCTION__ );
+            return STATUS_PROCESS_IS_TERMINATING;
         }
 
         //
@@ -1270,6 +1281,8 @@ void BBCallInitializers( IN PMMAP_CONTEXT pContext, IN BOOLEAN noTLS )
 
         pEntry->initialized = TRUE;
     }
+
+    return STATUS_SUCCESS;
 }
 
 /// <summary>
@@ -1692,7 +1705,7 @@ NTSTATUS BBCallRoutine( IN BOOLEAN newThread, IN PMMAP_CONTEXT pContext, IN PVOI
 
     if (newThread)
     {
-        status = BBExecuteInNewThread( pContext->userMem->code, NULL, THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER, TRUE, NULL );
+        status = BBExecuteInNewThread( pContext->userMem->code, NULL, 0/*THREAD_CREATE_FLAGS_HIDE_FROM_DEBUGGER*/, TRUE, NULL );
     }
     else
     {
