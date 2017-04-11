@@ -3,8 +3,8 @@
 
 #ifdef COMPILER_MSVC
 
-#include <mscoree.h>
-#include <metahost.h>
+#include "mscoree.h"
+#include "metahost.h"
 
 #include <vector>
 

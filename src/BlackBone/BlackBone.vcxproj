@@ -222,8 +222,8 @@
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath);$(include)</IncludePath>
-    <LibraryPath>$(LibraryPath);$(lib)</LibraryPath>
+    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release(XP)|Win32'">
     <LinkIncremental>false</LinkIncremental>
