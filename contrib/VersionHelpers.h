@@ -78,8 +78,10 @@ IsWindowsVersionOrGreater( WORD wMajorVersion, WORD wMinorVersion, WORD wService
         else if (verInfo.dwMinorVersion < wMinorVersion)
             return false;
 
-        if (verInfo.wServicePackMajor >= wServicePackMajor)
+        if (verInfo.wServicePackMajor > wServicePackMajor)
             return true;
+        else if (verInfo.wServicePackMajor < wServicePackMajor)
+            return false;
 
         if (verInfo.dwBuildNumber >= dwBuild)
             return true;
