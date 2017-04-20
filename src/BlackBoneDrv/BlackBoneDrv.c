@@ -369,17 +369,17 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 else if (verInfo.dwBuildNumber == 15063)
 				{
                     pData->ver              = WINVER_10_CU;
-					pData->KExecOpt         = 0x0;
-					pData->Protection       = 0x0;
-					pData->ObjTable         = 0x0;
-					pData->VadRoot          = 0x620;
-					pData->NtCreateThdIndex = 0x0;
-					pData->NtTermThdIndex   = 0x0;
-					pData->PrevMode         = 0x0;
-					pData->ExitStatus       = 0x0;
+					pData->KExecOpt         = 0x1BF;
+					pData->Protection       = 0x6CA;
+					pData->ObjTable         = 0x418;
+					pData->VadRoot          = 0x628;
+					pData->NtCreateThdIndex = 0xB9;
+					pData->NtTermThdIndex   = 0x53;
+					pData->PrevMode         = 0x232;
+					pData->ExitStatus       = 0x6F8;
 					pData->MiAllocPage      = 0;
-					if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable)))
-						pData->ExRemoveTable -= 0x60;
+					if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8B\x47\x20\x48\x83\xC7\x18", 0xCC, 8, (PVOID)&pData->ExRemoveTable)))
+						pData->ExRemoveTable -= 0x34;
 
                     status = BBLocatePageTables( pData );
 					break;
@@ -429,8 +429,11 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
             pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x49 + 2);
             pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x56 + 2);
         }
+
+        DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
         return STATUS_SUCCESS;
     }
 
+    DPRINT( "BlackBone: PDE_BASE/PTE_BASE not found \n" );
     return STATUS_NOT_FOUND;
 }

@@ -166,10 +166,10 @@ typedef struct _DYNAMIC_DATA
     ULONG PrevMode;         // KTHREAD::PreviousMode
     ULONG ExitStatus;       // ETHREAD::ExitStatus
     ULONG MiAllocPage;      // MiAllocateDriverPage offset
-    ULONG ExRemoveTable;    // ExRemoveHandleTable offset
+    ULONG ExRemoveTable;    // Ex(p)RemoveHandleTable offset
 
-    ULONG_PTR DYN_PDE_BASE; // Win10 AU relocated PDE base VA
-    ULONG_PTR DYN_PTE_BASE; // Win10 AU relocated PTE base VA
+    ULONG_PTR DYN_PDE_BASE; // Win10 AU+ relocated PDE base VA
+    ULONG_PTR DYN_PTE_BASE; // Win10 AU+ relocated PTE base VA
 } DYNAMIC_DATA, *PDYNAMIC_DATA;
 
 
