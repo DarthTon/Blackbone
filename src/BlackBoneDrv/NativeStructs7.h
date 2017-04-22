@@ -185,7 +185,7 @@ typedef struct _HANDLE_TABLE
     HANDLE UniqueProcessId;
     void* HandleLock;
     struct _LIST_ENTRY HandleTableList;
-    void* HandleContentionEvent;
+    EX_PUSH_LOCK HandleContentionEvent;
     struct _HANDLE_TRACE_DEBUG_INFO *DebugInfo;
     int ExtraInfoPages;
     ULONG Flags;
