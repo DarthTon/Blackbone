@@ -2,6 +2,7 @@
 
 #include "../../Include/Winheaders.h"
 #include "../../PE/PEImage.h"
+#include "../../Include/Types.h"
 #include "../../Include/NativeStructures.h"
 #include "../../Include/Macro.h"
 
@@ -19,6 +20,13 @@ enum LdrRefFlags
 
 ENUM_OPS( LdrRefFlags )
 
+struct NtLdrEntry : ModuleData
+{
+    LdrRefFlags flags = Ldr_None;
+    ptr_t entryPoint = 0;
+    ULONG hash = 0;
+    bool safeSEH = false;
+};
 
 class NtLdr
 {
@@ -36,45 +44,32 @@ public:
     /// Add module to some loader structures 
     /// (LdrpHashTable, LdrpModuleIndex( win8 only ), InMemoryOrderModuleList( win7 only ))
     /// </summary>
-    /// <param name="hMod">Module base address</param>
-    /// <param name="ImageSize">Size of image</param>
-    /// <param name="DllBasePath">Full-qualified image path</param>
-    /// <param name="entryPoint">Entry point RVA</param>
-    /// <param name="flags">Type of references to create</param>
+    /// <param name="mod">Module data</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool CreateNTReference(
-        HMODULE hMod,
-        size_t ImageSize,
-        const std::wstring& DllBasePath,
-        uintptr_t entryPoint,
-        LdrRefFlags flags = Ldr_All
-        );
+    BLACKBONE_API bool CreateNTReference( NtLdrEntry& mod );
 
     /// <summary>
     /// Create thread static TLS array
     /// </summary>
-    /// <param name="pModule">Module base address</param>
+    /// <param name="mod">Module data</param>
     /// <param name="pTls">TLS directory of target image</param>
     /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS AddStaticTLSEntry( void* pModule, IMAGE_TLS_DIRECTORY *pTls );
+    BLACKBONE_API NTSTATUS AddStaticTLSEntry( NtLdrEntry& mod, IMAGE_TLS_DIRECTORY *pTls );
 
     /// <summary>
     /// Create module record in LdrpInvertedFunctionTable
     /// Used to create fake SAFESEH entries
     /// </summary>
-    /// <param name="ModuleBase">Module base address</param>
-    /// <param name="ImageSize">Size of image</param>
-    /// <param name="safeseh">Is set into true, if image has SAFESEH handlers</param>
+    /// <param name="mod">Module data</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool InsertInvertedFunctionTable( void* ModuleBase, size_t ImageSize, bool& safeseh );
+    BLACKBONE_API bool InsertInvertedFunctionTable( NtLdrEntry& mod );
 
     /// <summary>
     /// Unlink module from Ntdll loader
     /// </summary>
-    /// <param name="baseAddress">Module base address</param>
-    /// <param name="type">32 or 64 bit.</param>
+    /// <param name="mod">Module data</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool Unlink( ptr_t baseAddress, const std::wstring& name, eModType type );
+    BLACKBONE_API bool Unlink( const ModuleData& mod );
 
     // 
     // Get some not exported values
@@ -113,42 +108,23 @@ private:
     /// <summary>
     ///  Initialize OS-specific module entry
     /// </summary>
-    /// <param name="ModuleBase">Module base address.</param>
-    /// <param name="ImageSize">Size of image.</param>
-    /// <param name="dllpath">Full-qualified image path</param>
-    /// <param name="entryPoint">Entry point RVA</param>
-    /// <param name="outHash">Iamge name hash</param>
+    /// <param name="mod">Module data</param>
     /// <returns>Pointer to created entry</returns>
-    _LDR_DATA_TABLE_ENTRY_W8* InitW8Node(
-        void* ModuleBase,
-        size_t ImageSize,
-        const std::wstring& dllpath,
-        uintptr_t entryPoint,
-        ULONG& outHash
-        );
+    _LDR_DATA_TABLE_ENTRY_W8* InitW8Node( NtLdrEntry& mod );
 
     /// <summary>
     ///  Initialize OS-specific module entry
     /// </summary>
-    /// <param name="ModuleBase">Module base address.</param>
-    /// <param name="ImageSize">Size of image.</param>
-    /// <param name="dllpath">Full-qualified image path</param>
-    /// <param name="entryPoint">Entry point RVA</param>
-    /// <param name="outHash">Iamge name hash</param>
+    /// <param name="mod">Module data</param>
     /// <returns>Pointer to created entry</returns>
-    _LDR_DATA_TABLE_ENTRY_W7* InitW7Node(
-        void* ModuleBase,
-        size_t ImageSize,
-        const std::wstring& dllpath,
-        uintptr_t entryPoint,
-        ULONG& outHash
-        );
+    _LDR_DATA_TABLE_ENTRY_W7* InitW7Node( NtLdrEntry& mod );
 
     /// <summary>
     /// Insert entry into win8 module graph
     /// </summary>
     /// <param name="pNode">Node to insert</param>
-    void InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, uintptr_t modBase );
+    /// <param name="mod">Module data</param>
+    void InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, const NtLdrEntry& mod );
 
     /// <summary>
     /// Insert entry into LdrpHashTable[]
@@ -190,10 +166,10 @@ private:
     /// <summary>
     /// Unlink module from PEB_LDR_DATA
     /// </summary>
-    /// <param name="baseAddress">Module base address.</param>
+    /// <param name="mod">Module data</param>
     /// <returns>Address of removed record</returns>
     template<typename T> 
-    ptr_t UnlinkFromLdr( ptr_t baseAddress, const std::wstring& name );
+    ptr_t UnlinkFromLdr( const ModuleData& mod );
 
     /// <summary>
     /// Remove record from LIST_ENTRY structure
@@ -212,9 +188,10 @@ private:
     /// <summary>
     /// Unlink from module graph
     /// </summary>
+    /// <param name="mod">Module data</param>
     /// <param name="ldrEntry">Module LDR entry</param>
     /// <returns>Address of removed record</returns>
-    ptr_t UnlinkTreeNode( ptr_t ldrEntry );
+    ptr_t UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry );
 
     NtLdr( const NtLdr& ) = delete;
     NtLdr& operator =(const NtLdr&) = delete;
@@ -232,7 +209,7 @@ private:
     uintptr_t _RtlInsertInvertedFunctionTable = 0;       // RtlInsertInvertedFunctionTable address
     uintptr_t _LdrProtectMrdata = 0;                     // LdrProtectMrdata address
 
-    std::map<HMODULE, void*> _nodeMap;                  // Allocated native structures
+    std::map<ptr_t, void*> _nodeMap;                  // Allocated native structures
 };
 
 }

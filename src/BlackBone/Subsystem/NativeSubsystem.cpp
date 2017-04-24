@@ -501,7 +501,7 @@ std::vector<ModuleDataPtr> Native::EnumSections()
                 for (ptr_t memptr2 = mbi.AllocationBase; memptr2 < maxAddr(); memptr2 = mbi2.BaseAddress + mbi2.RegionSize)
                     if (!NT_SUCCESS( VirtualQueryExT( memptr2, &mbi2 ) ) || mbi2.Type != SEC_IMAGE)
                     {
-                        data.size = (size_t)(mbi2.BaseAddress - mbi.AllocationBase);
+                        data.size = static_cast<uint32_t>(mbi2.BaseAddress - mbi.AllocationBase);
                         break;
                     }
 

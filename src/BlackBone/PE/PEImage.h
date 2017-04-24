@@ -202,7 +202,7 @@ public:
     /// Get image size in bytes
     /// </summary>
     /// <returns>Image size</returns>
-    BLACKBONE_API inline size_t imageSize() const { return _imgSize; }
+    BLACKBONE_API inline uint32_t imageSize() const { return _imgSize; }
 
     /// <summary>
     /// Get size of image headers

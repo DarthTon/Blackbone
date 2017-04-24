@@ -163,17 +163,9 @@ public:
     /// <summary>
     /// Store manually mapped module in module list
     /// </summary>
-    /// <param name="FilePath">Full qualified module path</param>
-    /// <param name="base">Base address</param>
-    /// <param name="size">Module size</param>
-    /// <param name="mt">Module type. 32 bit or 64 bit</param>
+    /// <param name="mod">Module data</param>
     /// <returns>Module info</returns>
-    BLACKBONE_API ModuleDataPtr AddManualModule(
-        const std::wstring& FilePath,
-        module_t base,
-        size_t size, 
-        eModType mt
-        );
+    BLACKBONE_API ModuleDataPtr AddManualModule( const ModuleData& mod );
 
     /// <summary>
     /// Remove module from module list

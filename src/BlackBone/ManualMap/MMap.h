@@ -6,6 +6,7 @@
 #include "../PE/PEImage.h"
 
 #include "../Process/MemBlock.h"
+#include "../ManualMap/Native/NtLoader.h"
 #include "MExcept.h"
 
 #include <array>
@@ -168,11 +169,9 @@ struct ImageContext
 
     pe::PEImage    peImage;                 // PE image data
     MemBlock       imgMem;                  // Target image memory region
-    std::wstring   FilePath;                // path to image being mapped
-    std::wstring   FileName;                // File name string
+    NtLdrEntry     ldrEntry;                // Native loader module information
     vecPtr         tlsCallbacks;            // TLS callback routines
     ptr_t          pExpTableAddr = 0;       // Exception table address (amd64 only)
-    ptr_t          EntryPoint = 0;          // Target image entry point
     eLoadFlags     flags = NoFlags;         // Image loader flags
     bool           initialized = false;     // Image entry point was called
 };

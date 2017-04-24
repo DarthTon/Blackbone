@@ -68,7 +68,7 @@ struct ModuleData
     ptr_t baseAddress;      // Base image address
     std::wstring name;      // File name
     std::wstring fullPath;  // Full file path
-    size_t size;            // Size of image
+    uint32_t size;          // Size of image
     eModType type;          // Module type
     bool manual;            // Image is manually mapped
 

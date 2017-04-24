@@ -489,7 +489,7 @@ NTSTATUS ProcessModules::Unload( const ModuleDataPtr& hMod )
 /// <returns>true on success</returns>
 bool ProcessModules::Unlink( const ModuleDataPtr& mod )
 {
-    return _proc.nativeLdr().Unlink( mod->baseAddress, mod->name, mod->type );
+    return _proc.nativeLdr().Unlink( *mod );
 }
 
 /// <summary>
@@ -515,24 +515,18 @@ bool ProcessModules::ValidateModule( module_t base )
 /// <summary>
 /// Store manually mapped module in module list
 /// </summary>
-/// <param name="FilePath">Full qualified module path</param>
-/// <param name="base">Base address</param>
-/// <param name="size">Module size</param>
-/// <param name="mt">Module type. 32 bit or 64 bit</param>
+/// <param name="mod">Module data</param>
 /// <returns>Module info</returns>
-ModuleDataPtr ProcessModules::AddManualModule( const std::wstring& FilePath, module_t base, size_t size, eModType mt )
+ModuleDataPtr ProcessModules::AddManualModule( const ModuleData& mod )
 {
-    ModuleData module;
+    auto modCopy( mod );
 
-    module.fullPath = Utils::ToLower( FilePath );
-    module.baseAddress = base;
-    module.size = size;
-    module.name = Utils::ToLower( Utils::StripPath( FilePath ) );
-    module.manual = true;
-    module.type = mt;
+    modCopy.fullPath = Utils::ToLower( modCopy.fullPath );
+    modCopy.name = Utils::ToLower( modCopy.name );
+    modCopy.manual = true;
 
-    auto key = std::make_pair( module.name, module.type );
-    _modules.emplace( std::make_pair( key, std::make_shared<const ModuleData>( module ) ) );
+    auto key = std::make_pair( modCopy.name, modCopy.type );
+    _modules.emplace( std::make_pair( key, std::make_shared<const ModuleData>( modCopy ) ) );
 
     return _modules.find( key )->second;
 }
