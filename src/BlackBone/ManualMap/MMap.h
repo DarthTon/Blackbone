@@ -355,7 +355,7 @@ private:
     /// <param name="id">Manifest resource id</param>
     /// <param name="asImage">if true - 'path' points to a valid PE file, otherwise - 'path' points to separate manifest file</param>
     /// <returns>true on success</returns>
-    NTSTATUS CreateActx( const std::wstring& path, int id = 2, bool asImage = true );
+    NTSTATUS CreateActx( const pe::PEImage& image );
 
     /// <summary>
     /// Calculate and set security cookie

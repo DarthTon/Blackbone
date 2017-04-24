@@ -54,7 +54,8 @@ ModuleDataPtr ProcessModules::GetModule(
 /// <summary>
 /// Get module by name
 /// </summary>
-/// <param name="name">TModule name.</param>
+/// <param name="name">Module name.</param>
+/// <param name="search">Search type.</param>
 /// <param name="type">Module type. 32 bit or 64 bit</param>
 /// <param name="baseModule">Import module name. Used only to resolve ApiSchema during manual map</param>
 /// <returns>Module data. nullptr if not found</returns>
@@ -92,8 +93,8 @@ ModuleDataPtr ProcessModules::GetModule(
 /// </summary>
 /// <param name="modBase">Module base address</param>
 /// <param name="strict">If true modBase must exactly match module base address</param>
+/// <param name="search">Search type.</param>
 /// <param name="type">Module type. 32 bit or 64 bit</param>
-/// <param name="search">Saerch type</param>
 /// <returns>Module data. nullptr if not found</returns>
 ModuleDataPtr ProcessModules::GetModule(
     module_t modBase,
@@ -346,6 +347,26 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, 
 }
 
 /// <summary>
+/// Get export from ntdll
+/// </summary>
+/// <param name="name_ord">Function name or ordinal</param>
+/// <param name="type">Module type. 32 bit or 64 bit</param>
+/// <param name="search">Search type.</param>
+/// <returns>Export info. If failed procAddress field is 0</returns>
+call_result_t<exportData> ProcessModules::GetNtdllExport( 
+    const char* name_ord,
+    eModType type /*= mt_default*/, 
+    eModSeachType search /*= LdrList */ 
+    )
+{
+    auto mod = GetModule( L"ntdll.dll", search, type );
+    if (!mod)
+        return STATUS_NOT_FOUND;
+
+    return GetExport( mod, name_ord );
+}
+
+/// <summary>
 /// Inject image into target process
 /// </summary>
 /// <param name="path">Full-qualified image path</param>
@@ -408,7 +429,7 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
     if (_proc.core().isWow64() && img.mType() == mt_mod64)
         switchMode = ForceSwitch;
 
-    auto pLdrLoadDll = GetExport( GetModule( L"ntdll.dll", Sections, img.mType() ), "LdrLoadDll" );
+    auto pLdrLoadDll = GetNtdllExport( "LdrLoadDll", img.mType(), Sections );
     if (!pLdrLoadDll)
         return pLdrLoadDll.status;
 
@@ -460,7 +481,7 @@ NTSTATUS ProcessModules::Unload( const ModuleDataPtr& hMod )
         return STATUS_NOT_FOUND;
 
     // Unload routine
-    auto pUnload = GetExport( GetModule( L"ntdll.dll", LdrList, hMod->type ), "LdrUnloadDll" );
+    auto pUnload = GetNtdllExport( "LdrUnloadDll", hMod->type );
     if (!pUnload)
         return pUnload.status;
 

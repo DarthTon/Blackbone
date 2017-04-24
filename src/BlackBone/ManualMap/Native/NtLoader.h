@@ -5,6 +5,7 @@
 #include "../../Include/Types.h"
 #include "../../Include/NativeStructures.h"
 #include "../../Include/Macro.h"
+#include "../../Include/CallResult.h"
 
 namespace blackbone
 {
@@ -153,6 +154,14 @@ private:
     /// <param name="str">Iamge name</param>
     /// <returns>Hash</returns>
     ULONG HashString( const std::wstring& str );
+
+    /// <summary>
+    /// Allocate memory from heap if possible
+    /// </summary>
+    /// <param name="size">Module type</param>
+    /// <param name="size">Size to allocate</param>
+    /// <returns>Allocated address</returns>
+    call_result_t<ptr_t> AllocateInHeap( eModType mt, size_t size );
 
     /// <summary>
     /// Get module native node ptr or create new

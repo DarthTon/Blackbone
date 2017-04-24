@@ -59,7 +59,7 @@ NTSTATUS RemoteExec::ExecInNewThread(
         break;
     }
 
-    auto pExitThread = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, switchMode ? mt_mod64 : mt_default ), "NtTerminateThread" );
+    auto pExitThread = _mods.GetNtdllExport( "NtTerminateThread", switchMode ? mt_mod64 : mt_default );
     if (!pExitThread)
         return pExitThread.status;
 
@@ -72,7 +72,7 @@ NTSTATUS RemoteExec::ExecInNewThread(
     if(switchMode)
     {
         // Allocate new x64 activation stack
-        auto createActStack = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt_mod64 ), "RtlAllocateActivationContextStack" );
+        auto createActStack = _mods.GetNtdllExport( "RtlAllocateActivationContextStack", mt_mod64 );
         if (createActStack)
         {
             a->GenCall( createActStack->procAddress, { _userData.ptr() + 0x3100 } );
@@ -395,7 +395,7 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
             (*a)->and_( (*a)->zsp, -16 );
 
             // Allocate new x64 activation stack
-            auto createActStack = _mods.GetExport( _mods.GetModule( L"ntdll.dll", LdrList, mt_mod64 ), "RtlAllocateActivationContextStack" );
+            auto createActStack = _mods.GetNtdllExport( "RtlAllocateActivationContextStack", mt_mod64 );
             if(createActStack)
             {
                 a->GenCall( createActStack->procAddress, { _userData.ptr() + 0x3000 } );
@@ -454,7 +454,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
 
     if(_hWaitEvent == NULL)
     {
-        AsmJitHelper a;
+        auto a = AsmFactory::GetAssembler( _proc.core().isWow64() );
 
         wchar_t pEventName[128] = { 0 };
         uint64_t dwResult = NULL;
@@ -483,7 +483,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         obAttr.Length = sizeof(obAttr);
         obAttr.SecurityDescriptor = pDescriptor;
 
-        auto pOpenEvent = _mods.GetExport( _mods.GetModule( L"ntdll.dll", Sections, mt ), "NtOpenEvent" );
+        auto pOpenEvent = _mods.GetNtdllExport( "NtOpenEvent", mt, Sections );
         if (!pOpenEvent)
             return pOpenEvent.status;
 
@@ -498,17 +498,17 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         obAttr.ObjectName = reinterpret_cast<PUNICODE_STRING>(_userData.ptr<uintptr_t>() + ARGS_OFFSET + sizeof(obAttr));
         obAttr.SecurityDescriptor = nullptr;
 
-        a.GenCall( static_cast<uintptr_t>(pOpenEvent->procAddress), {
-            _userData.ptr<uintptr_t>() + EVENT_OFFSET, 
+        a->GenCall( pOpenEvent->procAddress, {
+            _userData.ptr() + EVENT_OFFSET, 
             EVENT_MODIFY_STATE | SYNCHRONIZE,
-            _userData.ptr<uintptr_t>() + ARGS_OFFSET 
+            _userData.ptr() + ARGS_OFFSET 
         } );
 
         // Save status
-        a->mov( a->zdx, _userData.ptr<uintptr_t>() + ERR_OFFSET );
-        a->mov( asmjit::host::dword_ptr( a->zdx ), asmjit::host::eax );
+        (*a)->mov( (*a)->zdx, _userData.ptr() + ERR_OFFSET );
+        (*a)->mov( asmjit::host::dword_ptr( (*a)->zdx ), asmjit::host::eax );
 
-        a->ret();
+        (*a)->ret();
 
         status = _userData.Write( ARGS_OFFSET, obAttr );
         status |= _userData.Write( ARGS_OFFSET + sizeof(obAttr), ustr );
@@ -516,7 +516,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         if (!NT_SUCCESS( status ))
             return status;
 
-        ExecInNewThread( a->make(), a->getCodeSize(), dwResult );
+        ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), dwResult );
         status = _userData.Read<NTSTATUS>( ERR_OFFSET, -1 );
     }
 
@@ -654,7 +654,7 @@ void RemoteExec::AddReturnWithEvent(
     }
 
     ptr_t ptr = _userData.ptr();
-    auto pSetEvent = _proc.modules().GetExport( _proc.modules().GetModule( L"ntdll.dll", LdrList, mt ), "NtSetEvent" );
+    auto pSetEvent = _proc.modules().GetNtdllExport( "NtSetEvent", mt );
     if(pSetEvent)
         a.SaveRetValAndSignalEvent( pSetEvent->procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
 }

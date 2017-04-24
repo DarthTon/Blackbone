@@ -293,12 +293,6 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
 _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( NtLdrEntry& mod )
 {
     UNICODE_STRING strLocal = { 0 };
-    uint64_t result = 0;
-
-    _LDR_DATA_TABLE_ENTRY_W8 *pEntry = nullptr; 
-    _LDR_DDAG_NODE *pDdagNode = nullptr;
-    
-    AsmJitHelper a;
 
     // Allocate space for Unicode string
     auto mem = _process.memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
@@ -306,59 +300,15 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( NtLdrEntry& mod )
         return nullptr;
 
     auto StringBuf = std::move( mem.result() );
-    auto RtlAllocateHeap = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, mod.type ), "RtlAllocateHeap" );
-
-    if (_LdrHeapBase && RtlAllocateHeap)
-    {
-        //
-        // HeapAlloc(LdrHeap, HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
-        //
-        a.GenPrologue();
-
-        a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap->procAddress), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W8 ) } );
-        _process.remote().AddReturnWithEvent( a, mod.type );
-        a.GenEpilogue();
-
-        _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-
-        pEntry = reinterpret_cast<decltype(pEntry)>(result);
-    }
-    else
-    {
-        mem = _process.memory().Allocate( sizeof( _LDR_DATA_TABLE_ENTRY_W8 ), PAGE_READWRITE, 0, false );
-        if (!mem)
-            return nullptr;
-
-        pEntry = mem->ptr<_LDR_DATA_TABLE_ENTRY_W8*>();
-    }
+    _LDR_DATA_TABLE_ENTRY_W8* pEntry = reinterpret_cast<decltype(pEntry)>(AllocateInHeap( 
+        mod.type, sizeof( *pEntry ) 
+    ).result( 0 ));
 
     if(pEntry)
     {
-        if (_LdrHeapBase)
-        {
-            a->reset();
-
-            //
-            // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DDAG_NODE));
-            //
-            a.GenPrologue();
-
-            a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap->procAddress), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DDAG_NODE ) } );
-
-            _process.remote().AddReturnWithEvent( a, mod.type );
-            a.GenEpilogue();
-
-            _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-            pDdagNode = reinterpret_cast<decltype(pDdagNode)>(result);
-        }
-        else
-        {
-            mem = _process.memory().Allocate( sizeof( _LDR_DDAG_NODE ), PAGE_READWRITE, 0, false );
-            if (!mem)
-                return nullptr;
-
-            pDdagNode = mem->ptr<_LDR_DDAG_NODE*>();
-        }  
+        _LDR_DDAG_NODE* pDdagNode = reinterpret_cast<decltype(pDdagNode)>(AllocateInHeap( 
+            mod.type, sizeof( *pDdagNode ) 
+        ).result(0));
 
         if(pDdagNode)
         {
@@ -426,11 +376,6 @@ _LDR_DATA_TABLE_ENTRY_W8* NtLdr::InitW8Node( NtLdrEntry& mod )
 _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node( NtLdrEntry& mod )
 {
     UNICODE_STRING strLocal = { 0 };
-    uint64_t result = 0;
-
-    _LDR_DATA_TABLE_ENTRY_W7 *pEntry = nullptr; 
-
-    AsmJitHelper a;
 
     // Allocate space for Unicode string
     auto mem = _process.memory().Allocate( MAX_PATH, PAGE_READWRITE, 0, false );
@@ -438,31 +383,10 @@ _LDR_DATA_TABLE_ENTRY_W7* NtLdr::InitW7Node( NtLdrEntry& mod )
         return nullptr;
 
     auto StringBuf = std::move( mem.result() );
-    auto RtlAllocateHeap = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll", LdrList, mod.type ), "RtlAllocateHeap" );
 
-    if (_LdrHeapBase && RtlAllocateHeap)
-    {
-        //
-        // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(_LDR_DATA_TABLE_ENTRY_W8));
-        //
-        a.GenPrologue();
-
-        a.GenCall( static_cast<uintptr_t>(RtlAllocateHeap->procAddress), { _LdrHeapBase, HEAP_ZERO_MEMORY, sizeof( _LDR_DATA_TABLE_ENTRY_W7 ) } );
-
-        _process.remote().AddReturnWithEvent( a, mod.type );
-        a.GenEpilogue();
-
-        _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
-        pEntry = reinterpret_cast<decltype(pEntry)>(result);
-    }
-    else
-    {
-        mem = _process.memory().Allocate( sizeof( _LDR_DATA_TABLE_ENTRY_W7 ), PAGE_READWRITE, 0, false );
-        if (!mem)
-            return nullptr;
-
-        pEntry = mem->ptr<_LDR_DATA_TABLE_ENTRY_W7*>();
-    }
+    _LDR_DATA_TABLE_ENTRY_W7* pEntry = reinterpret_cast<decltype(pEntry)>(AllocateInHeap( 
+        mod.type, sizeof( *pEntry ) 
+    ).result( 0 ));
 
     if(pEntry)
     {
@@ -571,11 +495,7 @@ void NtLdr::InsertTreeNode( _LDR_DATA_TABLE_ENTRY_W8* pNode, const NtLdrEntry& m
     // Insert using RtlRbInsertNodeEx
     auto a = AsmFactory::GetAssembler( mod.type );
     uint64_t result = 0;
-    auto RtlRbInsertNodeEx = _process.modules().GetExport( 
-        _process.modules().GetModule( L"ntdll.dll", LdrList, mod.type ), 
-        "RtlRbInsertNodeEx"
-    );
-
+    auto RtlRbInsertNodeEx = _process.modules().GetNtdllExport( "RtlRbInsertNodeEx", mod.type );
     if (!RtlRbInsertNodeEx)
         return;
 
@@ -682,6 +602,48 @@ ULONG NtLdr::HashString( const std::wstring& str )
     }
 
     return hash;
+}
+
+/// <summary>
+/// Allocate memory from heap if possible
+/// </summary>
+/// <param name="size">Module type</param>
+/// <param name="size">Size to allocate</param>
+/// <returns>Allocated address</returns>
+call_result_t<ptr_t> NtLdr::AllocateInHeap( eModType mt, size_t size )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    auto RtlAllocateHeap = _process.modules().GetNtdllExport( "RtlAllocateHeap", mt );
+    if (_LdrHeapBase && RtlAllocateHeap)
+    {
+        auto a = AsmFactory::GetAssembler( mt );
+
+        //
+        // HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, size);
+        //
+        a->GenPrologue();
+        a->GenCall( RtlAllocateHeap->procAddress, { _LdrHeapBase, HEAP_ZERO_MEMORY, size } );
+        _process.remote().AddReturnWithEvent( (*a), mt );
+        a->GenEpilogue();
+
+        uint64_t result = 0;
+        status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+        if (NT_SUCCESS( status ))
+            return result;
+    }
+    else
+        status = STATUS_ORDINAL_NOT_FOUND;
+
+    if (!NT_SUCCESS( status ))
+    {
+        auto mem = _process.memory().Allocate( size, PAGE_READWRITE, 0, false );
+        if (!mem)
+            return mem.status;
+
+        return mem->ptr();
+    }
+
+    return STATUS_UNSUCCESSFUL;
 }
 
 /// <summary>
@@ -988,7 +950,7 @@ ptr_t NtLdr::UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry )
     auto a = AsmFactory::GetAssembler( mod.type );
     uint64_t result = 0;
 
-    auto RtlRbRemoveNode = _process.modules().GetExport( _process.modules().GetModule( L"ntdll.dll" ), "RtlRbRemoveNode" );
+    auto RtlRbRemoveNode = _process.modules().GetNtdllExport( "RtlRbRemoveNode" );
     if (!RtlRbRemoveNode)
         return RtlRbRemoveNode.status;
 

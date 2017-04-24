@@ -30,11 +30,6 @@ struct ModuleTable
 /// </summary>
 class MExcept
 {
-public:
-    // For debug purposes only
-    BLACKBONE_API static void*  g_pImageBase;
-    BLACKBONE_API static size_t g_imageSize;
-
 protected:
     BLACKBONE_API MExcept( class Process& proc );
     BLACKBONE_API ~MExcept();
@@ -72,6 +67,9 @@ private:
     MemBlock  _pVEHCode;    // VEH function codecave
     MemBlock  _pModTable;   // x64 module address range table
     uint64_t  _hVEH = 0;    // VEH handle
+
+    static uint8_t _handler32[];
+    static uint8_t _handler64[];
 };
 
 }

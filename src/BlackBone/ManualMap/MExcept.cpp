@@ -4,8 +4,6 @@
 #include "../Misc/Trace.hpp"
 #include "../Asm/LDasm.h"
 
-LONG CALLBACK VectoredHandler( PEXCEPTION_POINTERS ExceptionInfo );
-
 namespace blackbone
 {
 
@@ -14,271 +12,8 @@ namespace blackbone
 #define EH_PURE_MAGIC_NUMBER1   0x01994000
 #define EH_EXCEPTION_NUMBER     ('msc' | 0xE0000000)
 
-
-void*  MExcept::g_pImageBase = nullptr;
-size_t MExcept::g_imageSize = 0;
-
-MExcept::MExcept( class Process& proc )
-    : _proc( proc )
-{
-    //AddVectoredExceptionHandler( 0, &VectoredHandler );
-}
-
-MExcept::~MExcept()
-{
-}
-
-/// <summary>
-/// Inject VEH wrapper into process
-/// Used to enable execution of SEH handlers out of image
-/// </summary>
-/// <param name="pTargetBase">Target image base address</param>
-/// <param name="imageSize">Size of the image</param>
-/// <param name="mt">Mosule type</param>
-/// <param name="partial">Partial exception support</param>
-/// <returns>Error code</returns>
-NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType mt, bool partial )
-{    
-    auto a = AsmFactory::GetAssembler( mt );
-    uint64_t result = 0;
-    auto& mods = _proc.modules();
-
-    if(mt == mt_mod64)
-    {
-
-        // Add module to module table
-        if (!_pModTable.valid())
-        {
-            auto mem = _proc.memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
-            if (!mem)
-                return mem.status;
-
-            _pModTable = std::move( mem.result() );
-        }
-
-        ModuleTable table;
-        _pModTable.Read ( 0, table );
-
-        // Add new entry to the table
-        table.entry[table.count].base = pTargetBase;
-        table.entry[table.count].size = imageSize;
-        table.count++;
-
-        _pModTable.Write( 0, table );
-
-        // No handler required
-        if (partial)
-            return STATUS_SUCCESS;
-
-        // VEH codecave
-        auto mem = _proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
-        if (!_pVEHCode.valid())
-            return mem.status;
-
-        _pVEHCode = std::move( mem.result() );
-
-        BLACKBONE_TRACE( "ManualMap: Vectored hander: 0x%p\n", _pVEHCode.ptr() );
-
-        asmjit::Label lExit  = (*a)->newLabel();
-        asmjit::Label lLoop1 = (*a)->newLabel();
-        asmjit::Label skip1  = (*a)->newLabel();
-        asmjit::Label found1 = (*a)->newLabel();
-
-        //
-        // Assembly code for VectoredHandler64
-        // 0x10 - EXCEPTION_RECORD.ExceptionAddress
-        // 0x20 - EXCEPTION_RECORD.ExceptionInformation[0]
-        // 0x30 - EXCEPTION_RECORD.ExceptionInformation[2]
-        // 0x38 - EXCEPTION_RECORD.ExceptionInformation[3]
-        //
-        (*a)->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rcx ) );
-        (*a)->cmp( asmjit::host::dword_ptr( asmjit::host::rax ), EH_EXCEPTION_NUMBER );            // Exception code
-        (*a)->jne( lExit );
-        (*a)->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_PURE_MAGIC_NUMBER1 );    // Sub code
-        (*a)->jne( lExit );
-        (*a)->cmp( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), 0 );                        // Image base
-        (*a)->jne( lExit );
-
-        (*a)->mov( asmjit::host::r9, _pModTable.ptr() );
-        (*a)->mov( asmjit::host::rdx, asmjit::host::qword_ptr( asmjit::host::r9 ) );               // Record count
-        (*a)->add( asmjit::host::r9, sizeof( table.count ) );
-        (*a)->xor_( asmjit::host::r10, asmjit::host::r10 );
-
-        (*a)->bind( lLoop1 );
-
-        (*a)->mov( asmjit::host::r8, asmjit::host::qword_ptr( asmjit::host::rax, 0x30 ) );
-        (*a)->mov( asmjit::host::r11, asmjit::host::qword_ptr( asmjit::host::r9 ) );
-        (*a)->cmp( asmjit::host::r8, asmjit::host::r11 );
-        (*a)->jl( skip1 );
-        (*a)->add( asmjit::host::r11, asmjit::host::qword_ptr( asmjit::host::r9, sizeof( table.entry[0].base ) ) );    // Size
-        (*a)->cmp( asmjit::host::r8, asmjit::host::r11 );
-        (*a)->jg( skip1 );
-
-        (*a)->jmp( found1 );
-
-        (*a)->bind( skip1 );
-        (*a)->add( asmjit::host::r9, sizeof( ExceptionModule ) );
-        (*a)->add( asmjit::host::r10, 1 );
-        (*a)->cmp( asmjit::host::r10, asmjit::host::rdx );
-        (*a)->jne( lLoop1 );
-
-        (*a)->jmp( lExit );
-
-        (*a)->bind( found1 );
-        (*a)->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x20 ), EH_MAGIC_NUMBER1 );
-        (*a)->mov( asmjit::host::rcx, asmjit::host::qword_ptr( asmjit::host::rcx ) );
-        (*a)->mov( asmjit::host::rdx, asmjit::host::qword_ptr( asmjit::host::r9 ) );
-        (*a)->mov( asmjit::host::qword_ptr( asmjit::host::rax, 0x38 ), asmjit::host::rdx );
-
-        (*a)->bind( lExit );
-        (*a)->xor_( asmjit::host::rax, asmjit::host::rax );
-        (*a)->ret();
-        (*a)->db( 0xCC );
-        (*a)->db( 0xCC );
-        (*a)->db( 0xCC );
-
-        if (_pVEHCode.Write( 0, (*a)->getCodeSize(), (*a)->make() ) != STATUS_SUCCESS)
-        {
-            _pVEHCode.Free();
-            return LastNtStatus();
-        }
-    }
-    else
-    {
-        // No handler required
-        if (partial)
-            return STATUS_SUCCESS;
-
-        // VEH codecave
-        auto mem = _proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
-        if (!mem)
-            return mem.status;
-
-        _pVEHCode = std::move( mem.result() );
-
-        // Resolve compiler incremental table address, if any
-        void *pFunc = ResolveJmp( &VectoredHandler );
-        size_t fnSize = static_cast<size_t>(SizeOfProc( pFunc ));
-        size_t dataOfs = 0, code_ofs = 0, code_ofs2 = 0;;
-
-        // Find and replace magic values
-        for (uint8_t *pData = reinterpret_cast<uint8_t*>(pFunc);
-            pData < reinterpret_cast<uint8_t*>(pFunc) + fnSize - 4;
-            pData++)
-        {
-            // LdrpInvertedFunctionTable
-            if (*(uintptr_t*)pData == 0xDEADDA7A)
-            {
-                dataOfs = pData - reinterpret_cast<uint8_t*>(pFunc);
-                continue;
-            }
-
-            // DecodeSystemPointer address
-            if (*(uintptr_t*)pData == 0xDEADC0DE)
-            {
-                code_ofs = pData - reinterpret_cast<uint8_t*>(pFunc);
-                break;
-            }
-
-            // LdrProtectMrdata address
-            if (*(uintptr_t*)pData == 0xDEADC0D2)
-            {
-                code_ofs2 = pData - reinterpret_cast<uint8_t*>(pFunc);
-                continue;
-            }
-        }
-
-        auto pDecode = mods.GetExport( mods.GetModule( L"ntdll.dll", Sections, mt ), "RtlDecodeSystemPointer" );
-        if (!pDecode)
-            return pDecode.status;
-
-        // Write handler data into target process
-        if (!NT_SUCCESS( _pVEHCode.Write( 0, fnSize, pFunc ) ) ||
-            !NT_SUCCESS( _pVEHCode.Write( dataOfs, _proc.nativeLdr().LdrpInvertedFunctionTable() ) ) ||
-            !NT_SUCCESS( _pVEHCode.Write( code_ofs, static_cast<uintptr_t>(pDecode->procAddress) ) ) ||
-            !NT_SUCCESS( _pVEHCode.Write( code_ofs2, _proc.nativeLdr().LdrProtectMrdata() ) ))
-        {
-            _pVEHCode.Free();
-            return LastNtStatus();
-        }
-    }
-
-    // AddVectoredExceptionHandler(0, pHandler);
-    auto pAddHandler = mods.GetExport( mods.GetModule( L"ntdll.dll", Sections, mt ), "RtlAddVectoredExceptionHandler" );
-    if (!pAddHandler)
-        return pAddHandler.status;
-
-    (*a)->reset();
-    a->GenPrologue();
-
-    a->GenCall( pAddHandler->procAddress, { 0, _pVEHCode.ptr() } );
-
-    _proc.remote().AddReturnWithEvent( *a, mt );
-    a->GenEpilogue();
-
-    _proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
-    _hVEH = result;
-
-    return (_hVEH == 0 ? STATUS_NOT_FOUND : STATUS_SUCCESS);
-}
-
-/// <summary>
-/// Removes VEH from target process
-/// </summary>
-/// <param name="partial">Partial exception support</param>
-/// <param name="mt">Mosule type</param>
-/// <returns>Status code</returns>
-NTSTATUS MExcept::RemoveVEH( bool partial, eModType mt )
-{  
-    auto a = AsmFactory::GetAssembler( mt );
-    uint64_t result = 0;
-
-    auto& mods = _proc.modules();
-    auto pRemoveHandler = mods.GetExport( mods.GetModule( L"ntdll.dll", LdrList, mt ), "RtlRemoveVectoredExceptionHandler" );
-    if (!pRemoveHandler)
-        return pRemoveHandler.status;
-
-    a->GenPrologue();
-
-    // RemoveVectoredExceptionHandler(pHandler);
-    a->GenCall( pRemoveHandler->procAddress, { _hVEH } );
-
-    _proc.remote().AddReturnWithEvent( *a );
-    a->GenEpilogue();
-
-    // Destroy table and handler
-    if (!partial)
-    {
-        _proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
-        _pVEHCode.Free();
-        _hVEH = 0;
-
-        _pModTable.Free();
-    }        
-
-    return STATUS_SUCCESS;
-}
-
-}
-
-using namespace blackbone;
-
-//
-// VEH to inject into process
-//
-#ifdef USE64
-LONG CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*ExceptionInfo*/ )
-{
-    return 0;
-}
-#else
-
-/// <summary>
-/// Handler itself.
-/// </summary>
-/// <param name="ExceptionInfo">Exception-related inforamtion</param>
-/// <returns>Exception status</returns>
-LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*ExceptionInfo*/ )
+/*
+LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS / *ExceptionInfo* / )
 {
     PEXCEPTION_REGISTRATION_RECORD pFs;
     PRTL_INVERTED_FUNCTION_TABLE7 pTable;// = (PRTL_INVERTED_FUNCTION_TABLE7)0x777dc2b0;
@@ -317,22 +52,22 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
 
 
     //LdrProtectMrdata = (decltype(LdrProtectMrdata))0x777043aa;
-    if(LdrProtectMrdata)
+    if (LdrProtectMrdata)
         LdrProtectMrdata( FALSE );
 
     //
     // Add each handler to LdrpInvertedFunctionTable
     //
-    for (; pFs && pFs != reinterpret_cast<EXCEPTION_REGISTRATION_RECORD*>(0xffffffff) 
-          && pFs->Next != reinterpret_cast<EXCEPTION_REGISTRATION_RECORD*>(0xffffffff); 
-          pFs = pFs->Next)
+    for (; pFs && pFs != reinterpret_cast<EXCEPTION_REGISTRATION_RECORD*>(0xffffffff)
+        && pFs->Next != reinterpret_cast<EXCEPTION_REGISTRATION_RECORD*>(0xffffffff);
+        pFs = pFs->Next)
     {
         // Find image for handler
         for (ULONG imageIndex = 0; imageIndex < pTable->Count; imageIndex++)
         {
-            if ( reinterpret_cast<uintptr_t>(pFs->Handler) >= reinterpret_cast<uintptr_t>(pEntries[imageIndex].ImageBase) &&
-                 reinterpret_cast<uintptr_t>(pFs->Handler) <= reinterpret_cast<uintptr_t>(pEntries[imageIndex].ImageBase)
-                                                           + pEntries[imageIndex].ImageSize)
+            if (reinterpret_cast<uintptr_t>(pFs->Handler) >= reinterpret_cast<uintptr_t>(pEntries[imageIndex].ImageBase) &&
+                reinterpret_cast<uintptr_t>(pFs->Handler) <= reinterpret_cast<uintptr_t>(pEntries[imageIndex].ImageBase)
+                + pEntries[imageIndex].ImageSize)
             {
                 newHandler = false;
 
@@ -376,7 +111,7 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
         }
     }
 
-    if(LdrProtectMrdata)
+    if (LdrProtectMrdata)
         LdrProtectMrdata( TRUE );
 
     // Return control to SEH
@@ -389,12 +124,267 @@ LONG __declspec(naked) CALLBACK VectoredHandler( PEXCEPTION_POINTERS /*Exception
 
         mov eax, EXCEPTION_CONTINUE_SEARCH
         ret 4
-
-        // End of function marker
-        _emit 0xCC
-        _emit 0xCC
-        _emit 0xCC
     }
 }
+*/
+uint8_t MExcept::_handler32[]=
+{
+    0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x18, 0x60, 0xB8, 0x7A, 0xDA, 0xAD, 0xDE, 0x89, 0x45, 0xF4, 0xB8, 
+    0xD2, 0xC0, 0xAD, 0xDE, 0x89, 0x45, 0xEC, 0x64, 0x8B, 0x1D, 0x00, 0x00, 0x00, 0x00, 0x64, 0x8B,
+    0x0D, 0x30, 0x00, 0x00, 0x00, 0x89, 0x5D, 0xF8, 0x8B, 0x81, 0xA4, 0x00, 0x00, 0x00, 0x83, 0xF8, 
+    0x06, 0x72, 0x09, 0x83, 0xB9, 0xA8, 0x00, 0x00, 0x00, 0x02, 0x73, 0x11, 0x83, 0xF8, 0x0A, 0x73, 
+    0x0C, 0x8B, 0x7D, 0xF4, 0xC6, 0x45, 0xFF, 0x00, 0x83, 0xC7, 0x0C, 0xEB, 0x0A, 0x8B, 0x7D, 0xF4, 
+    0xC6, 0x45, 0xFF, 0x01, 0x83, 0xC7, 0x10, 0x8B, 0x45, 0xEC, 0x89, 0x7D, 0xE8, 0x85, 0xC0, 0x74, 
+    0x07, 0x6A, 0x00, 0xFF, 0xD0, 0x8B, 0x45, 0xEC, 0x85, 0xDB, 0x0F, 0x84, 0xEA, 0x00, 0x00, 0x00, 
+    0x83, 0xFB, 0xFF, 0x0F, 0x84, 0xDE, 0x00, 0x00, 0x00, 0x83, 0x3B, 0xFF, 0x0F, 0x84, 0xD5, 0x00, 
+    0x00, 0x00, 0x8B, 0x45, 0xF4, 0x33, 0xF6, 0x89, 0x75, 0xF0, 0x39, 0x30, 0x0F, 0x86, 0xB5, 0x00, 
+    0x00, 0x00, 0x83, 0xC7, 0x04, 0x8B, 0x4B, 0x04, 0x8B, 0x17, 0x3B, 0xCA, 0x0F, 0x82, 0x8E, 0x00, 
+    0x00, 0x00, 0x8B, 0x47, 0x04, 0x03, 0xC2, 0x3B, 0xC8, 0x0F, 0x87, 0x81, 0x00, 0x00, 0x00, 0x80, 
+    0x7D, 0xFF, 0x00, 0x74, 0x08, 0x85, 0xF6, 0x0F, 0x84, 0x8A, 0x00, 0x00, 0x00, 0xFF, 0x77, 0xFC, 
+    0xB8, 0xDE, 0xC0, 0xAD, 0xDE, 0xFF, 0xD0, 0x8B, 0xD8, 0x8B, 0xCB, 0x85, 0xDB, 0x74, 0x5E, 0x8D, 
+    0xB3, 0x00, 0x04, 0x00, 0x00, 0x3B, 0xCE, 0x73, 0x54, 0x8B, 0x11, 0x85, 0xD2, 0x74, 0x13, 0x8B, 
+    0x07, 0x03, 0xC2, 0x8B, 0x55, 0xF8, 0x3B, 0x42, 0x04, 0x74, 0x42, 0x83, 0xC1, 0x04, 0x75, 0xE5, 
+    0xEB, 0x3B, 0x8B, 0x45, 0xF8, 0x8B, 0x40, 0x04, 0x2B, 0x07, 0x89, 0x01, 0xB9, 0x00, 0x00, 0x00, 
+    0x00, 0x83, 0x47, 0x08, 0x01, 0x74, 0x26, 0x8B, 0x47, 0x08, 0x48, 0x3B, 0xC1, 0x76, 0x18, 0x90, 
+    0x8B, 0x74, 0x83, 0xFC, 0x8B, 0x14, 0x83, 0x3B, 0xF2, 0x76, 0x07, 0x89, 0x54, 0x83, 0xFC, 0x89, 
+    0x34, 0x83, 0x48, 0x3B, 0xC1, 0x77, 0xE9, 0x41, 0x3B, 0x4F, 0x08, 0x72, 0xDA, 0x8B, 0x5D, 0xF8, 
+    0x8B, 0x4D, 0xF0, 0x83, 0xC7, 0x10, 0x8B, 0x45, 0xF4, 0x41, 0x89, 0x4D, 0xF0, 0x8B, 0xF1, 0x3B, 
+    0x08, 0x0F, 0x82, 0x4E, 0xFF, 0xFF, 0xFF, 0x8B, 0x1B, 0x8B, 0x7D, 0xE8, 0x89, 0x5D, 0xF8, 0x85, 
+    0xDB, 0x0F, 0x85, 0x19, 0xFF, 0xFF, 0xFF, 0x8B, 0x45, 0xEC, 0x85, 0xC0, 0x74, 0x04, 0x6A, 0x01, 
+    0xFF, 0xD0, 0x61, 0x8B, 0xE5, 0x5D, 0xB8, 0x00, 0x00, 0x00, 0x00, 0xC2, 0x04, 0x00
+};
 
-#endif//USE64
+/*
+LONG CALLBACK VectoredHandler( PEXCEPTION_POINTERS ExceptionInfo )
+{
+    // Check if it's a VC++ exception
+    // for SEH RtlAddFunctionTable is enough
+    if (ExceptionInfo->ExceptionRecord->ExceptionCode == EH_EXCEPTION_NUMBER)
+    {
+        ModuleTable* pTable = reinterpret_cast<ModuleTable*>(0xDEADBEEFDEADBEEF);
+        for (ptr_t i = 0; i < pTable->count; i++)
+        {
+            // Check exception site image boundaries
+            if (ExceptionInfo->ExceptionRecord->ExceptionInformation[2] >= pTable->entry[i].base &&
+                ExceptionInfo->ExceptionRecord->ExceptionInformation[2] <= pTable->entry[i].base + pTable->entry[i].size)
+            {
+                // Assume that's our exception because ImageBase = 0 and not suitable magic number
+                if (ExceptionInfo->ExceptionRecord->ExceptionInformation[0] == EH_PURE_MAGIC_NUMBER1
+                    && ExceptionInfo->ExceptionRecord->ExceptionInformation[3] == 0)
+                {
+                    // CRT magic number
+                    ExceptionInfo->ExceptionRecord->ExceptionInformation[0] = (ULONG_PTR)EH_MAGIC_NUMBER1;
+
+                    // fix exception image base
+                    ExceptionInfo->ExceptionRecord->ExceptionInformation[3] = (ULONG_PTR)pTable->entry[i].base;
+                }
+            }
+        }
+    }
+
+    return EXCEPTION_CONTINUE_SEARCH;
+}*/
+uint8_t MExcept::_handler64[] =
+{
+    0x48, 0x83, 0xEC, 0x08, 0x48, 0x8B, 0x01, 0x4C, 0x8B, 0xD9, 0x81, 0x38, 0x63, 0x73, 0x6D, 0xE0, 
+    0x0F, 0x85, 0x7C, 0x00, 0x00, 0x00, 0x48, 0x89, 0x1C, 0x24, 0x45, 0x33, 0xC9, 0x48, 0xBB, 0xEF, 
+    0xBE, 0xAD, 0xDE, 0xEF, 0xBE, 0xAD, 0xDE, 0x4C, 0x39, 0x0B, 0x76, 0x5B, 0x48, 0xB8, 0xF7, 0xBE, 
+    0xAD, 0xDE, 0xEF, 0xBE, 0xAD, 0xDE, 0x66, 0x66, 0x0F, 0x1F, 0x84, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x4D, 0x8B, 0x03, 0x48, 0x8B, 0x10, 0x4D, 0x8B, 0x50, 0x30, 0x4C, 0x3B, 0xD2, 0x72, 0x2C, 0x48, 
+    0x03, 0x50, 0x08, 0x4C, 0x3B, 0xD2, 0x77, 0x23, 0x49, 0x81, 0x78, 0x20, 0x00, 0x40, 0x99, 0x01,
+    0x75, 0x19, 0x49, 0x83, 0x78, 0x38, 0x00, 0x75, 0x12, 0x49, 0xC7, 0x40, 0x20, 0x20, 0x05, 0x93, 
+    0x19, 0x49, 0x8B, 0x13, 0x48, 0x8B, 0x08, 0x48, 0x89, 0x4A, 0x38, 0x49, 0xFF, 0xC1, 0x48, 0x83, 
+    0xC0, 0x10, 0x4C, 0x3B, 0x0B, 0x72, 0xB9, 0x33, 0xC0, 0x48, 0x8B, 0x1C, 0x24, 0x48, 0x83, 0xC4, 
+    0x08, 0xC3, 0x33, 0xC0, 0x48, 0x83, 0xC4, 0x08, 0xC3
+};
+
+MExcept::MExcept( class Process& proc )
+    : _proc( proc )
+{
+    //AddVectoredExceptionHandler( 0, &VectoredHandler );
+}
+
+MExcept::~MExcept()
+{
+}
+
+/// <summary>
+/// Inject VEH wrapper into process
+/// Used to enable execution of SEH handlers out of image
+/// </summary>
+/// <param name="pTargetBase">Target image base address</param>
+/// <param name="imageSize">Size of the image</param>
+/// <param name="mt">Mosule type</param>
+/// <param name="partial">Partial exception support</param>
+/// <returns>Error code</returns>
+NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType mt, bool partial )
+{    
+    auto a = AsmFactory::GetAssembler( mt );
+    uint64_t result = 0;
+    auto& mods = _proc.modules();
+
+    if(mt == mt_mod64)
+    {
+        // Add module to module table
+        if (!_pModTable.valid())
+        {
+            auto mem = _proc.memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
+            if (!mem)
+                return mem.status;
+
+            _pModTable = std::move( mem.result() );
+        }
+
+        ModuleTable table;
+        _pModTable.Read ( 0, table );
+
+        // Add new entry to the table
+        table.entry[table.count].base = pTargetBase;
+        table.entry[table.count].size = imageSize;
+        table.count++;
+
+        _pModTable.Write( 0, table );
+
+        // No handler required
+        if (partial)
+            return STATUS_SUCCESS;
+
+        // VEH codecave
+        auto mem = _proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
+        if (!mem)
+            return mem.status;
+
+        _pVEHCode = std::move( mem.result() );
+
+        BLACKBONE_TRACE( "ManualMap: Vectored hander: 0x%p\n", _pVEHCode.ptr() );
+
+        for (uint8_t *pData = _handler64; pData < _handler64 + sizeof( _handler64 ) - sizeof( uint8_t* ); pData++)
+        {
+            // Module table pointer
+            if (*(ptr_t*)pData == 0xDEADBEEFDEADBEEF)
+            {
+                *(ptr_t*)pData = _pModTable.ptr();
+                continue;
+            }
+
+            // ModuleTable::count
+            if (*(ptr_t*)pData == 0xDEADBEEFDEADBEF7)
+            {
+                *(ptr_t*)pData = _pModTable.ptr() + sizeof( ptr_t );
+                continue;
+            }
+        }
+
+        if (_pVEHCode.Write( 0, sizeof( _handler64 ), _handler64 ) != STATUS_SUCCESS)
+        {
+            _pVEHCode.Free();
+            return LastNtStatus();
+        }       
+    }
+    else
+    {
+        // No handler required
+        if (partial)
+            return STATUS_SUCCESS;
+
+        // VEH codecave
+        auto mem = _proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
+        if (!mem)
+            return mem.status;
+
+        _pVEHCode = std::move( mem.result() );
+
+        auto pDecode = mods.GetNtdllExport( "RtlDecodeSystemPointer", mt, Sections );
+        if (!pDecode)
+            return pDecode.status;
+
+        // Find and replace magic values
+        for (uint8_t *pData = _handler32; pData < _handler32 + sizeof( _handler32 ) - sizeof( uint8_t* ); pData++)
+        {
+            // LdrpInvertedFunctionTable
+            if (*(uint32_t*)pData == 0xDEADDA7A)
+            {
+                *(uint32_t*)pData = static_cast<uint32_t>(_proc.nativeLdr().LdrpInvertedFunctionTable());
+                continue;
+            }
+
+            // DecodeSystemPointer address
+            if (*(uint32_t*)pData == 0xDEADC0DE)
+            {
+                *(uint32_t*)pData = static_cast<uint32_t>(pDecode->procAddress);
+                break;
+            }
+
+            // LdrProtectMrdata address
+            if (*(uint32_t*)pData == 0xDEADC0D2)
+            {
+                *(uint32_t*)pData = static_cast<uint32_t>(_proc.nativeLdr().LdrProtectMrdata());
+                continue;
+            }
+        }
+
+        // Write handler data into target process
+        if (!NT_SUCCESS( _pVEHCode.Write( 0, sizeof( _handler32 ), _handler32 ) ))
+        {
+            _pVEHCode.Free();
+            return LastNtStatus();
+        }
+    }
+
+    // AddVectoredExceptionHandler(0, pHandler);
+    auto pAddHandler = mods.GetNtdllExport( "RtlAddVectoredExceptionHandler", mt, Sections );
+    if (!pAddHandler)
+        return pAddHandler.status;
+
+    (*a)->reset();
+    a->GenPrologue();
+
+    a->GenCall( pAddHandler->procAddress, { 0, _pVEHCode.ptr() } );
+
+    _proc.remote().AddReturnWithEvent( *a, mt );
+    a->GenEpilogue();
+
+    _proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+    _hVEH = result;
+
+    return (_hVEH == 0 ? STATUS_NOT_FOUND : STATUS_SUCCESS);
+}
+
+/// <summary>
+/// Removes VEH from target process
+/// </summary>
+/// <param name="partial">Partial exception support</param>
+/// <param name="mt">Mosule type</param>
+/// <returns>Status code</returns>
+NTSTATUS MExcept::RemoveVEH( bool partial, eModType mt )
+{  
+    auto a = AsmFactory::GetAssembler( mt );
+    uint64_t result = 0;
+
+    auto& mods = _proc.modules();
+    auto pRemoveHandler = mods.GetNtdllExport( "RtlRemoveVectoredExceptionHandler", mt );
+    if (!pRemoveHandler)
+        return pRemoveHandler.status;
+
+    a->GenPrologue();
+
+    // RemoveVectoredExceptionHandler(pHandler);
+    a->GenCall( pRemoveHandler->procAddress, { _hVEH } );
+
+    _proc.remote().AddReturnWithEvent( *a );
+    a->GenEpilogue();
+
+    // Destroy table and handler
+    if (!partial)
+    {
+        _proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+        _pVEHCode.Free();
+        _hVEH = 0;
+
+        _pModTable.Free();
+    }        
+
+    return STATUS_SUCCESS;
+}
+
+}
