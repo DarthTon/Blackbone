@@ -2,7 +2,6 @@ version: 1.0.{build}
 
 branches:
   only:
-    - master
     - VS2017
 
 image: Visual Studio 2017
@@ -15,3 +14,7 @@ platform:
 configuration: 
   - Debug
   - Release
+  
+build:
+  parallel: true
+  project: BlackBone.sln 
