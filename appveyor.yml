@@ -13,7 +13,9 @@ platform:
 
 configuration: 
   - Debug
+  - Debug(DLL)
   - Release
+  - Release(DLL)
   
 build:
   parallel: true
