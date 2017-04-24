@@ -9,7 +9,7 @@
 /*
     Get explorer.exe path
 */
-TEST_CASE( "04. Remote function call" )
+TEST_CASE( "05. Remote function call" )
 {
 #ifdef COMPILER_MSVC
     std::wcout << L"Remote function call test inside 'explorer.exe'" << std::endl;
@@ -26,7 +26,7 @@ TEST_CASE( "04. Remote function call" )
     }
 
     auto hMainMod = explorer.modules().GetMainModule();
-    auto pRemote = explorer.modules().GetExport( explorer.modules().GetModule( L"ntdll.dll" ), "NtQueryVirtualMemory" );
+    auto pRemote = explorer.modules().GetNtdllExport( "NtQueryVirtualMemory" );
 
     REQUIRE( hMainMod );
     REQUIRE( pRemote );

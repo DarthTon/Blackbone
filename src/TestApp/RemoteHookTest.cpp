@@ -5,7 +5,7 @@
 /*
     Prevent termination of current process in task manager.
 */
-TEST_CASE( "06. Remote hooks" )
+TEST_CASE( "07. Remote hooks" )
 {
 #ifdef COMPILER_MSVC
     struct HookClass
@@ -55,7 +55,7 @@ TEST_CASE( "06. Remote hooks" )
     }
 
     // Get function
-    auto pHookFn = hclass.procTaskMgr.modules().GetExport( hclass.procTaskMgr.modules().GetModule( L"ntdll.dll" ), "NtOpenProcess" );
+    auto pHookFn = hclass.procTaskMgr.modules().GetNtdllExport( "NtOpenProcess" );
     REQUIRE( pHookFn.success() );
 
     //std::wcout << L"Found. Hooking...\n";

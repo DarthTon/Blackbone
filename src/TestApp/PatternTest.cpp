@@ -2,18 +2,18 @@
 #include "Tests.h"
 #include "../BlackBone/Patterns/PatternSearch.h"
 
-TEST_CASE( "03. Patterns" )
+TEST_CASE( "04. Patterns" )
 {
     Process explorer;
 
     REQUIRE_NT_SUCCESS( explorer.Attach( L"explorer.exe" ) );
 
     // Scan all allocated process memory
-    SECTION( "Pattern '48 89 D2'" )
+    SECTION( "Pattern '48 89 D0'" )
     {
         std::wcout << L"Local pattern match in 'explorer.exe'" << std::endl;
 
-        PatternSearch ps1( "\x48\x89\xD2" );
+        PatternSearch ps1( "\x48\x89\xD0" );
 
         std::vector<ptr_t> results;
         ps1.SearchRemoteWhole( explorer, false, 0, results );

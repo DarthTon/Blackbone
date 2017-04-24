@@ -2,8 +2,10 @@
 #include "Tests.h"
 #include "../BlackBone/DriverControl/DriverControl.h"
 
-TEST_CASE( "07. Driver" )
+TEST_CASE( "08. Driver" )
 {
+    std::cout << "Driver functionality testing" << std::endl;
+
     Process proc, thisProc;
     REQUIRE_NT_SUCCESS( proc.Attach( L"explorer.exe" ) );
     REQUIRE_NT_SUCCESS( thisProc.Attach( GetCurrentProcessId() ) );
@@ -71,7 +73,7 @@ TEST_CASE( "07. Driver" )
         proc.memory().Protect( address, 0x1000, PAGE_READONLY );
 
     // Unlink handle table
-    CHECK_NT_SUCCESS( status = Driver().UnlinkHandleTable( proc.pid() ) );
+    //CHECK_NT_SUCCESS( status = Driver().UnlinkHandleTable( proc.pid() ) );
 
     // Enum regions
     std::vector<MEMORY_BASIC_INFORMATION64> info;

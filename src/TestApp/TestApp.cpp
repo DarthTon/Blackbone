@@ -8,7 +8,7 @@ TEST_CASE( "01. PEB and TEB" )
 
     SECTION( "PEB" ) 
     {
-        std::wcout << std::endl << L"PEB test for current process" << std::endl;
+        std::cout << "PEB test for current process" << std::endl;
 
         _PEB32 peb32 = { { { 0 } } };
         _PEB64 peb64 = { { { 0 } } };
@@ -27,7 +27,7 @@ TEST_CASE( "01. PEB and TEB" )
 
     SECTION( "TEB" )
     {
-        std::wcout << L"TEB info test for current process" << std::endl;
+        std::cout << "TEB info test for current process" << std::endl;
 
         _TEB32 teb32 = { { 0 } };
         _TEB64 teb64 = { { 0 } };
@@ -46,6 +46,30 @@ TEST_CASE( "01. PEB and TEB" )
     }
 }
 
+DWORD CALLBACK VoidFn( void* )
+{
+    return 0;
+}
+
+TEST_CASE( "02. Invalid handle access" )
+{
+    std::cout << "Restricted handle rights test" << std::endl;
+
+    Process proc;
+
+    HANDLE hProc = OpenProcess( PROCESS_ALL_ACCESS & ~PROCESS_CREATE_THREAD, FALSE, GetCurrentProcessId() );
+    REQUIRE_NT_SUCCESS( proc.Attach( hProc ) );
+    CHECK( proc.threads().CreateNew( reinterpret_cast<ptr_t>(&VoidFn), 0 ).status == STATUS_ACCESS_DENIED );
+    proc.Detach();
+
+    hProc = OpenProcess( PROCESS_ALL_ACCESS & ~PROCESS_VM_READ, FALSE, GetCurrentProcessId() );
+    REQUIRE_NT_SUCCESS( proc.Attach( hProc ) );
+
+    PEB_T peb = { { { 0 } } };
+    CHECK( proc.core().peb( &peb ) != 0 );
+    CHECK( peb.ImageBaseAddress == 0 );
+    CHECK( LastNtStatus() == STATUS_ACCESS_DENIED );
+}
 
 int main( int argc, char* argv[] )
 {

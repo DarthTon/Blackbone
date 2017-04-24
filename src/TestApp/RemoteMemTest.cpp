@@ -2,11 +2,11 @@
 #include "Tests.h"
 #include "../BlackBoneDrv/BlackBoneDef.h"
 
-TEST_CASE( "08. Driver remote memory" )
+TEST_CASE( "09. Driver remote memory" )
 {
     Process proc;
 
-    std::wcout << L"Remote memory mapping test" << std::endl;
+    std::cout << "Remote memory mapping test" << std::endl;
     NTSTATUS status = Driver().EnsureLoaded();
     if (!NT_SUCCESS( status ))
     {

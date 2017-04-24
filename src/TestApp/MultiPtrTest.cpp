@@ -37,7 +37,7 @@ struct s3
 typedef int( __fastcall* pfnClass )(s_end* _this, void* zdx);
 
 //void TestMultiPtr()
-TEST_CASE( "02. Multi-level pointer" )
+TEST_CASE( "03. Multi-level pointer" )
 {
     std::unique_ptr<s3> pS3( new s3() );
     REQUIRE( pS3 != nullptr );
