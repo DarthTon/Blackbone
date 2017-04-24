@@ -18,4 +18,7 @@ configuration:
   
 build:
   parallel: true
-  project: BlackBone.sln 
+  project: BlackBone.sln
+  
+skip_commits:
+  message: /Driver/
