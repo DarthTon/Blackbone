@@ -5,12 +5,6 @@
 #include "AsmHelper64.h"
 #include "AsmHelper32.h"
 
-#ifdef USE64
-#define AsmJitHelper AsmHelper64
-#else
-#define AsmJitHelper AsmHelper32
-#endif
-
 namespace blackbone
 {
 

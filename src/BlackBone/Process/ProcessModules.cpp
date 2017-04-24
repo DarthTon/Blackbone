@@ -617,8 +617,10 @@ bool ProcessModules::InjectPureIL(
 
     const std::wstring* strArr[] = { &netVersion, &netAssemblyPath, &ClassName, &MethodName, &netAssemblyArgs };
 
-    uintptr_t* ofstArr[] = { &address_VersionString, &address_netAssemblyDll, &address_netAssemblyClass,
-                          &address_netAssemblyMethod, &address_netAssemblyArgs };
+    uintptr_t* ofstArr[] = { 
+        &address_VersionString, &address_netAssemblyDll, &address_netAssemblyClass,
+        &address_netAssemblyMethod, &address_netAssemblyArgs 
+    };
 
     // DWORD alignment
     auto DWAlign = []( size_t offset )
@@ -679,7 +681,8 @@ bool ProcessModules::InjectPureIL(
         return false;
 
     // Scary assembler code incoming!
-    AsmJitHelper a;
+    auto pAsm = AsmFactory::GetAssembler( _proc.core().isWow64() );
+    auto& a = *pAsm;
     AsmStackAllocator sa( a.assembler(), 0x30 );   // 0x30 - 6 arguments of ExecuteInDefaultAppDomain
 
     // Stack will be reserved manually

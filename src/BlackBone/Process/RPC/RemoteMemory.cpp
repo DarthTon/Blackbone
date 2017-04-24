@@ -332,7 +332,8 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
 
     int hookDataOfs = sizeof( HookData ) * opType;
 
-    AsmJitHelper a;
+    auto pAsm = AsmFactory::GetAssembler( _process->core().isWow64() );
+    auto& a = *pAsm;
     AsmStackAllocator sa( a.assembler(), 0x60 );
     asmjit::Label skip1 = a->newLabel();
     ALLOC_STACK_VAR( sa, data, OperationData );
@@ -457,7 +458,8 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
 
     int hookDataOfs = sizeof( HookData ) * opType;
 
-    AsmJitHelper a;
+    auto pAsm = AsmFactory::GetAssembler( _process->core().isWow64() );
+    auto& a = *pAsm;
     AsmStackAllocator sa( a.assembler() );
     asmjit::Label skip1 = a->newLabel();
     ALLOC_STACK_VAR( sa, data, OperationData );
