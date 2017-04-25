@@ -461,6 +461,8 @@ int PEImage::GetTLSCallbacks( module_t targetBase, std::vector<ptr_t>& result ) 
         return 0;
 
     uint64_t offset = _is64 ? TLS64( pTls )->AddressOfCallBacks : TLS32( pTls )->AddressOfCallBacks;
+    if (offset == 0)
+        return 0;
 
     // Not at base
     if (imageBase() != reinterpret_cast<module_t>(_pFileBase))
