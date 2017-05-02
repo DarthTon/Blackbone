@@ -445,6 +445,17 @@ namespace blackbone
         ULONG NonPagedPoolUsage;
     };
 
+    template<typename T>
+    struct _OBJECT_ATTRIBUTES_T
+    {
+        ULONG Length;
+        T RootDirectory;
+        T ObjectName;
+        ULONG Attributes;
+        T SecurityDescriptor;        // Points to type SECURITY_DESCRIPTOR
+        T SecurityQualityOfService;  // Points to type SECURITY_QUALITY_OF_SERVICE
+    };
+
     struct _XSAVE_FORMAT64
     {
         WORD ControlWord;
@@ -679,37 +690,47 @@ namespace blackbone
         T PatchInformation;
     };
   
-    typedef struct _RTL_INVERTED_FUNCTION_TABLE_ENTRY
+    template<typename T>
+    struct _RTL_INVERTED_FUNCTION_TABLE_ENTRY
     {
-        PIMAGE_RUNTIME_FUNCTION_ENTRY ExceptionDirectory;
-        PVOID ImageBase;
+        T     ExceptionDirectory;   // PIMAGE_RUNTIME_FUNCTION_ENTRY
+        T     ImageBase;
         ULONG ImageSize;
         ULONG SizeOfTable;
-    } RTL_INVERTED_FUNCTION_TABLE_ENTRY, *PRTL_INVERTED_FUNCTION_TABLE_ENTRY;
+    };
 
+    typedef _UNICODE_STRING_T<DWORD>                _UNICODE_STRING32;
+    typedef _UNICODE_STRING_T<DWORD64>              _UNICODE_STRING64;
+    typedef _UNICODE_STRING_T<DWORD_PTR>            UNICODE_STRING_T;
 
-    typedef _PEB_T<DWORD, DWORD64, 34> _PEB32;
-    typedef _PEB_T<DWORD64, DWORD, 30> _PEB64;
+    typedef _PEB_T<DWORD, DWORD64, 34>              _PEB32;
+    typedef _PEB_T<DWORD64, DWORD, 30>              _PEB64;
 
-    typedef _TEB_T<DWORD>     _TEB32;
-    typedef _TEB_T<DWORD64>   _TEB64;
-    typedef _TEB_T<DWORD_PTR>  TEB_T;
+#ifdef USE64
+    typedef _PEB64 PEB_T;
+#else
+    typedef _PEB32 PEB_T;
+#endif
 
-    typedef _PEB_LDR_DATA2<DWORD>     _PEB_LDR_DATA232;
-    typedef _PEB_LDR_DATA2<DWORD64>   _PEB_LDR_DATA264;
-    typedef _PEB_LDR_DATA2<DWORD_PTR>  PEB_LDR_DATA_T;
+    typedef _TEB_T<DWORD>                           _TEB32;
+    typedef _TEB_T<DWORD64>                         _TEB64;
+    typedef _TEB_T<DWORD_PTR>                       TEB_T;
 
-    typedef _LDR_DATA_TABLE_ENTRY_BASE<DWORD>     _LDR_DATA_TABLE_ENTRY_BASE32;
-    typedef _LDR_DATA_TABLE_ENTRY_BASE<DWORD64>   _LDR_DATA_TABLE_ENTRY_BASE64; 
-    typedef _LDR_DATA_TABLE_ENTRY_BASE<DWORD_PTR>  LDR_DATA_TABLE_ENTRY_BASE_T;
+    typedef _PEB_LDR_DATA2<DWORD>                   _PEB_LDR_DATA232;
+    typedef _PEB_LDR_DATA2<DWORD64>                 _PEB_LDR_DATA264;
+    typedef _PEB_LDR_DATA2<DWORD_PTR>               PEB_LDR_DATA_T;
 
-    typedef _CONTEXT_T<DWORD>     _CONTEXT32;
-    typedef _CONTEXT_T<DWORD64>   _CONTEXT64;
-    typedef _CONTEXT_T<DWORD_PTR>  CONTEXT_T;
+    typedef _LDR_DATA_TABLE_ENTRY_BASE<DWORD>       _LDR_DATA_TABLE_ENTRY_BASE32;
+    typedef _LDR_DATA_TABLE_ENTRY_BASE<DWORD64>     _LDR_DATA_TABLE_ENTRY_BASE64;
+    typedef _LDR_DATA_TABLE_ENTRY_BASE<DWORD_PTR>   LDR_DATA_TABLE_ENTRY_BASE_T;
+
+    typedef _CONTEXT_T<DWORD>                       _CONTEXT32;
+    typedef _CONTEXT_T<DWORD64>                     _CONTEXT64;
+    typedef _CONTEXT_T<DWORD_PTR>                   CONTEXT_T;
 
     typedef _SECTION_BASIC_INFORMATION_T<DWORD>     _SECTION_BASIC_INFORMATION32;
     typedef _SECTION_BASIC_INFORMATION_T<DWORD64>   _SECTION_BASIC_INFORMATION64;
-    typedef _SECTION_BASIC_INFORMATION_T<DWORD_PTR>  SECTION_BASIC_INFORMATION_T;
+    typedef _SECTION_BASIC_INFORMATION_T<DWORD_PTR> SECTION_BASIC_INFORMATION_T;
 
     typedef _SYSTEM_HANDLE_INFORMATION_T<DWORD>     _SYSTEM_HANDLE_INFORMATION32;
     typedef _SYSTEM_HANDLE_INFORMATION_T<DWORD64>   _SYSTEM_HANDLE_INFORMATION64;
@@ -719,11 +740,13 @@ namespace blackbone
     typedef _OBJECT_TYPE_INFORMATION_T<DWORD64>     _OBJECT_TYPE_INFORMATION64;
     typedef _OBJECT_TYPE_INFORMATION_T<DWORD_PTR>   OBJECT_TYPE_INFORMATION_T;
 
-#ifdef USE64
-    typedef _PEB64 PEB_T;
-#else
-    typedef _PEB32 PEB_T;
-#endif
+    typedef _OBJECT_ATTRIBUTES_T<DWORD>             _OBJECT_ATTRIBUTES32;
+    typedef _OBJECT_ATTRIBUTES_T<DWORD64>           _OBJECT_ATTRIBUTES64;
+    typedef _OBJECT_ATTRIBUTES_T<DWORD_PTR>         OBJECT_ATTRIBUTES_T;
+
+    typedef _ACTCTXW_T<DWORD>                       _ACTCTXW32;
+    typedef _ACTCTXW_T<DWORD64>                     _ACTCTXW64;
+    typedef _ACTCTXW_T<DWORD_PTR>                   ACTCTXW_T;
 }
 
 #include "ApiSet.h"

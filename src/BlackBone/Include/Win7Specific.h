@@ -16,14 +16,14 @@ namespace blackbone
         _LARGE_INTEGER LoadTime;
     };
 
-    typedef struct _RTL_INVERTED_FUNCTION_TABLE7
+    template<typename T>
+    struct _RTL_INVERTED_FUNCTION_TABLE7
     {
         ULONG Count;
         ULONG MaxCount;
         ULONG Epoch;
-        RTL_INVERTED_FUNCTION_TABLE_ENTRY Entries[0x200];
-
-    } RTL_INVERTED_FUNCTION_TABLE7, *PRTL_INVERTED_FUNCTION_TABLE7;
+        _RTL_INVERTED_FUNCTION_TABLE_ENTRY<T> Entries[0x200];
+    };
 
 #pragma warning(default : 4201)
 }

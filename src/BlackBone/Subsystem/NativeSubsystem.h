@@ -159,6 +159,15 @@ public:
     virtual NTSTATUS SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx );
 
     /// <summary>
+    /// NtQueueApcThread
+    /// </summary>
+    /// <param name="hThread">Thread handle.</param>
+    /// <param name="func">APC function</param>
+    /// <param name="arg">APC argument</param>
+    /// <returns>Status code</returns>
+    virtual NTSTATUS NtQueueApcThreadT( HANDLE hThread, ptr_t func, ptr_t arg );
+
+    /// <summary>
     /// Get WOW64 PEB
     /// </summary>
     /// <param name="ppeb">Retrieved PEB</param>

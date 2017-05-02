@@ -60,7 +60,7 @@ public:
     /// <param name="...args">Function args</param>
     /// <returns>Function result or 0 if import not found</returns>
     template<typename T, typename... Args>
-    inline auto safeCall( const std::string& name, Args&&... args ) -> typename std::result_of<T(Args...)>::type
+    inline auto safeCall( const std::string& name, Args&&... args )
     {
         auto pfn = DynImport::get<T>( name );
         return pfn ? pfn( std::forward<Args>( args )... ) : (std::result_of<T( Args... )>::type)(0);

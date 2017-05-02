@@ -2,6 +2,7 @@
 #include "../Process/Process.h"
 #include "../Include/Macro.h"
 #include "../Misc/Trace.hpp"
+#include "../Misc/PattrernLoader.h"
 #include "../Asm/LDasm.h"
 
 namespace blackbone
@@ -217,7 +218,7 @@ MExcept::~MExcept()
 /// <param name="mt">Mosule type</param>
 /// <param name="partial">Partial exception support</param>
 /// <returns>Error code</returns>
-NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType mt, bool partial )
+NTSTATUS MExcept::CreateVEH( ptr_t pTargetBase, size_t imageSize, eModType mt, bool partial )
 {    
     auto a = AsmFactory::GetAssembler( mt );
     uint64_t result = 0;
@@ -304,7 +305,7 @@ NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType m
             // LdrpInvertedFunctionTable
             if (*(uint32_t*)pData == 0xDEADDA7A)
             {
-                *(uint32_t*)pData = static_cast<uint32_t>(_proc.nativeLdr().LdrpInvertedFunctionTable());
+                *(uint32_t*)pData = static_cast<uint32_t>(g_PatternLoader->data().LdrpInvertedFunctionTable32);
                 continue;
             }
 
@@ -318,7 +319,7 @@ NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType m
             // LdrProtectMrdata address
             if (*(uint32_t*)pData == 0xDEADC0D2)
             {
-                *(uint32_t*)pData = static_cast<uint32_t>(_proc.nativeLdr().LdrProtectMrdata());
+                *(uint32_t*)pData = static_cast<uint32_t>(g_PatternLoader->data().LdrProtectMrdata);
                 continue;
             }
         }
@@ -344,10 +345,17 @@ NTSTATUS MExcept::CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType m
     _proc.remote().AddReturnWithEvent( *a, mt );
     a->GenEpilogue();
 
-    _proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
-    _hVEH = result;
-
-    return (_hVEH == 0 ? STATUS_NOT_FOUND : STATUS_SUCCESS);
+    NTSTATUS status = _proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+    if (result != 0)
+    {
+        _hVEH = result;
+        return STATUS_SUCCESS;
+    }
+    else
+    {
+        status = _proc.remote().GetLastStatus();
+        return status;
+    }
 }
 
 /// <summary>

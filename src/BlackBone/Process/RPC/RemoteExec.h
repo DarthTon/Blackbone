@@ -118,7 +118,7 @@ public:
     /// <param name="a">Target assembly helper</param>
     BLACKBONE_API inline void SaveCallResult( IAsmHelper& a, uint32_t retOffset = RET_OFFSET )
     {
-        a->mov( a->zdx, _userData.ptr<uintptr_t>() + retOffset );
+        a->mov( a->zdx, _userData.ptr() + retOffset );
         a->mov( asmjit::host::dword_ptr( a->zdx ), a->zax );
     }
 

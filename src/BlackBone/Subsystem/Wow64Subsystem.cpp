@@ -273,6 +273,25 @@ NTSTATUS NativeWow64::SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx )
 }
 
 /// <summary>
+/// NtQueueApcThread
+/// </summary>
+/// <param name="hThread">Thread handle.</param>
+/// <param name="func">APC function</param>
+/// <param name="arg">APC argument</param>
+/// <returns>Status code</returns>
+NTSTATUS NativeWow64::NtQueueApcThreadT( HANDLE hThread, ptr_t func, ptr_t arg )
+{
+    if (_wowBarrier.targetWow64)
+        return Native::NtQueueApcThreadT( hThread, func, arg );
+
+    static ptr_t qat = GetProcAddress64( getNTDLL64(), "NtQueueApcThread" );
+    if (qat == 0)
+        return STATUS_ORDINAL_NOT_FOUND;
+
+    return static_cast<NTSTATUS>(X64Call( qat, 5, (DWORD64)hThread, func, arg, 0ull, 0ull ));
+}
+
+/// <summary>
 /// Gets WOW64 PEB
 /// </summary>
 /// <param name="ppeb">Retrieved PEB</param>

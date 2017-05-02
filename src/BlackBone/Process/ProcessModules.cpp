@@ -4,6 +4,7 @@
 #include "RPC/RemoteExec.h"
 #include "../Misc/NameResolve.h"
 #include "../Misc/Utils.h"
+#include "../Misc/PattrernLoader.h"
 #include "../Asm/AsmFactory.h"
 
 #include <memory>
@@ -18,10 +19,6 @@
 
 namespace blackbone
 {
-
-typedef std::unique_ptr<std::remove_pointer<HANDLE>::type, decltype(&CloseHandle)> handlePtr;
-
-
 ProcessModules::ProcessModules( class Process& proc )
     : _proc( proc )
     , _memory( _proc.memory() )
@@ -437,7 +434,7 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
     if (switchMode == ForceSwitch && !_ldrPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
     {
         uint8_t patch[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-        auto patchBase = _proc.nativeLdr().LdrKernel32PatchAddress();
+        auto patchBase = g_PatternLoader->data().LdrKernel32PatchAddress;
 
         if (patchBase != 0)
         {
@@ -870,7 +867,7 @@ bool ProcessModules::InjectPureIL(
 
     // write JIT code to target
     size_t codeSize = a->getCodeSize();
-    uintptr_t codeAddress = address.ptr<uintptr_t>() + offset;
+    ptr_t codeAddress = address.ptr() + offset;
 
     std::vector<uint8_t> codeBuffer( codeSize );
 

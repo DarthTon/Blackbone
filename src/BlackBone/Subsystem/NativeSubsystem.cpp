@@ -304,6 +304,18 @@ NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
 }
 
 /// <summary>
+/// NtQueueApcThread
+/// </summary>
+/// <param name="hThread">Thread handle.</param>
+/// <param name="func">APC function</param>
+/// <param name="arg">APC argument</param>
+/// <returns>Status code</returns>
+NTSTATUS Native::NtQueueApcThreadT( HANDLE hThread, ptr_t func, ptr_t arg )
+{
+    return SAFE_NATIVE_CALL( NtQueueApcThread, hThread, reinterpret_cast<PVOID>(func), reinterpret_cast<PVOID>(arg), nullptr, nullptr );
+}
+
+/// <summary>
 /// Get WOW64 PEB
 /// </summary>
 /// <param name="ppeb">Retrieved PEB</param>

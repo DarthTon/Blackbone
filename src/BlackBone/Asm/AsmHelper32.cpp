@@ -170,7 +170,7 @@ void AsmHelper32::SaveRetValAndSignalEvent(
 
     // Save last NT status
     _assembler.mov( asmjit::host::edx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );
-    _assembler.add( asmjit::host::edx, LAST_STATUS_OFS );
+    _assembler.add( asmjit::host::edx, 0x598 + 0x197 * sizeof( uint32_t ) );
     _assembler.mov( asmjit::host::edx, asmjit::host::dword_ptr( asmjit::host::edx ) );
     _assembler.mov( asmjit::host::eax, errPtr );
     _assembler.mov( asmjit::host::dword_ptr( asmjit::host::eax ), asmjit::host::edx );

@@ -43,7 +43,7 @@ protected:
     /// <param name="mt">Mosule type</param>
     /// <param name="partial">Partial exception support</param>
     /// <returns>Error code</returns>
-    BLACKBONE_API NTSTATUS CreateVEH( uintptr_t pTargetBase, size_t imageSize, eModType mt, bool partial );
+    BLACKBONE_API NTSTATUS CreateVEH( ptr_t pTargetBase, size_t imageSize, eModType mt, bool partial );
 
     /// <summary>
     /// Removes VEH from target process

@@ -1,5 +1,6 @@
 #pragma once
 #include "../Config.h"
+#include <stdint.h>
 
 // Architecture-dependent pointer size
 #define WordSize sizeof(void*)
@@ -71,6 +72,18 @@
 template<int s> 
 struct CompileTimeSizeOf;
 
+template<typename T, typename U>
+constexpr size_t offsetOf( U T::*member )
+{
+    return (size_t)&((T*)nullptr->*member);
+}
+
+template<typename T, typename U>
+constexpr uint64_t fieldPtr( uint64_t base, U T::*member )
+{
+    return base + offsetOf( member );
+}
+
 // Type-unsafe cast.
 template<typename _Tgt, typename _Src>
 inline _Tgt brutal_cast( const _Src& src )
@@ -110,3 +123,5 @@ inline NTSTATUS SetLastNtStatus( NTSTATUS status )
 {
     return *(NTSTATUS*)((unsigned char*)NtCurrentTeb() + LAST_STATUS_OFS) = status;
 }
+
+#define SharedUserData32 ((KUSER_SHARED_DATA* const)0x7FFE0000)

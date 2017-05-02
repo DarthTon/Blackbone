@@ -22,6 +22,7 @@ PEImage::PEImage( void )
 
 PEImage::~PEImage( void )
 {
+    Release();
 }
 
 /// <summary>

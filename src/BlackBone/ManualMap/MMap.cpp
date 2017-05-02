@@ -362,7 +362,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     ldrEntry.baseAddress = pImage->imgMem.ptr();
     ldrEntry.size = pImage->peImage.imageSize();
 
-    BLACKBONE_TRACE( L"ManualMap: Image base allocated at 0x%p", pImage->imgMem.ptr<uintptr_t>() );
+    BLACKBONE_TRACE( L"ManualMap: Image base allocated at 0x%016x", pImage->imgMem.ptr() );
 
     // Create Activation context for SxS
     if (pImage->peImage.manifestID() == 0)
@@ -661,7 +661,7 @@ NTSTATUS MMap::RelocateImage( ImageContext* pImage )
     BLACKBONE_TRACE( L"ManualMap: Relocating image '%ls'", pImage->ldrEntry.fullPath.c_str() );
 
     // Reloc delta
-    uintptr_t Delta = pImage->imgMem.ptr<uintptr_t>() - static_cast<uintptr_t>(pImage->peImage.imageBase());
+    ptr_t Delta = pImage->imgMem.ptr() - pImage->peImage.imageBase();
 
     // No need to relocate
     if (Delta == 0)
@@ -681,6 +681,10 @@ NTSTATUS MMap::RelocateImage( ImageContext* pImage )
         return STATUS_INVALID_IMAGE_FORMAT;
     }
 
+    size_t size = sizeof( ptr_t );
+    if (pImage->ldrEntry.type == mt_mod32)
+        size = sizeof( uint32_t );
+
     while ((uintptr_t)fixrec < end && fixrec->BlockSize)
     {
         DWORD count = (fixrec->BlockSize - 8) >> 1;             // records count
@@ -698,14 +702,15 @@ NTSTATUS MMap::RelocateImage( ImageContext* pImage )
             if (fixtype == IMAGE_REL_BASED_HIGHLOW || fixtype == IMAGE_REL_BASED_DIR64)
             {
                 uintptr_t fixRVA = fixoffset + fixrec->PageRVA;
-                uintptr_t val = *reinterpret_cast<uintptr_t*>(pImage->peImage.ResolveRVAToVA( fixoffset + fixrec->PageRVA )) + Delta;
+                ptr_t val = pImage->peImage.ResolveRVAToVA( fixoffset + fixrec->PageRVA );
+                val = pImage->ldrEntry.type == mt_mod64 ? *reinterpret_cast<uint64_t*>(val) : *reinterpret_cast<uint32_t*>(val);
+                val += Delta;
 
                 auto status = STATUS_SUCCESS;
-
                 if (pImage->flags & HideVAD)
-                    status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + fixRVA, sizeof( val ), &val );
+                    status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + fixRVA, size, &val );
                 else
-                    status = pImage->imgMem.Write( fixRVA, val );
+                    status = pImage->imgMem.Write( fixRVA, size, &val );
 
                 // Apply relocation
                 if (!NT_SUCCESS( status ))
@@ -744,11 +749,17 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapDependency( ImageContext* pImage, st
 
     BLACKBONE_TRACE( L"ManualMap: Loading new dependency '%ls'", path.c_str() );
 
+    auto flags = NameResolve::EnsureFullPath;
+
+    // Wow64 fs redirection
+    if (pImage->ldrEntry.type == mt_mod32 && !_process.barrier().sourceWow64)
+        flags = static_cast<NameResolve::eResolveFlag>(static_cast<int32_t>(flags) | NameResolve::Wow64);
+
     auto basedir = pImage->peImage.noPhysFile() ? Utils::GetExeDirectory() : Utils::GetParent( pImage->ldrEntry.fullPath );
     auto status = NameResolve::Instance().ResolvePath( 
-        path, pImage->ldrEntry.name, 
-        basedir, 
-        NameResolve::EnsureFullPath, 
+        path,
+        pImage->ldrEntry.name, 
+        basedir, flags, 
         _process.pid(), 
         pImage->peImage.actx() 
     );
@@ -802,6 +813,10 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
     auto imports = pImage->peImage.GetImports( useDelayed );
     if (imports.empty())
         return STATUS_SUCCESS;
+
+    auto entrySize = sizeof( uint32_t );
+    if (pImage->ldrEntry.type == mt_mod64)
+        entrySize = sizeof( uint64_t );
 
     // Traverse entries
     for (auto& importMod : imports)
@@ -864,12 +879,9 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
             auto status = STATUS_SUCCESS;
 
             if (pImage->flags & HideVAD)
-            {
-                uintptr_t address = static_cast<uintptr_t>(expData->procAddress);
-                status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + importFn.ptrRVA, sizeof( address ), &address );
-            }
+                status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + importFn.ptrRVA, entrySize, &expData->procAddress );
             else
-                status = pImage->imgMem.Write( importFn.ptrRVA, static_cast<uintptr_t>(expData->procAddress) );
+                status = pImage->imgMem.Write( importFn.ptrRVA, entrySize, &expData->procAddress );
 
             // Write function address
             if (!NT_SUCCESS( status ))
@@ -1012,44 +1024,54 @@ NTSTATUS MMap::InitStaticTLS( ImageContext* pImage )
 /// <returns>Status code</returns>
 NTSTATUS MMap::InitializeCookie( ImageContext* pImage )
 {
-    auto pLoadConfig = reinterpret_cast<PIMAGE_LOAD_CONFIG_DIRECTORY>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG ));
+    auto pLoadConfig32 = reinterpret_cast<PIMAGE_LOAD_CONFIG_DIRECTORY32>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG ));
+    auto pLoadConfig64 = reinterpret_cast<PIMAGE_LOAD_CONFIG_DIRECTORY64>(pLoadConfig32);
+
+    ptr_t pCookie = pLoadConfig32->SecurityCookie;
+    if (pImage->ldrEntry.type == mt_mod64)
+        pCookie = pLoadConfig64->SecurityCookie;
 
     //
     // Cookie generation based on MSVC++ compiler
     //
-    if (pLoadConfig && pLoadConfig->SecurityCookie)
+    if (pLoadConfig32 && pCookie)
     {
         BLACKBONE_TRACE( L"ManualMap: Performing security cookie initializtion for image '%ls'", pImage->ldrEntry.name.c_str() );
 
         FILETIME systime = { 0 };
         LARGE_INTEGER PerformanceCount = { { 0 } };
-        uintptr_t cookie = 0;
+        size_t size = sizeof( uint32_t );
 
         GetSystemTimeAsFileTime( &systime );
         QueryPerformanceCounter( &PerformanceCount );
 
-        cookie = _process.pid() ^ _process.remote().getWorker()->id() ^ reinterpret_cast<uintptr_t>(&cookie);
+        ptr_t cookie = _process.pid() ^ _process.remote().getWorker()->id() ^ reinterpret_cast<uintptr_t>(&cookie);
 
-    #ifdef USE64
-        cookie ^= *reinterpret_cast<uint64_t*>(&systime);
-        cookie ^= (PerformanceCount.QuadPart << 32) ^ PerformanceCount.QuadPart;
-        cookie &= 0xFFFFFFFFFFFF;
+        if (pImage->ldrEntry.type == mt_mod64) 
+        {
+            size = sizeof( uint64_t );
 
-        if (cookie == 0x2B992DDFA232)
-            cookie++;
-    #else
+            cookie ^= *reinterpret_cast<uint64_t*>(&systime);
+            cookie ^= (PerformanceCount.QuadPart << 32) ^ PerformanceCount.QuadPart;
+            cookie &= 0xFFFFFFFFFFFF;
 
-        cookie ^= systime.dwHighDateTime ^ systime.dwLowDateTime;
-        cookie ^= PerformanceCount.LowPart;
-        cookie ^= PerformanceCount.HighPart;
+            if (cookie == 0x2B992DDFA232)
+                cookie++;
+        }
+        else
+        {
+            cookie &= 0xFFFFFFFF;
+            cookie ^= systime.dwHighDateTime ^ systime.dwLowDateTime;
+            cookie ^= PerformanceCount.LowPart;
+            cookie ^= PerformanceCount.HighPart;
 
-        if (cookie == 0xBB40E64E)
-            cookie++;
-        else if (!(cookie & 0xFFFF0000))
-            cookie |= (cookie | 0x4711) << 16;
-    #endif
+            if (cookie == 0xBB40E64E)
+                cookie++;
+            else if (!(cookie & 0xFFFF0000))
+                cookie |= (cookie | 0x4711) << 16;
+        }
 
-        return _process.memory().Write( REBASE( pLoadConfig->SecurityCookie, pImage->peImage.imageBase(), pImage->imgMem.ptr<ptr_t>() ), cookie );
+        return _process.memory().Write( REBASE( pCookie, pImage->peImage.imageBase(), pImage->imgMem.ptr() ), size, &cookie );
     }
 
     return STATUS_SUCCESS;
@@ -1106,7 +1128,7 @@ call_result_t<uint64_t> MMap::RunModuleInitializers( ImageContext* pImage, DWORD
         if (!( pImage->flags & NoTLS ))
             for (auto& pCallback : pImage->tlsCallbacks)
             {
-                BLACKBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d",
+                BLACKBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%016llx for '%ls', Reason: %d",
                     pCallback, pImage->ldrEntry.name.c_str(), dwReason );
 
                 a->GenCall( pCallback, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
@@ -1134,7 +1156,7 @@ call_result_t<uint64_t> MMap::RunModuleInitializers( ImageContext* pImage, DWORD
         if (!( pImage->flags & NoTLS ))
             for (auto& pCallback : pImage->tlsCallbacks)
             {
-                BLACKBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%p for '%ls', Reason: %d",
+                BLACKBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%016llx for '%ls', Reason: %d",
                     pCallback, pImage->ldrEntry.name.c_str(), dwReason );
 
                 a->GenCall( pCallback, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
@@ -1180,7 +1202,6 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
 
     NTSTATUS status = STATUS_SUCCESS;
     uint64_t result = 0;
-    ACTCTXW act = { 0 };
 
     auto mem = _process.memory().Allocate( 512, PAGE_READWRITE );
     if (!mem)
@@ -1188,16 +1209,6 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
 
     _pAContext = std::move( mem.result() );
     
-    act.cbSize = sizeof( act );
-    act.lpSource = reinterpret_cast<LPCWSTR>(_pAContext.ptr<uintptr_t>() + sizeof( ptr_t ) + sizeof( act ));
-
-    // Ignore some fields for pure manifest file
-    if (!image.noPhysFile())
-    {
-        act.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
-        act.lpResourceName = MAKEINTRESOURCEW( image.manifestID() );
-    }
-
     bool switchMode = image.mType() == mt_mod64 && _process.core().isWow64();
     auto pCreateActx = _process.modules().GetExport( _process.modules().GetModule( L"kernel32.dll" ), "CreateActCtxW" );
     if (!pCreateActx)
@@ -1251,8 +1262,37 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
     // Native way
     else
     {
-        a->GenPrologue();
+        auto fillACTX = [this, &image]( auto&& act )
+        {
+            memset( &act, 0, sizeof( act ) );
 
+            act.cbSize = sizeof( act );
+            act.lpSource = static_cast<decltype(act.lpSource)>(this->_pAContext.ptr() + sizeof( ptr_t ) + sizeof( act ));
+
+            // Ignore some fields for pure manifest file
+            if (!image.noPhysFile())
+            {
+                act.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
+                act.lpResourceName = static_cast<decltype(act.lpResourceName)>(image.manifestID());
+            }
+
+            // Write path to file
+            NTSTATUS status = this->_pAContext.Write( sizeof( ptr_t ), act );
+            status |= this->_pAContext.Write(
+                sizeof( ptr_t ) + sizeof( act ),
+                (image.manifestFile().length() + 1) * sizeof( wchar_t ),
+                image.manifestFile().c_str()
+            );
+
+            return status;
+        };
+
+        if (_process.core().isWow64())
+            status = fillACTX( _ACTCTXW32() );
+        else
+            status = fillACTX( _ACTCTXW64() );
+
+        a->GenPrologue();
         a->GenCall( pCreateActx->procAddress, { _pAContext.ptr() + sizeof( ptr_t ) } );
 
         (*a)->mov( (*a)->zdx, _pAContext.ptr() );
@@ -1260,14 +1300,6 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
 
         _process.remote().AddReturnWithEvent( *a );
         a->GenEpilogue();
-
-        // Write path to file
-        _pAContext.Write( sizeof( ptr_t ), act );
-        _pAContext.Write( 
-            sizeof( ptr_t ) + sizeof(act),
-            (image.manifestFile().length() + 1) * sizeof(wchar_t),
-            image.manifestFile().c_str() 
-        );
 
         status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
         if (!NT_SUCCESS( status ))

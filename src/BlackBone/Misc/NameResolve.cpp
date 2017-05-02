@@ -189,7 +189,10 @@ NTSTATUS NameResolve::ResolvePath(
                 dwSize = 255;
 
                 // In Win10 DllDirectory value got screwed, so less reliable method is used
-                GetSystemDirectoryW( sys_path, dwSize );
+                if (flags & Wow64)
+                    GetSystemWow64DirectoryW( sys_path, dwSize );
+                else
+                    GetSystemDirectoryW( sys_path, dwSize );
 
                 if (res == ERROR_SUCCESS)
                 {
@@ -232,7 +235,10 @@ NTSTATUS NameResolve::ResolvePath(
     //
     // 4. The system directory
     //
-    GetSystemDirectoryW( tmpPath, ARRAYSIZE( tmpPath ) );
+    if (flags & Wow64)
+        GetSystemWow64DirectoryW( tmpPath, ARRAYSIZE( tmpPath ) );
+    else
+        GetSystemDirectoryW( tmpPath, ARRAYSIZE( tmpPath ) );
 
     completePath = std::wstring( tmpPath ) + L"\\" + filename;
 
