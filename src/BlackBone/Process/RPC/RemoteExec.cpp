@@ -112,24 +112,23 @@ NTSTATUS RemoteExec::ExecInNewThread(
 /// <returns>Status</returns>
 NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& callResult )
 {
-    NTSTATUS dwResult = STATUS_SUCCESS;
+    NTSTATUS status = STATUS_SUCCESS;
 
-    if (_proc.barrier().type == wow_64_32)
-        return ExecInAnyThread( pCode, size, callResult, _hWorkThd );
+    //if (_proc.barrier().type == wow_64_32)
+        //return ExecInAnyThread( pCode, size, callResult, _hWorkThd );
 
     // Create thread if needed
-    CreateRPCEnvironment();
+    if (!NT_SUCCESS( status = CreateRPCEnvironment() ))
+        return status;
 
     // Write code
-    dwResult = CopyCode( pCode, size );
-    if (dwResult != STATUS_SUCCESS)
-        return dwResult;
+    if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
+        return status;
 
     if (_hWaitEvent)
         ResetEvent( _hWaitEvent );
 
     // Patch KiUserApcDispatcher 
-#ifdef USE64
     if (!_apcPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
     {
         if (_proc.barrier().type == wow_64_32)
@@ -150,14 +149,28 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
         else
             _apcPatched = true;
     }
-#endif
+
+    auto pRemoteCode = _userCode.ptr();
+
+    // Switch thread to WOW64 mode
+    /*if (_proc.barrier().type == wow_64_32)
+    {
+        auto offset = Align( size, 0x10 );
+        auto a = AsmFactory::GetAssembler( AsmFactory::asm32 );
+        (*a)->setBaseAddress( pRemoteCode + offset );
+        a->SwitchTo86();
+        //(*a)->add( asmjit::host::esp, 4 );
+        (*a)->jmp( pRemoteCode );
+
+        _userCode.Write( offset, (*a)->getCodeSize(), (*a)->make() );
+        pRemoteCode += offset;
+    }*/
 
     // Execute code in thread context
     // TODO: Find out why am I passing pRemoteCode as an argument???
-    auto pRemoteCode = _userCode.ptr();
     if (NT_SUCCESS( _proc.core().native()->NtQueueApcThreadT( _hWorkThd->handle(), pRemoteCode, pRemoteCode ) ))
     {
-        dwResult = WaitForSingleObject( _hWaitEvent, 30 * 1000 /*wait 30s*/ );
+        status = WaitForSingleObject( _hWaitEvent, 30 * 1000 /*wait 30s*/ );
         callResult = _userData.Read<uint64_t>( RET_OFFSET, 0 );
     }
     else
@@ -166,7 +179,7 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
     // Ensure APC function fully returns
     Sleep( 1 );
 
-    return dwResult;
+    return status;
 }
 
 /// <summary>

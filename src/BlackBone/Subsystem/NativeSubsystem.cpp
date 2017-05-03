@@ -312,6 +312,9 @@ NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
 /// <returns>Status code</returns>
 NTSTATUS Native::NtQueueApcThreadT( HANDLE hThread, ptr_t func, ptr_t arg )
 {
+    if(_wowBarrier.type == wow_64_32)
+        return SAFE_NATIVE_CALL( RtlQueueApcWow64Thread, hThread, reinterpret_cast<PVOID>(func), reinterpret_cast<PVOID>(arg), nullptr, nullptr );
+
     return SAFE_NATIVE_CALL( NtQueueApcThread, hThread, reinterpret_cast<PVOID>(func), reinterpret_cast<PVOID>(arg), nullptr, nullptr );
 }
 

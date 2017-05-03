@@ -106,6 +106,7 @@ private:
         LOAD_IMPORT( "NtCreateEvent",                            hNtdll );
         LOAD_IMPORT( "NtQueueApcThread",                         hNtdll );
         LOAD_IMPORT( "RtlEncodeSystemPointer",                   hNtdll );
+        LOAD_IMPORT( "RtlQueueApcWow64Thread",                   hNtdll ); 
         LOAD_IMPORT( "NtWow64QueryInformationProcess64",         hNtdll );
         LOAD_IMPORT( "NtWow64ReadVirtualMemory64",               hNtdll );
         LOAD_IMPORT( "NtWow64WriteVirtualMemory64",              hNtdll );
