@@ -728,7 +728,9 @@ NTSTATUS MMap::RelocateImage( ImageContext* pImage )
         status = _process.memory().Write( pImage->ldrEntry.baseAddress + 0x1000, pImage->ldrEntry.size - 0x1000, pLocal + 0x1000 );
 
     if (!NT_SUCCESS( status ))
+    {
         BLACKBONE_TRACE( L"ManualMap: Failed to apply relocations. Status = 0x%x", status );
+    }
 
     return status;
 }
@@ -813,9 +815,10 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
     if (imports.empty())
         return STATUS_SUCCESS;
 
-    auto entrySize = sizeof( uint32_t );
-    if (pImage->ldrEntry.type == mt_mod64)
-        entrySize = sizeof( uint64_t );
+    // Read whole image to process it locally
+    std::unique_ptr<uint8_t[]> localImage( new uint8_t[pImage->ldrEntry.size] );
+    auto pLocal = localImage.get();
+    _process.memory().Read( pImage->imgMem.ptr(), pImage->ldrEntry.size, pLocal );
 
     // Traverse entries
     for (auto& importMod : imports)
@@ -839,14 +842,8 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
             else
                 expData = _process.modules().GetExport( hMod.result(), importFn.importName.c_str() );
 
-            if (!expData)
-            {
-                BLACKBONE_TRACE( L"ManualMap: Failed to get function from dependency '%ls'. Status 0x%x", wstrDll.c_str(), expData.status );
-                return expData.status;
-            }
-
             // Still forwarded, load missing modules
-            while (expData->procAddress && expData->isForwarded)
+            while (expData && expData->procAddress && expData->isForwarded)
             {
                 std::wstring wdllpath = expData->forwardModule;
 
@@ -875,23 +872,28 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
                 return expData.status;
             }
 
-            auto status = STATUS_SUCCESS;
-
-            if (pImage->flags & HideVAD)
-                status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + importFn.ptrRVA, entrySize, &expData->procAddress );
+            if (pImage->ldrEntry.type == mt_mod64)
+                *reinterpret_cast<uint64_t*>(pLocal + importFn.ptrRVA) = expData->procAddress;
             else
-                status = pImage->imgMem.Write( importFn.ptrRVA, entrySize, &expData->procAddress );
-
-            // Write function address
-            if (!NT_SUCCESS( status ))
-            {
-                BLACKBONE_TRACE( L"ManualMap: Failed to write import function address at offset 0x%x. Status 0x%x", importFn.ptrRVA, status );
-                return status;
-            }
+                *reinterpret_cast<uint32_t*>(pLocal + importFn.ptrRVA) = static_cast<uint32_t>(expData->procAddress);
         }
     }
 
-    return STATUS_SUCCESS;
+    auto status = STATUS_SUCCESS;
+
+    // Apply imports, skip header
+    if (pImage->flags & HideVAD)
+        status = Driver().WriteMem( _process.pid(), pImage->ldrEntry.baseAddress + 0x1000, pImage->ldrEntry.size - 0x1000, pLocal + 0x1000 );
+    else
+        status = _process.memory().Write( pImage->ldrEntry.baseAddress + 0x1000, pImage->ldrEntry.size - 0x1000, pLocal + 0x1000 );
+
+    // Write function address
+    if (!NT_SUCCESS( status ))
+    {
+        BLACKBONE_TRACE( L"ManualMap: Failed to write import function. Status 0x%x", status );
+    }
+
+    return status;
 }
 
 /// <summary>
