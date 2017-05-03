@@ -143,14 +143,14 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
 
         // PEB64
         _process.memory().Write( 
-            _process.core().peb64() + FIELD_OFFSET( _PEB64, ImageBaseAddress ),
-            &mod.result()->baseAddress
+            _process.core().peb64() + offsetOf( &_PEB64::ImageBaseAddress ),
+            mod.result()->baseAddress
             );
 
         // PEB32
         if(_process.core().isWow64())
             _process.memory().Write(
-                _process.core().peb32() + FIELD_OFFSET( _PEB32, ImageBaseAddress ),
+                _process.core().peb32() + offsetOf( &_PEB32::ImageBaseAddress ),
                 sizeof( uint32_t ), &mod.result()->baseAddress
                 );
     }
@@ -362,7 +362,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     ldrEntry.baseAddress = pImage->imgMem.ptr();
     ldrEntry.size = pImage->peImage.imageSize();
 
-    BLACKBONE_TRACE( L"ManualMap: Image base allocated at 0x%016x", pImage->imgMem.ptr() );
+    BLACKBONE_TRACE( L"ManualMap: Image base allocated at 0x%016llx", pImage->imgMem.ptr() );
 
     // Create Activation context for SxS
     if (pImage->peImage.manifestID() == 0)
@@ -392,37 +392,32 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     }
 
     auto mt = ldrEntry.type;
-    const PVOID invalidRedirection = (PVOID)(-1);
-    PVOID fsRedirection = invalidRedirection;
-
-    // Handle x64 system32 dlls for wow64 process
-    if (_process.modules().GetManualModules().empty() && mt == mt_mod64 && _process.barrier().sourceWow64)
-        Wow64DisableWow64FsRedirection( &fsRedirection );
-
     auto pMod = _process.modules().AddManualModule( static_cast<ModuleData&>(ldrEntry) );
-
-    // Import
-    if (!NT_SUCCESS(status = ResolveImport( pImage.get() )))
     {
-        if(fsRedirection != invalidRedirection)
-            Wow64RevertWow64FsRedirection ( fsRedirection );
-        pImage->peImage.Release();
-        _process.modules().RemoveManualModule( ldrEntry.name, mt );
-        return status;
-    }
 
-    // Delayed import
-    if (!(flags & NoDelayLoad) && !NT_SUCCESS( status = ResolveImport( pImage.get(), true ) ))
-    {
-        if (fsRedirection != invalidRedirection)
-            Wow64RevertWow64FsRedirection ( fsRedirection );
-        pImage->peImage.Release();
-        _process.modules().RemoveManualModule( ldrEntry.name, mt );
-        return status;
-    }
+        // Handle x64 system32 dlls for wow64 process
+        bool fsRedirect = _process.modules().GetManualModules().empty()
+            && mt == mt_mod64
+            && _process.barrier().sourceWow64;
 
-    if (fsRedirection != invalidRedirection)
-        Wow64RevertWow64FsRedirection ( fsRedirection );
+        FsRedirector fsr( fsRedirect );
+
+        // Import
+        if (!NT_SUCCESS( status = ResolveImport( pImage.get() ) ))
+        {
+            pImage->peImage.Release();
+            _process.modules().RemoveManualModule( ldrEntry.name, mt );
+            return status;
+        }
+
+        // Delayed import
+        if (!(flags & NoDelayLoad) && !NT_SUCCESS( status = ResolveImport( pImage.get(), true ) ))
+        {
+            pImage->peImage.Release();
+            _process.modules().RemoveManualModule( ldrEntry.name, mt );
+            return status;
+        }
+    }
 
     // Apply proper memory protection for sections
     if (!(flags & HideVAD))
@@ -783,9 +778,9 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapDependency( ImageContext* pImage, st
         tmpData.baseAddress = 0;
         tmpData.manual = ((pImage->flags & ManualImports) != 0);
         tmpData.fullPath = path;
-        tmpData.name = Utils::StripPath( path );
+        tmpData.name = Utils::ToLower( Utils::StripPath( path ) );
         tmpData.size = 0;
-        tmpData.type = mt_unknown;
+        tmpData.type = pImage->ldrEntry.type;
 
         data = _mapCallback( PreCallback, _userContext, _process, tmpData );
     }

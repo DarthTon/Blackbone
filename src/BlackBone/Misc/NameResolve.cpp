@@ -132,7 +132,10 @@ NTSTATUS NameResolve::ResolvePath(
     if (iter != _apiSchema.end())
     {
         // Select appropriate api host
-        path = iter->second.front() != baseName ? iter->second.front() : iter->second.back();
+        if (!iter->second.empty())
+            path = iter->second.front() != baseName ? iter->second.front() : iter->second.back();
+        else
+            path = baseName;
 
         if (ProbeSxSRedirect( path, actx ) == STATUS_SUCCESS)
         {
@@ -143,7 +146,7 @@ NTSTATUS NameResolve::ResolvePath(
             wchar_t sys_path[255] = { 0 };
             GetSystemDirectoryW( sys_path, 255 );
 
-            path = sys_path + path;
+            path = std::wstring( sys_path ) + L"\\" + path;
         }
         
         return STATUS_SUCCESS;

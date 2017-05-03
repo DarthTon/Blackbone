@@ -114,9 +114,6 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
 {
     NTSTATUS status = STATUS_SUCCESS;
 
-    //if (_proc.barrier().type == wow_64_32)
-        //return ExecInAnyThread( pCode, size, callResult, _hWorkThd );
-
     // Create thread if needed
     if (!NT_SUCCESS( status = CreateRPCEnvironment() ))
         return status;
@@ -151,20 +148,6 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
     }
 
     auto pRemoteCode = _userCode.ptr();
-
-    // Switch thread to WOW64 mode
-    /*if (_proc.barrier().type == wow_64_32)
-    {
-        auto offset = Align( size, 0x10 );
-        auto a = AsmFactory::GetAssembler( AsmFactory::asm32 );
-        (*a)->setBaseAddress( pRemoteCode + offset );
-        a->SwitchTo86();
-        //(*a)->add( asmjit::host::esp, 4 );
-        (*a)->jmp( pRemoteCode );
-
-        _userCode.Write( offset, (*a)->getCodeSize(), (*a)->make() );
-        pRemoteCode += offset;
-    }*/
 
     // Execute code in thread context
     // TODO: Find out why am I passing pRemoteCode as an argument???

@@ -762,7 +762,7 @@ bool NtLdr::FindLdrpModuleIndexBase()
 /// <returns>true on success</returns>
 bool NtLdr::FindLdrHeap()
 {
-    int32_t retries = 10;
+    int32_t retries = 50;
     PEB_T Peb = { 0 };
 
     _process.core().peb( &Peb );
@@ -775,11 +775,15 @@ bool NtLdr::FindLdrHeap()
         if (!Ldr)
             return Ldr.status;
 
+        for (; Ldr->InMemoryOrderModuleList.Flink == Ldr->InMemoryOrderModuleList.Blink && retries > 0; retries--, Sleep( 10 ))
+            Ldr = _process.memory().Read<PEB_LDR_DATA_T>( Peb.Ldr );
+
         MEMORY_BASIC_INFORMATION64 mbi = { 0 };
         auto NtdllEntry = CONTAINING_RECORD( Ldr->InMemoryOrderModuleList.Flink, LDR_DATA_TABLE_ENTRY_BASE_T, InMemoryOrderLinks );
         if (NT_SUCCESS( _process.core().native()->VirtualQueryExT( reinterpret_cast<ptr_t>(NtdllEntry), &mbi ) ))
         {
             _LdrHeapBase = static_cast<uintptr_t>(mbi.AllocationBase);
+            assert( _LdrHeapBase != _process.modules().GetModule( L"ntdll.dll" )->baseAddress );
             return true;
         }
     }

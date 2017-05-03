@@ -6,31 +6,6 @@
 
 namespace blackbone
 {
-
-/// <summary>
-/// System32 helper
-/// </summary>
-class FsRedirector
-{
-public:
-    FsRedirector( bool wow64 )
-        : _wow64( wow64 )
-    {
-        if (wow64)
-            Wow64DisableWow64FsRedirection( &_fsRedirection );
-    }
-
-    ~FsRedirector()
-    {
-        if (_wow64)
-            Wow64RevertWow64FsRedirection( _fsRedirection );
-    }
-
-private:
-    PVOID _fsRedirection = nullptr;
-    bool _wow64;
-};
-
 /// <summary>
 /// Scan ntdll for internal loader data
 /// </summary>
