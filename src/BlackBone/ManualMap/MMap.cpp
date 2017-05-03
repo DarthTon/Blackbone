@@ -658,6 +658,7 @@ NTSTATUS MMap::ProtectImageMemory( ImageContext* pImage )
 /// <returns>true on success</returns>
 NTSTATUS MMap::RelocateImage( ImageContext* pImage )
 {
+    NTSTATUS status = STATUS_SUCCESS;
     BLACKBONE_TRACE( L"ManualMap: Relocating image '%ls'", pImage->ldrEntry.fullPath.c_str() );
 
     // Reloc delta
@@ -673,17 +674,17 @@ NTSTATUS MMap::RelocateImage( ImageContext* pImage )
     auto start = pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_BASERELOC );
     auto end = start + pImage->peImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_BASERELOC );
 
-    pe::RelocData* fixrec = reinterpret_cast<pe::RelocData*>(start);
+    auto fixrec = reinterpret_cast<pe::RelocData*>(start);
     if (fixrec == nullptr)
     {
-        // TODO: return proper error code
         BLACKBONE_TRACE( L"ManualMap: Can't relocate image, no relocation data" );
         return STATUS_INVALID_IMAGE_FORMAT;
     }
 
-    size_t size = sizeof( ptr_t );
-    if (pImage->ldrEntry.type == mt_mod32)
-        size = sizeof( uint32_t );
+    // Read whole image to process it locally
+    std::unique_ptr<uint8_t[]> localImage( new uint8_t[pImage->ldrEntry.size] );
+    auto pLocal = localImage.get();
+    _process.memory().Read( pImage->imgMem.ptr(), pImage->ldrEntry.size, pLocal );
 
     while ((uintptr_t)fixrec < end && fixrec->BlockSize)
     {
@@ -702,21 +703,15 @@ NTSTATUS MMap::RelocateImage( ImageContext* pImage )
             if (fixtype == IMAGE_REL_BASED_HIGHLOW || fixtype == IMAGE_REL_BASED_DIR64)
             {
                 uintptr_t fixRVA = fixoffset + fixrec->PageRVA;
-                ptr_t val = pImage->peImage.ResolveRVAToVA( fixoffset + fixrec->PageRVA );
-                val = pImage->ldrEntry.type == mt_mod64 ? *reinterpret_cast<uint64_t*>(val) : *reinterpret_cast<uint32_t*>(val);
-                val += Delta;
-
-                auto status = STATUS_SUCCESS;
-                if (pImage->flags & HideVAD)
-                    status = Driver().WriteMem( _process.pid(), pImage->imgMem.ptr() + fixRVA, size, &val );
-                else
-                    status = pImage->imgMem.Write( fixRVA, size, &val );
-
-                // Apply relocation
-                if (!NT_SUCCESS( status ))
+                if (pImage->ldrEntry.type == mt_mod64)
                 {
-                    BLACKBONE_TRACE( L"ManualMap: Failed to apply relocation at offset 0x%x. Status = 0x%x", fixRVA, status );
-                    return false;
+                    uint64_t val = *reinterpret_cast<uint64_t*>(pLocal + fixRVA) + Delta;
+                    *reinterpret_cast<uint64_t*>(pLocal + fixRVA) = val;
+                }
+                else
+                {
+                    uint32_t val = *reinterpret_cast<uint32_t*>(pLocal + fixRVA) + static_cast<uint32_t>(Delta);
+                    *reinterpret_cast<uint32_t*>(pLocal + fixRVA) = static_cast<uint32_t>(val);
                 }
             }
             else
@@ -731,7 +726,16 @@ NTSTATUS MMap::RelocateImage( ImageContext* pImage )
         fixrec = reinterpret_cast<pe::RelocData*>(reinterpret_cast<uintptr_t>(fixrec) + fixrec->BlockSize);
     }
 
-    return STATUS_SUCCESS;
+    // Apply relocations, skip header
+    if (pImage->flags & HideVAD)
+        status = Driver().WriteMem( _process.pid(), pImage->ldrEntry.baseAddress + 0x1000, pImage->ldrEntry.size - 0x1000, pLocal + 0x1000 );
+    else
+        status = _process.memory().Write( pImage->ldrEntry.baseAddress + 0x1000, pImage->ldrEntry.size - 0x1000, pLocal + 0x1000 );
+
+    if (!NT_SUCCESS( status ))
+        BLACKBONE_TRACE( L"ManualMap: Failed to apply relocations. Status = 0x%x", status );
+
+    return status;
 }
 
 /// <summary>
