@@ -123,11 +123,11 @@ const PatternData& PatternLoader::DoSearch()
         BLACKBONE_TRACE( "PatternData: LdrpHandleTlsData64 not found" );
     if (_data.LdrpHandleTlsData32 == 0)
         BLACKBONE_TRACE( "PatternData: LdrpHandleTlsData32 not found" );
-    if (_data.LdrpInvertedFunctionTable64 == 0)
+    if (IsWindows8Point1OrGreater() && _data.LdrpInvertedFunctionTable64 == 0)
         BLACKBONE_TRACE( "PatternData: LdrpInvertedFunctionTable64 not found" );
     if (_data.LdrpInvertedFunctionTable32 == 0)
         BLACKBONE_TRACE( "PatternData: LdrpInvertedFunctionTable32 not found" );
-    if (_data.RtlInsertInvertedFunctionTable64 == 0)
+    if (IsWindows8Point1OrGreater() && _data.RtlInsertInvertedFunctionTable64 == 0)
         BLACKBONE_TRACE( "PatternData: RtlInsertInvertedFunctionTable64 not found" );
     if (_data.RtlInsertInvertedFunctionTable32 == 0)
         BLACKBONE_TRACE( "PatternData: RtlInsertInvertedFunctionTable32 not found" );

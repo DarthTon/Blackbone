@@ -72,6 +72,7 @@
 template<int s> 
 struct CompileTimeSizeOf;
 
+// offsetof alternative
 template<typename T, typename U>
 constexpr size_t offsetOf( U T::*member )
 {
@@ -82,6 +83,13 @@ template<typename T, typename U>
 constexpr uint64_t fieldPtr( uint64_t base, U T::*member )
 {
     return base + offsetOf( member );
+}
+
+// CONTAINING_RECORD alternative
+template<typename T, typename U>
+constexpr uint64_t structBase( uint64_t ptr, U T::*member )
+{
+    return ptr - offsetOf( member );
 }
 
 // Type-unsafe cast.

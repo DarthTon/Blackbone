@@ -252,9 +252,9 @@ DWORD RemoteHook::EventThread()
     // 
     // Reset debug flag in PEB
     //
-    _memory.Write( _core.peb64() + FIELD_OFFSET( _PEB64, BeingDebugged ), uint8_t( 0 ) );
+    _memory.Write( fieldPtr( _core.peb64(), &_PEB64::BeingDebugged ), uint8_t( 0 ) );
     if (!_x64Target)
-        _memory.Write( _core.peb32() + FIELD_OFFSET( _PEB32, BeingDebugged ), uint8_t( 0 ) );
+        _memory.Write( fieldPtr( _core.peb32(), &_PEB32::BeingDebugged ), uint8_t( 0 ) );
 
     _active = true;
 

@@ -6,21 +6,23 @@ namespace blackbone
 {
 #pragma warning(disable : 4201)
 
-    typedef struct _RTL_RB_TREE
+    template<typename T>
+    struct _RTL_RB_TREE
     {
-        struct _RTL_BALANCED_NODE * Root;
-        struct _RTL_BALANCED_NODE * Min;
-    } RTL_RB_TREE, *PRTL_RB_TREE;
+        T Root;
+        T Min;
+    };
 
-    typedef struct _RTL_BALANCED_NODE
+    template<typename T>
+    struct _RTL_BALANCED_NODE
     {
         union
         {
-            struct _RTL_BALANCED_NODE * Children[2];
+            T Children[2];
             struct
             {
-                struct _RTL_BALANCED_NODE * Left;
-                struct _RTL_BALANCED_NODE * Right;
+                T Left;
+                T Right;
             };
         };
         union
@@ -37,39 +39,41 @@ namespace blackbone
                 };
             };
 
-            uintptr_t ParentValue;
+            T ParentValue;
         };
-    } RTL_BALANCED_NODE, *PRTL_BALANCED_NODE;
-
-    struct _LDR_DDAG_NODE
-    {
-        _LIST_ENTRY Modules;
-        struct _LDR_SERVICE_TAG_RECORD * ServiceTagList;
-        unsigned long LoadCount;
-        unsigned long ReferenceCount;
-        unsigned long DependencyCount;
-        _SINGLE_LIST_ENTRY RemovalLink;
-        void* IncomingDependencies;
-        _LDR_DDAG_STATE State;
-        struct _SINGLE_LIST_ENTRY CondenseLink;
-        unsigned long PreorderNumber;
-        unsigned long LowestLink;
     };
 
-    struct _LDR_DATA_TABLE_ENTRY_W8 : LDR_DATA_TABLE_ENTRY_BASE_T
+    template<typename T>
+    struct _LDR_DDAG_NODE
     {
-        _LDR_DDAG_NODE * DdagNode;
-        _LIST_ENTRY NodeModuleLink;
-        struct _LDRP_DLL_SNAP_CONTEXT * SnapContext;
-        void * ParentDllBase;
-        void * SwitchBackContext;
-        _RTL_BALANCED_NODE BaseAddressIndexNode;
-        _RTL_BALANCED_NODE MappingInfoIndexNode;
-        void * OriginalBase;
+        _LIST_ENTRY_T<T> Modules;
+        T ServiceTagList;
+        ULONG LoadCount;
+        ULONG ReferenceCount;
+        ULONG DependencyCount;
+        T RemovalLink;
+        T IncomingDependencies;
+        _LDR_DDAG_STATE State;
+        T CondenseLink;
+        ULONG PreorderNumber;
+        ULONG LowestLink;
+    };
+
+    template<typename T>
+    struct _LDR_DATA_TABLE_ENTRY_W8 : _LDR_DATA_TABLE_ENTRY_BASE<T>
+    {
+        T DdagNode;                                     // _LDR_DDAG_NODE*
+        _LIST_ENTRY_T<T> NodeModuleLink;
+        T SnapContext;
+        T ParentDllBase;
+        T SwitchBackContext;
+        _RTL_BALANCED_NODE<T> BaseAddressIndexNode;
+        _RTL_BALANCED_NODE<T> MappingInfoIndexNode;
+        T OriginalBase;
         _LARGE_INTEGER LoadTime;
-        unsigned long BaseNameHashValue;
+        ULONG BaseNameHashValue;
         _LDR_DLL_LOAD_REASON LoadReason;
-        unsigned long ImplicitPathOptions;
+        ULONG ImplicitPathOptions;
     };
 
     template<typename T>
@@ -81,6 +85,14 @@ namespace blackbone
         UCHAR Overflow;
         _RTL_INVERTED_FUNCTION_TABLE_ENTRY<T> Entries[0x200];
     };
+
+    typedef _LDR_DATA_TABLE_ENTRY_W8<DWORD>     _LDR_DATA_TABLE_ENTRY_W832;
+    typedef _LDR_DATA_TABLE_ENTRY_W8<DWORD64>   _LDR_DATA_TABLE_ENTRY_W864;
+    typedef _LDR_DATA_TABLE_ENTRY_W8<DWORD_PTR> LDR_DATA_TABLE_ENTRY_W8T;
+
+    typedef _LDR_DDAG_NODE<DWORD>               _LDR_DDAG_NODE_32;
+    typedef _LDR_DDAG_NODE<DWORD64>             _LDR_DDAG_NODE_64;
+    typedef _LDR_DDAG_NODE<DWORD_PTR>           LDR_DDAG_NODE_T;
 
 #pragma warning(default : 4201)
 }

@@ -30,28 +30,28 @@ struct ModuleTable
 /// </summary>
 class MExcept
 {
-protected:
-    BLACKBONE_API MExcept( class Process& proc );
-    BLACKBONE_API ~MExcept();
+public:
+    BLACKBONE_API MExcept() = default;
+    BLACKBONE_API ~MExcept() = default;
 
     /// <summary>
     /// Inject VEH wrapper into process
     /// Used to enable execution of SEH handlers out of image
     /// </summary>
-    /// <param name="pTargetBase">Target image base address</param>
-    /// <param name="imageSize">Size of the image</param>
-    /// <param name="mt">Mosule type</param>
+    /// <param name="proc">Target process</param>
+    /// <param name="mod">Target module</param>
     /// <param name="partial">Partial exception support</param>
     /// <returns>Error code</returns>
-    BLACKBONE_API NTSTATUS CreateVEH( ptr_t pTargetBase, size_t imageSize, eModType mt, bool partial );
+    BLACKBONE_API NTSTATUS CreateVEH( class Process& proc, ModuleData& mod, bool partial );
 
     /// <summary>
     /// Removes VEH from target process
     /// </summary>
+    /// <param name="proc">Target process</param>
     /// <param name="partial">Partial exception support</param>
     /// <param name="mt">Mosule type</param>
     /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS RemoveVEH( bool partial, eModType mt );
+    BLACKBONE_API NTSTATUS RemoveVEH( class Process& proc, bool partial, eModType mt );
 
     /// <summary>
     /// Reset data
@@ -63,7 +63,6 @@ private:
     MExcept& operator =(const MExcept&) = delete;
 
 private:
-    class Process& _proc;   // Underlying process
     MemBlock  _pVEHCode;    // VEH function codecave
     MemBlock  _pModTable;   // x64 module address range table
     uint64_t  _hVEH = 0;    // VEH handle

@@ -279,10 +279,10 @@ NTSTATUS NativeWow64::SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx )
 /// <param name="func">APC function</param>
 /// <param name="arg">APC argument</param>
 /// <returns>Status code</returns>
-NTSTATUS NativeWow64::NtQueueApcThreadT( HANDLE hThread, ptr_t func, ptr_t arg )
+NTSTATUS NativeWow64::QueueApcT( HANDLE hThread, ptr_t func, ptr_t arg )
 {
     if (_wowBarrier.targetWow64)
-        return Native::NtQueueApcThreadT( hThread, func, arg );
+        return Native::QueueApcT( hThread, func, arg );
 
     static ptr_t qat = GetProcAddress64( getNTDLL64(), "NtQueueApcThread" );
     if (qat == 0)

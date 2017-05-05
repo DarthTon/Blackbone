@@ -63,7 +63,7 @@ ModuleDataPtr ProcessModules::GetModule(
     const wchar_t* baseModule /*= L""*/
     )
 {
-    NameResolve::Instance().ResolvePath( name, Utils::StripPath( baseModule ), L"", NameResolve::ApiSchemaOnly, _core.pid() );
+    NameResolve::Instance().ResolvePath( name, Utils::StripPath( baseModule ), L"", NameResolve::ApiSchemaOnly, _proc );
 
     // Detect module type
     if (type == mt_default)
@@ -420,7 +420,7 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
 
     // Can't inject 32bit dll into native process
     if (!_proc.core().isWow64() && img.mType() == mt_mod32)
-        return STATUS_IMAGE_MACHINE_TYPE_MISMATCH;
+        return STATUS_INVALID_IMAGE_WIN_32;
 
     auto switchMode = NoSwitch;
     if (_proc.core().isWow64() && img.mType() == mt_mod64)
@@ -663,7 +663,7 @@ bool ProcessModules::InjectPureIL(
 
     std::wstring libName = L"mscoree.dll";
 
-    NameResolve::Instance().ResolvePath( libName, L"", L"", NameResolve::EnsureFullPath, 0 );
+    NameResolve::Instance().ResolvePath( libName, L"", L"", NameResolve::EnsureFullPath, _proc );
 
     auto pMscoree = Inject( libName );
     if(!pMscoree)

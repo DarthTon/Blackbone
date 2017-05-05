@@ -13,8 +13,7 @@ namespace blackbone
 {
 
 MMap::MMap( Process& proc )
-    : MExcept( proc )
-    , _process( proc )
+    : _process( proc )
 {
 }
 
@@ -295,7 +294,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     {
         BLACKBONE_TRACE( L"ManualMap: Can't map x86 dll '%ls' into native x64 process", path.c_str() );
         pImage->peImage.Release();
-        return STATUS_IMAGE_MACHINE_TYPE_MISMATCH;
+        return STATUS_INVALID_IMAGE_WIN_32;
     }
 
     BLACKBONE_TRACE( L"ManualMap: Loading new image '%ls'", path.c_str() );
@@ -394,9 +393,8 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     auto mt = ldrEntry.type;
     auto pMod = _process.modules().AddManualModule( static_cast<ModuleData&>(ldrEntry) );
     {
-
         // Handle x64 system32 dlls for wow64 process
-        bool fsRedirect = _process.modules().GetManualModules().empty()
+        bool fsRedirect = _process.modules().GetManualModules().size() == 1
             && mt == mt_mod64
             && _process.barrier().sourceWow64;
 
@@ -760,10 +758,17 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapDependency( ImageContext* pImage, st
     auto status = NameResolve::Instance().ResolvePath( 
         path,
         pImage->ldrEntry.name, 
-        basedir, flags, 
-        _process.pid(), 
+        basedir, 
+        flags, 
+        _process, 
         pImage->peImage.actx() 
     );
+
+    // Do remote SxS probe
+    if (status == STATUS_SXS_IDENTITIES_DIFFERENT)
+    {
+        status = ProbeRemoteSxS( path );
+    }
 
     if (!NT_SUCCESS( status ))
     {
@@ -924,7 +929,6 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
 
                 pImage->pExpTableAddr = expTableRVA + pImage->imgMem.ptr<ptr_t>();
                 auto pAddTable = _process.modules().GetNtdllExport( "RtlAddFunctionTable", pImage->ldrEntry.type );
-
                 if (!pAddTable)
                     return pAddTable.status;
 
@@ -955,7 +959,7 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
     if (pImage->ldrEntry.safeSEH || (pImage->ldrEntry.type == mt_mod64 && (pImage->flags & CreateLdrRef || success)))
         return STATUS_SUCCESS;
 
-    return MExcept::CreateVEH( pImage->imgMem.ptr<uintptr_t>(), pImage->peImage.imageSize(), pImage->peImage.mType(), partial );
+    return _expMgr.CreateVEH( _process, pImage->ldrEntry, partial );
 }
 
 /// <summary>
@@ -995,7 +999,7 @@ NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
     else
         partial = (pImage->flags & PartialExcept) != 0;
 
-    return MExcept::RemoveVEH( partial, pImage->peImage.mType() );
+    return _expMgr.RemoveVEH( _process, partial, pImage->peImage.mType() );
 }
 
 /// <summary>
@@ -1321,6 +1325,118 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
 }
 
 /// <summary>
+/// Do SxS path probing in the target process
+/// </summary>
+/// <param name="path">Path to probe</param>
+/// <returns>Status code</returns>
+NTSTATUS MMap::ProbeRemoteSxS( std::wstring& path )
+{
+    NTSTATUS status = STATUS_SUCCESS;
+
+    constexpr uint32_t memSize    = 0x1000;
+    constexpr uint32_t dll1Offset = 0x200;
+    constexpr uint32_t dll2Offset = 0x400;
+    constexpr uint32_t pathOffset = 0x800;
+    constexpr uint32_t strOffset  = 0x1000;
+    constexpr uint16_t strSize    = 0x200;
+
+    // No underlying function
+    auto ProbeFn = _process.modules().GetNtdllExport( "RtlDosApplyFileIsolationRedirection_Ustr" );
+    if (!ProbeFn)
+        return ProbeFn.status;
+
+    auto actx = _pAContext.ptr();
+    auto pActivateActx = _process.modules().GetNtdllExport( "RtlActivateActivationContext" );
+    auto pDeactivateActx = _process.modules().GetNtdllExport( "RtlDeactivateActivationContext" );
+    auto pAsm = AsmFactory::GetAssembler( _process.barrier().targetWow64 );
+    auto& a = *pAsm.get();
+
+    // REmote buffer
+    auto memBuf = _process.memory().Allocate( memSize, PAGE_READWRITE );
+    if (!memBuf)
+        return memBuf.status;
+
+    // Fill Unicode strings
+    auto memPtr = memBuf->ptr();
+    auto fillStr = [&]( auto OriginalName )
+    {
+        decltype(OriginalName) DllName1 = { 0 };
+
+        OriginalName.Length = static_cast<WORD>(path.length() * sizeof( wchar_t ));
+        OriginalName.MaximumLength = OriginalName.Length;
+        OriginalName.Buffer = static_cast<decltype(OriginalName.Buffer)>(memPtr + sizeof( OriginalName ));
+
+        auto status = _process.memory().Write( memPtr, OriginalName );
+        status = _process.memory().Write( memPtr + sizeof( OriginalName ), OriginalName.Length + 2, path.c_str() );
+        if (!NT_SUCCESS( status ))
+            return status;
+
+        DllName1.Length = 0;
+        DllName1.MaximumLength = strSize;
+        DllName1.Buffer = static_cast<decltype(DllName1.Buffer)>(memPtr + strOffset);
+
+        return _process.memory().Write( memPtr + dll1Offset, DllName1 );
+    };
+
+    if (_process.barrier().targetWow64)
+        status = fillStr( _UNICODE_STRING_T<DWORD>() );
+    else
+        status = fillStr( _UNICODE_STRING_T<DWORD64>() );
+
+    if (!NT_SUCCESS( status ))
+        return status;
+
+    a.GenPrologue();
+
+    // ActivateActCtx
+    if (actx && pActivateActx)
+    {
+        a->mov( a->zax, actx );
+        a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
+        a.GenCall( pActivateActx->procAddress, { 0, a->zax, actx + sizeof( ptr_t ) } );
+    }
+
+    // RtlDosApplyFileIsolationRedirection_Ustr
+    a.GenCall( ProbeFn->procAddress,
+    {
+        TRUE,
+        memPtr + 0, 0,
+        memPtr + dll1Offset,
+        memPtr + dll2Offset,
+        memPtr + pathOffset,
+        0, 0, 0
+    } );
+
+    _process.remote().SaveCallResult( a );
+
+    // DeactivateActCtx
+    if (actx && pDeactivateActx)
+    {
+        a->mov( a->zax, actx + sizeof( ptr_t ) );
+        a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
+        a.GenCall( pDeactivateActx->procAddress, { 0, a->zax } );
+    }
+
+    _process.remote().AddReturnWithEvent( a, mt_default, rt_int32, ARGS_OFFSET );
+    a.GenEpilogue();
+
+    uint64_t result = 0;
+    if (!NT_SUCCESS( status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result ) ))
+        return status;
+
+    status = static_cast<NTSTATUS>(result);
+    if (NT_SUCCESS( status ))
+    {
+        // Read result back
+        std::unique_ptr<uint8_t[]> localBuf( new uint8_t[memSize] );
+        if (NT_SUCCESS( status = memBuf->Read( 0, memSize, localBuf.get() ) ))
+            path = reinterpret_cast<wchar_t*>(localBuf.get() + strOffset);
+    }
+
+    return status;
+}
+
+/// <summary>
 /// Hide memory VAD node
 /// </summary>
 /// <param name="imageMem">Image to purge</param>
@@ -1387,7 +1503,7 @@ NTSTATUS MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
 void MMap::Cleanup()
 {
     reset();
-    MExcept::reset();
+    _expMgr.reset();
     _process.remote().reset();
 }
 

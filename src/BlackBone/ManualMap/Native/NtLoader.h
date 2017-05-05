@@ -77,18 +77,21 @@ private:
     /// Find LdrpHashTable[] variable
     /// </summary>
     /// <returns>true on success</returns>
+    template<typename T>
     bool FindLdrpHashTable();
 
     /// <summary>
     /// Find LdrpModuleIndex variable under win8
     /// </summary>
     /// <returns>true on success</returns>
+    template<typename T>
     bool FindLdrpModuleIndexBase();
 
     /// <summary>
     /// Find Loader heap base
     /// </summary>
     /// <returns>true on success</returns>
+    template<typename T>
     bool FindLdrHeap();
 
     /// <summary>
@@ -96,6 +99,15 @@ private:
     /// </summary>
     /// <param name="mod">Module data</param>
     /// <returns>Pointer to created entry</returns>
+    template<typename T>
+    ptr_t InitBaseNode( NtLdrEntry& mod );
+
+    /// <summary>
+    ///  Initialize OS-specific module entry
+    /// </summary>
+    /// <param name="mod">Module data</param>
+    /// <returns>Pointer to created entry</returns>
+    template<typename T>
     ptr_t InitW8Node( NtLdrEntry& mod );
 
     /// <summary>
@@ -103,20 +115,23 @@ private:
     /// </summary>
     /// <param name="mod">Module data</param>
     /// <returns>Pointer to created entry</returns>
-    _LDR_DATA_TABLE_ENTRY_W7* InitW7Node( NtLdrEntry& mod );
+    template<typename T>
+    ptr_t InitW7Node( NtLdrEntry& mod );
 
     /// <summary>
     /// Insert entry into win8 module graph
     /// </summary>
-    /// <param name="pNode">Node to insert</param>
+    /// <param name="nodePtr">Node to insert</param>
     /// <param name="mod">Module data</param>
-    void InsertTreeNode( ptr_t pNode, const NtLdrEntry& mod );
+    template<typename T>
+    void InsertTreeNode( ptr_t nodePtr, const NtLdrEntry& mod );
 
     /// <summary>
     /// Insert entry into LdrpHashTable[]
     /// </summary>
     /// <param name="pNodeLink">Link of entry to be inserted</param>
     /// <param name="hash">Module hash</param>
+    template<typename T>
     void InsertHashNode( ptr_t pNodeLink, ULONG hash );
 
     /// <summary>
@@ -178,6 +193,10 @@ private:
     template<typename T> 
     ptr_t UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, uintptr_t ofst, ptr_t baseAddress );
 
+    /// <summary>
+    ///  Remove record from LIST_ENTRY structure
+    /// </summary>
+    /// <param name="pListLink">Entry link</param>
     template<typename T>
     void UnlinkListEntry( ptr_t pListLink );
 
@@ -187,19 +206,20 @@ private:
     /// <param name="mod">Module data</param>
     /// <param name="ldrEntry">Module LDR entry</param>
     /// <returns>Address of removed record</returns>
+    template<typename T>
     ptr_t UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry );
 
     NtLdr( const NtLdr& ) = delete;
     NtLdr& operator =(const NtLdr&) = delete;
 
 private:
-    class Process& _process;                    // Process memory routines
+    class Process& _process;            // Process memory routines
 
-    uintptr_t _LdrpHashTable = 0;               // LdrpHashTable address
-    uintptr_t _LdrpModuleIndexBase = 0;         // LdrpModuleIndex address
-    uintptr_t _LdrHeapBase = 0;                 // Loader heap base address
+    ptr_t _LdrpHashTable = 0;           // LdrpHashTable address
+    ptr_t _LdrpModuleIndexBase = 0;     // LdrpModuleIndex address
+    ptr_t _LdrHeapBase = 0;             // Loader heap base address
 
-    std::map<ptr_t, ptr_t> _nodeMap;            // Allocated native structures
+    std::map<ptr_t, ptr_t> _nodeMap;    // Allocated native structures
 };
 
 }

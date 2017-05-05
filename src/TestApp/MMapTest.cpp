@@ -1,4 +1,7 @@
 #include "Tests.h"
+#include "../../contrib/VersionHelpers.h"
+
+std::set<std::wstring> nativeMods, modList;
 
 /*
     Try to map calc.exe into current process
@@ -8,18 +11,33 @@ void TestMMap()
     Process thisProc;
     thisProc.Attach( GetCurrentProcessId() );
 
+    nativeMods.clear();
+    modList.clear();
+
+    nativeMods.emplace( L"combase.dll" );
+    nativeMods.emplace( L"user32.dll" );
+    nativeMods.emplace( L"comctl32.dll" );
+    nativeMods.emplace( L"gdiplus.dll" );
+
+    modList.emplace( L"windows.storage.dll" );
+    modList.emplace( L"shell32.dll" );
+    modList.emplace( L"shlwapi.dll" );
+    if (IsWindows7OrGreater() && !IsWindows8OrGreater())
+    {
+        modList.emplace( L"msvcr120.dll" );
+        modList.emplace( L"msvcp120.dll" );
+    }
+
     auto callback = []( CallbackType type, void* /*context*/, Process& /*process*/, const ModuleData& modInfo )
     {
         if(type == PreCallback)
         {
-#ifdef USE64
-            if (modInfo.name == L"msvcr120.dll" || modInfo.name == L"msvcp120.dll")
+            if(nativeMods.count(modInfo.name))
                 return LoadData( MT_Native, Ldr_None );
-#endif
         }
         else
         {
-            if (modInfo.name == L"windows.storage.dll" || modInfo.name == L"shell32.dll")
+            if (modList.count( modInfo.name ))
                 return LoadData( MT_Default, Ldr_ModList );
         }
 

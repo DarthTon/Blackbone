@@ -21,7 +21,7 @@ public:
         ApiSchemaOnly   = 1,    // Resolve only Api schema dlls
         EnsureFullPath  = 2,    // Make sure resulting path is full-qualified
         NoSearch        = 4,    // Don't perform file search, only resolve name
-        Wow64           = 8,    // Reserved
+        Wow64           = 8,    // Redirect System32 files to SysWow64
     };
 
 public:
@@ -42,7 +42,7 @@ public:
     /// <param name="baseName">Name of parent image. Used only when resolving import images</param>
     /// <param name="searchDir">Directory where source image is located</param>
     /// <param name="flags">Resolve flags</param>
-    /// <param name="procID">Process ID. Used to search process executable directory</param>
+    /// <param name="proc">Process. Used to search process executable directory</param>
     /// <param name="actx">Activation context</param>
     /// <returns>Status</returns>
     BLACKBONE_API NTSTATUS ResolvePath( 
@@ -50,7 +50,7 @@ public:
         const std::wstring& baseName,
         const std::wstring& searchDir,
         eResolveFlag flags,
-        DWORD procID,
+        class Process& proc,
         HANDLE actx = INVALID_HANDLE_VALUE
         );
 
@@ -58,9 +58,10 @@ public:
     /// Try SxS redirection
     /// </summary>
     /// <param name="path">Image path.</param>
+    /// <param name="proc">Process. Used to search process executable directory</param>
     /// <param name="actx">Activation context</param>
     /// <returns></returns>
-    BLACKBONE_API NTSTATUS ProbeSxSRedirect( std::wstring& path, HANDLE actx = INVALID_HANDLE_VALUE );
+    BLACKBONE_API NTSTATUS ProbeSxSRedirect( std::wstring& path, class Process& proc, HANDLE actx = INVALID_HANDLE_VALUE );
 
 private:
     // Ensure singleton

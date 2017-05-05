@@ -202,7 +202,7 @@ private:
 
 private:    
     // Process routines
-    class Process&        _proc;
+    class Process&        _process;
     class ProcessModules& _mods;
     class ProcessMemory&  _memory;
     class ProcessThreads& _threads;

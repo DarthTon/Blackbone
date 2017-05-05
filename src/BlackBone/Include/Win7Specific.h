@@ -6,13 +6,14 @@ namespace blackbone
 {
 #pragma warning(disable : 4201)
 
+    template<typename T>
     struct _LDR_DATA_TABLE_ENTRY_W7 : LDR_DATA_TABLE_ENTRY_BASE_T
     {
-        _LIST_ENTRY ForwarderLinks;
-        _LIST_ENTRY ServiceTagLinks;
-        _LIST_ENTRY StaticLinks;
-        void * ContextInformation;
-        unsigned long OriginalBase;
+        _LIST_ENTRY_T<T> ForwarderLinks;
+        _LIST_ENTRY_T<T> ServiceTagLinks;
+        _LIST_ENTRY_T<T> StaticLinks;
+        T ContextInformation;
+        ULONG OriginalBase;
         _LARGE_INTEGER LoadTime;
     };
 

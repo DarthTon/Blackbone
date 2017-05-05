@@ -12,10 +12,10 @@ namespace blackbone
 {
 
 RemoteExec::RemoteExec( Process& proc )
-    : _proc( proc )
-    , _mods( _proc.modules() )
-    , _memory( _proc.memory() )
-    , _threads( _proc.threads() )
+    : _process( proc )
+    , _mods( _process.modules() )
+    , _memory( _process.memory() )
+    , _threads( _process.threads() )
     , _hWorkThd( new Thread( (DWORD)0, &_memory.core() ) )
     , _hWaitEvent( NULL )
     , _apcPatched( false )
@@ -56,7 +56,7 @@ NTSTATUS RemoteExec::ExecInNewThread(
         break;
 
     case blackbone::AutoSwitch:
-        switchMode = _proc.barrier().type == wow_64_32;
+        switchMode = _process.barrier().type == wow_64_32;
         break;
     }
 
@@ -65,7 +65,7 @@ NTSTATUS RemoteExec::ExecInNewThread(
         return pExitThread.status;
 
     auto a = switchMode ? AsmFactory::GetAssembler( AsmFactory::asm64 ) 
-                        : AsmFactory::GetAssembler( _proc.core().isWow64() );
+                        : AsmFactory::GetAssembler( _process.core().isWow64() );
 
     a->GenPrologue( switchMode );
 
@@ -126,7 +126,7 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
         ResetEvent( _hWaitEvent );
 
     // Patch KiUserApcDispatcher 
-    if (!_apcPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
+    /*if (!_apcPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
     {
         if (_proc.barrier().type == wow_64_32)
         {
@@ -145,13 +145,13 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
         }
         else
             _apcPatched = true;
-    }
+    }*/
 
     auto pRemoteCode = _userCode.ptr();
 
     // Execute code in thread context
     // TODO: Find out why am I passing pRemoteCode as an argument???
-    if (NT_SUCCESS( _proc.core().native()->NtQueueApcThreadT( _hWorkThd->handle(), pRemoteCode, pRemoteCode ) ))
+    if (NT_SUCCESS( _process.core().native()->QueueApcT( _hWorkThd->handle(), pRemoteCode, pRemoteCode ) ))
     {
         status = WaitForSingleObject( _hWaitEvent, 30 * 1000 /*wait 30s*/ );
         callResult = _userData.Read<uint64_t>( RET_OFFSET, 0 );
@@ -193,8 +193,8 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     if (!thd->Suspend())
         return LastNtStatus();
 
-    auto a = AsmFactory::GetAssembler( _proc.core().isWow64() );
-    if (!_proc.core().isWow64())
+    auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
+    if (!_process.core().isWow64())
     {
         const int count = 15;
         static const asmjit::GpReg regs[] =
@@ -259,7 +259,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
 
     if (NT_SUCCESS( status = _userCode.Write( size, (*a)->getCodeSize(), (*a)->make() ) ))
     {
-        if (_proc.core().isWow64())
+        if (_process.core().isWow64())
         {
             ctx32.Eip = static_cast<uint32_t>(_userCode.ptr() + size);
             status = thd->SetContext( ctx32, true );
@@ -369,7 +369,7 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool bThread /*= true*/, bool bEvent 
 /// <returns>Thread ID</returns>
 call_result_t<DWORD> RemoteExec::CreateWorkerThread()
 {
-    auto a = AsmFactory::GetAssembler( _proc.core().isWow64() );
+    auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
     asmjit::Label l_loop = (*a)->newLabel();
 
     //
@@ -444,7 +444,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
 
     if(_hWaitEvent == NULL)
     {
-        auto a = AsmFactory::GetAssembler( _proc.core().isWow64() );
+        auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
 
         wchar_t pEventName[128] = { 0 };
         uint64_t dwResult = NULL;
@@ -494,7 +494,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
             return status;
         };
 
-        if (_proc.core().isWow64())
+        if (_process.core().isWow64())
         {
             _OBJECT_ATTRIBUTES32 obAttr32 = { 0 };
             _UNICODE_STRING32 ustr32 = { 0 };
@@ -660,11 +660,10 @@ void RemoteExec::AddReturnWithEvent(
     }
 
     ptr_t ptr = _userData.ptr();
-    auto pSetEvent = _proc.modules().GetNtdllExport( "NtSetEvent", mt );
+    auto pSetEvent = _process.modules().GetNtdllExport( "NtSetEvent", mt );
     if(pSetEvent)
         a.SaveRetValAndSignalEvent( pSetEvent->procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );
 }
-
 
 /// <summary>
 /// Terminate existing worker thread

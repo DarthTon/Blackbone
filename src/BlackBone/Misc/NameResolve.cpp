@@ -3,6 +3,7 @@
 #include "../Include/Macro.h"
 #include "../Misc/Utils.h"
 #include "../Misc/DynImport.h"
+#include "../Process/Process.h"
 
 #include <stdint.h>
 #include <algorithm>
@@ -106,10 +107,11 @@ NTSTATUS NameResolve::ResolvePath(
     const std::wstring& baseName,
     const std::wstring& searchDir,
     eResolveFlag flags, 
-    DWORD procID, 
+    Process& proc,
     HANDLE actx /*= INVALID_HANDLE_VALUE*/ 
     )
 {
+    NTSTATUS status = STATUS_SUCCESS;
     wchar_t tmpPath[4096] = { 0 };
     std::wstring completePath;
 
@@ -137,9 +139,10 @@ NTSTATUS NameResolve::ResolvePath(
         else
             path = baseName;
 
-        if (ProbeSxSRedirect( path, actx ) == STATUS_SUCCESS)
+        status = ProbeSxSRedirect( path, proc, actx );
+        if (NT_SUCCESS( status ) || status == STATUS_SXS_IDENTITIES_DIFFERENT)
         {
-            return STATUS_SUCCESS;
+            return status;
         }
         else if (flags & EnsureFullPath)
         {
@@ -156,8 +159,9 @@ NTSTATUS NameResolve::ResolvePath(
         return STATUS_NOT_FOUND;
 
     // SxS redirection
-    if (ProbeSxSRedirect( path, actx ) == STATUS_SUCCESS)
-        return STATUS_SUCCESS;
+    status = ProbeSxSRedirect( path, proc, actx );
+    if (NT_SUCCESS( status ) || status == STATUS_SXS_IDENTITIES_DIFFERENT)
+        return status;
 
     if (flags & NoSearch)
         return STATUS_NOT_FOUND;
@@ -227,7 +231,7 @@ NTSTATUS NameResolve::ResolvePath(
     //
     // 3. The directory from which the application was started.
     //
-    completePath = GetProcessDirectory( procID ) + L"\\" + filename;
+    completePath = GetProcessDirectory( proc.core().pid() ) + L"\\" + filename;
 
     if (Utils::FileExists( completePath ))
     {
@@ -302,9 +306,10 @@ NTSTATUS NameResolve::ResolvePath(
 /// Try SxS redirection
 /// </summary>
 /// <param name="path">Image path.</param>
+/// <param name="proc">Process. Used to search process executable directory</param>
 /// <param name="actx">Activation context</param>
 /// <returns></returns>
-NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVALID_HANDLE_VALUE*/ )
+NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, Process& proc, HANDLE actx /*= INVALID_HANDLE_VALUE*/ )
 {
     UNICODE_STRING OriginalName = { 0 };
     UNICODE_STRING DllName1 = { 0 };
@@ -339,7 +344,11 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, HANDLE actx /*= INVA
 
     if (status == STATUS_SUCCESS)
     {
-        path = pPath->Buffer;
+        // Arch mismatch, local SxS redirection is incorrect
+        if (proc.barrier().mismatch)
+            return STATUS_SXS_IDENTITIES_DIFFERENT;
+        else
+            path = pPath->Buffer;
     }
     else
     {

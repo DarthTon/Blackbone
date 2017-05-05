@@ -143,7 +143,7 @@ public:
     /// <param name="func">APC function</param>
     /// <param name="arg">APC argument</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS NtQueueApcThreadT( HANDLE hThread, ptr_t func, ptr_t arg );
+    virtual NTSTATUS QueueApcT( HANDLE hThread, ptr_t func, ptr_t arg );
 
     /// <summary>
     /// Get WOW64 PEB

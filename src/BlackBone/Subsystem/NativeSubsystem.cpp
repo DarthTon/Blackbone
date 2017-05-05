@@ -38,9 +38,15 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
         else if (wowSrc == FALSE && wowTgt == FALSE)
             _wowBarrier.type = wow_64_64;
         else if (wowSrc == TRUE)
+        {
             _wowBarrier.type = wow_32_64;
+            _wowBarrier.mismatch = true;
+        }
         else
+        {
             _wowBarrier.type = wow_64_32;
+            _wowBarrier.mismatch = true;
+        }
     } 
 }
 
@@ -310,10 +316,13 @@ NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
 /// <param name="func">APC function</param>
 /// <param name="arg">APC argument</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::NtQueueApcThreadT( HANDLE hThread, ptr_t func, ptr_t arg )
+NTSTATUS Native::QueueApcT( HANDLE hThread, ptr_t func, ptr_t arg )
 {
-    if(_wowBarrier.type == wow_64_32)
+    if (_wowBarrier.type == wow_64_32)
+    {
         return SAFE_NATIVE_CALL( RtlQueueApcWow64Thread, hThread, reinterpret_cast<PVOID>(func), reinterpret_cast<PVOID>(arg), nullptr, nullptr );
+        //func = (~func) << 2;
+    }
 
     return SAFE_NATIVE_CALL( NtQueueApcThread, hThread, reinterpret_cast<PVOID>(func), reinterpret_cast<PVOID>(arg), nullptr, nullptr );
 }
