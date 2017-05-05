@@ -13,6 +13,9 @@
 #define FIELD_OFFSET2(type, field)  ((LONG)(LONG_PTR)&(((type)0)->field))
 #define GET_FIELD_PTR(entry, field) (uintptr_t)((uint8_t*)entry + FIELD_OFFSET2(decltype(entry), field))
 
+#define CALL_64_86(b, f, ...) (b ? f<uint64_t>(__VA_ARGS__) : f<uint32_t>(__VA_ARGS__))
+#define FIELD_PTR_64_86(b, e, t, f) (b ? fieldPtr( e, &t<uint64_t>::f ) : fieldPtr( e, &t<uint32_t>::f ))
+
 #define LODWORD(l) ((uint32_t)(((uint64_t)(l)) & 0xffffffff))
 #define HIDWORD(l) ((uint32_t)((((uint64_t)(l)) >> 32) & 0xffffffff))
 

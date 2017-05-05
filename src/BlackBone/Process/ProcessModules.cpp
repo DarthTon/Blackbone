@@ -137,7 +137,7 @@ ModuleDataPtr ProcessModules::GetMainModule()
 {
     if (_proc.barrier().x86OS)
     {
-        _PEB32 peb = { { { 0 } } };
+        _PEB32 peb = { 0 };
         if (_proc.core().peb32( &peb ) == 0)
             return nullptr;
 
@@ -145,7 +145,7 @@ ModuleDataPtr ProcessModules::GetMainModule()
     }
     else
     {
-        _PEB64 peb = { { { 0 } } };
+        _PEB64 peb = { 0 };
         if (_proc.core().peb64( &peb ) == 0)
             return nullptr;
 

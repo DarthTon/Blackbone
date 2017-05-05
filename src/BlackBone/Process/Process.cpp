@@ -23,8 +23,6 @@ Process::Process()
     // Ensure InitOnce is called
     auto i = g_Initialized;
     UNREFERENCED_PARAMETER( i );
-
-    NameResolve::Instance().Initialize();
 }
 
 Process::~Process(void)

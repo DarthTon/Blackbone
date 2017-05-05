@@ -697,6 +697,7 @@
     <ClInclude Include="Include\CallResult.h" />
     <ClInclude Include="Include\FunctionTypes.h" />
     <ClInclude Include="Include\Macro.h" />
+    <ClInclude Include="Include\NativeEnums.h" />
     <ClInclude Include="Include\NativeStructures.h" />
     <ClInclude Include="Include\Types.h" />
     <ClInclude Include="Include\Win7Specific.h" />

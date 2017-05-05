@@ -13,15 +13,8 @@ namespace blackbone
 typedef uint64_t ptr_t;     // Generic pointer in remote process
 typedef ptr_t    module_t;  // Module base pointer
 
-// PEB helper
-template<typename T>
-struct _PEB_T2
-{
-    typedef typename std::conditional<std::is_same<T, DWORD>::value, _PEB32, _PEB64>::type type;
-};
-
 // Type of barrier
-enum WoW64Type
+enum eBarrier
 {
     wow_32_32 = 0,  // Both processes are WoW64 
     wow_64_64,      // Both processes are x64
@@ -31,7 +24,7 @@ enum WoW64Type
 
 struct Wow64Barrier
 {
-    WoW64Type type = wow_32_32;
+    eBarrier type = wow_32_32;
     bool sourceWow64 = false;
     bool targetWow64 = false;
     bool x86OS = false;
@@ -66,7 +59,7 @@ enum eThreadModeSwitch
 // Module info
 struct ModuleData
 {
-    ptr_t baseAddress;      // Base image address
+    module_t baseAddress;   // Base image address
     std::wstring name;      // File name
     std::wstring fullPath;  // Full file path
     uint32_t size;          // Size of image
@@ -85,13 +78,5 @@ struct ModuleData
 };
 
 typedef std::shared_ptr<const ModuleData> ModuleDataPtr;
-
-// Wow64 register helper
-union reg64
-{
-    uint32_t dw[2];
-    uint64_t v;
-};
-
 
 }

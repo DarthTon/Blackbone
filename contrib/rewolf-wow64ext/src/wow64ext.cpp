@@ -562,7 +562,7 @@ extern "C" BOOL __cdecl WriteProcessMemory64(HANDLE hProcess, DWORD64 lpBaseAddr
     }
 }
 
-extern "C" BOOL __cdecl GetThreadContext64(HANDLE hThread, _CONTEXT64* lpContext)
+extern "C" BOOL __cdecl GetThreadContext64(HANDLE hThread, _CONTEXT64_2* lpContext)
 {
     static DWORD64 gtc = 0;
     if (0 == gtc)
@@ -581,7 +581,7 @@ extern "C" BOOL __cdecl GetThreadContext64(HANDLE hThread, _CONTEXT64* lpContext
         return TRUE;
 }
 
-extern "C" BOOL __cdecl SetThreadContext64(HANDLE hThread, _CONTEXT64* lpContext)
+extern "C" BOOL __cdecl SetThreadContext64(HANDLE hThread, _CONTEXT64_2* lpContext)
 {
     static DWORD64 stc = 0;
     if (0 == stc)

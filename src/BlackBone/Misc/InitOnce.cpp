@@ -3,6 +3,7 @@
 #include "../Include/Macro.h"
 #include "DynImport.h"
 #include "PattrernLoader.h"
+#include "NameResolve.h"
 
 #include <string>
 #include <cassert>
@@ -23,6 +24,8 @@ public:
 
             g_PatternLoader.reset( new PatternLoader );
             g_PatternLoader->DoSearch();
+
+            NameResolve::Instance().Initialize();
 
             _done = true;
         }

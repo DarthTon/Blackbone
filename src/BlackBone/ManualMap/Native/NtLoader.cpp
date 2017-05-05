@@ -11,9 +11,6 @@
 namespace blackbone
 {
 
-#define CHECKED_CALL(b, f, ...) (b ? f<DWORD64>(__VA_ARGS__) : f<DWORD>(__VA_ARGS__))
-#define CHECKED_FIELD_PTR(b, e, t, f) (b ? fieldPtr( e, &t<DWORD64>::f ) : fieldPtr( e, &t<DWORD>::f ))
-
 NtLdr::NtLdr( Process& proc )
     : _process( proc )
 {
@@ -31,19 +28,17 @@ bool NtLdr::Init()
 {
     if (_process.core().isWow64())
     {
-        FindLdrHeap<DWORD>();
-        FindLdrpHashTable<DWORD>();
-
+        FindLdrHeap<uint32_t>();
+        FindLdrpHashTable<uint32_t>();
         if (IsWindows8OrGreater())
-            FindLdrpModuleIndexBase<DWORD>();
+            FindLdrpModuleIndexBase<uint32_t>();
     }
     else
     {
-        FindLdrHeap<DWORD64>();
-        FindLdrpHashTable<DWORD64>();
-
+        FindLdrHeap<uint64_t>();
+        FindLdrpHashTable<uint64_t>();
         if (IsWindows8OrGreater())
-            FindLdrpModuleIndexBase<DWORD64>();
+            FindLdrpModuleIndexBase<uint64_t>();
     }
 
     _nodeMap.clear();
@@ -80,10 +75,10 @@ bool NtLdr::CreateNTReference( NtLdrEntry& mod )
 
     // Win 8 and higher
     if (w8)
-        entry = CHECKED_CALL( x64Image, InitW8Node, mod );             
+        entry = CALL_64_86( x64Image, InitW8Node, mod );             
     // Windows 7 and earlier
     else
-        entry = CHECKED_CALL( x64Image, InitW7Node, mod );
+        entry = CALL_64_86( x64Image, InitW7Node, mod );
 
     if (entry == 0)
         return false;
@@ -92,26 +87,26 @@ bool NtLdr::CreateNTReference( NtLdrEntry& mod )
 
     // Insert into module graph
     if (mod.flags & Ldr_ModList && w8)
-        CHECKED_CALL( x64Image, InsertTreeNode, entry, mod );
+        CALL_64_86( x64Image, InsertTreeNode, entry, mod );
 
     // Insert into LdrpHashTable
     if (mod.flags & Ldr_HashTable)
     {
-        auto ptr = CHECKED_FIELD_PTR( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE, HashLinks );
-        CHECKED_CALL( x64Image, InsertHashNode, ptr, mod.hash );
+        auto ptr = FIELD_PTR_64_86( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE_T, HashLinks );
+        CALL_64_86( x64Image, InsertHashNode, ptr, mod.hash );
     }
 
     // Insert into ldr lists
     if (mod.flags & Ldr_ThdCall || (mod.flags & Ldr_ModList && !w8))
     {
-        _process.memory().Write( CHECKED_FIELD_PTR( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE, Flags ), 0x80004 );
+        _process.memory().Write( FIELD_PTR_64_86( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE_T, Flags ), 0x80004 );
         ptr_t loadPtr = 0, initptr = 0;
 
-        loadPtr = CHECKED_FIELD_PTR( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE, InLoadOrderLinks );
+        loadPtr = FIELD_PTR_64_86( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE_T, InLoadOrderLinks );
         if(w8)
-            initptr = CHECKED_FIELD_PTR( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE, InInitializationOrderLinks );
+            initptr = FIELD_PTR_64_86( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
 
-        CHECKED_CALL( x64Image, InsertMemModuleNode, 0, loadPtr, initptr );
+        CALL_64_86( x64Image, InsertMemModuleNode, 0, loadPtr, initptr );
     }
 
     return true;
@@ -336,7 +331,7 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
 template<typename T>
 ptr_t NtLdr::InitBaseNode( NtLdrEntry& mod )
 {
-    typedef _LDR_DATA_TABLE_ENTRY_BASE<T> EntryType;
+    typedef _LDR_DATA_TABLE_ENTRY_BASE_T<T> EntryType;
     ptr_t entryPtr = AllocateInHeap( mod.type, sizeof( _LDR_DATA_TABLE_ENTRY_W8<T> ) ).result( 0 );
     if (entryPtr == 0)
         return 0;
@@ -539,15 +534,15 @@ void NtLdr::InsertMemModuleNode( ptr_t pNodeMemoryOrderLink, ptr_t pNodeLoadOrde
     {
         // pLdr->InMemoryOrderModuleList
         if (pNodeMemoryOrderLink)
-            InsertTailList<T>( fieldPtr( pLdr, &_PEB_LDR_DATA2<T>::InMemoryOrderModuleList ), pNodeMemoryOrderLink );
+            InsertTailList<T>( fieldPtr( pLdr, &_PEB_LDR_DATA2_T<T>::InMemoryOrderModuleList ), pNodeMemoryOrderLink );
 
         // pLdr->InLoadOrderModuleList
         if (pNodeLoadOrderLink)
-            InsertTailList<T>( fieldPtr( pLdr, &_PEB_LDR_DATA2<T>::InLoadOrderModuleList ), pNodeLoadOrderLink );
+            InsertTailList<T>( fieldPtr( pLdr, &_PEB_LDR_DATA2_T<T>::InLoadOrderModuleList ), pNodeLoadOrderLink );
 
         // pLdr->InInitializationOrderModuleList
         if (pNodeInitOrderLink)
-            InsertTailList<T>( fieldPtr( pLdr, &_PEB_LDR_DATA2<T>::InInitializationOrderModuleList ), pNodeInitOrderLink );
+            InsertTailList<T>( fieldPtr( pLdr, &_PEB_LDR_DATA2_T<T>::InInitializationOrderModuleList ), pNodeInitOrderLink );
     }
 }
 
@@ -663,18 +658,18 @@ call_result_t<ptr_t> NtLdr::AllocateInHeap( eModType mt, size_t size )
 template<typename T>
 bool NtLdr::FindLdrpHashTable()
 {
-    typename _PEB_T2<T>::type Peb = { 0 };
-    _process.core().peb<T>( &Peb );
+    _PEB_T<T> Peb = { 0 };
+    _process.core().peb( &Peb );
     if (Peb.ImageBaseAddress == 0)
         return false;
 
-    auto Ldr = _process.memory().Read<_PEB_LDR_DATA2<T>>( Peb.Ldr );
+    auto Ldr = _process.memory().Read<_PEB_LDR_DATA2_T<T>>( Peb.Ldr );
     if (!Ldr)
         return false;
 
     // Get loader entry
-    _LDR_DATA_TABLE_ENTRY_BASE<T> entry = { 0 };
-    auto entryPtr = structBase( Ldr->InInitializationOrderModuleList.Flink, &_LDR_DATA_TABLE_ENTRY_BASE<T>::InInitializationOrderLinks );
+    _LDR_DATA_TABLE_ENTRY_BASE_T<T> entry = { 0 };
+    auto entryPtr = structBase( Ldr->InInitializationOrderModuleList.Flink, &_LDR_DATA_TABLE_ENTRY_BASE_T<T>::InInitializationOrderLinks );
     if (!NT_SUCCESS( _process.memory().Read( entryPtr, entry ) ))
         return false;
 
@@ -688,10 +683,10 @@ bool NtLdr::FindLdrpHashTable()
 
     // scan hash list to the head (head is located within ntdll)
     T NtdllHashHeadPtr = 0;
-    _LIST_ENTRY_T<T> hashNode = { 0 };
+    _LIST_ENTRY_T<T> hashNode = entry.HashLinks;
 
-    for (auto e = entry.HashLinks.Flink; 
-        e != fieldPtr( entryPtr, &_LDR_DATA_TABLE_ENTRY_BASE<T>::HashLinks ); 
+    for (auto e = hashNode.Flink;
+        e != fieldPtr( entryPtr, &_LDR_DATA_TABLE_ENTRY_BASE_T<T>::HashLinks ); 
         e = hashNode.Flink)
     {
         if (e >= NtdllBase && e < NtdllEndAddress)
@@ -700,7 +695,7 @@ bool NtLdr::FindLdrpHashTable()
             break;
         }
 
-        if (!NT_SUCCESS ( _process.memory().Read( entry.HashLinks.Flink, hashNode ) ))
+        if (!NT_SUCCESS ( _process.memory().Read( hashNode.Flink, hashNode ) ))
             return false;
     }
 
@@ -718,13 +713,13 @@ bool NtLdr::FindLdrpHashTable()
 template<typename T>
 bool NtLdr::FindLdrpModuleIndexBase()
 {
-    typename _PEB_T2<T>::type Peb = { 0 };
-    _process.core().peb<T>( &Peb );
+    _PEB_T<T> Peb = { 0 };
+    _process.core().peb( &Peb );
 
     if (Peb.ImageBaseAddress != 0)
     {
         T lastNode = 0;
-        auto Ldr = _process.memory().Read<_PEB_LDR_DATA2<T>>( Peb.Ldr );
+        auto Ldr = _process.memory().Read<_PEB_LDR_DATA2_T<T>>( Peb.Ldr );
         if (!Ldr)
             return false;
 
@@ -781,7 +776,7 @@ template<typename T>
 bool NtLdr::FindLdrHeap()
 {
     int32_t retries = 50;
-    typename _PEB_T2<T>::type Peb = { 0 };
+    _PEB_T<T> Peb = { 0 };
 
     _process.core().peb<T>( &Peb );
     for (; Peb.Ldr == 0 && retries > 0; retries--, Sleep( 10 ))
@@ -789,12 +784,12 @@ bool NtLdr::FindLdrHeap()
 
     if (Peb.Ldr)
     {
-        auto Ldr = _process.memory().Read<_PEB_LDR_DATA2<T>>( Peb.Ldr );
+        auto Ldr = _process.memory().Read<_PEB_LDR_DATA2_T<T>>( Peb.Ldr );
         if (!Ldr)
             return false;
 
         for (; Ldr->InMemoryOrderModuleList.Flink == Ldr->InMemoryOrderModuleList.Blink && retries > 0; retries--, Sleep( 10 ))
-            Ldr = _process.memory().Read<_PEB_LDR_DATA2<T>>( Peb.Ldr );
+            Ldr = _process.memory().Read<_PEB_LDR_DATA2_T<T>>( Peb.Ldr );
 
         MEMORY_BASIC_INFORMATION64 mbi = { 0 };
         auto NtdllEntry = Ldr->InMemoryOrderModuleList.Flink;
@@ -820,12 +815,12 @@ bool NtLdr::Unlink( const ModuleData& mod )
     auto x64Image = mod.type == mt_mod64;
 
     // Unlink from linked lists
-    ldrEntry = CHECKED_CALL( x64Image, UnlinkFromLdr, mod );
+    ldrEntry = CALL_64_86( x64Image, UnlinkFromLdr, mod );
 
     // Unlink from graph
     // TODO: Unlink from _LdrpMappingInfoIndex. Still can't decide if it is required.
     if (IsWindows8OrGreater())
-        ldrEntry = CHECKED_CALL( x64Image, UnlinkTreeNode, mod, ldrEntry );
+        ldrEntry = CALL_64_86( x64Image, UnlinkTreeNode, mod, ldrEntry );
 
     return ldrEntry != 0;
 }
@@ -838,8 +833,8 @@ bool NtLdr::Unlink( const ModuleData& mod )
 template<typename T>
 ptr_t NtLdr::UnlinkFromLdr( const ModuleData& mod )
 {
-    typename _PEB_T2<T>::type peb = { { { 0 } } };
-    _PEB_LDR_DATA2<T> ldr = { 0 };
+    _PEB_T<T> peb = { 0 };
+    _PEB_LDR_DATA2_T<T> ldr = { 0 };
 
     auto native = _process.core().native();
 
@@ -850,24 +845,24 @@ ptr_t NtLdr::UnlinkFromLdr( const ModuleData& mod )
         // InLoadOrderModuleList
         ldrEntry |= UnlinkListEntry(
             ldr.InLoadOrderModuleList,
-            fieldPtr(peb.Ldr, &_PEB_LDR_DATA2<T>::InLoadOrderModuleList ),
-            offsetOf( &_LDR_DATA_TABLE_ENTRY_BASE<T>::InLoadOrderLinks ),
+            fieldPtr(peb.Ldr, &_PEB_LDR_DATA2_T<T>::InLoadOrderModuleList ),
+            offsetOf( &_LDR_DATA_TABLE_ENTRY_BASE_T<T>::InLoadOrderLinks ),
             mod.baseAddress
             );
 
         // InMemoryOrderModuleList
         ldrEntry |= UnlinkListEntry(
             ldr.InMemoryOrderModuleList,
-            fieldPtr( peb.Ldr, &_PEB_LDR_DATA2<T>::InMemoryOrderModuleList ),
-            offsetOf( &_LDR_DATA_TABLE_ENTRY_BASE<T>::InMemoryOrderLinks ),
+            fieldPtr( peb.Ldr, &_PEB_LDR_DATA2_T<T>::InMemoryOrderModuleList ),
+            offsetOf( &_LDR_DATA_TABLE_ENTRY_BASE_T<T>::InMemoryOrderLinks ),
             mod.baseAddress
             );
 
         // InInitializationOrderModuleList
         ldrEntry |= UnlinkListEntry(
             ldr.InInitializationOrderModuleList,
-            fieldPtr( peb.Ldr, &_PEB_LDR_DATA2<T>::InInitializationOrderModuleList ),
-            offsetOf( &_LDR_DATA_TABLE_ENTRY_BASE<T>::InInitializationOrderLinks ),
+            fieldPtr( peb.Ldr, &_PEB_LDR_DATA2_T<T>::InInitializationOrderModuleList ),
+            offsetOf( &_LDR_DATA_TABLE_ENTRY_BASE_T<T>::InInitializationOrderLinks ),
             mod.baseAddress
             );
 
@@ -880,10 +875,10 @@ ptr_t NtLdr::UnlinkFromLdr( const ModuleData& mod )
             auto pHashList = _LdrpHashTable + sizeof( _LIST_ENTRY_T<T> )*(HashString( mod.name ) & 0x1F);
             auto hashList = _process.memory().Read<_LIST_ENTRY_T<T>>( pHashList ).result( _LIST_ENTRY_T<T>() );
 
-            UnlinkListEntry( hashList, pHashList, offsetOf( &_LDR_DATA_TABLE_ENTRY_BASE<T>::HashLinks ), mod.baseAddress );
+            UnlinkListEntry( hashList, pHashList, offsetOf( &_LDR_DATA_TABLE_ENTRY_BASE_T<T>::HashLinks ), mod.baseAddress );
         }
         else
-            UnlinkListEntry<T>( fieldPtr( ldrEntry, &_LDR_DATA_TABLE_ENTRY_BASE<T>::HashLinks ) );
+            UnlinkListEntry<T>( fieldPtr( ldrEntry, &_LDR_DATA_TABLE_ENTRY_BASE_T<T>::HashLinks ) );
 
         return ldrEntry;
     }
@@ -906,7 +901,7 @@ ptr_t NtLdr::UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, uintptr_t
 
     for (T entry = pListEntry.Flink; entry != 0 && entry != head; native->ReadProcessMemoryT( entry, &entry, sizeof( entry ) ))
     {
-        _LDR_DATA_TABLE_ENTRY_BASE<T> modData = { { 0 } };
+        _LDR_DATA_TABLE_ENTRY_BASE_T<T> modData = { { 0 } };
 
         native->ReadProcessMemoryT( entry - ofst, &modData, sizeof(modData), 0 );
 

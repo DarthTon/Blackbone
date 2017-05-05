@@ -268,7 +268,7 @@ struct _XSAVE_FORMAT64
     BYTE Reserved4[96];
 };
 
-struct _CONTEXT64
+struct _CONTEXT64_2
 {
     DWORD64 P1Home;
     DWORD64 P2Home;
@@ -371,7 +371,7 @@ extern "C"
 	BOOL __cdecl VirtualProtectEx64(HANDLE hProcess, DWORD64 lpAddress, SIZE_T dwSize, DWORD flNewProtect, DWORD* lpflOldProtect);
 	BOOL __cdecl ReadProcessMemory64(HANDLE hProcess, DWORD64 lpBaseAddress, LPVOID lpBuffer, SIZE_T nSize, SIZE_T *lpNumberOfBytesRead);
 	BOOL __cdecl WriteProcessMemory64(HANDLE hProcess, DWORD64 lpBaseAddress, LPVOID lpBuffer, SIZE_T nSize, SIZE_T *lpNumberOfBytesWritten);
-	BOOL __cdecl GetThreadContext64(HANDLE hThread, _CONTEXT64* lpContext);
-	BOOL __cdecl SetThreadContext64(HANDLE hThread, _CONTEXT64* lpContext);
+	BOOL __cdecl GetThreadContext64(HANDLE hThread, _CONTEXT64_2* lpContext);
+	BOOL __cdecl SetThreadContext64(HANDLE hThread, _CONTEXT64_2* lpContext);
 	VOID __cdecl SetLastErrorFromX64Call(DWORD64 status);
 }

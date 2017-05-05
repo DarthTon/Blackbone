@@ -453,5 +453,8 @@
     <ClInclude Include="Misc\PattrernLoader.h">
       <Filter>Misc</Filter>
     </ClInclude>
+    <ClInclude Include="Include\NativeEnums.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

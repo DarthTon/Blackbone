@@ -10,8 +10,8 @@ TEST_CASE( "01. PEB and TEB" )
     {
         std::cout << "PEB test for current process" << std::endl;
 
-        _PEB32 peb32 = { { { 0 } } };
-        _PEB64 peb64 = { { { 0 } } };
+        _PEB32 peb32 = { 0 };
+        _PEB64 peb64 = { 0 };
 
         auto ppeb32 = proc.core().peb32( &peb32 );
         auto ppeb64 = proc.core().peb64( &peb64 );
@@ -65,7 +65,7 @@ TEST_CASE( "02. Invalid handle access" )
     hProc = OpenProcess( PROCESS_ALL_ACCESS & ~PROCESS_VM_READ, FALSE, GetCurrentProcessId() );
     REQUIRE_NT_SUCCESS( proc.Attach( hProc ) );
 
-    PEB_T peb = { { { 0 } } };
+    PEB_T peb = { 0 };
     CHECK( proc.core().peb( &peb ) != 0 );
     CHECK( peb.ImageBaseAddress == 0 );
     CHECK( LastNtStatus() == STATUS_ACCESS_DENIED );

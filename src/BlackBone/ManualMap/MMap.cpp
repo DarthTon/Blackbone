@@ -130,14 +130,12 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
         // Managed path fix
         if (_images.rbegin()->get()->peImage.pureIL() && !path.empty())
         {
-            auto mpath = _process.memory().Read<uintptr_t>( _process.core().peb() + 2 * WordSize );
-            if (!mpath)
-            {
-                Cleanup();
-                return mpath.status;
-            }
-
-            FixManagedPath( mpath.result(), path );
+            CALL_64_86(
+                mod.result()->type == mt_mod64, 
+                FixManagedPath, 
+                _process.modules().GetMainModule()->baseAddress, 
+                path 
+            );
         }
 
         // PEB64
@@ -220,19 +218,20 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
 /// </summary>
 /// <param name="base">Image base</param>
 /// <param name="path">New image path</param>
-void MMap::FixManagedPath( uintptr_t base, const std::wstring &path )
+template<typename T>
+void MMap::FixManagedPath( ptr_t base, const std::wstring &path )
 {
-    _PEB_T2<DWORD_PTR>::type peb = { { { 0 } } };
-    _PEB_LDR_DATA2<DWORD_PTR> ldr = { 0 };
+    _PEB_T<T> peb = { 0 };
+    _PEB_LDR_DATA2_T<T> ldr = { 0 };
 
     if (_process.core().peb( &peb ) != 0 && _process.memory().Read( peb.Ldr, sizeof( ldr ), &ldr ) == STATUS_SUCCESS)
     {
         // Get PEB loader entry
-        for (auto head = static_cast<DWORD_PTR>(ldr.InLoadOrderModuleList.Flink);
-            head != (peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2<DWORD_PTR>, InLoadOrderModuleList ));
-            head = _process.memory().Read<DWORD_PTR>( head ).result( 0 ))
+        for (auto head = ldr.InLoadOrderModuleList.Flink;
+            head != fieldPtr( peb.Ldr, &_PEB_LDR_DATA2_T<T>::InLoadOrderModuleList );
+            head = _process.memory().Read<T>( head ).result( 0 ))
         {
-            _LDR_DATA_TABLE_ENTRY_BASE<DWORD_PTR> localdata = { { 0 } };
+            _LDR_DATA_TABLE_ENTRY_BASE_T<T> localdata = { { 0 } };
 
             _process.memory().Read( head, sizeof( localdata ), &localdata );
             if (localdata.DllBase == base)
@@ -240,7 +239,7 @@ void MMap::FixManagedPath( uintptr_t base, const std::wstring &path )
                 auto len = path.length()* sizeof( wchar_t );
                 _process.memory().Write( localdata.FullDllName.Buffer, len + 2, path.c_str() );
                 _process.memory().Write<short>(
-                    head + FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE<DWORD_PTR>, FullDllName.Length ),
+                    head + FIELD_OFFSET( _LDR_DATA_TABLE_ENTRY_BASE_T<T>, FullDllName.Length ),
                     static_cast<short>(len)
                     );
 
@@ -1031,55 +1030,55 @@ NTSTATUS MMap::InitializeCookie( ImageContext* pImage )
 {
     auto pLoadConfig32 = reinterpret_cast<PIMAGE_LOAD_CONFIG_DIRECTORY32>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG ));
     auto pLoadConfig64 = reinterpret_cast<PIMAGE_LOAD_CONFIG_DIRECTORY64>(pLoadConfig32);
+    if (!pLoadConfig32)
+        return STATUS_SUCCESS;
 
     ptr_t pCookie = pLoadConfig32->SecurityCookie;
     if (pImage->ldrEntry.type == mt_mod64)
         pCookie = pLoadConfig64->SecurityCookie;
 
+    if (!pCookie)
+        return STATUS_SUCCESS;
+
     //
     // Cookie generation based on MSVC++ compiler
     //
-    if (pLoadConfig32 && pCookie)
+    BLACKBONE_TRACE( L"ManualMap: Performing security cookie initializtion for image '%ls'", pImage->ldrEntry.name.c_str() );
+
+    FILETIME systime = { 0 };
+    LARGE_INTEGER PerformanceCount = { { 0 } };
+    size_t size = sizeof( uint32_t );
+
+    GetSystemTimeAsFileTime( &systime );
+    QueryPerformanceCounter( &PerformanceCount );
+
+    ptr_t cookie = _process.pid() ^ _process.remote().getWorker()->id() ^ reinterpret_cast<uintptr_t>(&cookie);
+
+    if (pImage->ldrEntry.type == mt_mod64)
     {
-        BLACKBONE_TRACE( L"ManualMap: Performing security cookie initializtion for image '%ls'", pImage->ldrEntry.name.c_str() );
+        size = sizeof( uint64_t );
 
-        FILETIME systime = { 0 };
-        LARGE_INTEGER PerformanceCount = { { 0 } };
-        size_t size = sizeof( uint32_t );
+        cookie ^= *reinterpret_cast<uint64_t*>(&systime);
+        cookie ^= (PerformanceCount.QuadPart << 32) ^ PerformanceCount.QuadPart;
+        cookie &= 0xFFFFFFFFFFFF;
 
-        GetSystemTimeAsFileTime( &systime );
-        QueryPerformanceCounter( &PerformanceCount );
+        if (cookie == 0x2B992DDFA232)
+            cookie++;
+    }
+    else
+    {
+        cookie &= 0xFFFFFFFF;
+        cookie ^= systime.dwHighDateTime ^ systime.dwLowDateTime;
+        cookie ^= PerformanceCount.LowPart;
+        cookie ^= PerformanceCount.HighPart;
 
-        ptr_t cookie = _process.pid() ^ _process.remote().getWorker()->id() ^ reinterpret_cast<uintptr_t>(&cookie);
-
-        if (pImage->ldrEntry.type == mt_mod64) 
-        {
-            size = sizeof( uint64_t );
-
-            cookie ^= *reinterpret_cast<uint64_t*>(&systime);
-            cookie ^= (PerformanceCount.QuadPart << 32) ^ PerformanceCount.QuadPart;
-            cookie &= 0xFFFFFFFFFFFF;
-
-            if (cookie == 0x2B992DDFA232)
-                cookie++;
-        }
-        else
-        {
-            cookie &= 0xFFFFFFFF;
-            cookie ^= systime.dwHighDateTime ^ systime.dwLowDateTime;
-            cookie ^= PerformanceCount.LowPart;
-            cookie ^= PerformanceCount.HighPart;
-
-            if (cookie == 0xBB40E64E)
-                cookie++;
-            else if (!(cookie & 0xFFFF0000))
-                cookie |= (cookie | 0x4711) << 16;
-        }
-
-        return _process.memory().Write( REBASE( pCookie, pImage->peImage.imageBase(), pImage->imgMem.ptr() ), size, &cookie );
+        if (cookie == 0xBB40E64E)
+            cookie++;
+        else if (!(cookie & 0xFFFF0000))
+            cookie |= (cookie | 0x4711) << 16;
     }
 
-    return STATUS_SUCCESS;
+    return _process.memory().Write( REBASE( pCookie, pImage->peImage.imageBase(), pImage->imgMem.ptr() ), size, &cookie );
 }
 
 /// <summary>
@@ -1113,16 +1112,16 @@ call_result_t<uint64_t> MMap::RunModuleInitializers( ImageContext* pImage, DWORD
     }
 
     // Prepare custom arguments
-    uintptr_t customArgumentsAddress = 0;
+    ptr_t customArgumentsAddress = 0;
     if (pCustomArgs)
     {
-        auto memBuf = _process.memory().Allocate( static_cast<size_t>(pCustomArgs->size()) + sizeof( uint64_t ), PAGE_EXECUTE_READWRITE, 0, false );
+        auto memBuf = _process.memory().Allocate( pCustomArgs->size() + sizeof( uint64_t ), PAGE_EXECUTE_READWRITE, 0, false );
         if (!memBuf)
             return memBuf.status;
 
         memBuf->Write( 0, pCustomArgs->size() );
-        memBuf->Write( sizeof( uint64_t ), static_cast<size_t>(pCustomArgs->size()), pCustomArgs->data() );
-        customArgumentsAddress = static_cast<uintptr_t>(memBuf->ptr());
+        memBuf->Write( sizeof( uint64_t ), pCustomArgs->size(), pCustomArgs->data() );
+        customArgumentsAddress = memBuf->ptr();
     }
 
     // Function order
