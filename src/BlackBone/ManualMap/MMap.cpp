@@ -397,9 +397,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     auto pMod = _process.modules().AddManualModule( static_cast<ModuleData&>(ldrEntry) );
     {
         // Handle x64 system32 dlls for wow64 process
-        bool fsRedirect = _process.modules().GetManualModules().size() == 1
-            && mt == mt_mod64
-            && _process.barrier().sourceWow64;
+        bool fsRedirect = !(flags & IsDependency) && mt == mt_mod64 && _process.barrier().sourceWow64;
 
         FsRedirector fsr( fsRedirect );
 
@@ -461,7 +459,8 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     if (_mapCallback != nullptr)
     {
         auto mapData = _mapCallback( PostCallback, _userContext, _process, *pMod );
-        pImage->ldrEntry.flags = mapData.ldrFlags;
+        if(mapData.ldrFlags != Ldr_Ignore)
+            pImage->ldrEntry.flags = mapData.ldrFlags;
     }
 
     if (pImage->ldrEntry.flags != Ldr_None)
@@ -798,7 +797,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapDependency( ImageContext* pImage, st
     // Loading method
     if (data.mtype == MT_Manual || (data.mtype == MT_Default && pImage->flags & ManualImports))
     {
-        return FindOrMapModule( path, nullptr, 0, false, pImage->flags | NoSxS | NoDelayLoad | PartialExcept );
+        return FindOrMapModule( path, nullptr, 0, false, pImage->flags | NoSxS | NoDelayLoad | PartialExcept | IsDependency );
     }
     else if (data.mtype != MT_None)
     {

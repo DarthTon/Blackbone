@@ -40,11 +40,8 @@ NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
     Detach();
 
     auto status = _core.Open( pid, access );
-    if (NT_SUCCESS( status ))
-    {
-        _nativeLdr.Init();
+    if (NT_SUCCESS( status ) && (access & PROCESS_VM_WRITE))
         status = _remote.CreateRPCEnvironment( false, false );
-    }
 
     return status;
 }
@@ -64,7 +61,6 @@ NTSTATUS Process::Attach( HANDLE hProc )
         if (!valid())
             return STATUS_INVALID_HANDLE;
 
-        _nativeLdr.Init();
         _remote.CreateRPCEnvironment( false, false );
     }
 
@@ -131,8 +127,6 @@ NTSTATUS Process::CreateAndAttach(
         }
         else
             ResumeThread( pi.hThread );
-
-        _nativeLdr.Init();
     }
 
     // Close unneeded handles

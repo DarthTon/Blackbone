@@ -23,10 +23,22 @@ NtLdr::~NtLdr(void)
 /// <summary>
 /// Initialize some loader stuff
 /// </summary>
-/// <returns></returns>
-bool NtLdr::Init()
+/// <param name="initFor">Target module type</param>
+/// <returns>true on success</returns
+bool NtLdr::Init( eModType initFor /*= mt_default*/ )
 {
-    if (_process.core().isWow64())
+    // Sanity check, already initialized
+    assert( initFor != _initializedFor );
+    if (initFor == _initializedFor)
+        return true;
+
+    // Detect target module type
+    _initializedFor = initFor;
+    if (_initializedFor == mt_unknown)
+        _initializedFor = _process.core().isWow64() ? mt_mod32 : mt_mod64;
+
+    // Select loader version
+    if (_initializedFor == mt_mod32)
     {
         FindLdrHeap<uint32_t>();
         FindLdrpHashTable<uint32_t>();
@@ -45,13 +57,12 @@ bool NtLdr::Init()
 
     // Report errors
 #ifndef BLACBONE_NO_TRACE
-    auto barrier = _process.barrier().type;
+    if (_LdrHeapBase == 0)
+        BLACKBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
     if (_LdrpHashTable == 0)
         BLACKBONE_TRACE( "NativeLdr: LdrpHashTable not found" );
     if (IsWindows8OrGreater() && _LdrpModuleIndexBase == 0)
         BLACKBONE_TRACE( "NativeLdr: LdrpModuleIndexBase not found" );
-    if (_LdrHeapBase == 0 && (barrier == wow_32_32 || barrier == wow_64_64))
-        BLACKBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
 #endif
 
     return true;
@@ -68,6 +79,10 @@ bool NtLdr::CreateNTReference( NtLdrEntry& mod )
     // Skip
     if (mod.flags == Ldr_None)
         return true;
+
+    // Check if reinitialization is required
+    if (_initializedFor != mod.type)
+        Init( mod.type );
 
     bool x64Image = (mod.type == mt_mod64);
     bool w8 = IsWindows8OrGreater();
@@ -97,7 +112,7 @@ bool NtLdr::CreateNTReference( NtLdrEntry& mod )
     }
 
     // Insert into ldr lists
-    if (mod.flags & Ldr_ThdCall || (mod.flags & Ldr_ModList && !w8))
+    if (mod.flags & Ldr_ThdCall || (!w8 && mod.flags & Ldr_ModList))
     {
         _process.memory().Write( FIELD_PTR_64_86( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE_T, Flags ), 0x80004 );
         ptr_t loadPtr = 0, initptr = 0;
@@ -140,7 +155,7 @@ ptr_t NtLdr::SetNode( ptr_t ptr, T2 pModule )
 /// <param name="mod">Module data</param>
 /// <param name="tlsPtr">TLS directory of target image</param>
 /// <returns>Status code</returns>
-NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
+NTSTATUS NtLdr::AddStaticTLSEntry( const NtLdrEntry& mod, ptr_t tlsPtr )
 {
     bool wxp = IsWindowsXPOrGreater() && !IsWindowsVistaOrGreater();
     ptr_t pNode = _nodeMap.count( mod.baseAddress ) ? _nodeMap[mod.baseAddress] : 0;
@@ -820,6 +835,10 @@ bool NtLdr::Unlink( const ModuleData& mod )
 {
     ptr_t ldrEntry = 0;
     auto x64Image = mod.type == mt_mod64;
+
+    // Reinitialize
+    if (_initializedFor != mod.type)
+        Init( mod.type );
 
     // Unlink from linked lists
     ldrEntry = CALL_64_86( x64Image, UnlinkFromLdr, mod );

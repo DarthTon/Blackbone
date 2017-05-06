@@ -125,6 +125,7 @@ enum eLoadFlags
     NoDelayLoad     = 0x04000,   // Do not resolve delay import
     NoSxS           = 0x08000,   // Do not apply SxS activation context
     NoTLS           = 0x10000,   // Skip TLS initialization and don't execute TLS callbacks
+    IsDependency    = 0x20000,   // Module is a dependency
 };
 
 ENUM_OPS( eLoadFlags )

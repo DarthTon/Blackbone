@@ -16,7 +16,8 @@ enum LdrRefFlags
     Ldr_ModList   = 0x01,   // Add to module list -  LdrpModuleIndex( win8 only ), InMemoryOrderModuleList( win7 only )
     Ldr_HashTable = 0x02,   // Add to LdrpHashTable
     Ldr_ThdCall   = 0x04,   // Add to thread callback list (dllmain will be called with THREAD_ATTACH/DETACH reasons)
-    Ldr_All       = 0xFF    // Add to everything
+    Ldr_All       = 0xFF,   // Add to everything
+    Ldr_Ignore    = 0xDE    // Only valid in mod callback, mod callback value will be ignored
 };
 
 ENUM_OPS( LdrRefFlags )
@@ -38,8 +39,9 @@ public:
     /// <summary>
     /// Initialize some loader stuff
     /// </summary>
-    /// <returns></returns>
-    BLACKBONE_API bool Init();
+    /// <param name="initFor">Target module type</param>
+    /// <returns>true on success</returns>
+    BLACKBONE_API bool Init( eModType initFor = mt_default );
 
     /// <summary>
     /// Add module to some loader structures 
@@ -55,7 +57,7 @@ public:
     /// <param name="mod">Module data</param>
     /// <param name="tlsPtr">TLS directory of target image</param>
     /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr );
+    BLACKBONE_API NTSTATUS AddStaticTLSEntry( const NtLdrEntry& mod, ptr_t tlsPtr );
 
     /// <summary>
     /// Create module record in LdrpInvertedFunctionTable
@@ -213,13 +215,14 @@ private:
     NtLdr& operator =(const NtLdr&) = delete;
 
 private:
-    class Process& _process;            // Process memory routines
+    class Process& _process;                // Process memory routines
 
-    ptr_t _LdrpHashTable = 0;           // LdrpHashTable address
-    ptr_t _LdrpModuleIndexBase = 0;     // LdrpModuleIndex address
-    ptr_t _LdrHeapBase = 0;             // Loader heap base address
+    ptr_t _LdrpHashTable = 0;               // LdrpHashTable address
+    ptr_t _LdrpModuleIndexBase = 0;         // LdrpModuleIndex address
+    ptr_t _LdrHeapBase = 0;                 // Loader heap base address
 
-    std::map<ptr_t, ptr_t> _nodeMap;    // Allocated native structures
+    eModType _initializedFor = mt_unknown;  // Loader initialization target
+    std::map<ptr_t, ptr_t> _nodeMap;        // Allocated native structures
 };
 
 }
