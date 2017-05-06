@@ -53,9 +53,9 @@ public:
     /// Create thread static TLS array
     /// </summary>
     /// <param name="mod">Module data</param>
-    /// <param name="pTls">TLS directory of target image</param>
+    /// <param name="tlsPtr">TLS directory of target image</param>
     /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS AddStaticTLSEntry( NtLdrEntry& mod, IMAGE_TLS_DIRECTORY *pTls );
+    BLACKBONE_API NTSTATUS AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr );
 
     /// <summary>
     /// Create module record in LdrpInvertedFunctionTable

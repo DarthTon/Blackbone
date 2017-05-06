@@ -96,7 +96,7 @@ NTSTATUS RemoteExec::ExecInNewThread(
     auto thread = _threads.CreateNew( _userCode.ptr() + size, _userData.ptr()/*, HideFromDebug*/ );
     if (!thread)
         return thread.status;
-    if (!thread.result()->Join())
+    if (!(*thread)->Join())
         return LastNtStatus();
 
     callResult = _userData.Read<uint64_t>( INTRET_OFFSET, 0 );
@@ -294,8 +294,8 @@ DWORD RemoteExec::ExecDirect( ptr_t pCode, ptr_t arg )
     if (!thread)
         return thread.status;
 
-    thread.result()->Join();
-    return thread.result()->ExitCode();
+    (*thread)->Join();
+    return (*thread)->ExitCode();
 }
 
 /// <summary>

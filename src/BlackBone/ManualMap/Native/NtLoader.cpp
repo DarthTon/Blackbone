@@ -138,9 +138,9 @@ ptr_t NtLdr::SetNode( ptr_t ptr, T2 pModule )
 /// Create thread static TLS array
 /// </summary>
 /// <param name="mod">Module data</param>
-/// <param name="pTls">TLS directory of target image</param>
+/// <param name="tlsPtr">TLS directory of target image</param>
 /// <returns>Status code</returns>
-NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, IMAGE_TLS_DIRECTORY *pTls )
+NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
 {
     bool wxp = IsWindowsXPOrGreater() && !IsWindowsVistaOrGreater();
     ptr_t pNode = _nodeMap.count( mod.baseAddress ) ? _nodeMap[mod.baseAddress] : 0;
@@ -162,7 +162,7 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, IMAGE_TLS_DIRECTORY *pTls )
         return STATUS_NO_MEMORY;
 
     // Manually add TLS table
-    if (wxp && pTls != nullptr)
+    if (wxp && tlsPtr != 0)
     {
         ptr_t pTeb = 0;
         pTeb = _process.remote().getWorker()->teb( static_cast<_TEB32*>(nullptr) );
@@ -174,7 +174,7 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, IMAGE_TLS_DIRECTORY *pTls )
         auto tlsStore = std::move( mem.result() );
 
         IMAGE_TLS_DIRECTORY remoteTls = { 0 };
-        _process.memory().Read( reinterpret_cast<ptr_t>(pTls), sizeof( remoteTls ), &remoteTls );
+        _process.memory().Read( tlsPtr, sizeof( remoteTls ), &remoteTls );
 
         auto size = remoteTls.EndAddressOfRawData - remoteTls.StartAddressOfRawData;
         std::unique_ptr<uint8_t[]> buf( new uint8_t[size]() );
@@ -184,7 +184,7 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, IMAGE_TLS_DIRECTORY *pTls )
         tlsStore.Write( 0, tlsStore.ptr<uintptr_t>() + 0x800 );
         tlsStore.Write( 0x800, size, buf.get() );
 
-        return _process.memory().Write( pTeb + FIELD_OFFSET( _TEB32, ThreadLocalStoragePointer ), tlsStore.ptr<uint32_t>() );
+        return _process.memory().Write( fieldPtr( pTeb, &_TEB32::ThreadLocalStoragePointer ), tlsStore.ptr<uint32_t>() );
     }
 
     // Use native method
@@ -373,6 +373,9 @@ ptr_t NtLdr::InitBaseNode( NtLdrEntry& mod )
     // entryPtr->FullDllName = strLocal;
     _process.memory().Write( fieldPtr( entryPtr, &EntryType::FullDllName ), strLocal );
 
+    // entryPtr->LoadCount = -1;
+    _process.memory().Write( fieldPtr( entryPtr, &EntryType::LoadCount ), strLocal );
+
     return entryPtr;
 }
 
@@ -431,6 +434,10 @@ ptr_t NtLdr::InitW7Node( NtLdrEntry& mod )
     // Forward Links
     _process.memory().Write( fieldPtr( entryPtr, &EntryType::ForwarderLinks ), fieldPtr( entryPtr, &EntryType::ForwarderLinks ) );
     _process.memory().Write( fieldPtr( entryPtr, &EntryType::ForwarderLinks ) + sizeof( T ), fieldPtr( entryPtr, &EntryType::ForwarderLinks ) );
+
+    // Static links
+    _process.memory().Write( fieldPtr( entryPtr, &EntryType::StaticLinks ), fieldPtr( entryPtr, &EntryType::StaticLinks ) );
+    _process.memory().Write( fieldPtr( entryPtr, &EntryType::StaticLinks ) + sizeof( T ), fieldPtr( entryPtr, &EntryType::StaticLinks ) );
 
     return entryPtr;
 }

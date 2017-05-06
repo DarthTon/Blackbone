@@ -1,5 +1,6 @@
 #include "InitOnce.h"
 #include "../Include/Winheaders.h"
+#include "../../../contrib/VersionHelpers.h"
 #include "../Include/Macro.h"
 #include "DynImport.h"
 #include "PattrernLoader.h"
@@ -18,6 +19,8 @@ public:
     {
         if(!_done)
         {
+            InitVersion();
+
             GrantPriviledge( L"SeDebugPrivilege" );
             GrantPriviledge( L"SeLoadDriverPrivilege" );
             LoadFuncs();

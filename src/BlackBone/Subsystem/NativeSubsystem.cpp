@@ -450,21 +450,21 @@ std::vector<ModuleDataPtr> Native::EnumModulesT()
     {
         for (T head = ldr.InLoadOrderModuleList.Flink;
               head != (peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2_T<T>, InLoadOrderModuleList ));
-              ReadProcessMemoryT( static_cast<ptr_t>(head), &head, sizeof(head), 0 ))
+              ReadProcessMemoryT( static_cast<ptr_t>(head), &head, sizeof(head) ))
         {
             ModuleData data;
             wchar_t localPath[512] = { 0 };
             _LDR_DATA_TABLE_ENTRY_BASE_T<T> localdata = { { 0 } };
 
             ReadProcessMemoryT( head, &localdata, sizeof(localdata), 0 );
-            ReadProcessMemoryT( localdata.FullDllName.Buffer, localPath, localdata.FullDllName.Length, 0 );
+            ReadProcessMemoryT( localdata.FullDllName.Buffer, localPath, localdata.FullDllName.Length );
 
             data.baseAddress = localdata.DllBase;
             data.size = localdata.SizeOfImage;
             data.fullPath = Utils::ToLower( localPath );
             data.name = Utils::StripPath( data.fullPath );
+            data.type = (sizeof( T ) < sizeof( uint64_t )) ? mt_mod32 : mt_mod64;
             data.manual = false;
-            data.type = std::integral_constant<bool, (sizeof( T ) < sizeof( uint64_t ))>::value ? mt_mod32 : mt_mod64;
 
             result.emplace_back( std::make_shared<const ModuleData>( data ) );
         }

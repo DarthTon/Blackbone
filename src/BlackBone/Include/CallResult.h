@@ -38,8 +38,10 @@ struct call_result_t
     inline T result( const T& def_val ) const { return result_data.value_or( def_val ); }
 
     inline explicit operator bool() const { return NT_SUCCESS( status ); }
-    inline explicit operator T() const { return result_data.value(); }
+    inline explicit operator T() const    { return result_data.value(); }
+
     inline T* operator ->() { return &result_data.value(); }
+    inline T& operator *()  { return result_data.value(); }
 };
 }
 #endif

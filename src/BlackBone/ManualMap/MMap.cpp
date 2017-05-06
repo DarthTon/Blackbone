@@ -125,13 +125,13 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
     // Change process base module address if needed
     if (flags & RebaseProcess && !_images.empty() && _images.rbegin()->get()->peImage.isExe())
     {
-        BLACKBONE_TRACE( L"ManualMap: Rebasing process to address 0x%p", mod.result()->baseAddress );
+        BLACKBONE_TRACE( L"ManualMap: Rebasing process to address 0x%p", (*mod)->baseAddress );
 
         // Managed path fix
         if (_images.rbegin()->get()->peImage.pureIL() && !path.empty())
         {
             CALL_64_86(
-                mod.result()->type == mt_mod64, 
+                (*mod)->type == mt_mod64,
                 FixManagedPath, 
                 _process.modules().GetMainModule()->baseAddress, 
                 path 
@@ -140,16 +140,20 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
 
         // PEB64
         _process.memory().Write( 
-            _process.core().peb64() + offsetOf( &_PEB64::ImageBaseAddress ),
-            mod.result()->baseAddress
-            );
+            fieldPtr( _process.core().peb64(), &_PEB64::ImageBaseAddress ),
+            sizeof( uint64_t ), 
+            &(*mod)->baseAddress
+        );
 
         // PEB32
         if(_process.core().isWow64())
+        {
             _process.memory().Write(
-                _process.core().peb32() + offsetOf( &_PEB32::ImageBaseAddress ),
-                sizeof( uint32_t ), &mod.result()->baseAddress
-                );
+                fieldPtr(_process.core().peb32(), &_PEB32::ImageBaseAddress ),
+                sizeof( uint32_t ), 
+                &(*mod)->baseAddress
+            );
+        }
     }
 
     auto wipeMemory = []( Process& proc, ImageContext* img, uintptr_t offset, uintptr_t size )
@@ -860,7 +864,13 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
                 }
 
                 if (expData->forwardByOrd)
-                    expData = _process.modules().GetExport( hFwdMod.result(), reinterpret_cast<const char*>(expData->forwardOrdinal), wdllpath.c_str() );
+                {
+                    expData = _process.modules().GetExport(
+                        hFwdMod.result(),
+                        reinterpret_cast<const char*>(expData->forwardOrdinal),
+                        wdllpath.c_str()
+                    );
+                }
                 else
                     expData = _process.modules().GetExport( hFwdMod.result(), expData->forwardName.c_str(), wdllpath.c_str() );
             }
@@ -869,9 +879,21 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
             if (!expData)
             {
                 if (importFn.importByOrd)
-                    BLACKBONE_TRACE( L"ManualMap: Failed to get import #%d from image '%ls'", importFn.importOrdinal, wstrDll.c_str() );
+                {
+                    BLACKBONE_TRACE(
+                        L"ManualMap: Failed to get import #%d from image '%ls'",
+                        importFn.importOrdinal,
+                        wstrDll.c_str()
+                    );
+                }
                 else
-                    BLACKBONE_TRACE( L"ManualMap: Failed to get import '%ls' from image '%ls'", Utils::AnsiToWstring( importFn.importName ).c_str(), wstrDll.c_str() );
+                {
+                    BLACKBONE_TRACE(
+                        L"ManualMap: Failed to get import '%ls' from image '%ls'",
+                        Utils::AnsiToWstring( importFn.importName ).c_str(),
+                        wstrDll.c_str()
+                    );
+                }
 
                 return expData.status;
             }
@@ -887,9 +909,22 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
 
     // Apply imports, skip header
     if (pImage->flags & HideVAD)
-        status = Driver().WriteMem( _process.pid(), pImage->ldrEntry.baseAddress + 0x1000, pImage->ldrEntry.size - 0x1000, pLocal + 0x1000 );
+    {
+        status = Driver().WriteMem(
+            _process.pid(),
+            pImage->ldrEntry.baseAddress + 0x1000,
+            pImage->ldrEntry.size - 0x1000,
+            pLocal + 0x1000
+        );
+    }
     else
-        status = _process.memory().Write( pImage->ldrEntry.baseAddress + 0x1000, pImage->ldrEntry.size - 0x1000, pLocal + 0x1000 );
+    {
+        status = _process.memory().Write(
+            pImage->ldrEntry.baseAddress + 0x1000,
+            pImage->ldrEntry.size - 0x1000,
+            pLocal + 0x1000
+        );
+    }
 
     // Write function address
     if (!NT_SUCCESS( status ))
@@ -992,12 +1027,9 @@ NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
         auto status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
         if (!NT_SUCCESS( status ))
             return status;
-
-        partial = (pImage->flags & CreateLdrRef) != 0;
     }
-    else
-        partial = (pImage->flags & PartialExcept) != 0;
 
+    partial = (pImage->flags & PartialExcept) != 0;
     return _expMgr.RemoveVEH( _process, partial, pImage->peImage.mType() );
 }
 
@@ -1008,14 +1040,14 @@ NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
 /// <returns>Status code</returns>
 NTSTATUS MMap::InitStaticTLS( ImageContext* pImage )
 {
-    IMAGE_TLS_DIRECTORY *pTls = reinterpret_cast<decltype(pTls)>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_TLS ));
-    auto pRebasedTls = reinterpret_cast<IMAGE_TLS_DIRECTORY*>(REBASE( pTls, pImage->peImage.base(), pImage->imgMem.ptr<ptr_t>() ));
+    auto pTls = reinterpret_cast<PIMAGE_TLS_DIRECTORY>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_TLS ));
+    auto rebasedTlsPtr = REBASE( pTls, pImage->peImage.base(), pImage->imgMem.ptr() );
 
     // Use native TLS initialization
     if (pTls && pTls->AddressOfIndex)
     {
         BLACKBONE_TRACE( L"ManualMap: Performing static TLS initialization for image '%ls'", pImage->ldrEntry.name.c_str() );
-        return _process.nativeLdr().AddStaticTLSEntry( pImage->ldrEntry, pRebasedTls );
+        return _process.nativeLdr().AddStaticTLSEntry( pImage->ldrEntry, rebasedTlsPtr );
     }
 
     return STATUS_SUCCESS;
@@ -1217,8 +1249,10 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
     auto pCreateActx = _process.modules().GetExport( _process.modules().GetModule( L"kernel32.dll" ), "CreateActCtxW" );
     if (!pCreateActx)
     {
-        BLACKBONE_TRACE( L"ManualMap: Failed to create activation context for image '%ls'. 'CreateActCtxW' is absent", 
-            image.manifestFile().c_str() );
+        BLACKBONE_TRACE( 
+            L"ManualMap: Failed to create activation context for image '%ls'. 'CreateActCtxW' is absent", 
+            image.manifestFile().c_str() 
+        );
         return STATUS_ORDINAL_NOT_FOUND;
     }
 
@@ -1226,7 +1260,7 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
     // Emulate Wow64
     if (switchMode)
     {
-        _ACTCTXW_T<DWORD> act32 = { 0 };
+        _ACTCTXW_T<uint32_t> act32 = { 0 };
 
         act32.cbSize = sizeof(act32);
         act32.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID;
@@ -1266,7 +1300,7 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
     // Native way
     else
     {
-        auto fillACTX = [this, &image]( auto&& act )
+        auto fillACTX = [this, &image]( auto act )
         {
             memset( &act, 0, sizeof( act ) );
 
@@ -1333,10 +1367,10 @@ NTSTATUS MMap::ProbeRemoteSxS( std::wstring& path )
     NTSTATUS status = STATUS_SUCCESS;
 
     constexpr uint32_t memSize    = 0x1000;
-    constexpr uint32_t dll1Offset = 0x200;
-    constexpr uint32_t dll2Offset = 0x400;
+    constexpr uint32_t dll1Offset = 0x300;
+    constexpr uint32_t dll2Offset = 0x600;
     constexpr uint32_t pathOffset = 0x800;
-    constexpr uint32_t strOffset  = 0x1000;
+    constexpr uint32_t strOffset  = 0xA00;
     constexpr uint16_t strSize    = 0x200;
 
     // No underlying function
@@ -1357,11 +1391,11 @@ NTSTATUS MMap::ProbeRemoteSxS( std::wstring& path )
 
     // Fill Unicode strings
     auto memPtr = memBuf->ptr();
-    auto fillStr = [&]( auto OriginalName )
+    auto fillStr = [&]( auto&& OriginalName )
     {
-        decltype(OriginalName) DllName1 = { 0 };
+        std::remove_reference<decltype(OriginalName)>::type DllName1 = { 0 };
 
-        OriginalName.Length = static_cast<WORD>(path.length() * sizeof( wchar_t ));
+        OriginalName.Length = static_cast<uint16_t>(path.length() * sizeof( wchar_t ));
         OriginalName.MaximumLength = OriginalName.Length;
         OriginalName.Buffer = static_cast<decltype(OriginalName.Buffer)>(memPtr + sizeof( OriginalName ));
 
@@ -1378,9 +1412,9 @@ NTSTATUS MMap::ProbeRemoteSxS( std::wstring& path )
     };
 
     if (_process.barrier().targetWow64)
-        status = fillStr( _UNICODE_STRING_T<DWORD>() );
+        status = fillStr( _UNICODE_STRING_T<uint32_t>() );
     else
-        status = fillStr( _UNICODE_STRING_T<DWORD64>() );
+        status = fillStr( _UNICODE_STRING_T<uint64_t>() );
 
     if (!NT_SUCCESS( status ))
         return status;

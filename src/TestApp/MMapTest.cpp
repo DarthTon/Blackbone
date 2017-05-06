@@ -16,17 +16,16 @@ void TestMMap()
 
     nativeMods.emplace( L"combase.dll" );
     nativeMods.emplace( L"user32.dll" );
-    nativeMods.emplace( L"comctl32.dll" );
-    nativeMods.emplace( L"gdiplus.dll" );
+    if (WinVer().ver == Win7)
+    {
+        nativeMods.emplace( L"gdi32.dll" );
+        nativeMods.emplace( L"msvcr120.dll" );
+        nativeMods.emplace( L"msvcp120.dll" );
+    }
 
     modList.emplace( L"windows.storage.dll" );
     modList.emplace( L"shell32.dll" );
     modList.emplace( L"shlwapi.dll" );
-    if (IsWindows7OrGreater() && !IsWindows8OrGreater())
-    {
-        modList.emplace( L"msvcr120.dll" );
-        modList.emplace( L"msvcp120.dll" );
-    }
 
     auto callback = []( CallbackType type, void* /*context*/, Process& /*process*/, const ModuleData& modInfo )
     {
