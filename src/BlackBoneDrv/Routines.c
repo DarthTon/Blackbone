@@ -1,5 +1,6 @@
 #include "BlackBoneDrv.h"
 #include "Routines.h"
+#include "Utils.h"
 #include <Ntstrsafe.h>
 
 LIST_ENTRY g_PhysProcesses;
@@ -14,9 +15,18 @@ LONG g_trIndex = 0;         // Trampoline global index
 /// <returns>Found entry, NULL if not found</returns>
 PMEM_PHYS_ENTRY BBLookupPhysMemEntry( IN PLIST_ENTRY pList, IN PVOID pBase );
 VOID BBWriteTrampoline( IN PUCHAR place, IN PVOID pfn );
+BOOLEAN BBHandleCallback(
+#if !defined(_WIN7_)
+    IN PHANDLE_TABLE HandleTable,
+#endif
+    IN PHANDLE_TABLE_ENTRY HandleTableEntry, 
+    IN HANDLE Handle, 
+    IN PVOID EnumParameter 
+    );
 
 #pragma alloc_text(PAGE, BBDisableDEP)
 #pragma alloc_text(PAGE, BBSetProtection)
+#pragma alloc_text(PAGE, BBHandleCallback)
 #pragma alloc_text(PAGE, BBGrantAccess)
 #pragma alloc_text(PAGE, BBCopyMemory)
 #pragma alloc_text(PAGE, BBAllocateFreeMemory)
@@ -137,17 +147,63 @@ NTSTATUS BBSetProtection( IN PSET_PROC_PROTECTION pProtection )
 }
 
 /// <summary>
+/// Handle enumeration callback
+/// </summary>
+/// <param name="HandleTable">Process handle table</param>
+/// <param name="HandleTableEntry">Handle entry</param>
+/// <param name="Handle">Handle value</param>
+/// <param name="EnumParameter">User context</param>
+/// <returns>TRUE when desired handle is found</returns>
+BOOLEAN BBHandleCallback(
+#if !defined(_WIN7_)
+    IN PHANDLE_TABLE HandleTable,
+#endif
+    IN PHANDLE_TABLE_ENTRY HandleTableEntry,
+    IN HANDLE Handle,
+    IN PVOID EnumParameter
+    )
+{
+
+    BOOLEAN result = FALSE;
+    ASSERT( EnumParameter );
+
+    if (EnumParameter != NULL)
+    {
+        PHANDLE_GRANT_ACCESS pAccess = (PHANDLE_GRANT_ACCESS)EnumParameter;
+        if (Handle == (HANDLE)pAccess->handle)
+        {
+            if (ExpIsValidObjectEntry( HandleTableEntry ))
+            {
+                // Update access
+                HandleTableEntry->GrantedAccessBits = pAccess->access;
+                result = TRUE;
+            }
+            else
+                DPRINT( "BlackBone: %s: 0x%X:0x%X handle is invalid\n. HandleEntry = 0x%p",
+                    __FUNCTION__, pAccess->pid, pAccess->handle, HandleTableEntry
+                    );
+        }
+    }
+
+#if !defined(_WIN7_)
+    // Release implicit locks
+    _InterlockedExchangeAdd8( (char*)&HandleTableEntry->VolatileLowValue, 1 );  // Set Unlocked flag to 1
+    if (HandleTable != NULL && HandleTable->HandleContentionEvent)
+        ExfUnblockPushLock( &HandleTable->HandleContentionEvent, NULL );
+#endif
+
+    return result;
+}
+
+/// <summary>
 /// Change handle granted access
 /// </summary>
 /// <param name="pAccess">Request params</param>
 /// <returns>Status code</returns>
 NTSTATUS BBGrantAccess( IN PHANDLE_GRANT_ACCESS pAccess )
 {
-    NTSTATUS  status = STATUS_SUCCESS;
+    NTSTATUS status = STATUS_SUCCESS;
     PEPROCESS pProcess = NULL;
-    PHANDLE_TABLE pTable = NULL;
-    PHANDLE_TABLE_ENTRY pHandleEntry = NULL;
-    EXHANDLE exHandle;
 
     // Validate dynamic offset
     if (dynData.ObjTable == 0)
@@ -157,25 +213,15 @@ NTSTATUS BBGrantAccess( IN PHANDLE_GRANT_ACCESS pAccess )
     }
 
     status = PsLookupProcessByProcessId( (HANDLE)pAccess->pid, &pProcess );
+    if (NT_SUCCESS( status ) && BBCheckProcessTermination( pProcess ))
+        status = STATUS_PROCESS_IS_TERMINATING;
+
     if (NT_SUCCESS( status ))
     {
-        pTable = *(PHANDLE_TABLE*)((PUCHAR)pProcess + dynData.ObjTable);
-        exHandle.Value = (ULONG_PTR)pAccess->handle;
-
-        if (pTable)
-            pHandleEntry = ExpLookupHandleTableEntry( pTable, exHandle );
-
-        if (ExpIsValidObjectEntry( pHandleEntry ))
-        {
-            pHandleEntry->GrantedAccessBits = pAccess->access;
-        }
-        else
-        {
-            DPRINT( "BlackBone: %s: 0x%X:0x%X handle is invalid. HandleEntry = 0x%p\n", 
-                    __FUNCTION__, pAccess->pid, pAccess->handle, pHandleEntry );
-
-            status = STATUS_UNSUCCESSFUL;
-        }
+        PHANDLE_TABLE pTable = *(PHANDLE_TABLE*)((PUCHAR)pProcess + dynData.ObjTable);
+        BOOLEAN found = ExEnumHandleTable( pTable, &BBHandleCallback, pAccess, NULL );
+        if (found == FALSE)
+            status = STATUS_NOT_FOUND;
     }
     else
         DPRINT( "BlackBone: %s: PsLookupProcessByProcessId failed with status 0x%X\n", __FUNCTION__, status );

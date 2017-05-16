@@ -16,8 +16,8 @@ Author:
 
 --*/
 
-#ifndef _API_SET_H_
-#define _API_SET_H_
+#ifndef _API_SET2_H_
+#define _API_SET2_H_
 
 //
 // API schema DLL information.
@@ -244,4 +244,4 @@ ApiSetResolveToHost (
 
 #endif // _NTDEF_
 
-#endif // _API_SET_H_
+#endif // _API_SET2_H_

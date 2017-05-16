@@ -171,6 +171,12 @@ typedef struct _HANDLE_TABLE
     ULONG NextHandleNeedingPool;
     long ExtraInfoPages;
     LONG_PTR TableCode;
+    PEPROCESS QuotaProcess;
+    LIST_ENTRY HandleTableList;
+    ULONG UniqueProcessId;
+    ULONG Flags;
+    EX_PUSH_LOCK HandleContentionEvent;
+    EX_PUSH_LOCK HandleTableLock;
     // More fields here...
 } HANDLE_TABLE, *PHANDLE_TABLE;
 

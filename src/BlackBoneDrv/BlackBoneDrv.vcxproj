@@ -198,7 +198,8 @@
       <PreprocessorDefinitions>_WIN8_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>copy /y "$(TargetPath)" \\PC8\c$\$(TargetFileName)</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
     <Link>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>
@@ -218,7 +219,8 @@
       <PreprocessorDefinitions>_WIN7_;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <PostBuildEvent>
-      <Command>copy /y "$(TargetPath)" \\Win7_x64\c$\$(TargetFileName)</Command>
+      <Command>
+      </Command>
     </PostBuildEvent>
     <Link>
       <OutputFile>$(OutDir)$(TargetName)$(TargetExt)</OutputFile>

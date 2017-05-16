@@ -1,22 +1,21 @@
-Blackbone
-=========
+# Blackbone
 
-# Windows memory hacking library #
+### Windows memory hacking library
 
-## Features ##
+## Features
 
-- x86 and x64 support
+- **x86 and x64 support**
 
-- **Process interaction**
+**Process interaction**
  - Manage PEB32/PEB64
  - Manage process through WOW64 barrier
 
-- **Process Memory**
+**Process Memory**
  - Allocate and free virtual memory
  - Change memory protection
  - Read/Write virtual memory 
 
-- **Process modules**
+**Process modules**
  - Enumerate all (32/64 bit) modules loaded. Enumerate modules using Loader list/Section objects/PE headers methods.
  - Get exported function address
  - Get the main module
@@ -25,7 +24,7 @@ Blackbone
  - Inject 64bit modules into WOW64 processes
  - Manually map native PE images
 
-- **Threads**
+**Threads**
  - Enumerate threads
  - Create and terminate threads. Support for cross-session thread creation.
  - Get thread exit code
@@ -35,10 +34,10 @@ Blackbone
  - Suspend and resume threads
  - Set/Remove hardware breakpoints
 
-- **Pattern search**
+**Pattern search**
  - Search for arbitrary pattern in local or remote process
  
-- **Remote code execution**
+**Remote code execution**
  - Execute functions in remote process
  - Assemble own code and execute it remotely
  - Support for cdecl/stdcall/thiscall/fastcall conventions
@@ -46,11 +45,11 @@ Blackbone
  - FPU types are supported
  - Execute code in new thread or any existing one
  
-- **Remote hooking**
+**Remote hooking**
  - Hook functions in remote process using int3 or hardware breakpoints
  - Hook functions upon return
  
-- **Manual map features**
+**Manual map features**
  - x86 and x64 image support
  - Mapping into any arbitrary unprotected process
  - Section mapping with proper memory protection flags
@@ -71,10 +70,9 @@ Blackbone
  - C++/CLI images are supported
  - Image unloading 
  - Increase reference counter for import libraries in case of manual import mapping
- - Cyclic dependencies are handled properly 
+ - Cyclic dependencies are handled properly
  
- 
-- **Driver features**
+**Driver features**
 - Allocate/free/protect user memory
 - Read/write user and kernel memory
 - Disable permanent DEP for WOW64 processes
@@ -87,3 +85,8 @@ Blackbone
 
 ## License ##
 Blackbone is licensed under the MIT License. Dependencies are under their respective licenses.
+
+[![Build status](https://ci.appveyor.com/api/projects/status/h3tr97727ngr7jko/branch/master?svg=true)](https://ci.appveyor.com/project/DarthTon/blackbone/branch/master)
+[![Build status](https://ci.appveyor.com/api/projects/status/h3tr97727ngr7jko/branch/master?svg=true)](https://ci.appveyor.com/project/DarthTon/blackbone/branch/VS2017)
+
+[![Build status](https://ci.appveyor.com/api/projects/status/5lu9aw84t00ibkdo?svg=true)](https://ci.appveyor.com/project/DarthTon/blackbone-q21rd)
