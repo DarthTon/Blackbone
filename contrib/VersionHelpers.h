@@ -104,11 +104,8 @@ IsWindowsVersionOrGreater( WORD wMajorVersion, WORD wMinorVersion, WORD wService
 
 		if (g_WinVer.native.wServicePackMajor > wServicePackMajor)
             return true;
-        else if (verInfo.wServicePackMajor < wServicePackMajor)
+        else if (g_WinVer.native.wServicePackMajor < wServicePackMajor)
             return false;
-
-		else if (g_WinVer.native.wServicePackMajor < wServicePackMajor)
-		    return false;
 
         if (g_WinVer.native.dwBuildNumber >= dwBuild)
             return true;
