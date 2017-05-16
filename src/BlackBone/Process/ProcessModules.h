@@ -6,6 +6,7 @@
 #include "../Include/Types.h"
 #include "../PE/PEImage.h"
 #include "../Misc/Utils.h"
+#include "Threads/Thread.h"
 
 #include <string>
 #include <map>
@@ -143,7 +144,7 @@ public:
     /// </summary>
     /// <param name="path">Full-qualified image path</param>
     /// <returns>Module info. nullptr if failed</returns>
-    BLACKBONE_API call_result_t<ModuleDataPtr> Inject( const std::wstring& path );
+    BLACKBONE_API call_result_t<ModuleDataPtr> Inject( const std::wstring& path, ThreadPtr pThread = nullptr );
 
 #ifdef COMPILER_MSVC
     /// <summary>

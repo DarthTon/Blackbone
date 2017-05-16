@@ -223,7 +223,7 @@ void PatternLoader::OSFillPatterns( std::unordered_map<ptr_t*, OffsetData>& patt
 
         // LdrProtectMrdata
         // 83 7D 08 00 8B 35
-        patterns.emplace( &_data.LdrProtectMrdata, OffsetData{ "\x83\x7d\x08\x00\x8b\x35", false, 0x12 } );
+        patterns.emplace( &_data.LdrProtectMrdata, OffsetData{ PatternSearch( "\x83\x7d\x08\x00\x8b\x35", 6 ), false, 0x12 } );
     }
     else if (IsWindows8OrGreater())
     {

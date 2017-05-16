@@ -213,7 +213,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
     uint64_t result = 0;
     auto& mods = proc.modules();
 
-    if(mod.type == mt_mod64)
+    if (mod.type == mt_mod64)
     {
         // Add module to module table
         if (!_pModTable.valid())
@@ -234,91 +234,69 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
         table.count++;
 
         _pModTable.Write( 0, table );
+    }
 
-        // No handler required
-        if (partial)
-            return STATUS_SUCCESS;
+    // No handler required
+    if (partial)
+        return STATUS_SUCCESS;
 
-        // VEH codecave
-        auto mem = proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
-        if (!mem)
-            return mem.status;
+    // VEH codecave
+    auto mem = proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
+    if (!mem)
+        return mem.status;
 
-        _pVEHCode = std::move( mem.result() );
+    _pVEHCode = std::move( mem.result() );
 
-        BLACKBONE_TRACE( "ManualMap: Vectored hander: 0x%p\n", _pVEHCode.ptr() );
+    BLACKBONE_TRACE( "ManualMap: Vectored hander: 0x%p\n", _pVEHCode.ptr() );
 
-        for (uint8_t *pData = _handler64; pData < _handler64 + sizeof( _handler64 ) - sizeof( uint8_t* ); pData++)
+    auto replaceStub = []( uint8_t* ptr, size_t size, auto oldVal, auto newVal )
+    {
+        typedef typename std::add_pointer<decltype(oldVal)>::type ValuePtr;
+
+        for (uint8_t *pData = ptr; pData < ptr + size - sizeof( oldVal ); pData++)
         {
-            // Module table pointer
-            if (*(ptr_t*)pData == 0xDEADBEEFDEADBEEF)
+            if (*reinterpret_cast<ValuePtr>(pData) == oldVal)
             {
-                *(ptr_t*)pData = _pModTable.ptr();
-                continue;
-            }
-
-            // ModuleTable::count
-            if (*(ptr_t*)pData == 0xDEADBEEFDEADBEF7)
-            {
-                *(ptr_t*)pData = _pModTable.ptr() + sizeof( ptr_t );
-                continue;
+                *reinterpret_cast<ValuePtr>(pData) = newVal;
+                return true;
             }
         }
 
-        if (_pVEHCode.Write( 0, sizeof( _handler64 ), _handler64 ) != STATUS_SUCCESS)
-        {
-            _pVEHCode.Free();
-            return LastNtStatus();
-        }       
+        return false;
+    };
+
+    uint8_t newHandler[sizeof( _handler32 ) + sizeof( _handler64 )];
+    size_t handlerSize = 0;
+
+    if (mod.type == mt_mod64)
+    {
+        handlerSize = sizeof( _handler64 );
+        memcpy( newHandler, _handler64, handlerSize );
+
+        replaceStub( newHandler, handlerSize, 0xDEADBEEFDEADBEEF, _pModTable.ptr() );
+        replaceStub( newHandler, handlerSize, 0xDEADBEEFDEADBEF7, _pModTable.ptr() + sizeof( ptr_t ) );    
     }
     else
     {
-        // No handler required
-        if (partial)
-            return STATUS_SUCCESS;
-
-        // VEH codecave
-        auto mem = proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
-        if (!mem)
-            return mem.status;
-
-        _pVEHCode = std::move( mem.result() );
+        handlerSize = sizeof( _handler32 );
+        memcpy( newHandler, _handler32, handlerSize );
 
         auto pDecode = mods.GetNtdllExport( "RtlDecodeSystemPointer", mod.type, Sections );
         if (!pDecode)
             return pDecode.status;
 
-        // Find and replace magic values
-        for (uint8_t *pData = _handler32; pData < _handler32 + sizeof( _handler32 ) - sizeof( uint8_t* ); pData++)
-        {
-            // LdrpInvertedFunctionTable
-            if (*(uint32_t*)pData == 0xDEADDA7A)
-            {
-                *(uint32_t*)pData = static_cast<uint32_t>(g_PatternLoader->data().LdrpInvertedFunctionTable32);
-                continue;
-            }
+        auto& data = g_PatternLoader->data();
 
-            // DecodeSystemPointer address
-            if (*(uint32_t*)pData == 0xDEADC0DE)
-            {
-                *(uint32_t*)pData = static_cast<uint32_t>(pDecode->procAddress);
-                break;
-            }
+        replaceStub( newHandler, handlerSize, 0xDEADDA7A, static_cast<uint32_t>(data.LdrpInvertedFunctionTable32) );
+        replaceStub( newHandler, handlerSize, 0xDEADC0DE, static_cast<uint32_t>(pDecode->procAddress) );
+        replaceStub( newHandler, handlerSize, 0xDEADC0D2, static_cast<uint32_t>(data.LdrProtectMrdata) );
+    }
 
-            // LdrProtectMrdata address
-            if (*(uint32_t*)pData == 0xDEADC0D2)
-            {
-                *(uint32_t*)pData = static_cast<uint32_t>(g_PatternLoader->data().LdrProtectMrdata);
-                continue;
-            }
-        }
-
-        // Write handler data into target process
-        if (!NT_SUCCESS( _pVEHCode.Write( 0, sizeof( _handler32 ), _handler32 ) ))
-        {
-            _pVEHCode.Free();
-            return LastNtStatus();
-        }
+    // Write handler data into target process
+    if (!NT_SUCCESS( _pVEHCode.Write( 0, handlerSize, newHandler ) ))
+    {
+        _pVEHCode.Free();
+        return LastNtStatus();
     }
 
     // AddVectoredExceptionHandler(0, pHandler);

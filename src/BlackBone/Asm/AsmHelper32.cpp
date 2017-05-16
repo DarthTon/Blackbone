@@ -111,7 +111,7 @@ void AsmHelper32::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVaria
             if (arg.type != AsmVariant::dataPtr)
                 argsize += arg.size;
             else
-                argsize += sizeof(void*);
+                argsize += sizeof( uint32_t );
         }
 
         _assembler.add( asmjit::host::esp, argsize );
