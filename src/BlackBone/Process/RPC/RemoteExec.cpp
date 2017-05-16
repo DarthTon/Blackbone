@@ -204,7 +204,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
             asmjit::host::r12, asmjit::host::r13, asmjit::host::r14, asmjit::host::r15, asmjit::host::rbp
         };
 
-        if (!NT_SUCCESS( status = thd->GetContext( ctx64, CONTEXT_CONTROL, true ) ))
+        if (!NT_SUCCESS( status = thd->GetContext( ctx64, CONTEXT64_CONTROL, true ) ))
         {
             thd->Resume();
             return status;
@@ -213,11 +213,12 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         //
         // Preserve thread context
         // I don't care about FPU, XMM and anything else
+        // Stack must be aligned on 16 bytes 
         //
-        (*a)->sub( asmjit::host::rsp, count * sizeof( uint64_t ) );   // Stack must be aligned on 16 bytes 
-        (*a)->pushf();                                              //
+        (*a)->sub( asmjit::host::rsp, count * sizeof( uint64_t ) );
+        (*a)->pushf(); 
 
-                                                                    // Save registers
+        // Save registers
         for (int i = 0; i < count; i++)
             (*a)->mov( asmjit::Mem( asmjit::host::rsp, i * sizeof( uint64_t ) ), regs[i] );
 
@@ -248,6 +249,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         (*a)->pushf();
 
         a->GenCall( _userCode.ptr(), { _userData.ptr() } );
+        (*a)->add( asmjit::host::esp, sizeof( uint32_t ) );
         AddReturnWithEvent( *a, mt_default, rt_int32, INTRET_OFFSET );
 
         (*a)->popf();
@@ -274,7 +276,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     thd->Resume();
     if (NT_SUCCESS( status ))
     {
-        WaitForSingleObject( _hWaitEvent, INFINITE );
+        WaitForSingleObject( _hWaitEvent, 20 * 1000/*INFINITE*/ );
         status = _userData.Read( RET_OFFSET, callResult );
     }
 

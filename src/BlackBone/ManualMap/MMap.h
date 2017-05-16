@@ -177,7 +177,8 @@ struct ImageContext
     bool           initialized = false;     // Image entry point was called
 };
 
-typedef std::vector<std::unique_ptr<ImageContext>> vecImageCtx;
+typedef std::shared_ptr<ImageContext> ImageContextPtr;
+typedef std::vector<ImageContextPtr> vecImageCtx;
 
 /// <summary>
 /// Manual image mapper
@@ -293,28 +294,28 @@ private:
     /// DLL_THREAD_DETTACH
     /// </param>
     /// <returns>DllMain result</returns>
-    call_result_t<uint64_t> RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomArgs_t* pCustomArgs_t = nullptr );
+    call_result_t<uint64_t> RunModuleInitializers( ImageContextPtr pImage, DWORD dwReason, CustomArgs_t* pCustomArgs_t = nullptr );
 
     /// <summary>
     /// Copies image into target process
     /// </summary>
     /// <param name="pImage">Image data</param>
     /// <returns>Status code</returns>
-    NTSTATUS CopyImage( ImageContext* pImage );
+    NTSTATUS CopyImage( ImageContextPtr pImage );
 
     /// <summary>
     /// Adjust image memory protection
     /// </summary>
     /// <param name="pImage">image data</param>
     /// <returns>Status code</returns>
-    NTSTATUS ProtectImageMemory( ImageContext* pImage );
+    NTSTATUS ProtectImageMemory( ImageContextPtr pImage );
 
     /// <summary>
     ///  Fix relocations if image wasn't loaded at base address
     /// </summary>
     /// <param name="pImage">image data</param>
     /// <returns>true on success</returns>
-    NTSTATUS RelocateImage( ImageContext* pImage );
+    NTSTATUS RelocateImage( ImageContextPtr pImage );
 
     /// <summary>
     /// Resolves image import or delayed image import
@@ -322,35 +323,35 @@ private:
     /// <param name="pImage">Image data</param>
     /// <param name="useDelayed">Resolve delayed import instead</param>
     /// <returns>Status code</returns>
-    NTSTATUS ResolveImport( ImageContext* pImage, bool useDelayed = false );
+    NTSTATUS ResolveImport( ImageContextPtr pImage, bool useDelayed = false );
 
     /// <summary>
     /// Resolve static TLS storage
     /// </summary>
     /// <param name="pImage">image data</param>
     /// <returns>Status code</returns>
-    NTSTATUS InitStaticTLS( ImageContext* pImage );
+    NTSTATUS InitStaticTLS( ImageContextPtr pImage );
 
     /// <summary>
     /// Set custom exception handler to bypass SafeSEH under DEP 
     /// </summary>
     /// <param name="pImage">image data</param>
     /// <returns>Status code</returns>
-    NTSTATUS EnableExceptions( ImageContext* pImage );
+    NTSTATUS EnableExceptions( ImageContextPtr pImage );
 
     /// <summary>
     /// Remove custom exception handler
     /// </summary>
     /// <param name="pImage">image data</param>
     /// <returns>true on success</returns>
-    NTSTATUS DisableExceptions( ImageContext* pImage );
+    NTSTATUS DisableExceptions( ImageContextPtr pImage );
 
     /// <summary>
     /// Calculate and set security cookie
     /// </summary>
     /// <param name="pImage">image data</param>
     /// <returns>Status code</returns>
-    NTSTATUS InitializeCookie( ImageContext* pImage );
+    NTSTATUS InitializeCookie( ImageContextPtr pImage );
 
     /// <summary>
     /// Return existing or load missing dependency
@@ -358,7 +359,7 @@ private:
     /// <param name="pImage">Currently mapped image data</param>
     /// <param name="path">Dependency path</param>
     /// <returns></returns>
-    call_result_t<ModuleDataPtr> FindOrMapDependency( ImageContext* pImage, std::wstring& path );
+    call_result_t<ModuleDataPtr> FindOrMapDependency( ImageContextPtr pImage, std::wstring& path );
 
     /// <summary>
     /// Create activation context

@@ -189,7 +189,7 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
                 img->imgMem.Protect( flOld, img->peImage.ilFlagOffset(), sizeof( flg ), &flOld );
             }
 
-            status = RunModuleInitializers( img.get(), DLL_PROCESS_ATTACH, pCustomArgs ).status;
+            status = RunModuleInitializers( img, DLL_PROCESS_ATTACH, pCustomArgs ).status;
             if (!NT_SUCCESS( status ))
             {
                 BLACKBONE_TRACE( L"ManualMap: ModuleInitializers failed for '%ls', status: 0x%X", img->ldrEntry.name.c_str(), status );
@@ -269,7 +269,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     )
 {
     NTSTATUS status = STATUS_SUCCESS;
-    std::unique_ptr<ImageContext> pImage( new ImageContext() );
+    ImageContextPtr pImage( new ImageContext() );
     auto& ldrEntry = pImage->ldrEntry;
 
     ldrEntry.fullPath = path;
@@ -381,13 +381,13 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     }
 
     // Core image mapping operations
-    if (!NT_SUCCESS( status = CopyImage( pImage.get() ) ))
+    if (!NT_SUCCESS( status = CopyImage( pImage ) ))
     {
         pImage->peImage.Release();
         return status;
     }
 
-    if (!NT_SUCCESS( status = RelocateImage( pImage.get() ) ))
+    if (!NT_SUCCESS( status = RelocateImage( pImage ) ))
     {
         pImage->peImage.Release();
         return status;
@@ -402,7 +402,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
         FsRedirector fsr( fsRedirect );
 
         // Import
-        if (!NT_SUCCESS( status = ResolveImport( pImage.get() ) ))
+        if (!NT_SUCCESS( status = ResolveImport( pImage ) ))
         {
             pImage->peImage.Release();
             _process.modules().RemoveManualModule( ldrEntry.name, mt );
@@ -410,7 +410,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
         }
 
         // Delayed import
-        if (!(flags & NoDelayLoad) && !NT_SUCCESS( status = ResolveImport( pImage.get(), true ) ))
+        if (!(flags & NoDelayLoad) && !NT_SUCCESS( status = ResolveImport( pImage, true ) ))
         {
             pImage->peImage.Release();
             _process.modules().RemoveManualModule( ldrEntry.name, mt );
@@ -420,12 +420,12 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
 
     // Apply proper memory protection for sections
     if (!(flags & HideVAD))
-        ProtectImageMemory( pImage.get() );
+        ProtectImageMemory( pImage );
 
     // Make exception handling possible (C and C++)
     if (!(flags & NoExceptions))
     {
-        if (!NT_SUCCESS( status = EnableExceptions( pImage.get() ) ) && status != STATUS_NOT_FOUND)
+        if (!NT_SUCCESS( status = EnableExceptions( pImage ) ) && status != STATUS_NOT_FOUND)
         {
             BLACKBONE_TRACE( L"ManualMap: Failed to enable exception handling for image %ls", ldrEntry.name.c_str() );
             pImage->peImage.Release();
@@ -435,7 +435,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     }
 
     // Initialize security cookie
-    if (!NT_SUCCESS ( status = InitializeCookie( pImage.get() ) ))
+    if (!NT_SUCCESS ( status = InitializeCookie( pImage ) ))
     {
         BLACKBONE_TRACE( L"ManualMap: Failed to initialize cookie for image %ls", ldrEntry.name.c_str() );
         pImage->peImage.Release();
@@ -472,7 +472,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     }
 
     // Static TLS data
-    if (!(flags & NoTLS) && !NT_SUCCESS( status = InitStaticTLS( pImage.get() ) ))
+    if (!(flags & NoTLS) && !NT_SUCCESS( status = InitStaticTLS( pImage ) ))
     {
         BLACKBONE_TRACE( L"ManualMap: Failed to initialize static TLS for image %ls, status 0x%X", ldrEntry.name.c_str(), status );
         pImage->peImage.Release();
@@ -502,7 +502,7 @@ NTSTATUS MMap::UnmapAllModules()
 {
     for (auto img = _images.rbegin(); img != _images.rend(); ++img)
     {
-        auto pImage = img->get();
+        auto pImage = *img;
         BLACKBONE_TRACE( L"ManualMap: Unmapping image '%ls'", pImage->ldrEntry.name.c_str() );
 
         // Call main
@@ -534,7 +534,7 @@ NTSTATUS MMap::UnmapAllModules()
 /// </summary>
 /// <param name="pImage">Image data</param>
 /// <returns>Status code</returns>
-NTSTATUS MMap::CopyImage( ImageContext* pImage )
+NTSTATUS MMap::CopyImage( ImageContextPtr pImage )
 {
     NTSTATUS status = STATUS_SUCCESS;
 
@@ -610,7 +610,7 @@ NTSTATUS MMap::CopyImage( ImageContext* pImage )
 /// </summary>
 /// <param name="pImage">image data</param>
 /// <returns>Status code</returns>
-NTSTATUS MMap::ProtectImageMemory( ImageContext* pImage )
+NTSTATUS MMap::ProtectImageMemory( ImageContextPtr pImage )
 {
     // Set section memory protection
     for (auto& section : pImage->peImage.sections())
@@ -651,7 +651,7 @@ NTSTATUS MMap::ProtectImageMemory( ImageContext* pImage )
 /// </summary>
 /// <param name="pImage">image data</param>
 /// <returns>true on success</returns>
-NTSTATUS MMap::RelocateImage( ImageContext* pImage )
+NTSTATUS MMap::RelocateImage( ImageContextPtr pImage )
 {
     NTSTATUS status = STATUS_SUCCESS;
     BLACKBONE_TRACE( L"ManualMap: Relocating image '%ls'", pImage->ldrEntry.fullPath.c_str() );
@@ -741,7 +741,7 @@ NTSTATUS MMap::RelocateImage( ImageContext* pImage )
 /// <param name="pImage">Currently napped image data</param>
 /// <param name="path">Dependency path</param>
 /// <returns></returns>
-call_result_t<ModuleDataPtr> MMap::FindOrMapDependency( ImageContext* pImage, std::wstring& path )
+call_result_t<ModuleDataPtr> MMap::FindOrMapDependency( ImageContextPtr pImage, std::wstring& path )
 {
     // Already loaded
     auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType(), pImage->ldrEntry.fullPath.c_str() );
@@ -816,7 +816,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapDependency( ImageContext* pImage, st
 /// <param name="pImage">Image data</param>
 /// <param name="useDelayed">Resolve delayed import instead</param>
 /// <returns>Status code</returns>
-NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */ )
+NTSTATUS MMap::ResolveImport( ImageContextPtr pImage, bool useDelayed /*= false */ )
 {
     auto imports = pImage->peImage.GetImports( useDelayed );
     if (imports.empty())
@@ -939,11 +939,11 @@ NTSTATUS MMap::ResolveImport( ImageContext* pImage, bool useDelayed /*= false */
 /// </summary>
 /// <param name="pImage">image data</param>
 /// <returns>true on success</returns>
-NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
+NTSTATUS MMap::EnableExceptions( ImageContextPtr pImage )
 {
     BLACKBONE_TRACE( L"ManualMap: Enabling exception support for image '%ls'", pImage->ldrEntry.name.c_str() );
     bool partial = (pImage->flags & PartialExcept) != 0;
-    auto success = _process.nativeLdr().InsertInvertedFunctionTable( pImage->ldrEntry );
+    bool success = _process.nativeLdr().InsertInvertedFunctionTable( pImage->ldrEntry );
 
     if (pImage->ldrEntry.type == mt_mod64)
     {
@@ -1000,7 +1000,7 @@ NTSTATUS MMap::EnableExceptions( ImageContext* pImage )
 /// </summary>
 /// <param name="pImage">image data</param>
 /// <returns>true on success</returns>
-NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
+NTSTATUS MMap::DisableExceptions( ImageContextPtr pImage )
 {
     BLACKBONE_TRACE( L"ManualMap: Disabling exception support for image '%ls'", pImage->ldrEntry.name.c_str() );
     bool partial = false;
@@ -1037,7 +1037,7 @@ NTSTATUS MMap::DisableExceptions( ImageContext* pImage )
 /// </summary>
 /// <param name="pImage">image data</param>
 /// <returns>Status code</returns>
-NTSTATUS MMap::InitStaticTLS( ImageContext* pImage )
+NTSTATUS MMap::InitStaticTLS( ImageContextPtr pImage )
 {
     auto pTls = reinterpret_cast<PIMAGE_TLS_DIRECTORY>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_TLS ));
     auto rebasedTlsPtr = REBASE( pTls, pImage->peImage.base(), pImage->imgMem.ptr() );
@@ -1057,7 +1057,7 @@ NTSTATUS MMap::InitStaticTLS( ImageContext* pImage )
 /// </summary>
 /// <param name="pImage">image data</param>
 /// <returns>Status code</returns>
-NTSTATUS MMap::InitializeCookie( ImageContext* pImage )
+NTSTATUS MMap::InitializeCookie( ImageContextPtr pImage )
 {
     auto pLoadConfig32 = reinterpret_cast<PIMAGE_LOAD_CONFIG_DIRECTORY32>(pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_LOAD_CONFIG ));
     auto pLoadConfig64 = reinterpret_cast<PIMAGE_LOAD_CONFIG_DIRECTORY64>(pLoadConfig32);
@@ -1123,7 +1123,7 @@ NTSTATUS MMap::InitializeCookie( ImageContext* pImage )
 /// DLL_THREAD_DETTACH
 /// </param>
 /// <returns>DllMain result</returns>
-call_result_t<uint64_t> MMap::RunModuleInitializers( ImageContext* pImage, DWORD dwReason, CustomArgs_t* pCustomArgs /*= nullptr*/ )
+call_result_t<uint64_t> MMap::RunModuleInitializers( ImageContextPtr pImage, DWORD dwReason, CustomArgs_t* pCustomArgs /*= nullptr*/ )
 {
     auto a = AsmFactory::GetAssembler( pImage->ldrEntry.type );
     uint64_t result = 0;

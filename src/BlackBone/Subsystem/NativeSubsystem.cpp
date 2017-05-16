@@ -488,7 +488,7 @@ std::vector<ModuleDataPtr> Native::EnumSections()
     {
         auto status = VirtualQueryExT( memptr, &mbi );
 
-        if (status == STATUS_INVALID_PARAMETER || status == STATUS_ACCESS_DENIED)
+        if (status == STATUS_INVALID_PARAMETER || status == STATUS_ACCESS_DENIED || status == STATUS_PROCESS_IS_TERMINATING)
             break;
         else if (status != STATUS_SUCCESS)
             continue;
@@ -498,7 +498,7 @@ std::vector<ModuleDataPtr> Native::EnumSections()
             continue;
 
         uint8_t buf[0x1000] = { 0 };
-        _UNICODE_STRING_T<DWORD64>* ustr = (decltype(ustr))(buf + 0x800);
+        _UNICODE_STRING_T<uint64_t>* ustr = (decltype(ustr))(buf + 0x800);
 
         status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof(buf) / 2 );
 

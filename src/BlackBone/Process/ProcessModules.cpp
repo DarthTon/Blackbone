@@ -369,7 +369,7 @@ call_result_t<exportData> ProcessModules::GetNtdllExport(
 /// <param name="path">Full-qualified image path</param>
 /// <param name="pStatus">Injection status code</param>
 /// <returns>Module info. nullptr if failed</returns>
-call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
+call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, ThreadPtr pThread /*= nullptr*/ )
 {
     NTSTATUS status = STATUS_SUCCESS;
     ModuleDataPtr mod;
@@ -401,13 +401,13 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
 
     if (img.mType() == mt_mod32)
     {
-        _UNICODE_STRING_T<DWORD32> ustr = { 0 };
+        _UNICODE_STRING_T<uint32_t> ustr = { 0 };
         ustrSize = sizeof( ustr );
         fillDllName( ustr );
     }
     else if (img.mType() == mt_mod64)
     {
-        _UNICODE_STRING_T<DWORD64> ustr = { 0 };
+        _UNICODE_STRING_T<uint64_t> ustr = { 0 };
         ustrSize = sizeof( ustr );
         fillDllName( ustr );
     }
@@ -452,9 +452,23 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path )
     a->GenCall( pLdrLoadDll->procAddress, { 0, 0, modName->ptr(), modName->ptr() + 0x800 } );
     (*a)->ret();
 
-    status = _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, switchMode );
-    if (NT_SUCCESS( status ))
-        status = static_cast<NTSTATUS>(res);
+    // Execute call
+    if (pThread != nullptr)
+    {
+        if(pThread == _proc.remote().getWorker())
+            status = _proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), res );
+        else
+            status = _proc.remote().ExecInAnyThread( (*a)->make(), (*a)->getCodeSize(), res, pThread );
+
+        if (NT_SUCCESS( status ))
+            status = static_cast<NTSTATUS>(res);
+    }
+    else
+    {
+        status = _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, switchMode );
+        if (NT_SUCCESS( status ))
+            status = static_cast<NTSTATUS>(res);
+    }
 
     // Retry with LoadLibrary if possible
     if (!NT_SUCCESS( status ) && pLoadLibrary && sameArch)
@@ -603,12 +617,13 @@ bool ProcessModules::InjectPureIL(
 
     auto mem = _memory.Allocate( 0x10000 );
     if (!mem)
+    {
+        returnCode = 7;
         return false;
+    }
 
     auto address = mem.result();
-
     uintptr_t offset = 4;
-
     uintptr_t address_VersionString, address_netAssemblyDll, address_netAssemblyClass,
            address_netAssemblyMethod, address_netAssemblyArgs;
 
@@ -617,12 +632,6 @@ bool ProcessModules::InjectPureIL(
     uintptr_t* ofstArr[] = { 
         &address_VersionString, &address_netAssemblyDll, &address_netAssemblyClass,
         &address_netAssemblyMethod, &address_netAssemblyArgs 
-    };
-
-    // DWORD alignment
-    auto DWAlign = []( size_t offset )
-    {
-        return offset % sizeof( size_t ) == 0 ? offset : offset + (sizeof( size_t ) - offset % sizeof( size_t ));
     };
 
     // Write strings
@@ -639,7 +648,7 @@ bool ProcessModules::InjectPureIL(
             return false;
         }
 
-        offset = DWAlign( offset + len * sizeof(wchar_t) + 2 );
+        offset = Align( offset + len * sizeof( wchar_t ) + 2, sizeof( uint64_t ) );
     }
 
     offset += 4;
@@ -668,7 +677,7 @@ bool ProcessModules::InjectPureIL(
     auto pMscoree = Inject( libName );
     if(!pMscoree)
     {
-        returnCode = 15;
+        returnCode = pMscoree.status;
         return false;
     }
 
