@@ -4,7 +4,7 @@
 #include "RPC/RemoteExec.h"
 #include "../Misc/NameResolve.h"
 #include "../Misc/Utils.h"
-#include "../Misc/PattrernLoader.h"
+#include "../Misc/PatternLoader.h"
 #include "../Asm/AsmFactory.h"
 
 #include <memory>

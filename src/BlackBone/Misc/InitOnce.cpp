@@ -3,7 +3,7 @@
 #include "../../../contrib/VersionHelpers.h"
 #include "../Include/Macro.h"
 #include "DynImport.h"
-#include "PattrernLoader.h"
+#include "PatternLoader.h"
 #include "NameResolve.h"
 
 #include <string>

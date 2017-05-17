@@ -2,7 +2,7 @@
 #include "../Process/Process.h"
 #include "../Include/Macro.h"
 #include "../Misc/Trace.hpp"
-#include "../Misc/PattrernLoader.h"
+#include "../Misc/PatternLoader.h"
 #include "../Asm/LDasm.h"
 
 namespace blackbone

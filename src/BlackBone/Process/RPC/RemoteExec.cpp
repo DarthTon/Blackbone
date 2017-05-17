@@ -1,7 +1,7 @@
 #include "RemoteExec.h"
 #include "../Process.h"
 #include "../../Misc/DynImport.h"
-#include "../../Misc/PattrernLoader.h"
+#include "../../Misc/PatternLoader.h"
 
 #include <VersionHelpers.h>
 #include <sddl.h>

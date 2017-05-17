@@ -621,7 +621,7 @@
     <ClCompile Include="ManualMap\Native\NtLoader.cpp" />
     <ClCompile Include="Misc\InitOnce.cpp" />
     <ClCompile Include="Misc\NameResolve.cpp" />
-    <ClCompile Include="Misc\PattrernLoader.cpp" />
+    <ClCompile Include="Misc\PatternLoader.cpp" />
     <ClCompile Include="Misc\Utils.cpp" />
     <ClCompile Include="Patterns\PatternSearch.cpp" />
     <ClCompile Include="PE\ImageNET.cpp" />
@@ -719,7 +719,7 @@
     <ClInclude Include="Misc\DynImport.h" />
     <ClInclude Include="Misc\InitOnce.h" />
     <ClInclude Include="Misc\NameResolve.h" />
-    <ClInclude Include="Misc\PattrernLoader.h" />
+    <ClInclude Include="Misc\PatternLoader.h" />
     <ClInclude Include="Misc\Thunk.hpp" />
     <ClInclude Include="Misc\Trace.hpp" />
     <ClInclude Include="Misc\Utils.h" />

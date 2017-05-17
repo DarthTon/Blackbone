@@ -4,7 +4,7 @@
 #include "../../Misc/Utils.h"
 #include "../../Misc/DynImport.h"
 #include "../../Misc/trace.hpp"
-#include "../../Misc/PattrernLoader.h"
+#include "../../Misc/PatternLoader.h"
 
 #include "../contrib/VersionHelpers.h"
 

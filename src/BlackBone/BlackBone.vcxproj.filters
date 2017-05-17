@@ -192,7 +192,7 @@
     <ClCompile Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.cpp">
       <Filter>Subsystem</Filter>
     </ClCompile>
-    <ClCompile Include="Misc\PattrernLoader.cpp">
+    <ClCompile Include="Misc\PatternLoader.cpp">
       <Filter>Misc</Filter>
     </ClCompile>
   </ItemGroup>
@@ -450,11 +450,11 @@
     <ClInclude Include="Asm\AsmFactory.h">
       <Filter>AsmJit\Helpers</Filter>
     </ClInclude>
-    <ClInclude Include="Misc\PattrernLoader.h">
-      <Filter>Misc</Filter>
-    </ClInclude>
     <ClInclude Include="Include\NativeEnums.h">
       <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc\PatternLoader.h">
+      <Filter>Misc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
