@@ -8,16 +8,18 @@ KGUARDED_MUTEX g_globalLock;            // ProcessPageTables mutex
 /// <summary>
 /// Walk region list and create MDL for each region
 /// </summary>
+/// <param name="pProcess">Target process</param>
 /// <param name="pList">Region list</param>
 /// <returns>Status code</returns>
-NTSTATUS BBPrepareMDLList( IN PLIST_ENTRY pList );
+NTSTATUS BBPrepareMDLList( IN PEPROCESS pProcess, IN PLIST_ENTRY pList );
 
 /// <summary>
 /// Build MDL for memory region
 /// </summary>
+/// <param name="pProcess">Target process</param>
 /// <param name="pEntry">Region data</param>
 /// <returns>Status code</returns>
-NTSTATUS BBPrepareMDLListEntry( IN PMAP_ENTRY pEntry );
+NTSTATUS BBPrepareMDLListEntry( IN PEPROCESS pProcess, IN PMAP_ENTRY pEntry );
 
 /// <summary>
 /// Map locked physical pages into caller process
@@ -64,9 +66,10 @@ NTSTATUS BBConsolidateRegionList( IN PLIST_ENTRY pList );
 /// Function will attempt to trigger copy-on-write for underlying pages to convert them into private
 /// If copy-on-write fails, region will be then mapped as read-only
 /// </summary>
+/// <param name="pProcess">Target process</param>
 /// <param name="pEntry">Region data</param>
 /// <returns>Status code</returns>
-NTSTATUS BBHandleSharedRegion( IN PMAP_ENTRY pEntry );
+NTSTATUS BBHandleSharedRegion( IN PEPROCESS pProcess, IN PMAP_ENTRY pEntry );
 
 /// <summary>
 /// Unmap memory region, release corresponding MDL, and remove region form list
@@ -332,9 +335,10 @@ NTSTATUS BBUnmapRegionEntry( IN PMAP_ENTRY pPageEntry, IN PPROCESS_MAP_ENTRY pFo
 /// Function will attempt to trigger copy-on-write for underlying pages to convert them into private
 /// If copy-on-write fails, region will be then mapped as read-only
 /// </summary>
+/// <param name="pProcess">Target process</param>
 /// <param name="pEntry">Region data</param>
 /// <returns>Status code</returns>
-NTSTATUS BBHandleSharedRegion( IN PMAP_ENTRY pEntry )
+NTSTATUS BBHandleSharedRegion( IN PEPROCESS pProcess, IN PMAP_ENTRY pEntry )
 {
     NTSTATUS status = STATUS_SUCCESS;
 
@@ -356,8 +360,19 @@ NTSTATUS BBHandleSharedRegion( IN PMAP_ENTRY pEntry )
         status = ZwQueryVirtualMemory( ZwCurrentProcess(), (PVOID)memptr, MemoryBasicInformation, &mbi, sizeof( mbi ), &length );
         if (!NT_SUCCESS( status ))
         {
-            DPRINT( "BlackBone: %s: ZwQueryVirtualMemory for address 0x%p failed\n", __FUNCTION__, memptr );
+            DPRINT( "BlackBone: %s: ZwQueryVirtualMemory for address 0x%p failed, status 0x%X\n", __FUNCTION__, memptr, status );
             return status;
+        }
+
+        // Check if region has SEC_NO_CHANGE attribute
+        PMMVAD_SHORT pVad = { 0 };
+        if (NT_SUCCESS( BBFindVAD( pProcess, (ULONG_PTR)mbi.BaseAddress, &pVad ) ) && pVad != NULL)
+        {
+            // Can't change region protection
+            if (pVad->u.VadFlags.NoChange)
+            {
+                return STATUS_SHARING_VIOLATION;
+            }
         }
 
         writable = (mbi.Protect & (PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READWRITE));
@@ -365,7 +380,7 @@ NTSTATUS BBHandleSharedRegion( IN PMAP_ENTRY pEntry )
         size = (SIZE_T)mbi.RegionSize;
 
         // Make readonly pages writable
-        if (writable || NT_SUCCESS( ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &size, PAGE_EXECUTE_READWRITE, &oldProt ) ))
+        if (writable || NT_SUCCESS( status = ZwProtectVirtualMemory( ZwCurrentProcess(), &pBase, &size, PAGE_EXECUTE_READWRITE, &oldProt ) ))
         {
             BOOLEAN failed = FALSE;
 
@@ -412,8 +427,10 @@ NTSTATUS BBHandleSharedRegion( IN PMAP_ENTRY pEntry )
         }
         else
         {
-            DPRINT( "BlackBone: %s: Failed to alter protection of region at 0x%p\n", __FUNCTION__, mbi.BaseAddress );
-            return STATUS_SHARING_VIOLATION;
+            if(status != STATUS_SECTION_PROTECTION)
+                DPRINT( "BlackBone: %s: Failed to alter protection of region at 0x%p, status 0x%X\n", __FUNCTION__, mbi.BaseAddress, status );
+
+            return status;
         }
     }
 
@@ -426,7 +443,7 @@ NTSTATUS BBHandleSharedRegion( IN PMAP_ENTRY pEntry )
 /// </summary>
 /// <param name="pEntry">Region data</param>
 /// <returns>Status code</returns>
-NTSTATUS BBPrepareMDLListEntry( IN OUT PMAP_ENTRY pEntry )
+NTSTATUS BBPrepareMDLListEntry( IN PEPROCESS pProcess, IN OUT PMAP_ENTRY pEntry )
 {
     NTSTATUS status = STATUS_SUCCESS;
 
@@ -435,7 +452,7 @@ NTSTATUS BBPrepareMDLListEntry( IN OUT PMAP_ENTRY pEntry )
         return STATUS_INVALID_PARAMETER;
 
     // Handle shared pages
-    if (pEntry->shared != FALSE && !NT_SUCCESS( BBHandleSharedRegion( pEntry ) ))
+    if (pEntry->shared != FALSE && !NT_SUCCESS( BBHandleSharedRegion( pProcess, pEntry ) ))
         pEntry->readonly = TRUE;
     else
         pEntry->readonly = FALSE;
@@ -468,8 +485,9 @@ NTSTATUS BBPrepareMDLListEntry( IN OUT PMAP_ENTRY pEntry )
 /// Walk region list and create MDL for each region
 /// </summary>
 /// <param name="pList">Region list</param>
+/// <param name="pProcess">Target process</param>
 /// <returns>Status code</returns>
-NTSTATUS BBPrepareMDLList( IN PLIST_ENTRY pList )
+NTSTATUS BBPrepareMDLList( IN PEPROCESS pProcess, IN PLIST_ENTRY pList )
 {
     NTSTATUS status = STATUS_SUCCESS;
     PMAP_ENTRY pEntry = NULL;
@@ -478,7 +496,7 @@ NTSTATUS BBPrepareMDLList( IN PLIST_ENTRY pList )
     {
         pEntry = CONTAINING_RECORD( pListEntry, MAP_ENTRY, link );
         if (pEntry->pMdl == NULL)
-            BBPrepareMDLListEntry( pEntry );        
+            BBPrepareMDLListEntry( pProcess, pEntry );
     }
 
     return status;
@@ -728,31 +746,34 @@ NTSTATUS BBMapMemory( IN PMAP_MEMORY pRemap, OUT PPROCESS_MAP_ENTRY* ppEntry )
         {
             KAPC_STATE apc;
             WCHAR wbuf[48] = { 0 };
-            UNICODE_STRING pipeName = { 0 };
-            OBJECT_ATTRIBUTES attr = { 0 };
             IO_STATUS_BLOCK ioStatusBlock = { 0 };
 
-            pipeName.Buffer = wbuf;
-            pipeName.Length = 0;
-            pipeName.MaximumLength = sizeof( wbuf );
-
             KeStackAttachProcess( pProcess, &apc );
-            status = BBBuildProcessRegionListForRange( &pFoundEntry->pageList, (ULONG_PTR)MM_LOWEST_USER_ADDRESS, 
-                                                       (ULONG_PTR)MM_HIGHEST_USER_ADDRESS, pRemap->mapSections );
+            status = BBBuildProcessRegionListForRange( 
+                &pFoundEntry->pageList, (ULONG_PTR)MM_LOWEST_USER_ADDRESS, 
+                (ULONG_PTR)MM_HIGHEST_USER_ADDRESS, pRemap->mapSections 
+                );
 
             if (NT_SUCCESS( status ))
-                status = BBPrepareMDLList( &pFoundEntry->pageList );
+                status = BBPrepareMDLList( pProcess, &pFoundEntry->pageList );
 
             // Map shared page into target process
             if (NT_SUCCESS( status ))
                 status = BBMapSharedPage( pFoundEntry->pMDLShared, &pFoundEntry->target.sharedPage );
 
             // Open pipe endpoint
-            if (NT_SUCCESS( status ))
+            if (NT_SUCCESS( status ) && pRemap->pipeName[0] != L'\0')
             {
-                status = RtlUnicodeStringPrintf( &pipeName, L"\\??\\pipe\\%ls", pRemap->pipeName );
-                InitializeObjectAttributes( &attr, &pipeName, OBJ_CASE_INSENSITIVE, NULL, NULL );
-                status = ZwOpenFile( &pFoundEntry->targetPipe, GENERIC_WRITE, &attr, &ioStatusBlock, FILE_SHARE_READ | FILE_SHARE_WRITE, 0 );
+                UNICODE_STRING pipeName = { 0 };
+                pipeName.Buffer = wbuf;
+                pipeName.MaximumLength = sizeof( wbuf );
+
+                if (NT_SUCCESS( RtlUnicodeStringPrintf( &pipeName, L"\\??\\pipe\\%ls", pRemap->pipeName ) ))
+                {
+                    OBJECT_ATTRIBUTES attr = { 0 };
+                    InitializeObjectAttributes( &attr, &pipeName, OBJ_CASE_INSENSITIVE, NULL, NULL );
+                    ZwOpenFile( &pFoundEntry->targetPipe, GENERIC_WRITE, &attr, &ioStatusBlock, FILE_SHARE_READ | FILE_SHARE_WRITE, 0 );
+                }
             }
 
             KeUnstackDetachProcess( &apc );
@@ -763,7 +784,7 @@ NTSTATUS BBMapMemory( IN PMAP_MEMORY pRemap, OUT PPROCESS_MAP_ENTRY* ppEntry )
         DPRINT( "BlackBone: %s: Found mapping entry for process %u\n", __FUNCTION__, pFoundEntry->target.pid );
 
         // Caller is not Host and Host still exists
-        // Does not allow remapping into new process
+        // Do not allow remapping into new process
         if (pFoundEntry->host.pid != PsGetCurrentProcessId() && pFoundEntry->host.pid != NULL)
         {
             DPRINT( "BlackBone: %s: Host process %u still exists. Cannot map into new process\n", __FUNCTION__, pFoundEntry->host.pid );
@@ -907,7 +928,7 @@ NTSTATUS BBMapMemoryRegion( IN PMAP_MEMORY_REGION pRegion, OUT PMAP_MEMORY_REGIO
         status = BBBuildProcessRegionListForRange( &pFoundEntry->pageList, pRegion->base, pRegion->base + pRegion->size, TRUE );
 
         if (NT_SUCCESS( status ))
-            status = BBPrepareMDLList( &pFoundEntry->pageList );
+            status = BBPrepareMDLList( pProcess, &pFoundEntry->pageList );
 
         // Map shared page into target process
         if (NT_SUCCESS( status ) && newEntry)
