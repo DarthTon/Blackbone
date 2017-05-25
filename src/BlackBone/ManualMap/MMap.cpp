@@ -213,7 +213,7 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
         }
     }
 
-    Cleanup();
+    //Cleanup();
     return mod;
 }
 
@@ -524,8 +524,6 @@ NTSTATUS MMap::UnmapAllModules()
     } 
 
     Cleanup();
-    reset();
-
     return STATUS_SUCCESS;
 }
 

@@ -980,6 +980,9 @@ void NtLdr::UnlinkListEntry( ptr_t pListLink )
 template<typename T>
 ptr_t NtLdr::UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry )
 {
+    if (ldrEntry == 0)
+        return ldrEntry;
+
     auto a = AsmFactory::GetAssembler( mod.type );
     uint64_t result = 0;
 

@@ -8,8 +8,8 @@ namespace blackbone
 RemoteMemory::RemoteMemory( Process* process )
     : _process( process )
 {
+    _pipeName = Utils::RandomANString() + L"_" + std::to_wstring( _process->pid() ) + L"_" + std::to_wstring( GetCurrentProcessId() );
 }
-
 
 RemoteMemory::~RemoteMemory()
 {
@@ -180,7 +180,6 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
     // IPC
     if (_hPipe == NULL)
     {
-        _pipeName = Utils::RandomANString() + L"_" + std::to_wstring( _process->pid() ) + L"_" + std::to_wstring( GetCurrentProcessId() );
         _hPipe = CreateNamedPipeW( (L"\\\\.\\pipe\\" + _pipeName).c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE, 1, 0, 0, 0, NULL );
     }
 
