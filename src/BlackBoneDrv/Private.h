@@ -158,6 +158,7 @@ typedef struct _DYNAMIC_DATA
 
     ULONG KExecOpt;         // KPROCESS::ExecuteOptions 
     ULONG Protection;       // EPROCESS::Protection
+    ULONG EProcessFlags2;   // EPROCESS::Flags2
     ULONG ObjTable;         // EPROCESS::ObjectTable
     ULONG VadRoot;          // EPROCESS::VadRoot
     ULONG NtProtectIndex;   // NtProtectVirtualMemory SSDT index

@@ -319,6 +319,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
             case WINVER_81:
                 pData->KExecOpt         = 0x1B7;
                 pData->Protection       = 0x67A;
+                pData->EProcessFlags2   = 0x2F8;
                 pData->ObjTable         = 0x408;
                 pData->VadRoot          = 0x5D8;
                 pData->NtCreateThdIndex = 0xB0;
@@ -331,12 +332,13 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->ExRemoveTable -= 0x5E;
                 break;
 
-            // Windows 10, build 15063/14393/10586
+                // Windows 10, build 15063/14393/10586
             case WINVER_10:
                 if (verInfo.dwBuildNumber == 10586)
                 {
                     pData->KExecOpt         = 0x1BF;
                     pData->Protection       = 0x6B2;
+                    pData->EProcessFlags2   = 0x300;
                     pData->ObjTable         = 0x418;
                     pData->VadRoot          = 0x610;
                     pData->NtCreateThdIndex = 0xB4;
@@ -353,6 +355,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->ver              = WINVER_10_AU;
                     pData->KExecOpt         = 0x1BF;
                     pData->Protection       = 0x6C2;
+                    pData->EProcessFlags2   = 0x300;
                     pData->ObjTable         = 0x418;
                     pData->VadRoot          = 0x620;
                     pData->NtCreateThdIndex = 0xB6;
@@ -371,6 +374,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->ver              = WINVER_10_CU;
                     pData->KExecOpt         = 0x1BF;
                     pData->Protection       = 0x6CA;
+                    pData->EProcessFlags2   = 0x300;
                     pData->ObjTable         = 0x418;
                     pData->VadRoot          = 0x628;
                     pData->NtCreateThdIndex = 0xB9;

@@ -272,12 +272,24 @@ typedef struct _DISABLE_DEP
 } DISABLE_DEP, *PDISABLE_DEP;
 
 /// <summary>
+/// Policy activation option
+/// </summary>
+typedef enum _PolicyOpt
+{
+    Policy_Disable,
+    Policy_Enable,
+    Policy_Keep,        // Don't change current value
+} PolicyOpt;
+
+/// <summary>
 /// Input for IOCTL_BLACKBONE_SET_PROTECTION
 /// </summary>
 typedef struct _SET_PROC_PROTECTION
 {
-    ULONG   pid;            // Process ID
-    BOOLEAN enableState;    // TRUE to enable, FALSE to disable
+    ULONG pid;              // Process ID
+    PolicyOpt protection;   // Process protection
+    PolicyOpt dynamicCode;  // DynamiCode policy
+    PolicyOpt signature;    // BinarySignature policy
 } SET_PROC_PROTECTION, *PSET_PROC_PROTECTION;
 
 /// <summary>
