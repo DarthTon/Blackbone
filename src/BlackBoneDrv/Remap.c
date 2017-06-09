@@ -745,7 +745,6 @@ NTSTATUS BBMapMemory( IN PMAP_MEMORY pRemap, OUT PPROCESS_MAP_ENTRY* ppEntry )
         if (NT_SUCCESS( status ))
         {
             KAPC_STATE apc;
-            WCHAR wbuf[48] = { 0 };
             IO_STATUS_BLOCK ioStatusBlock = { 0 };
 
             KeStackAttachProcess( pProcess, &apc );
@@ -764,16 +763,21 @@ NTSTATUS BBMapMemory( IN PMAP_MEMORY pRemap, OUT PPROCESS_MAP_ENTRY* ppEntry )
             // Open pipe endpoint
             if (NT_SUCCESS( status ) && pRemap->pipeName[0] != L'\0')
             {
+                WCHAR wbuf[64] = { 0 };
                 UNICODE_STRING pipeName = { 0 };
                 pipeName.Buffer = wbuf;
                 pipeName.MaximumLength = sizeof( wbuf );
 
-                if (NT_SUCCESS( RtlUnicodeStringPrintf( &pipeName, L"\\??\\pipe\\%ls", pRemap->pipeName ) ))
+                NTSTATUS pipeStatus = RtlUnicodeStringPrintf( &pipeName, L"\\??\\pipe\\%ls", pRemap->pipeName );
+                if (NT_SUCCESS( pipeStatus ))
                 {
                     OBJECT_ATTRIBUTES attr = { 0 };
                     InitializeObjectAttributes( &attr, &pipeName, OBJ_CASE_INSENSITIVE, NULL, NULL );
-                    ZwOpenFile( &pFoundEntry->targetPipe, GENERIC_WRITE, &attr, &ioStatusBlock, FILE_SHARE_READ | FILE_SHARE_WRITE, 0 );
+                    pipeStatus = ZwOpenFile( &pFoundEntry->targetPipe, GENERIC_WRITE, &attr, &ioStatusBlock, FILE_SHARE_READ | FILE_SHARE_WRITE, 0 );
                 }
+
+                if (!NT_SUCCESS( pipeStatus ))
+                    DPRINT( "BlackBone: %s: Remap pipe failed with status 0x%X\n", __FUNCTION__, pipeStatus );
             }
 
             KeUnstackDetachProcess( &apc );

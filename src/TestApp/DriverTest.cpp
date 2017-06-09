@@ -35,10 +35,10 @@ TEST_CASE( "08. Driver" )
         WARN("Can't run DEP test for x64 executable");
 
     // Make current process protected
-    CHECK_NT_SUCCESS( status = Driver().ProtectProcess( GetCurrentProcessId(), Policy_Disable ) );
+    CHECK_NT_SUCCESS( status = Driver().ProtectProcess( GetCurrentProcessId(), Policy_Enable ) );
     CHECK( thisProc.core().isProtected() );
     if (NT_SUCCESS( status ))
-        Driver().ProtectProcess( GetCurrentProcessId(), Policy_Enable );
+        Driver().ProtectProcess( GetCurrentProcessId(), Policy_Disable );
 
     // Grant explorer.exe handle full access
     CHECK_NT_SUCCESS( status = Driver().PromoteHandle( GetCurrentProcessId(), proc.core().handle(), PROCESS_ALL_ACCESS ) );

@@ -23,7 +23,11 @@ RemoteMemory::~RemoteMemory()
 /// <returns>Status code</returns>
 NTSTATUS RemoteMemory::Map( bool mapSections )
 {
-    MapMemoryResult result;
+    MapMemoryResult result = { 0 };
+
+    // IPC
+    if (_hPipe == NULL)
+        _hPipe = CreateNamedPipeW( (L"\\\\.\\pipe\\" + _pipeName).c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE, 1, 0, 0, 0, NULL );
 
     Driver().EnsureLoaded();
     NTSTATUS status = Driver().MapMemory( _process->pid(), _pipeName, mapSections, result );
@@ -48,7 +52,11 @@ NTSTATUS RemoteMemory::Map( bool mapSections )
 /// <returns>Status code</returns>
 NTSTATUS RemoteMemory::Map( ptr_t base, uint32_t size )
 {
-    MapMemoryRegionResult memRes = { };
+    MapMemoryRegionResult memRes =  { 0 };
+
+    // IPC
+    if (_hPipe == NULL)
+        _hPipe = CreateNamedPipeW( (L"\\\\.\\pipe\\" + _pipeName).c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE, 1, 0, 0, 0, NULL );
 
     Driver().EnsureLoaded();
     NTSTATUS status = Driver().MapMemoryRegion( _process->pid(), base, size, memRes );
@@ -179,9 +187,7 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
 
     // IPC
     if (_hPipe == NULL)
-    {
         _hPipe = CreateNamedPipeW( (L"\\\\.\\pipe\\" + _pipeName).c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE, 1, 0, 0, 0, NULL );
-    }
 
     // Listening thread
     if (_hThread == NULL)
