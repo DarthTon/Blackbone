@@ -37,11 +37,8 @@ void AsmHelper32::GenPrologue( bool switchMode /*= false*/ )
 /// </summary>
 /// <param name="switchMode">Unused</param>
 /// <param name="retSize">Stack change value</param>
-void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= 0xC */ )
+void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= -1 */ )
 {
-    if (retSize == -1)
-        retSize = sizeof( uint32_t );
-
     if (switchMode == true)
     {
         IAsmHelper::SwitchTo86();
@@ -52,7 +49,10 @@ void AsmHelper32::GenEpilogue( bool switchMode /*= false*/ , int retSize /*= 0xC
         _assembler.pop( asmjit::host::ebp );
     }
 
-    _assembler.ret( retSize );
+    if (retSize == -1)
+        _assembler.ret();
+    else
+        _assembler.ret( retSize );
 }
 
 /// <summary>
@@ -138,7 +138,7 @@ void AsmHelper32::ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr
     _assembler.mov( asmjit::host::eax, pExitThread );
     _assembler.call( asmjit::host::eax );
     
-    GenEpilogue();
+    _assembler.ret();
 }
 
 /// <summary>

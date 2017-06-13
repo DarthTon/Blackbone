@@ -25,7 +25,7 @@ public:
     /// </summary>
     /// <param name="switchMode">Unused</param>
     /// <param name="retSize">Stack change value</param>
-    virtual void GenEpilogue( bool switchMode = false, int retSize = 0xC );
+    virtual void GenEpilogue( bool switchMode = false, int retSize = -1 );
 
     /// <summary>
     /// Generate function call

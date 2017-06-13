@@ -16,7 +16,6 @@ RemoteExec::RemoteExec( Process& proc )
     , _mods( _process.modules() )
     , _memory( _process.memory() )
     , _threads( _process.threads() )
-    , _hWorkThd( new Thread( (DWORD)0, &_memory.core() ) )
     , _hWaitEvent( NULL )
     , _apcPatched( false )
 {
@@ -42,7 +41,6 @@ NTSTATUS RemoteExec::ExecInNewThread(
     )
 {
     NTSTATUS status = STATUS_SUCCESS;
-    CreateRPCEnvironment( false, false );
 
     // Write code
     if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
@@ -114,9 +112,14 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
 {
     NTSTATUS status = STATUS_SUCCESS;
 
-    // Create thread if needed
-    if (!NT_SUCCESS( status = CreateRPCEnvironment() ))
-        return status;
+    // Delegate to another thread
+    if (_hijackThread)
+        return ExecInAnyThread( pCode, size, callResult, _hijackThread );
+
+    assert( _workerThread );
+    assert( _hWaitEvent != NULL );
+    if (!_workerThread || !_hWaitEvent)
+        return STATUS_INVALID_THREAD;
 
     // Write code
     if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
@@ -151,7 +154,7 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
 
     // Execute code in thread context
     // TODO: Find out why am I passing pRemoteCode as an argument???
-    if (NT_SUCCESS( _process.core().native()->QueueApcT( _hWorkThd->handle(), pRemoteCode, pRemoteCode ) ))
+    if (NT_SUCCESS( _process.core().native()->QueueApcT( _workerThread->handle(), pRemoteCode, pRemoteCode ) ))
     {
         status = WaitForSingleObject( _hWaitEvent, 30 * 1000 /*wait 30s*/ );
         callResult = _userData.Read<uint64_t>( RET_OFFSET, 0 );
@@ -179,10 +182,10 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     _CONTEXT32 ctx32 = { 0 };
     _CONTEXT64 ctx64 = { 0 };
 
-    // Prepare for remote exec
-    if (!NT_SUCCESS( status = CreateRPCEnvironment( false, true ) ))
-        return status;
-
+    assert( _hWaitEvent != NULL );
+    if (_hWaitEvent == NULL)
+        return STATUS_NOT_FOUND;
+    
     // Write code
     if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
         return status;
@@ -223,7 +226,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
             (*a)->mov( asmjit::Mem( asmjit::host::rsp, i * sizeof( uint64_t ) ), regs[i] );
 
         a->GenCall( _userCode.ptr(), { _userData.ptr() } );
-        AddReturnWithEvent( *a, mt_default, rt_int32, INTRET_OFFSET );
+        AddReturnWithEvent( *a );
 
         // Restore registers
         for (int i = 0; i < count; i++)
@@ -250,7 +253,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
 
         a->GenCall( _userCode.ptr(), { _userData.ptr() } );
         (*a)->add( asmjit::host::esp, sizeof( uint32_t ) );
-        AddReturnWithEvent( *a, mt_default, rt_int32, INTRET_OFFSET );
+        AddReturnWithEvent( *a, mt_mod32, rt_int32, INTRET_OFFSET );
 
         (*a)->popf();
         (*a)->popa();
@@ -307,13 +310,13 @@ DWORD RemoteExec::ExecDirect( ptr_t pCode, ptr_t arg )
 /// --------------------------------------------------------------------------------------------------------------------------
 /// | Internal return value | Return value |  Last Status code  |  Event handle   |  Space for copied arguments and strings  |
 /// -------------------------------------------------------------------------------------------------------------------------
-/// |       8/8 bytes       |   8/8 bytes  |      8/8 bytes     |   16/16 bytes   |                                          |
+/// |       8/8 bytes       |   8/8 bytes  |      8/8 bytes     |    8/8 bytes    |                                          |
 /// --------------------------------------------------------------------------------------------------------------------------
 /// </summary>
-/// <param name="bThread">Create worker thread</param>
+/// <param name="mode">Worket thread mode</param>
 /// <param name="bEvent">Create sync event for worker thread</param>
 /// <returns>Status</returns>
-NTSTATUS RemoteExec::CreateRPCEnvironment( bool bThread /*= true*/, bool bEvent /*= true*/ )
+NTSTATUS RemoteExec::CreateRPCEnvironment( WorkerThreadMode mode /*= Worker_None*/, bool bEvent /*= false*/ )
 {
     DWORD thdID = GetTickCount();       // randomize thread id
     NTSTATUS status = STATUS_SUCCESS;
@@ -349,13 +352,22 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( bool bThread /*= true*/, bool bEvent 
     }
 
     // Create RPC thread
-    if (bThread)
+    if (mode == Worker_CreateNew)
     {
         auto thd = CreateWorkerThread();
         if (!thd)
             return thd.status;
 
         thdID = thd.result();
+    }
+    // Get thread to hijack
+    else if (mode == Worker_UseExisting)
+    {
+        _hijackThread = _process.threads().getMostExecuted();
+        if (!_hijackThread)
+            return STATUS_INVALID_THREAD;
+
+        thdID = _hijackThread->id();
     }
 
     // Create RPC sync event
@@ -377,7 +389,7 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
     //
     // Create execution thread
     //
-    if(!_hWorkThd->valid())
+    if(!_workerThread || !_workerThread->valid())
     {
         /*if (_proc.barrier().type == wow_64_32)
         {
@@ -428,10 +440,10 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
         if (!thd)
             return thd.status;
 
-        _hWorkThd = std::move( thd.result() );
+        _workerThread = std::move( thd.result() );
     }
 
-    return _hWorkThd->id();
+    return _workerThread->id();
 }
 
 
@@ -449,7 +461,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
 
         wchar_t pEventName[128] = { 0 };
-        uint64_t dwResult = NULL;
+        uint64_t result = NULL;
         size_t len = sizeof(pEventName);
         OBJECT_ATTRIBUTES obAttr = { 0 };
         UNICODE_STRING ustr = { 0 };
@@ -523,9 +535,13 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         (*a)->mov( asmjit::host::dword_ptr( (*a)->zdx ), asmjit::host::eax );
         (*a)->ret();
 
-        status = ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), dwResult, NoSwitch );
+        if(_hijackThread)
+            status = ExecInAnyThread( (*a)->make(), (*a)->getCodeSize(), result, _hijackThread );
+        else
+            status = ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), result, NoSwitch );
+
         if (NT_SUCCESS( status ))
-            status = _userData.Read<NTSTATUS>( ERR_OFFSET, -1 );
+            status = static_cast<NTSTATUS>(result);
     }
 
     return status;
@@ -680,11 +696,12 @@ void RemoteExec::TerminateWorker()
     }
 
     // Stop thread
-    if(_hWorkThd->valid())
+    if(_workerThread && _workerThread->valid())
     {
-        _hWorkThd->Terminate();
-        _hWorkThd->Join();
-        _hWorkThd->Close();
+        _workerThread->Terminate();
+        _workerThread->Join();
+        _workerThread->Close();
+        _workerThread.reset();
         _workerCode.Free();
     }
 }

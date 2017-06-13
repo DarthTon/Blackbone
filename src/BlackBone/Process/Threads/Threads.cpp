@@ -138,21 +138,19 @@ ThreadPtr ProcessThreads::getLeastExecuted()
 ThreadPtr ProcessThreads::getMostExecuted()
 {
     uint64_t maxtime = 0;
-    auto pThread = getMain();
-    if (pThread->Suspended())
-        pThread.reset();
+    ThreadPtr result;
 
     for (auto& thread : getAll( true ))
     {
         uint64_t time = thread->execTime();
-        if (!thread->Suspended() && time > maxtime)
+        if (thread->id() != GetCurrentThreadId() /*&& !thread->Suspended()*/ && time > maxtime)
         {
             maxtime = time;
-            pThread = thread;
+            result = thread;
         }
     }
 
-    return pThread;
+    return result;
 }
 
 /// <summary>

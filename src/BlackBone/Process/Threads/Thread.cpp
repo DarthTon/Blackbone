@@ -56,7 +56,8 @@ bool Thread::Suspend()
         return true;
     
     // Target process is x86 and not running on x86 OS
-    if (_core->isWow64() && !_core->native()->GetWow64Barrier().x86OS)
+    const auto& barrier = _core->native()->GetWow64Barrier();
+    if (barrier.type == wow_64_32 && !barrier.x86OS)
         return (SAFE_CALL(Wow64SuspendThread, _handle ) != -1);
     else
         return (SuspendThread( _handle ) != -1);

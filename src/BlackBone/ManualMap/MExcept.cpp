@@ -209,7 +209,6 @@ uint8_t MExcept::_handler64[] =
 /// <returns>Error code</returns>
 NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
 {    
-    auto a = AsmFactory::GetAssembler( mod.type );
     uint64_t result = 0;
     auto& mods = proc.modules();
 
@@ -304,11 +303,10 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
     if (!pAddHandler)
         return pAddHandler.status;
 
-    (*a)->reset();
+    auto a = AsmFactory::GetAssembler( mod.type );
+
     a->GenPrologue();
-
     a->GenCall( pAddHandler->procAddress, { 0, _pVEHCode.ptr() } );
-
     proc.remote().AddReturnWithEvent( *a, mod.type );
     a->GenEpilogue();
 
