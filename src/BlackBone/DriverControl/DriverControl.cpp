@@ -66,15 +66,15 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
         const wchar_t* filename = nullptr;
 
         if (IsWindows10OrGreater())
-            filename = L"BlackBoneDrv10.sys";
+            filename = BLACKBONE_FILE_NAME_10;
         else if (IsWindows8Point1OrGreater())
-            filename = L"BlackBoneDrv81.sys";
+            filename = BLACKBONE_FILE_NAME_81;
         else if (IsWindows8OrGreater())
-            filename = L"BlackBoneDrv8.sys";
+            filename = BLACKBONE_FILE_NAME_8;
         else if (IsWindows7OrGreater())
-            filename = L"BlackBoneDrv7.sys";
+            filename = BLACKBONE_FILE_NAME_7;
         else
-            filename = L"BlackBoneDrv.sys";
+            filename = BLACKBONE_FILE_NAME;
 
         path = Utils::GetExeDirectory() + L"\\" + filename;
     }
