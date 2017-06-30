@@ -185,30 +185,28 @@ NTSTATUS PEImage::Parse( void* pImageBase /*= nullptr*/ )
     if (_pImageHdr32->Signature != IMAGE_NT_SIGNATURE)
         return STATUS_INVALID_IMAGE_FORMAT;
 
+    auto GetHeaderData = [this, &pSection]( auto pImageHeader )
+    {
+        _imgBase = pImageHeader->OptionalHeader.ImageBase;
+        _imgSize = pImageHeader->OptionalHeader.SizeOfImage;
+        _hdrSize = pImageHeader->OptionalHeader.SizeOfHeaders;
+        _epRVA = pImageHeader->OptionalHeader.AddressOfEntryPoint;
+        _subsystem = pImageHeader->OptionalHeader.Subsystem;
+        _DllCharacteristics = pImageHeader->OptionalHeader.DllCharacteristics;
+
+        pSection = reinterpret_cast<const IMAGE_SECTION_HEADER*>(pImageHeader + 1);
+    };
+
     // Detect x64 image
     if (_pImageHdr32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC)
     {
         _is64 = true;
-
-        _imgBase = _pImageHdr64->OptionalHeader.ImageBase;
-        _imgSize = _pImageHdr64->OptionalHeader.SizeOfImage;
-        _hdrSize = _pImageHdr64->OptionalHeader.SizeOfHeaders;
-        _epRVA   = _pImageHdr64->OptionalHeader.AddressOfEntryPoint;
-        _subsystem = _pImageHdr64->OptionalHeader.Subsystem;
-
-        pSection = reinterpret_cast<const IMAGE_SECTION_HEADER*>(_pImageHdr64 + 1);
+        GetHeaderData( _pImageHdr64 );
     }
     else
     {
         _is64 = false;
-
-        _imgBase = _pImageHdr32->OptionalHeader.ImageBase;
-        _imgSize = _pImageHdr32->OptionalHeader.SizeOfImage;
-        _hdrSize = _pImageHdr32->OptionalHeader.SizeOfHeaders;
-        _epRVA   = _pImageHdr32->OptionalHeader.AddressOfEntryPoint;
-        _subsystem = _pImageHdr32->OptionalHeader.Subsystem;
-
-        pSection = reinterpret_cast<const IMAGE_SECTION_HEADER*>(_pImageHdr32 + 1);
+        GetHeaderData( _pImageHdr32 );
     }
 
     // Exe file

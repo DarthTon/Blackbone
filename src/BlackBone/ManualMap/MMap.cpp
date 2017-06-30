@@ -665,14 +665,22 @@ NTSTATUS MMap::RelocateImage( ImageContextPtr pImage )
         return STATUS_SUCCESS;
     }
 
+    // Dll can't be relocated
+    if (!(pImage->peImage.DllCharacteristics() & IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE))
+    {
+        BLACKBONE_TRACE( L"ManualMap: Can't relocate image, no relocation flag" );
+        return STATUS_INVALID_IMAGE_HASH;
+    }
+
     auto start = pImage->peImage.DirectoryAddress( IMAGE_DIRECTORY_ENTRY_BASERELOC );
     auto end = start + pImage->peImage.DirectorySize( IMAGE_DIRECTORY_ENTRY_BASERELOC );
-
     auto fixrec = reinterpret_cast<pe::RelocData*>(start);
+
+    // No relocatable data
     if (fixrec == nullptr)
     {
-        BLACKBONE_TRACE( L"ManualMap: Can't relocate image, no relocation data" );
-        return STATUS_INVALID_IMAGE_FORMAT;
+        BLACKBONE_TRACE( L"ManualMap: Image does not use relocations" );
+        return STATUS_SUCCESS;
     }
 
     // Read whole image to process it locally

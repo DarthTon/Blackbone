@@ -275,8 +275,14 @@ public:
     /// <summary>
     /// If true - no actual PE file available on disk
     /// </summary>
-    /// <returns></returns>
+    /// <returns>Flag</returns>
     BLACKBONE_API inline bool noPhysFile() const { return _noFile; }
+
+    /// <summary>
+    /// DllCharacteristics field of header
+    /// </summary>
+    /// <returns>DllCharacteristics</returns>
+    BLACKBONE_API inline uint32_t DllCharacteristics() const { return _DllCharacteristics; }
 
 #ifdef COMPILER_MSVC
     /// <summary>
@@ -321,6 +327,7 @@ private:
     int32_t     _manifestIdx = 0;               // Manifest resource ID
     uint32_t    _subsystem = 0;                 // Image subsystem
     int32_t     _ILFlagOffset = 0;              // Offset of pure IL flag
+    uint32_t    _DllCharacteristics = 0;        // DllCharacteristics flags
 
     vecSections _sections;                      // Section info
     mapImports  _imports;                       // Import functions
