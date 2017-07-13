@@ -267,6 +267,6 @@ private:
     HANDLE _handle = NULL;              // Thread handle
 };
 
-typedef std::shared_ptr<Thread> ThreadPtr;
+using ThreadPtr = std::shared_ptr<Thread>;
 
 }

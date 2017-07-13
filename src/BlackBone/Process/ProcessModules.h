@@ -45,7 +45,7 @@ struct exportData
 class ProcessModules
 {
 public:
-    typedef std::unordered_map<std::pair<std::wstring, eModType>, ModuleDataPtr> mapModules;
+    using mapModules = std::unordered_map<std::pair<std::wstring, eModType>, ModuleDataPtr> ;
 
 public:
     BLACKBONE_API ProcessModules( class Process& proc );

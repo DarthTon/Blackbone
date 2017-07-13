@@ -135,8 +135,8 @@ bool ImageNET::Parse( mapMethodRVA* methods /*= nullptr*/ )
     return true;
 }
 
-typedef decltype(&GetRequestedRuntimeVersion) fnGetRequestedRuntimeVersion;
-typedef decltype(&CLRCreateInstance) fnCLRCreateInstancen;
+using fnGetRequestedRuntimeVersion = decltype(&GetRequestedRuntimeVersion);
+using fnCLRCreateInstancen = decltype(&CLRCreateInstance);
 
 /// <summary>
 /// Get image .NET runtime version

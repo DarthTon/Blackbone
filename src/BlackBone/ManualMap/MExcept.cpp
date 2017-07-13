@@ -250,7 +250,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
 
     auto replaceStub = []( uint8_t* ptr, size_t size, auto oldVal, auto newVal )
     {
-        typedef typename std::add_pointer<decltype(oldVal)>::type ValuePtr;
+        using ValuePtr = std::add_pointer_t<decltype(oldVal)>;
 
         for (uint8_t *pData = ptr; pData < ptr + size - sizeof( oldVal ); pData++)
         {

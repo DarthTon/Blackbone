@@ -51,7 +51,7 @@ typedef NTSTATUS( NTAPI *fnNtWow64ReadVirtualMemory64 )(
     );
 
 // NtWow64WriteVirtualMemory64
-typedef fnNtWow64ReadVirtualMemory64 fnNtWow64WriteVirtualMemory64;
+using fnNtWow64WriteVirtualMemory64 = fnNtWow64ReadVirtualMemory64;
 
 // NtWow64AllocateVirtualMemory64
 typedef NTSTATUS( NTAPI *fnNtWow64AllocateVirtualMemory64 )(
@@ -228,7 +228,7 @@ typedef NTSTATUS( NTAPI* fnNtQueueApcThread )(
     );
 
 // RtlQueueApcWow64Thread
-typedef fnNtQueueApcThread fnRtlQueueApcWow64Thread;
+using fnRtlQueueApcWow64Thread = fnNtQueueApcThread;
 
 // RtlImageNtHeader
 typedef PIMAGE_NT_HEADERS( NTAPI* fnRtlImageNtHeader )(
@@ -236,22 +236,22 @@ typedef PIMAGE_NT_HEADERS( NTAPI* fnRtlImageNtHeader )(
     );
 
 // RtlInitUnicodeString
-typedef decltype(&RtlInitUnicodeString) fnRtlInitUnicodeString;
+using fnRtlInitUnicodeString = decltype(&RtlInitUnicodeString);
 
 // RtlFreeUnicodeString
-typedef decltype(&RtlFreeUnicodeString) fnRtlFreeUnicodeString;
+using fnRtlFreeUnicodeString = decltype(&RtlFreeUnicodeString);
 
 // NtQuerySystemInformation
-typedef decltype(&NtQuerySystemInformation) fnNtQuerySystemInformation;
+using fnNtQuerySystemInformation = decltype(&NtQuerySystemInformation);
 
 // NtQueryInformationProcess
-typedef decltype(&NtQueryInformationProcess) fnNtQueryInformationProcess;
+using fnNtQueryInformationProcess = decltype(&NtQueryInformationProcess);
 
 // NtQueryInformationThread
-typedef decltype(&NtQueryInformationThread) fnNtQueryInformationThread;
+using fnNtQueryInformationThread = decltype(&NtQueryInformationThread);
 
 // NtQueryObject
-typedef decltype(&NtQueryObject) fnNtQueryObject;
+using fnNtQueryObject = decltype(&NtQueryObject);
 
 //
 // GCC compatibility

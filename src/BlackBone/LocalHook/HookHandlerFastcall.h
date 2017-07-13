@@ -6,18 +6,18 @@ namespace blackbone
 template<typename R, typename... Args, class C>
 struct HookHandler<R( __fastcall* )(Args...), C> : public DetourBase
 {
-    typedef typename std::conditional<std::is_same<R, void>::value, int, R>::type ReturnType;
+    using ReturnType = std::conditional_t<std::is_same_v<R, void>, int, R>;
 
-    typedef R( __fastcall *type )(Args...);
-    typedef R( __fastcall *hktype )(Args&...);
-    typedef R( C::*hktypeC )(Args&...);
+    using type    = R( __fastcall* )(Args...);
+    using hktype  = R( __fastcall* )(Args&...);
+    using hktypeC = R( C::* )(Args&...);
 
     //
     // Workaround for void return type
     //
-    typedef ReturnType( __fastcall *typeR )(Args...);
-    typedef ReturnType( __fastcall *hktypeR )(Args&...);
-    typedef ReturnType( C::*hktypeCR )(Args&...);
+    using typeR    = ReturnType( __fastcall* )(Args...);
+    using hktypeR  = ReturnType( __fastcall* )(Args&...);
+    using hktypeCR = ReturnType( C::* )(Args&...);
 
     static __declspec(noinline) ReturnType __fastcall Handler( Args... args )
     {

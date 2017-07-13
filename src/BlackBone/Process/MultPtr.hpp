@@ -16,11 +16,11 @@ template<typename T>
 class multi_ptr
 {
 public:
-    typedef typename std::remove_pointer<T>::type type;
-    typedef typename std::add_pointer<type>::type type_ptr;
-    typedef std::vector<intptr_t> vecOffsets;
+    using type = std::remove_pointer_t<T>;
+    using type_ptr = std::add_pointer_t<type>;
+    using vecOffsets = std::vector<intptr_t>;
 
-    constexpr static bool type_is_ptr = std::is_pointer<T>::value;
+    constexpr static bool type_is_ptr = std::is_pointer_v<T>;
 
 public:
     multi_ptr() = default;

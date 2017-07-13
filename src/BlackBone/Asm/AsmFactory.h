@@ -8,7 +8,7 @@
 namespace blackbone
 {
 
-typedef std::unique_ptr<IAsmHelper> AsmHelperPtr;
+using AsmHelperPtr = std::unique_ptr<IAsmHelper>;
 
 /// <summary>
 /// Get suitable asm generator

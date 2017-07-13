@@ -6,18 +6,18 @@ namespace blackbone
 template<typename R, typename... Args, class C>
 struct HookHandler<R( __stdcall* )(Args...), C> : public DetourBase
 {
-    typedef typename std::conditional<std::is_same<R, void>::value, int, R>::type ReturnType;
+    using ReturnType = std::conditional_t<std::is_same_v<R, void>, int, R>;
 
-    typedef R( __stdcall *type )(Args...);
-    typedef R( __stdcall *hktype )(Args&...);
-    typedef R( C::*hktypeC )(Args&...);
+    using type    = R( __stdcall* )(Args...);
+    using hktype  = R( __stdcall* )(Args&...);
+    using hktypeC = R( C::* )(Args&...);
 
     //
     // Workaround for void return type
     //
-    typedef ReturnType( __stdcall *typeR )(Args...);
-    typedef ReturnType( __stdcall *hktypeR )(Args&...);
-    typedef ReturnType( C::*hktypeCR )(Args&...);
+    using typeR    = ReturnType( __stdcall* )(Args...);
+    using hktypeR  = ReturnType( __stdcall* )(Args&...);
+    using hktypeCR = ReturnType( C::* )(Args&...);
 
     static __declspec(noinline) ReturnType __stdcall Handler( Args... args )
     {

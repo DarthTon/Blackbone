@@ -78,17 +78,17 @@ struct ExportData
 };
 
 // Imports and sections related
-typedef std::unordered_map<std::wstring, std::vector<ImportData>> mapImports;
-typedef std::vector<IMAGE_SECTION_HEADER> vecSections;
-typedef std::vector<ExportData> vecExports;
+using mapImports  = std::unordered_map<std::wstring, std::vector<ImportData>>;
+using vecSections = std::vector<IMAGE_SECTION_HEADER>;
+using vecExports  = std::vector<ExportData>;
 
 /// <summary>
 /// Primitive PE parsing class
 /// </summary>
 class PEImage
 {
-    typedef const IMAGE_NT_HEADERS32* PCHDR32;
-    typedef const IMAGE_NT_HEADERS64* PCHDR64;
+    using PCHDR32 = const IMAGE_NT_HEADERS32*;
+    using PCHDR64 = const IMAGE_NT_HEADERS64*;
     
 public:
     BLACKBONE_API PEImage( void );

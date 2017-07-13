@@ -14,7 +14,7 @@ ENUM_OPS( KMmapFlags );
 namespace blackbone
 {
 // [Original ptr, size] <--> [Mapped ptr]
-typedef std::map < std::pair<ptr_t, uint32_t>, ptr_t > mapMemoryMap;
+using mapMemoryMap = std::map<std::pair<ptr_t, uint32_t>, ptr_t>;
 
 struct MapMemoryResult
 {

@@ -10,9 +10,9 @@ template<typename Fn, class C = NoClass>
 class VTableDetour : public Detour<Fn, C>
 {
 public:
-    typedef typename HookHandler<Fn, C>::type type;
-    typedef typename HookHandler<Fn, C>::hktype hktype;
-    typedef typename HookHandler<Fn, C>::hktypeC hktypeC;
+    using type    = typename HookHandler<Fn, C>::type;
+    using hktype  = typename HookHandler<Fn, C>::hktype;
+    using hktypeC = typename HookHandler<Fn, C>::hktypeC;
 
 public:
     VTableDetour()

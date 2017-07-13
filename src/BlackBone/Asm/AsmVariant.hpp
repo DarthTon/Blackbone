@@ -17,7 +17,7 @@ namespace blackbone
 struct AsmVariant
 {
     template<typename T>
-    using cleanup_t = typename std::decay<typename std::remove_pointer<T>::type>::type;
+    using cleanup_t = std::decay_t<std::remove_pointer_t<T>>;
 
     enum eType
     {
@@ -49,15 +49,15 @@ struct AsmVariant
 
     // bool, short, int, unsigned long long, etc.
     template<typename T>
-    typename std::enable_if<!std::is_pointer<T>::value && (std::is_integral<T>::value || std::is_enum<T>::value)>::type
+    std::enable_if_t<!std::is_pointer_v<T> && (std::is_integral_v<T> || std::is_enum_v<T>)>
         Init( T arg )
     {
-        set( imm, sizeof( std::decay<T>::type ), static_cast<uint64_t>(arg) );
+        set( imm, sizeof( std::decay_t<T> ), static_cast<uint64_t>(arg) );
     }
 
     // char*, const char*, char[], etc.
     template<typename T>
-    typename std::enable_if<std::is_pointer<T>::value && std::is_same<cleanup_t<T>, char>::value>::type
+    std::enable_if_t<std::is_pointer_v<T> && std::is_same_v<cleanup_t<T>, char>>
         Init( T arg )
     {
         set( dataPtr, strlen( arg ) + 1, reinterpret_cast<uint64_t>(arg) );
@@ -65,7 +65,7 @@ struct AsmVariant
 
     // wchar_t*, const wchar_t*, wchar[], etc.
     template<typename T>
-    typename std::enable_if<std::is_pointer<T>::value && std::is_same<cleanup_t<T>, wchar_t>::value>::type
+    std::enable_if_t<std::is_pointer_v<T> && std::is_same_v<cleanup_t<T>, wchar_t>>
         Init( T arg )
     {
         set( dataPtr, (wcslen( arg ) + 1) * sizeof( wchar_t ), reinterpret_cast<uint64_t>(arg) );
@@ -73,7 +73,7 @@ struct AsmVariant
 
     // void*, const void*, etc.
     template<typename T>
-    typename std::enable_if<std::is_pointer<T>::value && std::is_same<cleanup_t<T>, void>::value>::type
+    std::enable_if_t<std::is_pointer_v<T> && std::is_same_v<cleanup_t<T>, void>>
         Init( T arg )
     {
         set( imm, sizeof( T ), reinterpret_cast<uint64_t>(arg) );
@@ -81,7 +81,7 @@ struct AsmVariant
 
     // Function pointer
     template<typename T>
-    typename std::enable_if<std::is_function<typename std::remove_pointer<T>::type>::value>::type
+    std::enable_if_t<std::is_function_v<std::remove_pointer_t<T>>>
         Init( T arg )
     {
         set( imm, sizeof( T ), reinterpret_cast<uint64_t>(arg) );
@@ -89,12 +89,12 @@ struct AsmVariant
 
     // Arbitrary pointer
     template<typename T>
-    typename std::enable_if<
-        std::is_pointer<T>::value &&
-        !std::is_function<typename std::remove_pointer<T>::type>::value &&
-        !std::is_same<cleanup_t<T>, void>::value &&
-        !std::is_same<cleanup_t<T>, char>::value &&
-        !std::is_same<cleanup_t<T>, wchar_t>::value>::type
+    std::enable_if_t<
+        std::is_pointer_v<T> &&
+        !std::is_function_v<std::remove_pointer_t<T>> &&
+        !std::is_same_v<cleanup_t<T>, void> &&
+        !std::is_same_v<cleanup_t<T>, char> &&
+        !std::is_same_v<cleanup_t<T>, wchar_t>>
         Init( T arg )
     {
         set( dataPtr, sizeof( std::remove_pointer<T>::type ), reinterpret_cast<uint64_t>(arg) );
@@ -102,11 +102,11 @@ struct AsmVariant
 
     // Arbitrary variable passed by value
     template<typename T>
-    typename std::enable_if<
-        !std::is_pointer<typename std::decay<T>::type>::value &&
-        !std::is_integral<cleanup_t<T>>::value &&
-        !std::is_enum<cleanup_t<T>>::value
-        >::type
+    std::enable_if_t<
+        !std::is_pointer_v<std::decay_t<T>> &&
+        !std::is_integral_v<cleanup_t<T>> &&
+        !std::is_enum_v<cleanup_t<T>>
+        >
         Init( T&& arg )
     {
         // Can fit into register

@@ -14,7 +14,7 @@ class ProcessCore
 {
     friend class Process;
 
-    typedef std::unique_ptr<Native> ptrNative;
+    using ptrNative = std::unique_ptr<Native>;
 
 public:
 

@@ -159,7 +159,7 @@ enum CallbackType
     PostCallback        // Called after manual mapping, but before entry point invocation. Loader flags are decided here
 };
 
-typedef LoadData( *MapCallback )(CallbackType type, void* context, Process& process, const ModuleData& modInfo);
+using MapCallback = LoadData( *)(CallbackType type, void* context, Process& process, const ModuleData& modInfo);
 
 
 /// <summary>
@@ -167,7 +167,7 @@ typedef LoadData( *MapCallback )(CallbackType type, void* context, Process& proc
 /// </summary>
 struct ImageContext
 {
-    typedef std::vector<ptr_t> vecPtr;
+    using vecPtr = std::vector<ptr_t>;
 
     pe::PEImage    peImage;                 // PE image data
     MemBlock       imgMem;                  // Target image memory region
@@ -178,8 +178,8 @@ struct ImageContext
     bool           initialized = false;     // Image entry point was called
 };
 
-typedef std::shared_ptr<ImageContext> ImageContextPtr;
-typedef std::vector<ImageContextPtr> vecImageCtx;
+using ImageContextPtr = std::shared_ptr<ImageContext>;
+using vecImageCtx = std::vector<ImageContextPtr>;
 
 /// <summary>
 /// Manual image mapper

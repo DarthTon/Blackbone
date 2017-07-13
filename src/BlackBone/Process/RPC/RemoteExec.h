@@ -26,7 +26,7 @@ enum WorkerThreadMode
 
 class RemoteExec
 {
-    typedef std::vector<AsmVariant> vecArgs;
+    using vecArgs = std::vector<AsmVariant>;
 
 public:
     BLACKBONE_API RemoteExec( class Process& proc );

@@ -35,8 +35,8 @@ struct PathNode
 /// </summary>
 struct HookContext
 {
-    typedef std::unordered_map<uintptr_t, std::pair<uintptr_t, bool>> mapHooks;
-    typedef std::vector<PathNode> vecState;
+    using mapHooks = std::unordered_map<uintptr_t, std::pair<uintptr_t, bool>>;
+    using vecState = std::vector<PathNode>;
 
     uintptr_t lastIP = 0;       // Previous EIP/RIP value
     uintptr_t lastSP = 0;       // Previous ESP/RSP value
@@ -70,8 +70,8 @@ class TraceHook
 {
 
 public:
-    typedef std::map<uintptr_t, HookContext> mapContext;
-    typedef std::vector <std::pair<uintptr_t, uintptr_t>> vecStackFrames;
+    using mapContext = std::map<uintptr_t, HookContext>;
+    using vecStackFrames = std::vector <std::pair<uintptr_t, uintptr_t>>;
 
 public:
     ~TraceHook();

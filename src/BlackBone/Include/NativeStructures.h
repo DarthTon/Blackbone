@@ -23,7 +23,7 @@ struct _LIST_ENTRY_T
 template <typename T>
 struct _UNICODE_STRING_T
 {
-    typedef T type;
+    using type = T;
 
     uint16_t Length;
     uint16_t MaximumLength;
@@ -60,7 +60,7 @@ struct _GDI_TEB_BATCH_T
 template <typename T>
 struct _TEB_T
 {
-    typedef T type;
+    using type = T;
 
     _NT_TIB_T<T> NtTib;
     T EnvironmentPointer;
@@ -154,14 +154,14 @@ struct _PEB_T
 {
     static_assert(
         std::is_same<T, uint32_t>::value || std::is_same<T, uint64_t>::value, 
-        "T must be uint32_t or uint64"
+        "T must be uint32_t or uint64_t"
         );
 
-    typedef T type;
-    typedef std::integral_constant<int, 34> const34;
-    typedef std::integral_constant<int, 60> const60;
-    typedef std::integral_constant<bool, std::is_same<T, uint32_t>::value> is32Bit;
-    typedef std::conditional<is32Bit::value, const34, const60> BufferSize_t;
+    using type = T;
+    using const34 = std::integral_constant<int, 34>;
+    using const60 = std::integral_constant<int, 60>;
+    using is32Bit = std::integral_constant<bool, std::is_same_v<T, uint32_t>>;
+    using BufferSize_t = std::conditional_t<is32Bit::value, const34, const60>;
 
     uint8_t InheritedAddressSpace;
     uint8_t ReadImageFileExecOptions;
@@ -255,7 +255,7 @@ struct _PEB_T
         T Padding4;
     };
     T ActiveProcessAffinityMask;
-    uint32_t GdiHandleBuffer[BufferSize_t::type::value];
+    uint32_t GdiHandleBuffer[BufferSize_t::value];
     T PostProcessInitRoutine;
     T TlsExpansionBitmap;
     uint32_t TlsExpansionBitmapBits[32];
@@ -694,49 +694,49 @@ struct _RTL_INVERTED_FUNCTION_TABLE_ENTRY
     uint32_t SizeOfTable;
 };
 
-typedef _UNICODE_STRING_T<uint32_t>             _UNICODE_STRING32;
-typedef _UNICODE_STRING_T<uint64_t>             _UNICODE_STRING64;
-typedef _UNICODE_STRING_T<uintptr_t>            UNICODE_STRING_T;
+using _UNICODE_STRING32 = _UNICODE_STRING_T<uint32_t>;
+using _UNICODE_STRING64 = _UNICODE_STRING_T<uint64_t>;
+using UNICODE_STRING_T  = _UNICODE_STRING_T<uintptr_t>;
 
-typedef _PEB_T<uint32_t>                        _PEB32;
-typedef _PEB_T<uint64_t>                        _PEB64;
-typedef _PEB_T<uintptr_t>                       PEB_T;
+using _PEB32 = _PEB_T<uint32_t>;
+using _PEB64 = _PEB_T<uint64_t>;
+using PEB_T  = _PEB_T<uintptr_t>;
 
-typedef _TEB_T<uint32_t>                        _TEB32;
-typedef _TEB_T<uint64_t>                        _TEB64;
-typedef _TEB_T<uintptr_t>                       TEB_T;
+using _TEB32 = _TEB_T<uint32_t>;
+using _TEB64 = _TEB_T<uint64_t>;
+using TEB_T  = _TEB_T<uintptr_t>;
 
-typedef _PEB_LDR_DATA2_T<uint32_t>              _PEB_LDR_DATA232;
-typedef _PEB_LDR_DATA2_T<uint64_t>              _PEB_LDR_DATA264;
-typedef _PEB_LDR_DATA2_T<uintptr_t>             PEB_LDR_DATA_T;
+using _PEB_LDR_DATA232 = _PEB_LDR_DATA2_T<uint32_t>;
+using _PEB_LDR_DATA264 = _PEB_LDR_DATA2_T<uint64_t>;
+using PEB_LDR_DATA_T   = _PEB_LDR_DATA2_T<uintptr_t>;
 
-typedef _LDR_DATA_TABLE_ENTRY_BASE_T<uint32_t>  _LDR_DATA_TABLE_ENTRY_BASE32;
-typedef _LDR_DATA_TABLE_ENTRY_BASE_T<uint64_t>  _LDR_DATA_TABLE_ENTRY_BASE64;
-typedef _LDR_DATA_TABLE_ENTRY_BASE_T<uintptr_t> LDR_DATA_TABLE_ENTRY_BASE_T;
+using _LDR_DATA_TABLE_ENTRY_BASE32 = _LDR_DATA_TABLE_ENTRY_BASE_T<uint32_t>;
+using _LDR_DATA_TABLE_ENTRY_BASE64 = _LDR_DATA_TABLE_ENTRY_BASE_T<uint64_t>;
+using LDR_DATA_TABLE_ENTRY_BASE_T  = _LDR_DATA_TABLE_ENTRY_BASE_T<uintptr_t>;
 
-typedef _CONTEXT_T<uint32_t>                    _CONTEXT32;
-typedef _CONTEXT_T<uint64_t>                    _CONTEXT64;
-typedef _CONTEXT_T<uintptr_t>                   CONTEXT_T;
+using _CONTEXT32 = _CONTEXT_T<uint32_t>;
+using _CONTEXT64 = _CONTEXT_T<uint64_t>;
+using CONTEXT_T  = _CONTEXT_T<uintptr_t>;
 
-typedef _SECTION_BASIC_INFORMATION_T<uint32_t>  _SECTION_BASIC_INFORMATION32;
-typedef _SECTION_BASIC_INFORMATION_T<uint64_t>  _SECTION_BASIC_INFORMATION64;
-typedef _SECTION_BASIC_INFORMATION_T<uintptr_t> SECTION_BASIC_INFORMATION_T;
+using _SECTION_BASIC_INFORMATION32 = _SECTION_BASIC_INFORMATION_T<uint32_t>;
+using _SECTION_BASIC_INFORMATION64 = _SECTION_BASIC_INFORMATION_T<uint64_t>;
+using SECTION_BASIC_INFORMATION_T  = _SECTION_BASIC_INFORMATION_T<uintptr_t>;
 
-typedef _SYSTEM_HANDLE_INFORMATION_T<uint32_t>  _SYSTEM_HANDLE_INFORMATION32;
-typedef _SYSTEM_HANDLE_INFORMATION_T<uint64_t>  _SYSTEM_HANDLE_INFORMATION64;
-typedef _SYSTEM_HANDLE_INFORMATION_T<uintptr_t> SYSTEM_HANDLE_INFORMATION_T;
+using _SYSTEM_HANDLE_INFORMATION32 = _SYSTEM_HANDLE_INFORMATION_T<uint32_t>;
+using _SYSTEM_HANDLE_INFORMATION64 = _SYSTEM_HANDLE_INFORMATION_T<uint64_t>;
+using SYSTEM_HANDLE_INFORMATION_T = _SYSTEM_HANDLE_INFORMATION_T<uintptr_t>;
 
-typedef _OBJECT_TYPE_INFORMATION_T<uint32_t>    _OBJECT_TYPE_INFORMATION32;
-typedef _OBJECT_TYPE_INFORMATION_T<uint64_t>    _OBJECT_TYPE_INFORMATION64;
-typedef _OBJECT_TYPE_INFORMATION_T<uintptr_t>   OBJECT_TYPE_INFORMATION_T;
+using _OBJECT_TYPE_INFORMATION32 = _OBJECT_TYPE_INFORMATION_T<uint32_t>;
+using _OBJECT_TYPE_INFORMATION64 = _OBJECT_TYPE_INFORMATION_T<uint64_t>;
+using OBJECT_TYPE_INFORMATION_T  = _OBJECT_TYPE_INFORMATION_T<uintptr_t>;
 
-typedef _OBJECT_ATTRIBUTES_T<uint32_t>          _OBJECT_ATTRIBUTES32;
-typedef _OBJECT_ATTRIBUTES_T<uint64_t>          _OBJECT_ATTRIBUTES64;
-typedef _OBJECT_ATTRIBUTES_T<uintptr_t>         OBJECT_ATTRIBUTES_T;
+using _OBJECT_ATTRIBUTES32 = _OBJECT_ATTRIBUTES_T<uint32_t>;
+using _OBJECT_ATTRIBUTES64 = _OBJECT_ATTRIBUTES_T<uint64_t>;
+using OBJECT_ATTRIBUTES_T  = _OBJECT_ATTRIBUTES_T<uintptr_t>;
 
-typedef _ACTCTXW_T<uint32_t>                    _ACTCTXW32;
-typedef _ACTCTXW_T<uint64_t>                    _ACTCTXW64;
-typedef _ACTCTXW_T<uintptr_t>                   ACTCTXW_T;
+using _ACTCTXW32 = _ACTCTXW_T<uint32_t>;
+using _ACTCTXW64 = _ACTCTXW_T<uint64_t>;
+using ACTCTXW_T  = _ACTCTXW_T<uintptr_t>;
 }
 
 #include "ApiSet.h"

@@ -12,14 +12,12 @@ namespace blackbone
 template <typename T>
 struct call_result_t
 {
-    typedef T type;
-
     NTSTATUS status = STATUS_UNSUCCESSFUL;          // Execution status
     std::optional<T> result_data = std::nullopt;    // Returned value
 
     call_result_t() = default;
 
-    call_result_t( const T& result_, NTSTATUS status_ = STATUS_SUCCESS )
+    call_result_t( T result_, NTSTATUS status_ = STATUS_SUCCESS )
         : status ( status_ )
         , result_data ( std::move( result_ ) )
     {

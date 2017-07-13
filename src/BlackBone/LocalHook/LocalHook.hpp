@@ -10,9 +10,9 @@ template<typename Fn, class C = NoClass>
 class Detour: public HookHandler<Fn, C>
 {
 public:
-    typedef typename HookHandler<Fn, C>::type type;
-    typedef typename HookHandler<Fn, C>::hktype hktype;
-    typedef typename HookHandler<Fn, C>::hktypeC hktypeC;
+    using type    = typename HookHandler<Fn, C>::type;
+    using hktype  = typename HookHandler<Fn, C>::hktype;
+    using hktypeC = typename HookHandler<Fn, C>::hktypeC;
 
 public:  
     Detour()
@@ -187,8 +187,9 @@ private:
         memcpy( this->_original, this->_newCode, codeSize );
 
         VirtualProtect( this->_original, codeSize, flOld, &flOld );
-    
-        return (this->_hooked = codeSize != 0);
+
+        this->_hooked = (codeSize != 0);
+        return this->_hooked;
     }
 
     /// <summary>

@@ -33,8 +33,8 @@ public:
     };
 
     // Hook callback prototype
-    typedef void( *fnCallback )(RemoteContext& context);
-    typedef void( __thiscall* fnClassCallback )(const void* __this, RemoteContext& context);
+    using fnCallback = void( *)(RemoteContext& context);
+    using fnClassCallback = void( __thiscall* )(const void* __this, RemoteContext& context);
 
     /// <summary>
     /// Hook descriptor
@@ -64,9 +64,9 @@ public:
         _CONTEXT64 entryCtx;            // Thread context on function entry (used in function return hook)
     };
 
-    typedef std::map<ptr_t, HookData> mapHook;
-    typedef std::map<ptr_t, ptr_t> mapAddress;
-    typedef std::map<ptr_t, bool> setAddresses;
+    using mapHook = std::map<ptr_t, HookData>;
+    using mapAddress = std::map<ptr_t, ptr_t>;
+    using setAddresses = std::map<ptr_t, bool>;
 
 public:
     BLACKBONE_API RemoteHook( class ProcessMemory& memory );

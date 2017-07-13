@@ -13,7 +13,14 @@ namespace blackbone
 /// <param name="size">Block size</param>
 /// <param name="prot">Memory protection</param>
 /// <param name="own">false if caller will be responsible for block deallocation</param>
-MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own /*= true*/, bool physical /*= false*/ )
+MemBlock::MemBlock( 
+    ProcessMemory* mem, 
+    ptr_t ptr, 
+    size_t size, 
+    DWORD prot, 
+    bool own /*= true*/, 
+    bool physical /*= false*/ 
+    )
     : _pImpl( new MemBlockImpl( mem, ptr, size, prot, own, physical ) )
 {
 }
@@ -26,7 +33,13 @@ MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool
 /// <param name="size">Block size</param>
 /// <param name="prot">Memory protection</param>
 /// <param name="own">false if caller will be responsible for block deallocation</param>
-MemBlock::MemBlockImpl::MemBlockImpl( class ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own /*= true*/, bool physical /*= false */ )
+MemBlock::MemBlockImpl::MemBlockImpl( 
+    class ProcessMemory* mem, 
+    ptr_t ptr, size_t size, 
+    DWORD prot, 
+    bool own /*= true*/, 
+    bool physical /*= false */ 
+    )
     : _ptr( ptr )
     , _size( size )
     , _protection( prot )
@@ -66,7 +79,13 @@ MemBlock::MemBlock( ProcessMemory* mem, ptr_t ptr, bool own /*= true*/ )
 /// <param name="protection">Memory protection</param>
 /// <param name="own">false if caller will be responsible for block deallocation</param>
 /// <returns>Memory block. If failed - returned block will be invalid</returns>
-call_result_t<MemBlock> MemBlock::Allocate( ProcessMemory& process, size_t size, ptr_t desired /*= 0*/, DWORD protection /*= PAGE_EXECUTE_READWRITE */, bool own /*= true*/ )
+call_result_t<MemBlock> MemBlock::Allocate( 
+    ProcessMemory& process, 
+    size_t size, 
+    ptr_t desired /*= 0*/, 
+    DWORD protection /*= PAGE_EXECUTE_READWRITE */, 
+    bool own /*= true*/ 
+    )
 {
     ptr_t desired64 = desired;
     DWORD newProt = CastProtection( protection, process.core().DEP() );

@@ -8,15 +8,17 @@
 
 namespace blackbone
 {
-template< typename R, typename... Args >
+template<typename R, typename... Args>
 class RemoteFunctionBase
 {
-public:
-    typedef typename std::conditional<std::is_same<R, void>::value, int, R>::type ReturnType;
+    template<bool...> 
+    struct bool_pack;
 
-    template<bool...> struct bool_pack;
     template<bool... bs>
     using all_true = std::is_same<bool_pack<bs..., true>, bool_pack<true, bs...>>;
+
+public:
+    using ReturnType = std::conditional_t<std::is_same_v<R, void>, int, R>;
 
     struct CallArguments
     {
@@ -40,7 +42,7 @@ public:
         , _conv( conv )
     {
         static_assert(
-            all_true<!std::is_reference<Args>::value...>::value,
+            all_true<!std::is_reference_v<Args>...>::value,
             "Please replace reference type to pointer type in function type specification"
             );
     }
@@ -48,7 +50,7 @@ public:
 #pragma warning(disable : 4127)
     call_result_t<ReturnType> Call( CallArguments& args, ThreadPtr contextThread = nullptr )
     {
-        ReturnType result;
+        ReturnType result = {};
         uint64_t tmpResult = 0;
         NTSTATUS status = STATUS_SUCCESS;
         auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
@@ -111,11 +113,11 @@ private:
 };
 
 // Remote function pointer
-template< typename Fn >
+template<typename Fn>
 class RemoteFunction;
 
 #define DECLPFN(CALL_OPT, CALL_DEF) \
-template< typename R, typename... Args > \
+template<typename R, typename... Args> \
 class RemoteFunction < R( CALL_OPT*)(Args...) > : public RemoteFunctionBase<R, Args...> \
 { \
 public: \

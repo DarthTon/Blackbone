@@ -12,7 +12,7 @@ namespace blackbone
 
 class NameResolve
 {
-    typedef std::unordered_map<std::wstring, std::vector<std::wstring>> mapApiSchema;
+    using mapApiSchema = std::unordered_map<std::wstring, std::vector<std::wstring>>;
    
 public:
     enum eResolveFlag

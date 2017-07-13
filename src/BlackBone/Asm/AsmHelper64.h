@@ -23,7 +23,7 @@ public:
     /// </summary>
     /// <param name="switchMode">true if execution must be swithed to x86 mode</param>
     /// <param name="retSize">Stack change value</param>
-    virtual void GenEpilogue( bool switchMode = false, int retSize = 0 );
+    virtual void GenEpilogue( bool switchMode = false, int retSize = -1 );
 
     /// <summary>
     /// Generate function call

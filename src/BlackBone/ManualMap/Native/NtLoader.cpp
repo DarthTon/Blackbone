@@ -346,7 +346,7 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
 template<typename T>
 ptr_t NtLdr::InitBaseNode( NtLdrEntry& mod )
 {
-    typedef _LDR_DATA_TABLE_ENTRY_BASE_T<T> EntryType;
+    using EntryType = _LDR_DATA_TABLE_ENTRY_BASE_T<T>;
     ptr_t entryPtr = AllocateInHeap( mod.type, sizeof( _LDR_DATA_TABLE_ENTRY_W8<T> ) ).result( 0 );
     if (entryPtr == 0)
         return 0;
@@ -402,8 +402,8 @@ ptr_t NtLdr::InitBaseNode( NtLdrEntry& mod )
 template<typename T>
 ptr_t NtLdr::InitW8Node( NtLdrEntry& mod )
 {
-    typedef _LDR_DATA_TABLE_ENTRY_W8<T> EntryType;
-    typedef _LDR_DDAG_NODE<T> DdagType;
+    using EntryType = _LDR_DATA_TABLE_ENTRY_W8<T>;
+    using DdagType = _LDR_DDAG_NODE<T>;
 
     ptr_t entryPtr = InitBaseNode<T>( mod );
     ptr_t DdagNodePtr = AllocateInHeap( mod.type, sizeof( DdagType ) ).result( 0 );
@@ -440,7 +440,7 @@ ptr_t NtLdr::InitW8Node( NtLdrEntry& mod )
 template<typename T>
 ptr_t NtLdr::InitW7Node( NtLdrEntry& mod )
 {
-    typedef _LDR_DATA_TABLE_ENTRY_W7<T> EntryType;
+    using EntryType = _LDR_DATA_TABLE_ENTRY_W7<T>;
 
     ptr_t entryPtr = InitBaseNode<T>( mod );
     if (!entryPtr)

@@ -57,8 +57,8 @@ template<typename R, typename... Args, typename C>
 class Win32Thunk < R( __stdcall* )(Args...), C >
 {
 public:
-    typedef R( C::*TypeMember )(Args...);
-    typedef R( __stdcall* TypeFree )(Args...);
+    using TypeMember = R( C::* )(Args...);
+    using TypeFree = R( __stdcall* )(Args...);
 
 public:
     Win32Thunk( TypeMember pfn, C* pInstance )

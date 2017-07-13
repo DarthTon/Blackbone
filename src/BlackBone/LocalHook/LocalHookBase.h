@@ -47,7 +47,7 @@ namespace ReturnMethod
 
 class DetourBase
 {
-    typedef std::unordered_map<DWORD, int> mapIdx;
+    using mapIdx = std::unordered_map<DWORD, int>;
 
 public:
     BLACKBONE_API DetourBase();

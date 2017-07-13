@@ -10,8 +10,8 @@
 namespace blackbone
 {
 
-typedef uint64_t ptr_t;     // Generic pointer in remote process
-typedef ptr_t    module_t;  // Module base pointer
+using ptr_t = uint64_t;     // Generic pointer in remote process
+using module_t = ptr_t;  // Module base pointer
 
 // Type of barrier
 enum eBarrier
@@ -77,6 +77,6 @@ struct ModuleData
     }
 };
 
-typedef std::shared_ptr<const ModuleData> ModuleDataPtr;
+using ModuleDataPtr = std::shared_ptr<const ModuleData>;
 
 }
