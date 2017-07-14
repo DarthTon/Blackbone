@@ -23,7 +23,7 @@ public:
     struct CallArguments
     {
         CallArguments( const Args&... args )
-            : arguments( { args... } ) { }
+            : arguments( { AsmVariant( args )... } ) { }
 
         // Manually set argument to custom value
         void set( int pos, const AsmVariant& newVal )
