@@ -688,6 +688,27 @@ void RemoteExec::AddReturnWithEvent(
 /// </summary>
 void RemoteExec::TerminateWorker()
 {
+    // Close remote event handle
+    ptr_t hRemoteEvent = 0;
+    _userData.Read( EVENT_OFFSET, hRemoteEvent );
+    if (hRemoteEvent)
+    {
+        HANDLE hLocal = nullptr;
+        DuplicateHandle( 
+            _process.core().handle(), 
+            reinterpret_cast<HANDLE>(hRemoteEvent), 
+            GetCurrentProcess(),
+            &hLocal, 
+            0, false, 
+            DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS
+        );
+
+        if (hLocal)
+            CloseHandle( hLocal );
+
+        _userData.Write( EVENT_OFFSET, 0ll );
+    }
+
     // Close event
     if(_hWaitEvent)
     {
