@@ -709,6 +709,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
     if (!NT_SUCCESS( status ))
     {
         DPRINT( "BlackBone: %s: Failed to open '%wZ'. Status: 0x%X\n", __FUNCTION__, pPath, status );
+        PsTerminateSystemThread( status );
         return status;
     }
 
@@ -818,6 +819,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
     if (NT_SUCCESS( status ))
         DPRINT( "BlackBone: %s: Successfully mapped '%wZ' at 0x%p\n", __FUNCTION__, pPath, imageSection );
 
+    PsTerminateSystemThread( status );
     return status;
 }
 
@@ -856,7 +858,8 @@ NTSTATUS BBMMapDriver( IN PUNICODE_STRING pPath )
 
         status = KeWaitForSingleObject( pThread, Executive, KernelMode, TRUE, NULL );
         status = ZwQueryInformationThread( hThread, ThreadBasicInformation, &info, sizeof( info ), &bytes );
-        status = info.ExitStatus;
+        if (NT_SUCCESS( status ));
+            status = info.ExitStatus;
     }
 
     if (pThread)
