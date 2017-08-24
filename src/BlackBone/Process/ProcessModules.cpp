@@ -622,7 +622,7 @@ bool ProcessModules::InjectPureIL(
         return false;
     }
 
-    auto address = mem.result();
+    auto address = std::move( mem.result() );
     uintptr_t offset = 4;
     uintptr_t address_VersionString, address_netAssemblyDll, address_netAssemblyClass,
            address_netAssemblyMethod, address_netAssemblyArgs;

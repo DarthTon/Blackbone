@@ -988,7 +988,7 @@ ptr_t NtLdr::UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry )
 
     auto RtlRbRemoveNode = _process.modules().GetNtdllExport( "RtlRbRemoveNode" );
     if (!RtlRbRemoveNode)
-        return RtlRbRemoveNode.status;
+        return 0;
 
     a->GenPrologue();
     a->GenCall( static_cast<uintptr_t>(RtlRbRemoveNode->procAddress),
@@ -1000,6 +1000,7 @@ ptr_t NtLdr::UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry )
     _process.remote().AddReturnWithEvent( *a );
     a->GenEpilogue();
 
+    _process.remote().CreateRPCEnvironment( Worker_CreateNew, true );
     _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
 
     return ldrEntry;
