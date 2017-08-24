@@ -165,14 +165,18 @@ public:
     FsRedirector( bool wow64 )
         : _wow64( wow64 )
     {
+#ifndef XP_BUILD
         if (wow64)
             Wow64DisableWow64FsRedirection( &_fsRedirection );
+#endif
     }
 
     ~FsRedirector()
     {
+#ifndef XP_BUILD
         if (_wow64)
             Wow64RevertWow64FsRedirection( _fsRedirection );
+#endif
     }
 
 private:
