@@ -442,6 +442,7 @@ std::vector<MEMORY_BASIC_INFORMATION64> Native::EnumRegions( bool includeFree /*
 template<typename T>
 std::vector<ModuleDataPtr> Native::EnumModulesT()
 {
+    NTSTATUS status = STATUS_SUCCESS;
     _PEB_T<T> peb = { 0 };
     _PEB_LDR_DATA2_T<T> ldr = { 0 };
     std::vector<ModuleDataPtr> result;
@@ -449,8 +450,8 @@ std::vector<ModuleDataPtr> Native::EnumModulesT()
     if (getPEB( &peb ) != 0 && ReadProcessMemoryT( peb.Ldr, &ldr, sizeof(ldr), 0 ) == STATUS_SUCCESS)
     {
         for (T head = ldr.InLoadOrderModuleList.Flink;
-              head != (peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2_T<T>, InLoadOrderModuleList ));
-              ReadProcessMemoryT( static_cast<ptr_t>(head), &head, sizeof(head) ))
+            NT_SUCCESS( status ) && head != (peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2_T<T>, InLoadOrderModuleList ));
+            status = ReadProcessMemoryT( static_cast<ptr_t>(head), &head, sizeof( head ) ))
         {
             ModuleData data;
             wchar_t localPath[512] = { 0 };
@@ -464,6 +465,7 @@ std::vector<ModuleDataPtr> Native::EnumModulesT()
             data.fullPath = Utils::ToLower( localPath );
             data.name = Utils::StripPath( data.fullPath );
             data.type = (sizeof( T ) < sizeof( uint64_t )) ? mt_mod32 : mt_mod64;
+            data.ldrPtr = static_cast<ptr_t>(head);
             data.manual = false;
 
             result.emplace_back( std::make_shared<const ModuleData>( data ) );
@@ -555,6 +557,7 @@ std::vector<ModuleDataPtr> Native::EnumSections()
 
             data.name = Utils::StripPath( data.fullPath );
             data.baseAddress = mbi.AllocationBase;
+            data.ldrPtr = 0;
             data.manual = false;
 
             result.emplace_back( std::make_shared<const ModuleData>( data ) );
@@ -623,6 +626,7 @@ std::vector<ModuleDataPtr> Native::EnumPEHeaders()
         }
 
         data.baseAddress = mbi.AllocationBase;
+        data.ldrPtr = 0;
         data.manual = false;
 
         // Try to get section name

@@ -314,7 +314,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     else if (flags & HideVAD)
     {      
         ptr_t base  = pImage->peImage.imageBase();
-        ptr_t isize = pImage->peImage.imageSize();
+        ptr_t image_size = pImage->peImage.imageSize();
 
         if (!NT_SUCCESS( Driver().EnsureLoaded() ))
         {
@@ -323,20 +323,20 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
         }
 
         // Allocate as physical at desired base
-        status = Driver().AllocateMem( _process.pid(), base, isize, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
+        status = Driver().AllocateMem( _process.pid(), base, image_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
 
         // Allocate at any base
         if (!NT_SUCCESS( status ))
         {
             base = 0;
-            size = pImage->peImage.imageSize();
-            status = Driver().AllocateMem( _process.pid(), base, isize, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
+            image_size = pImage->peImage.imageSize();
+            status = Driver().AllocateMem( _process.pid(), base, image_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
         }
 
         // Store allocated region
         if (NT_SUCCESS( status ))
         {
-            pImage->imgMem = MemBlock( &_process.memory(), base, static_cast<size_t>(isize), PAGE_EXECUTE_READWRITE, true, true );
+            pImage->imgMem = MemBlock( &_process.memory(), base, static_cast<size_t>(image_size), PAGE_EXECUTE_READWRITE, true, true );
         }
         // Stop mapping
         else

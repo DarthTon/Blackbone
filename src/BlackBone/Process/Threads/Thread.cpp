@@ -81,6 +81,9 @@ bool Thread::Resume()
 /// <returns>true if suspended</returns>
 bool Thread::Suspended()
 {
+    if (_id == GetCurrentThreadId())
+        return false;
+
     auto count = (_core->isWow64() && !_core->native()->GetWow64Barrier().x86OS)
         ? SAFE_CALL( Wow64SuspendThread, _handle )
         : SuspendThread( _handle );

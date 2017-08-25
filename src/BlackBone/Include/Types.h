@@ -64,7 +64,9 @@ struct ModuleData
     std::wstring fullPath;  // Full file path
     uint32_t size;          // Size of image
     eModType type;          // Module type
+    ptr_t ldrPtr;           // LDR_DATA_TABLE_ENTRY_BASE_T address
     bool manual;            // Image is manually mapped
+
 
     bool operator ==(const ModuleData& other) const
     {
