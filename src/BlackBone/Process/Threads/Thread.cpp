@@ -17,7 +17,7 @@ Thread::Thread( HANDLE handle, ProcessCore* core )
     : _core( core )
     , _handle( handle )
 {
-    _id = (handle != NULL ? GetThreadIdT( handle ) : 0);
+    _id = (handle ? GetThreadIdT( handle ) : 0);
 }
 
 Thread::~Thread()
@@ -356,12 +356,8 @@ uint64_t Thread::execTime()
 /// </summary>
 void Thread::Close()
 {
-    if (_handle && _handle != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle( _handle );
-        _handle = NULL;
-        _id = 0;
-    }
+    _handle.reset();
+    _id = 0;
 }
 
 /// <summary>

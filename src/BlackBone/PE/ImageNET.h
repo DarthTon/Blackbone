@@ -6,10 +6,11 @@
 
 #include <map>
 
+#pragma warning(push)
 #pragma warning(disable : 4091)
 #include "cor.h"
 #include <atlbase.h>
-#pragma warning(default : 4091)
+#pragma warning(pop)
 
 namespace blackbone
 {

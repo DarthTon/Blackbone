@@ -3,6 +3,7 @@
 #include "../Include/Winheaders.h"
 #include "../Include/Types.h"
 #include "../Include/Macro.h"
+#include "../Include/HandleGuard.h"
 #include "../../BlackBoneDrv/BlackBoneDef.h"
 
 #include <string>
@@ -311,7 +312,7 @@ private:
     /// <returns>Status code</returns>
     LSTATUS PrepareDriverRegEntry( const std::wstring& svcName, const std::wstring& path );
 private:
-    HANDLE _hDriver = INVALID_HANDLE_VALUE;
+    FileHandle _hDriver;
     NTSTATUS _loadStatus = STATUS_NOT_FOUND;
 };
 

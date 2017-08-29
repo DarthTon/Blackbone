@@ -696,6 +696,7 @@
     <ClInclude Include="Include\ApiSet.h" />
     <ClInclude Include="Include\CallResult.h" />
     <ClInclude Include="Include\FunctionTypes.h" />
+    <ClInclude Include="Include\HandleGuard.h" />
     <ClInclude Include="Include\Macro.h" />
     <ClInclude Include="Include\NativeEnums.h" />
     <ClInclude Include="Include\NativeStructures.h" />

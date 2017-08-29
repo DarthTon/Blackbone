@@ -105,9 +105,9 @@ public:
     template<class T>
     inline call_result_t<T> Read( ptr_t dwAddress )
     {
-        T res; 
-        auto status = Read( dwAddress, sizeof( T ), &res );
-        return call_result_t<T>( res, status );
+        auto res = reinterpret_cast<T*>(_malloca( sizeof( T ) ));
+        auto status = Read( dwAddress, sizeof( T ), res );
+        return call_result_t<T>( *res, status );
     };
 
     /// <summary>
@@ -118,9 +118,9 @@ public:
     template<class T>
     inline call_result_t<T> Read( std::vector<ptr_t>&& adrList )
     {
-        T res;
-        auto status = Read( std::forward<std::vector<ptr_t>>( adrList ), sizeof( T ), &res );
-        return call_result_t<T>( res, status );
+        auto res = reinterpret_cast<T*>(_malloca( sizeof( T ) ));
+        auto status = Read( std::forward<std::vector<ptr_t>>( adrList ), sizeof( T ), res );
+        return call_result_t<T>( *res, status );
     }
 
     /// <summary>

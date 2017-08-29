@@ -63,7 +63,7 @@ public:
     inline auto safeCall( const std::string& name, Args&&... args )
     {
         auto pfn = DynImport::get<T>( name );
-        return pfn ? pfn( std::forward<Args>( args )... ) : (std::result_of<T( Args... )>::type)(0);
+        return pfn ? pfn( std::forward<Args>( args )... ) : std::result_of_t<T( Args... )>();
     }
 
     /// <summary>

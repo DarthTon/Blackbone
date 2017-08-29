@@ -1,7 +1,9 @@
 #include "InitOnce.h"
 #include "../Include/Winheaders.h"
-#include "../../../contrib/VersionHelpers.h"
 #include "../Include/Macro.h"
+#include "../Include/HandleGuard.h"
+#include "../../../contrib/VersionHelpers.h"
+
 #include "DynImport.h"
 #include "PatternLoader.h"
 #include "NameResolve.h"
@@ -15,6 +17,12 @@ namespace blackbone
 class InitOnce
 {
 public:
+    InitOnce() = delete;
+    InitOnce( const InitOnce& ) = delete;
+    InitOnce& operator=( const InitOnce& ) = delete;
+    InitOnce( InitOnce&& ) = delete;
+    InitOnce& operator=( InitOnce&& ) = delete;
+
     static bool Exec()
     {
         if(!_done)
@@ -25,7 +33,7 @@ public:
             GrantPriviledge( L"SeLoadDriverPrivilege" );
             LoadFuncs();
 
-            g_PatternLoader.reset( new PatternLoader );
+            g_PatternLoader = std::make_unique<PatternLoader>();
             g_PatternLoader->DoSearch();
 
             NameResolve::Instance().Initialize();
@@ -34,12 +42,7 @@ public:
         }
 
         return _done;
-    }
-
-private:
-    InitOnce() = delete;
-    InitOnce( const InitOnce& ) = delete;
-    InitOnce& operator=( const InitOnce& ) = delete;
+    }  
 
     /// <summary>
     /// Grant current process arbitrary privilege
@@ -50,14 +53,14 @@ private:
     {
         TOKEN_PRIVILEGES Priv, PrivOld;
         DWORD cbPriv = sizeof( PrivOld );
-        HANDLE hToken;
+        Handle token;
 
-        if (!OpenThreadToken( GetCurrentThread(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, FALSE, &hToken ))
+        if (!OpenThreadToken( GetCurrentThread(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, FALSE, &token ))
         {
             if (GetLastError() != ERROR_NO_TOKEN)
                 return LastNtStatus();
 
-            if (!OpenProcessToken( GetCurrentProcess(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, &hToken ))
+            if (!OpenProcessToken( GetCurrentProcess(), TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES, &token ))
                 return LastNtStatus();
         }
 
@@ -65,19 +68,12 @@ private:
         Priv.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
         LookupPrivilegeValueW( NULL, name.c_str(), &Priv.Privileges[0].Luid );
 
-        if (!AdjustTokenPrivileges( hToken, FALSE, &Priv, sizeof( Priv ), &PrivOld, &cbPriv ))
-        {
-            CloseHandle( hToken );
+        if (!AdjustTokenPrivileges( token, FALSE, &Priv, sizeof( Priv ), &PrivOld, &cbPriv ))
             return LastNtStatus();
-        }
 
         if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
-        {
-            CloseHandle( hToken );
             return LastNtStatus();
-        }
 
-        CloseHandle( hToken );
         return STATUS_SUCCESS;
     }
 

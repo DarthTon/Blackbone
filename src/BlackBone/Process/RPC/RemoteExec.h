@@ -129,7 +129,6 @@ public:
         a->mov( asmjit::host::dword_ptr( a->zdx ), a->zax );
     }
 
-#pragma warning(disable : 4127)
     /// <summary>
     /// Retrieve call result
     /// </summary>
@@ -138,17 +137,16 @@ public:
     template<typename T>
     inline NTSTATUS GetCallResult( T& result )
     {
-        if (sizeof( T ) > sizeof( uint64_t ))
+        if constexpr (sizeof( T ) > sizeof( uint64_t ))
         {
-            if (std::is_reference<T>::value)
-                return _userData.Read( _userData.Read<uintptr_t>( RET_OFFSET, 0 ), sizeof( T ), (PVOID)&result );
+            if constexpr (std::is_reference_v<T>)
+                return _userData.Read( _userData.Read<uintptr_t>( RET_OFFSET, 0 ), sizeof( T ), reinterpret_cast<PVOID>(&result) );
             else
-                return _userData.Read( ARGS_OFFSET, sizeof( T ), (PVOID)&result );
+                return _userData.Read( ARGS_OFFSET, sizeof( T ), reinterpret_cast<PVOID>(&result) );
         }
         else
-            return _userData.Read( RET_OFFSET, sizeof( T ), (PVOID)&result );
+            return _userData.Read( RET_OFFSET, sizeof( T ), reinterpret_cast<PVOID>(&result) );
     }
-#pragma warning(default : 4127)
 
     /// <summary>
     /// Retrieve last NTSTATUS code

@@ -110,8 +110,7 @@ struct AsmVariant
         Init( T&& arg )
     {
         // Can fit into register
-        size = sizeof( T );
-        if (size <= sizeof( uintptr_t ))
+        if constexpr (sizeof( T ) <= sizeof( uintptr_t ))
         {
             type = imm;
             memcpy( &imm_val64, &arg, sizeof( T ) );

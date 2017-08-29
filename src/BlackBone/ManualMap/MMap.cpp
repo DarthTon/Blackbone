@@ -190,7 +190,10 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
                 img->imgMem.Protect( flOld, img->peImage.ilFlagOffset(), sizeof( flg ), &flOld );
             }
 
-            status = RunModuleInitializers( img, DLL_PROCESS_ATTACH, pCustomArgs ).status;
+            // Don't run initializer for pure IL dlls
+            if (!img->peImage.pureIL() || img->peImage.isExe())
+                status = RunModuleInitializers( img, DLL_PROCESS_ATTACH, pCustomArgs ).status;
+
             if (!NT_SUCCESS( status ))
             {
                 BLACKBONE_TRACE( L"ManualMap: ModuleInitializers failed for '%ls', status: 0x%X", img->ldrEntry.name.c_str(), status );
@@ -514,8 +517,8 @@ NTSTATUS MMap::UnmapAllModules()
             DisableExceptions( pImage );
 
         // Remove from loader
-        auto mod = _process.modules().GetModule( pImage->ldrEntry.name );
-        _process.modules().Unlink( mod );
+        if (pImage->ldrEntry.flags != Ldr_None)
+            _process.modules().Unlink( pImage->ldrEntry );
 
         // Free memory
         pImage->imgMem.Free();
@@ -1525,7 +1528,7 @@ NTSTATUS MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
     // Change protection and save address
     if (NT_SUCCESS( status ))
     {
-        _usedBlocks.emplace_back( std::make_pair( ptr, size ) );
+        _usedBlocks.emplace_back( ptr, size  );
 
         imageMem = MemBlock( &_process.memory(), ptr, size, PAGE_READWRITE, false );
         _process.memory().Protect( ptr, size, PAGE_READWRITE );

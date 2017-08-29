@@ -36,7 +36,7 @@ std::string Utils::WstringToUTF8( const std::wstring& str )
 /// <returns>wide char string</returns>
 std::wstring Utils::AnsiToWstring( const std::string& input, DWORD locale /*= CP_ACP*/ )
 {
-    wchar_t buf[8192] = { 0 };
+    wchar_t buf[2048] = { 0 };
     MultiByteToWideChar( locale, 0, input.c_str(), (int)input.length(), buf, ARRAYSIZE( buf ) );
     return buf;
 }
@@ -49,7 +49,7 @@ std::wstring Utils::AnsiToWstring( const std::string& input, DWORD locale /*= CP
 /// <returns>ANSI string</returns>
 std::string Utils::WstringToAnsi( const std::wstring& input, DWORD locale /*= CP_ACP*/ )
 {
-    char buf[8192] = { 0 };
+    char buf[2048] = { 0 };
     WideCharToMultiByte( locale, 0, input.c_str(), (int)input.length(), buf, ARRAYSIZE( buf ), nullptr, nullptr );
     return buf;
 }
@@ -159,12 +159,10 @@ std::wstring Utils::RandomANString( int length /*= 0*/ )
 /// </summary>
 /// <param name="str">Source string.</param>
 /// <returns>Result string</returns>
-std::wstring Utils::ToLower( const std::wstring& str )
+std::wstring Utils::ToLower( std::wstring str )
 {
-    std::wstring str2( str );
-    std::transform( str2.begin(), str2.end(), str2.begin(), ::towlower );
-
-    return str2;
+    std::transform( str.begin(), str.end(), str.begin(), ::towlower );
+    return str;
 }
 
 /// <summary>

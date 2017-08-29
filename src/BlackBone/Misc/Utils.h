@@ -74,7 +74,7 @@ public:
     /// </summary>
     /// <param name="str">Source string.</param>
     /// <returns>Result string</returns>
-    BLACKBONE_API static std::wstring ToLower( const std::wstring& str );
+    BLACKBONE_API static std::wstring ToLower( std::wstring str );
 
     /// <summary>
     /// Generate random alpha-numeric string

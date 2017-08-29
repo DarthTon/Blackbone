@@ -86,40 +86,39 @@ bool NtLdr::CreateNTReference( NtLdrEntry& mod )
 
     bool x64Image = (mod.type == mt_mod64);
     bool w8 = IsWindows8OrGreater();
-    ptr_t entry = 0;
 
     // Win 8 and higher
     if (w8)
-        entry = CALL_64_86( x64Image, InitW8Node, mod );             
+        mod.ldrPtr = CALL_64_86( x64Image, InitW8Node, mod );
     // Windows 7 and earlier
     else
-        entry = CALL_64_86( x64Image, InitW7Node, mod );
+        mod.ldrPtr = CALL_64_86( x64Image, InitW7Node, mod );
 
-    if (entry == 0)
+    if (mod.ldrPtr == 0)
         return false;
 
-    _nodeMap.emplace( std::make_pair( mod.baseAddress, entry ) );
+    _nodeMap.emplace( mod.baseAddress, mod.ldrPtr );
 
     // Insert into module graph
     if (mod.flags & Ldr_ModList && w8)
-        CALL_64_86( x64Image, InsertTreeNode, entry, mod );
+        CALL_64_86( x64Image, InsertTreeNode, mod.ldrPtr, mod );
 
     // Insert into LdrpHashTable
     if (mod.flags & Ldr_HashTable)
     {
-        auto ptr = FIELD_PTR_64_86( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE_T, HashLinks );
+        auto ptr = FIELD_PTR_64_86( x64Image, mod.ldrPtr, _LDR_DATA_TABLE_ENTRY_BASE_T, HashLinks );
         CALL_64_86( x64Image, InsertHashNode, ptr, mod.hash );
     }
 
     // Insert into ldr lists
     if (mod.flags & Ldr_ThdCall || (!w8 && mod.flags & Ldr_ModList))
     {
-        _process.memory().Write( FIELD_PTR_64_86( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE_T, Flags ), 0x80004 );
+        _process.memory().Write( FIELD_PTR_64_86( x64Image, mod.ldrPtr, _LDR_DATA_TABLE_ENTRY_BASE_T, Flags ), 0x80004 );
         ptr_t loadPtr = 0, initptr = 0;
 
-        loadPtr = FIELD_PTR_64_86( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE_T, InLoadOrderLinks );
+        loadPtr = FIELD_PTR_64_86( x64Image, mod.ldrPtr, _LDR_DATA_TABLE_ENTRY_BASE_T, InLoadOrderLinks );
         if(w8)
-            initptr = FIELD_PTR_64_86( x64Image, entry, _LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
+            initptr = FIELD_PTR_64_86( x64Image, mod.ldrPtr, _LDR_DATA_TABLE_ENTRY_BASE_T, InInitializationOrderLinks );
 
         CALL_64_86( x64Image, InsertMemModuleNode, 0, loadPtr, initptr );
     }
@@ -133,8 +132,8 @@ bool NtLdr::CreateNTReference( NtLdrEntry& mod )
 /// <param name="ptr">node pointer (if nullptr - new dummy node is allocated)</param>
 /// <param name="pModule">Module base address</param>
 /// <returns>Node address</returns>
-template<typename T, typename T2> 
-ptr_t NtLdr::SetNode( ptr_t ptr, T2 pModule )
+template<typename T, typename PApiSetEntry> 
+ptr_t NtLdr::SetNode( ptr_t ptr, PApiSetEntry pModule )
 {
     if(ptr == 0)
     {

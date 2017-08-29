@@ -33,7 +33,7 @@ DriverControl& DriverControl::Instance()
 NTSTATUS DriverControl::EnsureLoaded( const std::wstring& path /*= L"" */ )
 {
     // Already open
-    if (_hDriver != INVALID_HANDLE_VALUE)
+    if (_hDriver)
         return STATUS_SUCCESS;
 
     // Try to open handle to existing driver
@@ -44,7 +44,7 @@ NTSTATUS DriverControl::EnsureLoaded( const std::wstring& path /*= L"" */ )
         NULL, OPEN_EXISTING, 0, NULL
         );
 
-    if (_hDriver != INVALID_HANDLE_VALUE)
+    if (_hDriver)
         return _loadStatus = STATUS_SUCCESS;
 
     // Start new instance
@@ -93,7 +93,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
         NULL, OPEN_EXISTING, 0, NULL
         );
 
-    if (_hDriver == INVALID_HANDLE_VALUE)
+    if (!_hDriver)
     {
         _loadStatus = LastNtStatus();
         BLACKBONE_TRACE( L"Failed to open driver handle. Status 0x%X", _loadStatus );
@@ -109,12 +109,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::Unload()
 {
-    if (_hDriver != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle( _hDriver );
-        _hDriver = INVALID_HANDLE_VALUE;
-    }
-
+    _hDriver.reset();
     return UnloadDriver( DRIVER_SVC_NAME );
 }
 

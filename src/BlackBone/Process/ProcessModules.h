@@ -178,13 +178,14 @@ public:
     /// <param name="mod">Module to unlink</param>
     /// <returns>true on success</returns>
     BLACKBONE_API bool Unlink( const ModuleDataPtr& mod );
+    BLACKBONE_API bool Unlink( const ModuleData& mod );
 
     /// <summary>
     /// Store manually mapped module in module list
     /// </summary>
     /// <param name="mod">Module data</param>
     /// <returns>Module info</returns>
-    BLACKBONE_API ModuleDataPtr AddManualModule( const ModuleData& mod );
+    BLACKBONE_API ModuleDataPtr AddManualModule( ModuleData mod );
 
     /// <summary>
     /// Remove module from module list

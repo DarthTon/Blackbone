@@ -71,6 +71,7 @@ void RemoteHook::EndDebug()
     {
         _active = false;
         WaitForSingleObject( _hEventThd, INFINITE );
+        CloseHandle( _hEventThd );
         _hEventThd = NULL;
     }
 }
@@ -139,7 +140,7 @@ NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, con
     }
 
     // Store hooked address
-    _hooks.emplace( std::make_pair( ptr, data ) );
+    _hooks.emplace( ptr, data );
 
     return STATUS_SUCCESS;
 }
@@ -376,7 +377,7 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
         {
             hook.entryCtx = ctx64;
             auto newReturn = context.hookReturn();
-            _retHooks.emplace( std::make_pair( newReturn, addr ) );
+            _retHooks.emplace( newReturn, addr );
         }
 
         // Resume execution
@@ -462,7 +463,7 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
             {
                 hook.entryCtx = ctx64;
                 auto newReturn = context.hookReturn();
-                _retHooks.emplace( std::make_pair( newReturn, addr ) );
+                _retHooks.emplace( newReturn, addr );
             }
 
             ctx64.ContextFlags = use64 ? CONTEXT64_ALL : WOW64_CONTEXT_ALL;
@@ -636,7 +637,7 @@ DWORD RemoteHook::StackBacktrace( ptr_t ip, ptr_t sp, Thread& thd, std::vector<s
     }
 
     // Store exception address
-    results.emplace_back( std::make_pair( 0, ip ) );
+    results.emplace_back( 0, ip );
 
     // Walk stack
     for (ptr_t stackPtr = sp; stackPtr < stack_base && i < depth; stackPtr += _wordSize)
@@ -669,7 +670,7 @@ DWORD RemoteHook::StackBacktrace( ptr_t ip, ptr_t sp, Thread& thd, std::vector<s
         // TODO: Implement more reliable way to detect 'call'
         if (codeChunk[0] == 0xFF || codeChunk[1] == 0xE8 || codeChunk[4] == 0xFF)
         {
-            results.emplace_back( std::make_pair( stackPtr, stack_val ) );
+            results.emplace_back( stackPtr, stack_val );
             i++;
         }
     }
@@ -682,17 +683,21 @@ DWORD RemoteHook::StackBacktrace( ptr_t ip, ptr_t sp, Thread& thd, std::vector<s
 /// </summary>
 void RemoteHook::reset()
 {
-    _lock.lock();
-    for (auto& hook : _hooks)
-        Restore( hook.second, hook.first );
+    if (!_hooks.empty())
+    {
+        _lock.lock();
+        for (auto& hook : _hooks)
+            Restore( hook.second, hook.first );
 
-    _hooks.clear();
-    _repatch.clear();
+        _hooks.clear();
+        _repatch.clear();
 
-    _lock.unlock();
+        _lock.unlock();
 
-    // Wait for last events to finish
-    Sleep( 100 );
+        // Wait for last events to finish
+        Sleep( 100 );
+    }
+
     EndDebug();
 }
 

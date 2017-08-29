@@ -456,5 +456,8 @@
     <ClInclude Include="Misc\PatternLoader.h">
       <Filter>Misc</Filter>
     </ClInclude>
+    <ClInclude Include="Include\HandleGuard.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

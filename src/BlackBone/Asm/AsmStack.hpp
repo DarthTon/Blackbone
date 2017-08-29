@@ -1,8 +1,10 @@
 #pragma once
 
+#pragma warning(push)
 #pragma warning(disable : 4100)
 #include "../../../contrib/AsmJit/AsmJit.h"
-#pragma warning(default : 4100)
+#pragma warning(pop)
+
 #include "../Include/Macro.h"
 
 #include <stdint.h>

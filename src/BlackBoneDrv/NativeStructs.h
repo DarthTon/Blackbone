@@ -430,7 +430,7 @@ typedef struct _PEB
     PVOID AtlThunkSListPtr;
     PVOID IFEOKey;
     PVOID CrossProcessFlags;
-    PVOID UserSharedInfoPtr;
+    PVOID KernelCallbackTable;
     ULONG SystemReserved;
     ULONG AtlThunkSListPtr32;
     PVOID ApiSetMap;

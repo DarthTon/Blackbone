@@ -80,7 +80,7 @@ private:
     /// OS dependent api set initialization
     /// </summary>
     /// <returns>true on success</returns>
-    template<typename T1, typename T2, typename T3, typename T4>
+    template<typename PApiSetMap, typename PApiSetEntry, typename PHostArray, typename PHostEntry>
     bool InitializeP();
 
 private:

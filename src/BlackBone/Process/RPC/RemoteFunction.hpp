@@ -47,7 +47,6 @@ public:
             );
     }
 
-#pragma warning(disable : 4127)
     call_result_t<ReturnType> Call( CallArguments& args, ThreadPtr contextThread = nullptr )
     {
         ReturnType result = {};
@@ -62,19 +61,19 @@ public:
             return call_result_t<ReturnType>( result, status );
 
         // FPU check
-        constexpr bool isFloat = std::is_same<ReturnType, float>::value;
-        constexpr bool isDouble = std::is_same<ReturnType, double>::value || std::is_same<ReturnType, long double>::value;
+        constexpr bool isFloat = std::is_same_v<ReturnType, float>;
+        constexpr bool isDouble = std::is_same_v<ReturnType, double> || std::is_same_v<ReturnType, long double>;
 
         // Deduce return type
         eReturnType retType = rt_int32;
 
-        if (isFloat)
+        if constexpr (isFloat)
             retType = rt_float;
-        else if (isDouble)
+        else if constexpr (isDouble)
             retType = rt_double;
-        else if (sizeof( ReturnType ) == sizeof( uint64_t ))
+        else if constexpr (sizeof( ReturnType ) == sizeof( uint64_t ))
             retType = rt_int64;
-        else if (!std::is_reference<ReturnType>::value && sizeof( ReturnType ) > sizeof( uint64_t ))
+        else if constexpr (!std::is_reference_v<ReturnType> && sizeof( ReturnType ) > sizeof( uint64_t ))
             retType = rt_struct;
 
         _process.remote().PrepareCallAssembly( *a, _ptr, args.arguments, _conv, retType );
@@ -104,7 +103,6 @@ public:
 
         return call_result_t<ReturnType>( result, STATUS_SUCCESS );
     }
-#pragma warning(default : 4127)
 
 private:
     Process& _process;

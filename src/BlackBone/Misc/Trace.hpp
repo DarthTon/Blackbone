@@ -3,9 +3,10 @@
 #include <cstdio>
 #include <cstdlib>
 
+#pragma warning(push)
 #pragma warning(disable : 4091)
 #include <DbgHelp.h>
-#pragma warning(default : 4091)
+#pragma warning(pop)
 
 namespace blackbone
 {

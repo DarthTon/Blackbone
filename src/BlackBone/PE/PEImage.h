@@ -3,6 +3,7 @@
 #include "../Config.h"
 #include "../Include/Winheaders.h"
 #include "../Include/Types.h"
+#include "../Include/HandleGuard.h"
 #include "../Misc/Utils.h"
 
 #ifdef COMPILER_MSVC
@@ -309,8 +310,8 @@ private:
     void* GetManifest( uint32_t& size, int32_t& manifestID );
 
 private:
-    HANDLE      _hFile = INVALID_HANDLE_VALUE;  // Target file HANDLE
-    HANDLE      _hMapping = NULL;               // Memory mapping object
+    FileHandle  _hFile;                         // Target file HANDLE
+    Handle      _hMapping;                      // Memory mapping object
     void*       _pFileBase = nullptr;           // Mapping base
     bool        _isPlainData = false;           // File mapped as plain data file
     bool        _is64 = false;                  // Image is 64 bit
@@ -323,7 +324,7 @@ private:
     uint32_t    _imgSize = 0;                   // Image size
     uint32_t    _epRVA = 0;                     // Entry point RVA
     uint32_t    _hdrSize = 0;                   // Size of headers
-    HANDLE      _hctx = INVALID_HANDLE_VALUE;   // Activation context
+    ACtxHandle   _hctx;                          // Activation context
     int32_t     _manifestIdx = 0;               // Manifest resource ID
     uint32_t    _subsystem = 0;                 // Image subsystem
     int32_t     _ILFlagOffset = 0;              // Offset of pure IL flag
@@ -337,7 +338,7 @@ private:
     std::wstring _manifestPath;                 // Image manifest container
 
 #ifdef COMPILER_MSVC
-    ImageNET    _netImage;                  // .net image info
+    ImageNET    _netImage;                      // .net image info
 #endif
 };
 

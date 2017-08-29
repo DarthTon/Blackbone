@@ -173,8 +173,8 @@ private:
     /// <param name="ptr">node pointer (if nullptr - new dummy node is allocated)</param>
     /// <param name="pModule">Module base address</param>
     /// <returns>Node address</returns>
-    template<typename T, typename T2>
-    ptr_t SetNode( ptr_t ptr, T2 pModule );
+    template<typename T, typename PApiSetEntry>
+    ptr_t SetNode( ptr_t ptr, PApiSetEntry pModule );
 
     /// <summary>
     /// Unlink module from PEB_LDR_DATA
