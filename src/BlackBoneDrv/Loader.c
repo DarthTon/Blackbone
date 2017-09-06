@@ -530,7 +530,7 @@ NTSTATUS BBLookupProcessThread( IN PEPROCESS pProcess, OUT PETHREAD* ppThread )
             // Skip current thread
             if (/*pInfo->Threads[i].WaitReason == Suspended ||
                  pInfo->Threads[i].ThreadState == 5 ||*/
-                 pInfo->Threads[i].ClientId.UniqueThread == PsGetCurrentThread())
+                 pInfo->Threads[i].ClientId.UniqueThread == PsGetCurrentThreadId())
             {
                 continue;
             }
