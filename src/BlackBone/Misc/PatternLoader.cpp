@@ -118,7 +118,7 @@ const PatternData& PatternLoader::DoSearch()
     }
 
     // Report errors
-#ifndef BLACBONE_NO_TRACE
+#ifndef BLACKBONE_NO_TRACE
     if (_data.LdrpHandleTlsData64 == 0)
         BLACKBONE_TRACE( "PatternData: LdrpHandleTlsData64 not found" );
     if (_data.LdrpHandleTlsData32 == 0)
