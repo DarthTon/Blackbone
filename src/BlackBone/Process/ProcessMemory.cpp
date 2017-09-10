@@ -1,5 +1,6 @@
 #include "ProcessMemory.h"
 #include "Process.h"
+#include "../Misc/Trace.hpp"
 
 namespace blackbone
 {
@@ -37,6 +38,14 @@ call_result_t<MemBlock> ProcessMemory::Allocate( size_t size, DWORD protection /
 /// <returns>Status</returns>
 NTSTATUS ProcessMemory::Free( ptr_t pAddr, size_t size /*= 0*/, DWORD freeType /*= MEM_RELEASE*/ )
 {
+#ifdef _DEBUG
+    assert( freeType != MEM_RELEASE || size == 0 );
+    if (freeType == MEM_DECOMMIT) {
+        BLACKBONE_TRACE( L"Free: Decommit at address 0x%p (0x%x bytes)", static_cast<uintptr_t>(pAddr), size );
+    } else {
+        BLACKBONE_TRACE( L"Free: Free at address 0x%p", static_cast<uintptr_t>(pAddr) );
+    }
+#endif
     return _core.native()->VirtualFreeExT( pAddr, size, freeType );
 }
 
