@@ -571,7 +571,7 @@ ModuleDataPtr ProcessModules::AddManualModule( ModuleData mod )
 /// <param name="mt">Module type. 32 bit or 64 bit</param>
 void ProcessModules::RemoveManualModule( const std::wstring& filename, eModType mt )
 {
-    auto key = std::make_pair( filename, mt );
+    auto key = std::make_pair( Utils::ToLower( Utils::StripPath( filename ) ), mt );
     if (_modules.count( key ))
         _modules.erase( key );
 }

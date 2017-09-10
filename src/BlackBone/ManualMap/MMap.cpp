@@ -277,7 +277,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     auto& ldrEntry = pImage->ldrEntry;
 
     ldrEntry.fullPath = path;
-    ldrEntry.name = Utils::StripPath( path );
+    ldrEntry.name = Utils::ToLower( Utils::StripPath( path ) );
     pImage->flags = flags;
 
     // Load and parse image
