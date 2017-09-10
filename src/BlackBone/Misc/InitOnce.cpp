@@ -125,6 +125,9 @@ private:
 
 std::unique_ptr<PatternLoader> g_PatternLoader;
 
+bool Initialize() {
+    static bool initialized = InitOnce::Exec();
+    return initialized;
+}
 bool InitOnce::_done = false;
-const bool g_Initialized = InitOnce::Exec();
 }

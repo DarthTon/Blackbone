@@ -21,7 +21,7 @@ Process::Process()
     , _nativeLdr( *this )
 {
     // Ensure InitOnce is called
-    auto i = g_Initialized;
+    auto i = blackbone::Initialize();
     UNREFERENCED_PARAMETER( i );
 }
 

@@ -3,6 +3,7 @@
 #include "../Include/Types.h"
 #include "../Include/Winheaders.h"
 #include "Utils.h"
+#include "InitOnce.h"
 
 #include <unordered_map>
 
@@ -29,6 +30,8 @@ public:
     template<typename T>
     inline T get( const std::string& name ) 
     {
+        blackbone::Initialize();
+
         CSLock lck( _mapGuard );
 
         auto iter = _funcs.find( name );
