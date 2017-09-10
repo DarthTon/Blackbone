@@ -493,10 +493,11 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
         if (!NT_SUCCESS( status ))
             return status;
 
-        auto fillAttributes = [this, len, pEventName]( auto& obAttr, auto& ustr )
+        wchar_t* pEvent = pEventName; //for MSVC 14 - 2015
+        auto fillAttributes = [this, len, pEvent]( auto& obAttr, auto& ustr )
         {
             ustr.Buffer = static_cast<decltype(ustr.Buffer)>(this->_userData.ptr() + ARGS_OFFSET + sizeof( obAttr ) + sizeof( ustr ));
-            ustr.Length = static_cast<USHORT>(wcslen( pEventName ) * sizeof( wchar_t ));
+            ustr.Length = static_cast<USHORT>(wcslen( pEvent ) * sizeof( wchar_t ));
             ustr.MaximumLength = static_cast<USHORT>(len);
 
             obAttr.Length = sizeof( obAttr );
@@ -504,7 +505,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
 
             NTSTATUS status  = this->_userData.Write( ARGS_OFFSET, obAttr );
             status |= this->_userData.Write( ARGS_OFFSET + sizeof( obAttr ), ustr );
-            status |= this->_userData.Write( ARGS_OFFSET + sizeof( obAttr ) + sizeof( ustr ), len, pEventName );
+            status |= this->_userData.Write( ARGS_OFFSET + sizeof( obAttr ) + sizeof( ustr ), len, pEvent );
             return status;
         };
 
