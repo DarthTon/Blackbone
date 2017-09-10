@@ -40,9 +40,10 @@ NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
     Detach();
 
     auto status = _core.Open( pid, access );
+    /*
     if (NT_SUCCESS( status ) && (access & PROCESS_VM_WRITE))
         status = _remote.CreateRPCEnvironment();
-
+    */
     return status;
 }
 
@@ -56,6 +57,7 @@ NTSTATUS Process::Attach( HANDLE hProc )
     Detach();
 
     auto status = _core.Open( hProc );
+    /*
     if (NT_SUCCESS( status ))
     {
         if (!valid())
@@ -63,7 +65,7 @@ NTSTATUS Process::Attach( HANDLE hProc )
 
         _remote.CreateRPCEnvironment();
     }
-
+    */
     return status;
 }
 
