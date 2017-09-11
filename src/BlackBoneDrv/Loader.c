@@ -641,7 +641,8 @@ NTSTATUS BBQueueUserApc(
     IN PVOID Arg1,
     IN PVOID Arg2,
     IN PVOID Arg3,
-    IN BOOLEAN bForce )
+    IN BOOLEAN bForce
+    )
 {
     ASSERT( pThread != NULL );
     if (pThread == NULL)

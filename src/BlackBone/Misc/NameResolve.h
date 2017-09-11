@@ -25,7 +25,7 @@ public:
     };
 
 public:
-    BLACKBONE_API ~NameResolve();
+    BLACKBONE_API ~NameResolve() = default;
 
     BLACKBONE_API static NameResolve& Instance();
 
@@ -65,7 +65,7 @@ public:
 
 private:
     // Ensure singleton
-    NameResolve();
+    NameResolve() = default;
     NameResolve( const NameResolve& ) = delete;
     NameResolve& operator =( const NameResolve& ) = delete;
 

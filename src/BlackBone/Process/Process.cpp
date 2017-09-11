@@ -21,8 +21,7 @@ Process::Process()
     , _nativeLdr( *this )
 {
     // Ensure InitOnce is called
-    auto i = blackbone::Initialize();
-    UNREFERENCED_PARAMETER( i );
+    InitializeOnce();
 }
 
 Process::~Process(void)
@@ -38,13 +37,7 @@ Process::~Process(void)
 NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 {
     Detach();
-
-    auto status = _core.Open( pid, access );
-    /*
-    if (NT_SUCCESS( status ) && (access & PROCESS_VM_WRITE))
-        status = _remote.CreateRPCEnvironment();
-    */
-    return status;
+    return _core.Open( pid, access );
 }
 
 /// <summary>
@@ -55,18 +48,7 @@ NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 NTSTATUS Process::Attach( HANDLE hProc )
 {
     Detach();
-
-    auto status = _core.Open( hProc );
-    /*
-    if (NT_SUCCESS( status ))
-    {
-        if (!valid())
-            return STATUS_INVALID_HANDLE;
-
-        _remote.CreateRPCEnvironment();
-    }
-    */
-    return status;
+    return _core.Open( hProc );
 }
 
 /// <summary>

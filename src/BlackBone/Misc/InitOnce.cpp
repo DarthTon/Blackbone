@@ -125,9 +125,15 @@ private:
 
 std::unique_ptr<PatternLoader> g_PatternLoader;
 
-bool Initialize() {
-    static bool initialized = InitOnce::Exec();
-    return initialized;
+/// <summary>
+/// Exported InitOnce wrapper
+/// </summary>
+/// <returns>true on initialization completion</returns>
+bool InitializeOnce()
+{
+    // Static flag is still unsafe because of magic statics
+    return InitOnce::Exec();
 }
+
 bool InitOnce::_done = false;
 }

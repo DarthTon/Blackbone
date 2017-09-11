@@ -12,14 +12,6 @@
 namespace blackbone
 {
 
-NameResolve::NameResolve()
-{
-}
-
-NameResolve::~NameResolve()
-{
-}
-
 NameResolve& NameResolve::Instance()
 {
     static NameResolve instance;

@@ -1,5 +1,7 @@
 #pragma once
+#include "../Config.h"
+
 namespace blackbone
 {
-bool Initialize();
+BLACKBONE_API bool InitializeOnce();
 }

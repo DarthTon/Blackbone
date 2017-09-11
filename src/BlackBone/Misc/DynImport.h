@@ -30,7 +30,7 @@ public:
     template<typename T>
     inline T get( const std::string& name ) 
     {
-        blackbone::Initialize();
+        InitializeOnce();
 
         CSLock lck( _mapGuard );
 
