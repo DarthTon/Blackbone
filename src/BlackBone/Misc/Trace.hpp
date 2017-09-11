@@ -10,7 +10,7 @@
 
 namespace blackbone
 {
-#ifndef BLACBONE_NO_TRACE
+#ifndef BLACKBONE_NO_TRACE
 
 inline void DoTraceV( const char* fmt, va_list va_args )
 {

@@ -169,8 +169,8 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
         else
         {
             img->imgMem.Write( offset, size, zeroBuf.get() );
-            if (!NT_SUCCESS( proc.memory().Free( img->imgMem.ptr() + offset, size ) ))
-                proc.memory().Protect( img->imgMem.ptr() + offset, size, PAGE_NOACCESS );
+            proc.memory().Protect( img->imgMem.ptr() + offset, size, PAGE_NOACCESS );
+            proc.memory().Free( img->imgMem.ptr() + offset, size, MEM_DECOMMIT );
         }
     };
 
@@ -277,7 +277,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     auto& ldrEntry = pImage->ldrEntry;
 
     ldrEntry.fullPath = path;
-    ldrEntry.name = Utils::StripPath( path );
+    ldrEntry.name = Utils::ToLower( Utils::StripPath( path ) );
     pImage->flags = flags;
 
     // Load and parse image

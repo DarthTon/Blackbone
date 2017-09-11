@@ -56,7 +56,7 @@ bool NtLdr::Init( eModType initFor /*= mt_default*/ )
     _nodeMap.clear();
 
     // Report errors
-#ifndef BLACBONE_NO_TRACE
+#ifndef BLACKBONE_NO_TRACE
     if (_LdrHeapBase == 0)
         BLACKBONE_TRACE( "NativeLdr: LdrHeapBase not found" );
     if (_LdrpHashTable == 0)

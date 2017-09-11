@@ -7,7 +7,9 @@
 
 #if defined(_MSC_VER)
 
-    #define COMPILER_MSVC
+    #ifndef COMPILER_MSVC
+        #define COMPILER_MSVC 1
+    #endif
 
     #if defined(BLACKBONE_IMPORTS)
         #define BLACKBONE_API __declspec(dllimport)
