@@ -637,6 +637,16 @@
     <ClCompile Include="Process\RPC\RemoteMemory.cpp" />
     <ClCompile Include="Process\Threads\Thread.cpp" />
     <ClCompile Include="Process\Threads\Threads.cpp" />
+    <ClCompile Include="DllMain.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release(XP)|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release(XP)|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Subsystem\NativeSubsystem.cpp" />
     <ClCompile Include="Subsystem\Wow64Subsystem.cpp" />
     <ClCompile Include="Subsystem\x86Subsystem.cpp" />
