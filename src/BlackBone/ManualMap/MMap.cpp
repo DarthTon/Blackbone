@@ -276,8 +276,8 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     ImageContextPtr pImage( new ImageContext() );
     auto& ldrEntry = pImage->ldrEntry;
 
-    ldrEntry.fullPath = path;
-    ldrEntry.name = Utils::ToLower( Utils::StripPath( path ) );
+    ldrEntry.fullPath = Utils::ToLower( path );
+    ldrEntry.name = Utils::StripPath( ldrEntry.fullPath );
     pImage->flags = flags;
 
     // Load and parse image
@@ -524,7 +524,7 @@ NTSTATUS MMap::UnmapAllModules()
         pImage->imgMem.Free();
 
         // Remove reference from local modules list
-        _process.modules().RemoveManualModule( pImage->ldrEntry.fullPath, pImage->peImage.mType() );
+        _process.modules().RemoveManualModule( pImage->ldrEntry.name, pImage->peImage.mType() );
     } 
 
     Cleanup();
@@ -1167,45 +1167,26 @@ call_result_t<uint64_t> MMap::RunModuleInitializers( ImageContextPtr pImage, DWO
 
     // Function order
     // TLS first, entry point last
-    if (dwReason == DLL_PROCESS_ATTACH || dwReason == DLL_THREAD_ATTACH)
+    if (!(pImage->flags & NoTLS))
     {
         // PTLS_CALLBACK_FUNCTION(pImage->ImageBase, dwReason, NULL);
-        if (!( pImage->flags & NoTLS ))
-            for (auto& pCallback : pImage->tlsCallbacks)
-            {
-                BLACKBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%016llx for '%ls', Reason: %d",
-                    pCallback, pImage->ldrEntry.name.c_str(), dwReason );
-
-                a->GenCall( pCallback, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
-            }
-
-        // DllMain
-        if (pImage->ldrEntry.entryPoint != 0)
+        for (auto& pCallback : pImage->tlsCallbacks)
         {
-            BLACKBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->ldrEntry.name.c_str(), dwReason );
-            a->GenCall( pImage->ldrEntry.entryPoint, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
-            _process.remote().SaveCallResult( *a );
+            BLACKBONE_TRACE( 
+                L"ManualMap: Calling TLS callback at 0x%016llx for '%ls', Reason: %d",
+                pCallback, pImage->ldrEntry.name.c_str(), dwReason 
+            );
+
+            a->GenCall( pCallback, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
         }
     }
-    // Entry point first, TLS last
-    else
+
+    // DllMain
+    if (pImage->ldrEntry.entryPoint != 0)
     {
-        // DllMain
-        if (pImage->ldrEntry.entryPoint != 0)
-        {
-            BLACKBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->ldrEntry.name.c_str(), dwReason );
-            a->GenCall( pImage->ldrEntry.entryPoint, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
-        }
-
-        // PTLS_CALLBACK_FUNCTION(pImage->ImageBase, dwReason, NULL);
-        if (!( pImage->flags & NoTLS ))
-            for (auto& pCallback : pImage->tlsCallbacks)
-            {
-                BLACKBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%016llx for '%ls', Reason: %d",
-                    pCallback, pImage->ldrEntry.name.c_str(), dwReason );
-
-                a->GenCall( pCallback, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
-            }
+        BLACKBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->ldrEntry.name.c_str(), dwReason );
+        a->GenCall( pImage->ldrEntry.entryPoint, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
+        _process.remote().SaveCallResult( *a );
     }
 
     // DeactivateActCtx
