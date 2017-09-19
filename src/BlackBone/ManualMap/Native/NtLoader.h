@@ -173,8 +173,8 @@ private:
     /// <param name="ptr">node pointer (if nullptr - new dummy node is allocated)</param>
     /// <param name="pModule">Module base address</param>
     /// <returns>Node address</returns>
-    template<typename T, typename PApiSetEntry>
-    ptr_t SetNode( ptr_t ptr, PApiSetEntry pModule );
+    template<typename T, typename Module>
+    ptr_t SetNode( ptr_t ptr, Module pModule );
 
     /// <summary>
     /// Unlink module from PEB_LDR_DATA
@@ -185,15 +185,13 @@ private:
     ptr_t UnlinkFromLdr( const ModuleData& mod );
 
     /// <summary>
-    /// Remove record from LIST_ENTRY structure
+    /// Finds LDR entry for module
     /// </summary>
-    /// <param name="pListEntry">List to remove from</param>
-    /// <param name="head">List head address.</param>
-    /// <param name="ofst">Offset of link in _LDR_DATA_TABLE_ENTRY_BASE struct</param>
-    /// <param name="baseAddress">Record to remove.</param>
-    /// <returns>Address of removed record</returns>
-    template<typename T> 
-    ptr_t UnlinkListEntry( _LIST_ENTRY_T<T> pListEntry, ptr_t head, uintptr_t ofst, ptr_t baseAddress );
+    /// <param name="moduleBase">Target module base</param>
+    /// <param name="found">Found entry</param>
+    /// <returns>Found LDR entry address</returns>
+    template<typename T>
+    ptr_t FindLdrEntry( module_t moduleBase, _LDR_DATA_TABLE_ENTRY_BASE_T<T>* found = nullptr );
 
     /// <summary>
     ///  Remove record from LIST_ENTRY structure

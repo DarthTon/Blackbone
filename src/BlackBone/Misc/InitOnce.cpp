@@ -25,7 +25,7 @@ public:
 
     static bool Exec()
     {
-        if(!_done)
+        if (!_InterlockedCompareExchange( &_done, TRUE, FALSE ))
         {
             InitVersion();
 
@@ -37,11 +37,9 @@ public:
             g_PatternLoader->DoSearch();
 
             NameResolve::Instance().Initialize();
-
-            _done = true;
         }
 
-        return _done;
+        return true;
     }  
 
     /// <summary>
@@ -120,7 +118,7 @@ public:
     }
 
 private:
-    static bool _done;
+    static volatile long _done;
 };
 
 std::unique_ptr<PatternLoader> g_PatternLoader;
@@ -135,5 +133,5 @@ bool InitializeOnce()
     return InitOnce::Exec();
 }
 
-bool InitOnce::_done = false;
+volatile long InitOnce::_done = 0;
 }
