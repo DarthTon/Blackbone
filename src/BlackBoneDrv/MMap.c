@@ -1094,7 +1094,7 @@ NTSTATUS BBResolveImagePath(
         if (PsGetProcessWow64Process( pProcess ) != NULL)
             RtlUnicodeStringCatString( &fullResolved, L"\\SystemRoot\\syswow64\\" );
         else
-            RtlUnicodeStringCatString( &fullResolved, L"\\SystemRoot\\sytem32\\" );
+            RtlUnicodeStringCatString( &fullResolved, L"\\SystemRoot\\system32\\" );
 
         RtlUnicodeStringCat( &fullResolved, resolved );
         RtlFreeUnicodeString( resolved );
