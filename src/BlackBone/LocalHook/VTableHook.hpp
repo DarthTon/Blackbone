@@ -79,7 +79,7 @@ public:
             // Copy VTable
             if (vtableLen != 0)
             {
-                memcpy( this->_buf + 0x300, *ppVtable, vtableLen * sizeof( void* ) );
+                memcpy( this->_buf + 0x300 - sizeof( void* ), (*(void***)ppVtable) - 1, vtableLen * sizeof( void* ) );
             }
             else 
             {
@@ -95,7 +95,7 @@ public:
                     vptr = (*(uintptr_t**)ppVtable)[vtableLen];
                     if (vptr < imageBase || vptr >= imageBase + imageSzie)
                     {
-                        memcpy( this->_buf + 0x300, *ppVtable, vtableLen * sizeof( void* ) );
+                        memcpy( this->_buf + 0x300 - sizeof( void* ), (*(void***)ppVtable) - 1, vtableLen * sizeof( void* ) );
                         break;
                     }
                 }
