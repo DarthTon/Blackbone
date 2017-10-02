@@ -169,8 +169,8 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
         else
         {
             img->imgMem.Write( offset, size, zeroBuf.get() );
-            if (!NT_SUCCESS( proc.memory().Free( img->imgMem.ptr() + offset, size ) ))
-                proc.memory().Protect( img->imgMem.ptr() + offset, size, PAGE_NOACCESS );
+            proc.memory().Protect( img->imgMem.ptr() + offset, size, PAGE_NOACCESS );
+            proc.memory().Free( img->imgMem.ptr() + offset, size, MEM_DECOMMIT );
         }
     };
 
@@ -190,7 +190,10 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
                 img->imgMem.Protect( flOld, img->peImage.ilFlagOffset(), sizeof( flg ), &flOld );
             }
 
-            status = RunModuleInitializers( img, DLL_PROCESS_ATTACH, pCustomArgs ).status;
+            // Don't run initializer for pure IL dlls
+            if (!img->peImage.pureIL() || img->peImage.isExe())
+                status = RunModuleInitializers( img, DLL_PROCESS_ATTACH, pCustomArgs ).status;
+
             if (!NT_SUCCESS( status ))
             {
                 BLACKBONE_TRACE( L"ManualMap: ModuleInitializers failed for '%ls', status: 0x%X", img->ldrEntry.name.c_str(), status );
@@ -273,8 +276,8 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     ImageContextPtr pImage( new ImageContext() );
     auto& ldrEntry = pImage->ldrEntry;
 
-    ldrEntry.fullPath = path;
-    ldrEntry.name = Utils::StripPath( path );
+    ldrEntry.fullPath = Utils::ToLower( path );
+    ldrEntry.name = Utils::StripPath( ldrEntry.fullPath );
     pImage->flags = flags;
 
     // Load and parse image
@@ -314,7 +317,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     else if (flags & HideVAD)
     {      
         ptr_t base  = pImage->peImage.imageBase();
-        ptr_t isize = pImage->peImage.imageSize();
+        ptr_t image_size = pImage->peImage.imageSize();
 
         if (!NT_SUCCESS( Driver().EnsureLoaded() ))
         {
@@ -323,20 +326,20 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
         }
 
         // Allocate as physical at desired base
-        status = Driver().AllocateMem( _process.pid(), base, isize, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
+        status = Driver().AllocateMem( _process.pid(), base, image_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
 
         // Allocate at any base
         if (!NT_SUCCESS( status ))
         {
             base = 0;
-            size = pImage->peImage.imageSize();
-            status = Driver().AllocateMem( _process.pid(), base, isize, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
+            image_size = pImage->peImage.imageSize();
+            status = Driver().AllocateMem( _process.pid(), base, image_size, MEM_COMMIT, PAGE_EXECUTE_READWRITE, true );
         }
 
         // Store allocated region
         if (NT_SUCCESS( status ))
         {
-            pImage->imgMem = MemBlock( &_process.memory(), base, static_cast<size_t>(isize), PAGE_EXECUTE_READWRITE, true, true );
+            pImage->imgMem = MemBlock( &_process.memory(), base, static_cast<size_t>(image_size), PAGE_EXECUTE_READWRITE, true, true );
         }
         // Stop mapping
         else
@@ -514,14 +517,14 @@ NTSTATUS MMap::UnmapAllModules()
             DisableExceptions( pImage );
 
         // Remove from loader
-        auto mod = _process.modules().GetModule( pImage->ldrEntry.name );
-        _process.modules().Unlink( mod );
+        if (pImage->ldrEntry.flags != Ldr_None)
+            _process.modules().Unlink( pImage->ldrEntry );
 
         // Free memory
         pImage->imgMem.Free();
 
         // Remove reference from local modules list
-        _process.modules().RemoveManualModule( pImage->ldrEntry.fullPath, pImage->peImage.mType() );
+        _process.modules().RemoveManualModule( pImage->ldrEntry.name, pImage->peImage.mType() );
     } 
 
     Cleanup();
@@ -1164,45 +1167,26 @@ call_result_t<uint64_t> MMap::RunModuleInitializers( ImageContextPtr pImage, DWO
 
     // Function order
     // TLS first, entry point last
-    if (dwReason == DLL_PROCESS_ATTACH || dwReason == DLL_THREAD_ATTACH)
+    if (!(pImage->flags & NoTLS))
     {
         // PTLS_CALLBACK_FUNCTION(pImage->ImageBase, dwReason, NULL);
-        if (!( pImage->flags & NoTLS ))
-            for (auto& pCallback : pImage->tlsCallbacks)
-            {
-                BLACKBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%016llx for '%ls', Reason: %d",
-                    pCallback, pImage->ldrEntry.name.c_str(), dwReason );
-
-                a->GenCall( pCallback, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
-            }
-
-        // DllMain
-        if (pImage->ldrEntry.entryPoint != 0)
+        for (auto& pCallback : pImage->tlsCallbacks)
         {
-            BLACKBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->ldrEntry.name.c_str(), dwReason );
-            a->GenCall( pImage->ldrEntry.entryPoint, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
-            _process.remote().SaveCallResult( *a );
+            BLACKBONE_TRACE( 
+                L"ManualMap: Calling TLS callback at 0x%016llx for '%ls', Reason: %d",
+                pCallback, pImage->ldrEntry.name.c_str(), dwReason 
+            );
+
+            a->GenCall( pCallback, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
         }
     }
-    // Entry point first, TLS last
-    else
+
+    // DllMain
+    if (pImage->ldrEntry.entryPoint != 0)
     {
-        // DllMain
-        if (pImage->ldrEntry.entryPoint != 0)
-        {
-            BLACKBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->ldrEntry.name.c_str(), dwReason );
-            a->GenCall( pImage->ldrEntry.entryPoint, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
-        }
-
-        // PTLS_CALLBACK_FUNCTION(pImage->ImageBase, dwReason, NULL);
-        if (!( pImage->flags & NoTLS ))
-            for (auto& pCallback : pImage->tlsCallbacks)
-            {
-                BLACKBONE_TRACE( L"ManualMap: Calling TLS callback at 0x%016llx for '%ls', Reason: %d",
-                    pCallback, pImage->ldrEntry.name.c_str(), dwReason );
-
-                a->GenCall( pCallback, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
-            }
+        BLACKBONE_TRACE( L"ManualMap: Calling entry point for '%ls', Reason: %d", pImage->ldrEntry.name.c_str(), dwReason );
+        a->GenCall( pImage->ldrEntry.entryPoint, { pImage->imgMem.ptr(), dwReason, customArgumentsAddress } );
+        _process.remote().SaveCallResult( *a );
     }
 
     // DeactivateActCtx
@@ -1525,7 +1509,7 @@ NTSTATUS MMap::AllocateInHighMem( MemBlock& imageMem, size_t size )
     // Change protection and save address
     if (NT_SUCCESS( status ))
     {
-        _usedBlocks.emplace_back( std::make_pair( ptr, size ) );
+        _usedBlocks.emplace_back( ptr, size  );
 
         imageMem = MemBlock( &_process.memory(), ptr, size, PAGE_READWRITE, false );
         _process.memory().Protect( ptr, size, PAGE_READWRITE );

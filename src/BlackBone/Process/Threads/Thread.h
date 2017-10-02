@@ -4,6 +4,7 @@
 #include "../../Include/Winheaders.h"
 #include "../../Include/NativeStructures.h"
 #include "../../Include/CallResult.h"
+#include "../../Include/HandleGuard.h"
 #include "../../Include/Types.h"
 #include "../../Misc/Utils.h"
 
@@ -97,6 +98,12 @@ public:
     BLACKBONE_API Thread( HANDLE handle, class ProcessCore* hProcess );
     BLACKBONE_API ~Thread();
 
+    BLACKBONE_API Thread( const Thread& ) = delete;
+    BLACKBONE_API Thread& operator =( const Thread& ) = delete;
+
+    BLACKBONE_API Thread( Thread&& ) = default;
+    BLACKBONE_API Thread& operator =( Thread&& ) = default;
+
     /// <summary>
     /// Get thread ID
     /// </summary>
@@ -113,7 +120,7 @@ public:
     /// Check if thread exists
     /// </summary>
     /// <returns>true if thread exists</returns>
-    BLACKBONE_API inline bool valid() const { return (_handle != NULL && ExitCode() == STILL_ACTIVE); }
+    BLACKBONE_API inline bool valid() const { return (_handle && ExitCode() == STILL_ACTIVE); }
 
     /// <summary>
     /// Get WOW64 TEB
@@ -250,9 +257,6 @@ public:
     BLACKBONE_API inline bool operator ==( const Thread& other ) { return (_id == other._id); }
 
 private:
-    Thread( const Thread& ) = delete;
-    Thread& operator =( const Thread& ) = delete;
-
     /// <summary>
     /// GetThreadId support for XP
     /// </summary>
@@ -261,10 +265,10 @@ private:
     DWORD GetThreadIdT( HANDLE hThread );
 
 private:
-    class ProcessCore* _core;           // Core routines
+    class ProcessCore* _core;       // Core routines
 
-    DWORD _id = 0;                      // Thread ID
-    HANDLE _handle = NULL;              // Thread handle
+    DWORD _id = 0;                  // Thread ID
+    Handle _handle;                 // Thread handle
 };
 
 using ThreadPtr = std::shared_ptr<Thread>;

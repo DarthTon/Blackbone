@@ -102,6 +102,21 @@ public:
     BLACKBONE_API MemBlock( class ProcessMemory* mem, ptr_t ptr, size_t size, DWORD prot, bool own = true, bool physical = false );
 
     /// <summary>
+    /// Move ctor
+    /// </summary>
+    /// <param name="rhs">Move from</param>
+    BLACKBONE_API MemBlock( MemBlock&& rhs ) { _pImpl.swap( rhs._pImpl ); }
+    BLACKBONE_API MemBlock& operator = ( MemBlock&& rhs )
+    { 
+        // Self assign
+        if (_pImpl == rhs._pImpl)
+            return *this;
+
+        _pImpl.swap( rhs._pImpl ); 
+        return *this;
+    }
+
+    /// <summary>
     /// Allocate new memory block
     /// </summary>
     /// <param name="process">Process memory routines</param>

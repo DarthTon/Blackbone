@@ -4,6 +4,8 @@
 
 namespace blackbone
 {
+
+#pragma warning(push)
 #pragma warning(disable : 4201)
 typedef struct _IMAGE_DELAYLOAD_DESCRIPTOR 
 {
@@ -24,7 +26,7 @@ typedef struct _IMAGE_DELAYLOAD_DESCRIPTOR
     DWORD UnloadInformationTableRVA;        // RVA to an optional unload info table
     DWORD TimeDateStamp;                    // 0 if not bound, Otherwise, date/time of the target DLL
 } IMAGE_DELAYLOAD_DESCRIPTOR, *PIMAGE_DELAYLOAD_DESCRIPTOR;
-#pragma warning(default : 4201)
+#pragma warning(pop)
 
 typedef struct _EXCEPTION_REGISTRATION_RECORD 
 {

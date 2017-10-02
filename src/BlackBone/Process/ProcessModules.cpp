@@ -392,24 +392,24 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, T
     // Write dll name into target process
     auto fillDllName = [&modName, &path]( auto& ustr )
     {
-        ustr.Buffer = modName->ptr<std::decay<decltype(ustr)>::type::type>() + sizeof( ustr );
+        ustr.Buffer = modName->ptr<std::decay_t<decltype(ustr)>::type>() + sizeof( ustr );
         ustr.MaximumLength = ustr.Length = static_cast<USHORT>(path.size() * sizeof( wchar_t ));
 
         modName->Write( 0, ustr );
         modName->Write( sizeof( ustr ), path.size() * sizeof( wchar_t ), path.c_str() );
+
+        return static_cast<uint32_t>(sizeof( ustr ));
     };
 
     if (img.mType() == mt_mod32)
     {
-        _UNICODE_STRING_T<uint32_t> ustr = { 0 };
-        ustrSize = sizeof( ustr );
-        fillDllName( ustr );
+        _UNICODE_STRING32 ustr = { 0 };
+        ustrSize = fillDllName( ustr );
     }
     else if (img.mType() == mt_mod64)
     {
-        _UNICODE_STRING_T<uint64_t> ustr = { 0 };
-        ustrSize = sizeof( ustr );
-        fillDllName( ustr );
+        _UNICODE_STRING64 ustr = { 0 };
+        ustrSize = fillDllName( ustr );      
     }
     else
         return STATUS_INVALID_IMAGE_FORMAT;
@@ -524,6 +524,11 @@ bool ProcessModules::Unlink( const ModuleDataPtr& mod )
     return _proc.nativeLdr().Unlink( *mod );
 }
 
+bool ProcessModules::Unlink( const ModuleData& mod )
+{
+    return _proc.nativeLdr().Unlink( mod );
+}
+
 /// <summary>
 /// Ensure module is a valid PE image
 /// </summary>
@@ -549,18 +554,14 @@ bool ProcessModules::ValidateModule( module_t base )
 /// </summary>
 /// <param name="mod">Module data</param>
 /// <returns>Module info</returns>
-ModuleDataPtr ProcessModules::AddManualModule( const ModuleData& mod )
+ModuleDataPtr ProcessModules::AddManualModule( ModuleData mod )
 {
-    auto modCopy( mod );
+    mod.fullPath = Utils::ToLower( std::move( mod.fullPath ) );
+    mod.name = Utils::ToLower( std::move( mod.name ) );
+    mod.manual = true;
 
-    modCopy.fullPath = Utils::ToLower( modCopy.fullPath );
-    modCopy.name = Utils::ToLower( modCopy.name );
-    modCopy.manual = true;
-
-    auto key = std::make_pair( modCopy.name, modCopy.type );
-    _modules.emplace( std::make_pair( key, std::make_shared<const ModuleData>( modCopy ) ) );
-
-    return _modules.find( key )->second;
+    auto key = std::make_pair( mod.name, mod.type );
+    return _modules.emplace( key, std::make_shared<const ModuleData>( mod ) ).first->second;
 }
 
 /// <summary>
@@ -570,8 +571,7 @@ ModuleDataPtr ProcessModules::AddManualModule( const ModuleData& mod )
 /// <param name="mt">Module type. 32 bit or 64 bit</param>
 void ProcessModules::RemoveManualModule( const std::wstring& filename, eModType mt )
 {
-    auto key = std::make_pair( filename, mt );
-
+    auto key = std::make_pair( Utils::ToLower( Utils::StripPath( filename ) ), mt );
     if (_modules.count( key ))
         _modules.erase( key );
 }
@@ -579,7 +579,7 @@ void ProcessModules::RemoveManualModule( const std::wstring& filename, eModType 
 void ProcessModules::UpdateModuleCache( eModSeachType search, eModType type )
 {
     for (const auto& mod : _core.native()->EnumModules( search, type ))
-        _modules.emplace( std::make_pair( std::make_pair( mod->name, mod->type ), mod ) );
+        _modules.emplace( std::make_pair( mod->name, mod->type ), mod );
 }
 
 
@@ -622,7 +622,7 @@ bool ProcessModules::InjectPureIL(
         return false;
     }
 
-    auto address = mem.result();
+    auto address = std::move( mem.result() );
     uintptr_t offset = 4;
     uintptr_t address_VersionString, address_netAssemblyDll, address_netAssemblyClass,
            address_netAssemblyMethod, address_netAssemblyArgs;

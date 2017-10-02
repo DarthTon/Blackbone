@@ -480,7 +480,7 @@ NTSTATUS BBAllocateFreePhysical( IN PEPROCESS pProcess, IN PALLOCATE_FREE_MEMORY
             pResult->size = pAllocFree->size;
 
             // Set initial protection
-            BBProtectVAD( PsGetCurrentProcess(), pResult->address, BBConvertProtection( pAllocFree->protection, FALSE ) );
+            BBProtectVAD( pProcess, pResult->address, BBConvertProtection( pAllocFree->protection, FALSE ) );
 
             // Make pages executable
             if (pAllocFree->protection & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE))

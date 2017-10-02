@@ -113,7 +113,7 @@ struct _TEB_T
     T PerflibData;
     T EtwTraceData;
     T WinSockData;
-    uint32_t GdiBatchCount;
+    uint32_t GdiBatchCount;             // TEB64 pointer
     uint32_t IdealProcessorValue;
     uint32_t GuaranteedStackBytes;
     T ReservedForPerf;

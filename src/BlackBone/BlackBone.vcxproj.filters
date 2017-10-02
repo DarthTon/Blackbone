@@ -195,6 +195,7 @@
     <ClCompile Include="Misc\PatternLoader.cpp">
       <Filter>Misc</Filter>
     </ClCompile>
+    <ClCompile Include="DllMain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
@@ -455,6 +456,9 @@
     </ClInclude>
     <ClInclude Include="Misc\PatternLoader.h">
       <Filter>Misc</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\HandleGuard.h">
+      <Filter>Include</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

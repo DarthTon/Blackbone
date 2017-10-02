@@ -26,7 +26,7 @@ NTSTATUS RemoteMemory::Map( bool mapSections )
     MapMemoryResult result = { 0 };
 
     // IPC
-    if (_hPipe == NULL)
+    if (!_hPipe)
         _hPipe = CreateNamedPipeW( (L"\\\\.\\pipe\\" + _pipeName).c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE, 1, 0, 0, 0, NULL );
 
     Driver().EnsureLoaded();
@@ -55,7 +55,7 @@ NTSTATUS RemoteMemory::Map( ptr_t base, uint32_t size )
     MapMemoryRegionResult memRes =  { 0 };
 
     // IPC
-    if (_hPipe == NULL)
+    if (!_hPipe)
         _hPipe = CreateNamedPipeW( (L"\\\\.\\pipe\\" + _pipeName).c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE, 1, 0, 0, 0, NULL );
 
     Driver().EnsureLoaded();
@@ -186,7 +186,7 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
         return STATUS_INVALID_ADDRESS;
 
     // IPC
-    if (_hPipe == NULL)
+    if (!_hPipe)
         _hPipe = CreateNamedPipeW( (L"\\\\.\\pipe\\" + _pipeName).c_str(), PIPE_ACCESS_DUPLEX, PIPE_TYPE_MESSAGE, 1, 0, 0, 0, NULL );
 
     // Listening thread
@@ -255,11 +255,7 @@ void RemoteMemory::reset()
         _hThread = NULL;
     }
 
-    if (_hPipe != NULL)
-    {
-        CloseHandle( _hPipe );
-        _hPipe = NULL;
-    }
+    _hPipe.reset();
 
     for (int i = 0; i < 4; i++)
         RestoreHook( (OperationType)i );

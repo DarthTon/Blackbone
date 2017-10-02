@@ -7,6 +7,8 @@
 NTSTATUS BBMapWorker             ( IN PVOID pArg );
 VOID     KernelApcPrepareCallback( PKAPC, PKNORMAL_ROUTINE*, PVOID*, PVOID*, PVOID* );
 VOID     KernelApcInjectCallback ( PKAPC, PKNORMAL_ROUTINE*, PVOID*, PVOID*, PVOID* );
+BOOLEAN  BBSkipThread            ( IN PETHREAD pThread, IN BOOLEAN isWow64 );
+
 
 extern DYNAMIC_DATA dynData;
 
@@ -21,6 +23,7 @@ extern DYNAMIC_DATA dynData;
 #pragma alloc_text(PAGE, KernelApcInjectCallback)
 #pragma alloc_text(PAGE, BBMapWorker)
 #pragma alloc_text(PAGE, BBMMapDriver)
+#pragma alloc_text(PAGE, BBSkipThread)
 
 /// <summary>
 /// Remove list entry
@@ -95,7 +98,7 @@ PKLDR_DATA_TABLE_ENTRY BBGetSystemModule( IN PUNICODE_STRING pName, IN PVOID pAd
         PKLDR_DATA_TABLE_ENTRY pEntry = CONTAINING_RECORD( pListEntry, KLDR_DATA_TABLE_ENTRY, InLoadOrderLinks );
 
         // Check by name or by address
-        if ((pName && RtlCompareUnicodeString( &pEntry->BaseDllName, pName, FALSE ) == 0) ||
+        if ((pName && RtlCompareUnicodeString( &pEntry->BaseDllName, pName, TRUE ) == 0) ||
              (pAddress && pAddress >= pEntry->DllBase && (PUCHAR)pAddress < (PUCHAR)pEntry->DllBase + pEntry->SizeOfImage))
         {
             return pEntry;
@@ -421,14 +424,60 @@ PVOID BBGetModuleExport( IN PVOID pBase, IN PCCHAR name_ord, IN PEPROCESS pProce
 }
 
 /// <summary>
+/// Check if thread does not satisfy APC requirements
+/// </summary>
+/// <param name="pThread">Thread to check</param>
+/// /// <param name="isWow64">If TRUE - check Wow64 TEB</param>
+/// <returns>If TRUE - BBLookupProcessThread should skip thread</returns>
+BOOLEAN BBSkipThread( IN PETHREAD pThread, IN BOOLEAN isWow64 )
+{
+    PUCHAR pTeb64 = PsGetThreadTeb( pThread );
+    if (!pTeb64)
+        return TRUE;
+
+    // Skip GUI treads. APC to GUI thread causes ZwUserGetMessage to fail
+    // TEB64 + 0x78  = Win32ThreadInfo
+    if (*(PULONG64)(pTeb64 + 0x78) != 0)
+        return TRUE;
+
+    // Skip threads with no ActivationContext
+    // Skip threads with no TLS pointer
+    if (isWow64)
+    {
+        PUCHAR pTeb32 = pTeb64 + 0x2000;
+
+        // TEB32 + 0x1A8 = ActivationContextStackPointer
+        if (*(PULONG32)(pTeb32 + 0x1A8) == 0)
+            return TRUE;
+
+        // TEB64 + 0x2C = ThreadLocalStoragePointer
+        if (*(PULONG32)(pTeb32 + 0x2C) == 0)
+            return TRUE;
+    }
+    else
+    {
+        // TEB64 + 0x2C8 = ActivationContextStackPointer
+        if (*(PULONG64)(pTeb64 + 0x2C8) == 0)
+            return TRUE;
+
+        // TEB64 + 0x58 = ThreadLocalStoragePointer
+        if (*(PULONG64)(pTeb64 + 0x58) == 0)
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
+/// <summary>
 /// Find first thread of the target process
 /// </summary>
-/// <param name="pid">Target PID.</param>
+/// <param name="pProcess">Target process</param>
 /// <param name="ppThread">Found thread. Thread object reference count is increased by 1</param>
 /// <returns>Status code</returns>
-NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
+NTSTATUS BBLookupProcessThread( IN PEPROCESS pProcess, OUT PETHREAD* ppThread )
 {
     NTSTATUS status = STATUS_SUCCESS;
+    HANDLE pid = PsGetProcessId( pProcess );
     PVOID pBuf = ExAllocatePoolWithTag( NonPagedPool, 1024 * 1024, BB_POOL_TAG );
     PSYSTEM_PROCESS_INFO pInfo = (PSYSTEM_PROCESS_INFO)pBuf;
 
@@ -468,6 +517,8 @@ NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
         }
     }
 
+    BOOLEAN wow64 = PsGetProcessWow64Process( pProcess ) != NULL;
+
     // Reference target thread
     if (NT_SUCCESS( status ))
     {
@@ -479,12 +530,21 @@ NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
             // Skip current thread
             if (/*pInfo->Threads[i].WaitReason == Suspended ||
                  pInfo->Threads[i].ThreadState == 5 ||*/
-                 pInfo->Threads[i].ClientId.UniqueThread == PsGetCurrentThread())
+                 pInfo->Threads[i].ClientId.UniqueThread == PsGetCurrentThreadId())
             {
                 continue;
             }
 
             status = PsLookupThreadByThreadId( pInfo->Threads[i].ClientId.UniqueThread, ppThread );
+
+            // Skip specific threads
+            if (*ppThread && BBSkipThread( *ppThread, wow64 ))
+            {
+                ObDereferenceObject( *ppThread );
+                *ppThread = NULL;
+                continue;
+            }
+
             break;
         }
     }
@@ -493,6 +553,10 @@ NTSTATUS BBLookupProcessThread( IN HANDLE pid, OUT PETHREAD* ppThread )
 
     if (pBuf)
         ExFreePoolWithTag( pBuf, BB_POOL_TAG );
+
+    // No suitable thread
+    if (!*ppThread)
+        status = STATUS_NOT_FOUND;
 
     return status;
 }
@@ -577,7 +641,8 @@ NTSTATUS BBQueueUserApc(
     IN PVOID Arg1,
     IN PVOID Arg2,
     IN PVOID Arg3,
-    IN BOOLEAN bForce )
+    IN BOOLEAN bForce
+    )
 {
     ASSERT( pThread != NULL );
     if (pThread == NULL)
@@ -709,6 +774,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
     if (!NT_SUCCESS( status ))
     {
         DPRINT( "BlackBone: %s: Failed to open '%wZ'. Status: 0x%X\n", __FUNCTION__, pPath, status );
+        PsTerminateSystemThread( status );
         return status;
     }
 
@@ -818,6 +884,7 @@ NTSTATUS BBMapWorker( IN PVOID pArg )
     if (NT_SUCCESS( status ))
         DPRINT( "BlackBone: %s: Successfully mapped '%wZ' at 0x%p\n", __FUNCTION__, pPath, imageSection );
 
+    PsTerminateSystemThread( status );
     return status;
 }
 
@@ -856,7 +923,8 @@ NTSTATUS BBMMapDriver( IN PUNICODE_STRING pPath )
 
         status = KeWaitForSingleObject( pThread, Executive, KernelMode, TRUE, NULL );
         status = ZwQueryInformationThread( hThread, ThreadBasicInformation, &info, sizeof( info ), &bytes );
-        status = info.ExitStatus;
+        if (NT_SUCCESS( status ));
+            status = info.ExitStatus;
     }
 
     if (pThread)

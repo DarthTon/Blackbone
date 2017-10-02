@@ -74,7 +74,7 @@ public:
     /// </summary>
     /// <param name="str">Source string.</param>
     /// <returns>Result string</returns>
-    BLACKBONE_API static std::wstring ToLower( const std::wstring& str );
+    BLACKBONE_API static std::wstring ToLower( std::wstring str );
 
     /// <summary>
     /// Generate random alpha-numeric string
@@ -165,14 +165,18 @@ public:
     FsRedirector( bool wow64 )
         : _wow64( wow64 )
     {
+#ifndef XP_BUILD
         if (wow64)
             Wow64DisableWow64FsRedirection( &_fsRedirection );
+#endif
     }
 
     ~FsRedirector()
     {
+#ifndef XP_BUILD
         if (_wow64)
             Wow64RevertWow64FsRedirection( _fsRedirection );
+#endif
     }
 
 private:

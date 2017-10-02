@@ -10,6 +10,7 @@
 #include <TlHelp32.h>
 #include <Shlwapi.h>
 
+#pragma warning(push)
 #pragma warning(disable : 4005)
 #include <ntstatus.h>
-#pragma warning(default : 4005)
+#pragma warning(pop)

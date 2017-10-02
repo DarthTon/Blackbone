@@ -346,7 +346,7 @@ typedef struct _RTL_PROCESS_MODULE_INFORMATION
     USHORT InitOrderIndex;
     USHORT LoadCount;
     USHORT OffsetToFileName;
-    UCHAR  FullPathName[256];
+    UCHAR  FullPathName[MAXIMUM_FILENAME_LENGTH];
 } RTL_PROCESS_MODULE_INFORMATION, *PRTL_PROCESS_MODULE_INFORMATION;
 
 typedef struct _RTL_PROCESS_MODULES
@@ -430,7 +430,7 @@ typedef struct _PEB
     PVOID AtlThunkSListPtr;
     PVOID IFEOKey;
     PVOID CrossProcessFlags;
-    PVOID UserSharedInfoPtr;
+    PVOID KernelCallbackTable;
     ULONG SystemReserved;
     ULONG AtlThunkSListPtr32;
     PVOID ApiSetMap;

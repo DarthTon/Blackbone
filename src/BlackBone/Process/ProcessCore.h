@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Include/NativeStructures.h"
+#include "../Include/HandleGuard.h"
 #include "../Subsystem/Wow64Subsystem.h"
 #include "../Subsystem/x86Subsystem.h"
 
@@ -12,10 +13,6 @@ namespace blackbone
 
 class ProcessCore
 {
-    friend class Process;
-
-    using ptrNative = std::unique_ptr<Native>;
-
 public:
 
     /// <summary>
@@ -77,6 +74,10 @@ public:
     BLACKBONE_API bool isProtected();
 
 private:
+    friend class Process;
+    using ptrNative = std::unique_ptr<Native>;
+
+private:
      ProcessCore();
      ProcessCore( const ProcessCore& ) = delete;
     ~ProcessCore();
@@ -108,7 +109,7 @@ private:
     void Close();
 
 private:
-    HANDLE    _hProcess = NULL; // Process handle
+    Handle    _hProcess;        // Process handle
     DWORD     _pid = 0;         // Process ID
     ptrNative _native;          // Api wrapper
     bool      _dep = true;      // DEP state for process

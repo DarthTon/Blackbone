@@ -3,13 +3,14 @@
 #include <cstdio>
 #include <cstdlib>
 
+#pragma warning(push)
 #pragma warning(disable : 4091)
 #include <DbgHelp.h>
-#pragma warning(default : 4091)
+#pragma warning(pop)
 
 namespace blackbone
 {
-#ifndef BLACBONE_NO_TRACE
+#ifndef BLACKBONE_NO_TRACE
 
 inline void DoTraceV( const char* fmt, va_list va_args )
 {

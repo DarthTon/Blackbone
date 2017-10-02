@@ -2,6 +2,7 @@
 #include "ProcessMemory.h"
 #include "ProcessCore.h"
 #include "../Subsystem/NativeSubsystem.h"
+#include "../Misc/Trace.hpp"
 
 namespace blackbone
 {
@@ -90,7 +91,7 @@ call_result_t<MemBlock> MemBlock::Allocate(
     ptr_t desired64 = desired;
     DWORD newProt = CastProtection( protection, process.core().DEP() );
     
-    NTSTATUS status = process.core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, newProt );
+    NTSTATUS status = process.core().native()->VirtualAllocExT( desired64, size, MEM_RESERVE | MEM_COMMIT, newProt );
     if (!NT_SUCCESS( status ))
     {
         desired64 = 0;
@@ -100,7 +101,9 @@ call_result_t<MemBlock> MemBlock::Allocate(
         else
             return status;
     }
-
+#ifdef _DEBUG
+    BLACKBONE_TRACE(L"Allocate: Allocating at address 0x%p (0x%X bytes)", static_cast<uintptr_t>(desired64), size);
+#endif
     return MemBlock( &process, desired64, size, protection, own );
 }
 

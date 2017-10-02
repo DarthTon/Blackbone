@@ -25,7 +25,7 @@ public:
     };
 
 public:
-    BLACKBONE_API ~NameResolve();
+    BLACKBONE_API ~NameResolve() = default;
 
     BLACKBONE_API static NameResolve& Instance();
 
@@ -65,7 +65,7 @@ public:
 
 private:
     // Ensure singleton
-    NameResolve();
+    NameResolve() = default;
     NameResolve( const NameResolve& ) = delete;
     NameResolve& operator =( const NameResolve& ) = delete;
 
@@ -80,7 +80,7 @@ private:
     /// OS dependent api set initialization
     /// </summary>
     /// <returns>true on success</returns>
-    template<typename T1, typename T2, typename T3, typename T4>
+    template<typename PApiSetMap, typename PApiSetEntry, typename PHostArray, typename PHostEntry>
     bool InitializeP();
 
 private:

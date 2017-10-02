@@ -44,7 +44,7 @@ call_result_t<ThreadPtr> ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg,
         return status;
 
     CSLock lg( _lock );
-    _threads.emplace_back( new Thread( hThd, &_core ) );
+    _threads.emplace_back( std::make_shared<Thread>( hThd, &_core ) );
     return _threads.back();
 }
 
@@ -58,28 +58,26 @@ std::vector<ThreadPtr>& ProcessThreads::getAll( bool dontUpdate /*= false*/ )
     if (!_threads.empty() && dontUpdate)
         return _threads;
 
-    HANDLE hThreadSnapshot = CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 );
+    auto hThreadSnapshot = SnapHandle( CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 ) );
+    if (!hThreadSnapshot)
+        return _threads;
+   
+
+    THREADENTRY32 tEntry = { 0 };
+    tEntry.dwSize = sizeof( THREADENTRY32 );
 
     _threads.clear();
 
-    if (hThreadSnapshot != INVALID_HANDLE_VALUE)
+    // Iterate threads
+    for (BOOL success = Thread32First( hThreadSnapshot, &tEntry );
+        success != FALSE;
+        success = Thread32Next( hThreadSnapshot, &tEntry ))
     {
-        THREADENTRY32 tEntry = { 0 };
-        tEntry.dwSize = sizeof(THREADENTRY32);
+        if (tEntry.th32OwnerProcessID != _core.pid())
+            continue;
 
-        // Iterate threads
-        for (BOOL success = Thread32First( hThreadSnapshot, &tEntry ); 
-              success == TRUE;
-              success = Thread32Next( hThreadSnapshot, &tEntry ))
-        {
-            if (tEntry.th32OwnerProcessID != _core.pid())
-                continue;
-
-            CSLock lg( _lock );
-            _threads.emplace_back( new Thread( tEntry.th32ThreadID, &_core ) );
-        }
-
-        CloseHandle( hThreadSnapshot );
+        CSLock lg( _lock );
+        _threads.emplace_back( std::make_shared<Thread>( tEntry.th32ThreadID, &_core ) );
     }
 
     return _threads;
@@ -142,6 +140,9 @@ ThreadPtr ProcessThreads::getMostExecuted()
 
     for (auto& thread : getAll( true ))
     {
+        if (thread->id() == GetCurrentThreadId())
+            continue;
+
         uint64_t time = thread->execTime();
         if (thread->id() != GetCurrentThreadId() /*&& !thread->Suspended()*/ && time > maxtime)
         {

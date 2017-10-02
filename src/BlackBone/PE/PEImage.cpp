@@ -43,12 +43,11 @@ NTSTATUS PEImage::Load( const std::wstring& path, bool skipActx /*= false*/ )
         NULL, OPEN_EXISTING, 0, NULL
         );
 
-    if (_hFile != INVALID_HANDLE_VALUE)
+    if (_hFile)
     {
         // Try mapping as image
         _hMapping = CreateFileMappingW( _hFile, NULL, SEC_IMAGE | PAGE_READONLY, 0, 0, NULL );
-
-        if (_hMapping && _hMapping != INVALID_HANDLE_VALUE)
+        if (_hMapping)
         {
             _isPlainData = false;
             _pFileBase = MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 );
@@ -59,7 +58,7 @@ NTSTATUS PEImage::Load( const std::wstring& path, bool skipActx /*= false*/ )
             _isPlainData = true;
             _hMapping = CreateFileMappingW( _hFile, NULL, PAGE_READONLY, 0, 0, NULL );
 
-            if (_hMapping && _hMapping != INVALID_HANDLE_VALUE)
+            if (_hMapping)
                 _pFileBase = MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 );
         }
 
@@ -114,29 +113,15 @@ NTSTATUS PEImage::Reload()
 /// <param name="temporary">Preserve file paths for file reopening</param>
 void PEImage::Release( bool temporary /*= false*/ )
 {
-    if (_hctx != INVALID_HANDLE_VALUE)
+    if (_pFileBase)
     {
-        ReleaseActCtx( _hctx );
-        _hctx = INVALID_HANDLE_VALUE;
+        UnmapViewOfFile( _pFileBase );
+        _pFileBase = nullptr;
     }
 
-    if (_hMapping && _hMapping != INVALID_HANDLE_VALUE)
-    {
-        if (_pFileBase)
-        {
-            UnmapViewOfFile( _pFileBase );
-            _pFileBase = nullptr;
-        }
-
-        CloseHandle( _hMapping );
-        _hMapping = NULL;
-    }
-
-    if (_hFile != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle( _hFile );
-        _hFile = INVALID_HANDLE_VALUE;
-    }
+    _hMapping.reset();
+    _hFile.reset();
+    _hctx.reset();
 
     // Reset pointers to data
     _pImageHdr32 = nullptr;
@@ -512,12 +497,12 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
         if (GetTempFileNameW( tempDir, L"ImageManifest", 0, tempPath ) == 0)
             return STATUS_UNSUCCESSFUL;
      
-        HANDLE hTmpFile = CreateFileW( tempPath, FILE_GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, 0, NULL );
+        auto hTmpFile = FileHandle( CreateFileW( tempPath, FILE_GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, 0, NULL ) );
         if (hTmpFile != INVALID_HANDLE_VALUE)
         {
             DWORD bytes = 0;
             WriteFile( hTmpFile, pManifest, manifestSize, &bytes, NULL );
-            CloseHandle( hTmpFile );
+            hTmpFile.reset();
 
             act.lpSource = tempPath;
             _manifestPath = tempPath;

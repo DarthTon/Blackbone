@@ -79,7 +79,7 @@ struct CompileTimeSizeOf;
 template<typename T, typename U>
 constexpr size_t offsetOf( U T::*member )
 {
-    return (size_t)&((T*)nullptr->*member);
+    return reinterpret_cast<size_t>(&(reinterpret_cast<T*>(nullptr)->*member));
 }
 
 template<typename T, typename U>

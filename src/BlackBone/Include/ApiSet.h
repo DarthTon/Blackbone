@@ -60,10 +60,11 @@ typedef struct _API_SET_NAMESPACE_ARRAY_10
         return (PAPI_SET_VALUE_ARRAY_10)((BYTE*)this + Start + sizeof( API_SET_VALUE_ARRAY_10 ) * pEntry->Size);
     }
 
-    inline void apiName( PAPI_SET_NAMESPACE_ENTRY_10 pEntry, wchar_t* output )
+    inline ULONG apiName( PAPI_SET_NAMESPACE_ENTRY_10 pEntry, wchar_t* output )
     {
         auto pArray = valArray( pEntry );
         memcpy( output, (char*)this + pArray->NameOffset, pArray->NameLength );
+        return  pArray->NameLength;
     }
 } API_SET_NAMESPACE_ARRAY_10, *PAPI_SET_NAMESPACE_ARRAY_10;
 
@@ -122,9 +123,10 @@ typedef struct _API_SET_NAMESPACE_ARRAY
         return (PAPI_SET_VALUE_ARRAY)((BYTE*)this + pEntry->DataOffset);
     }
 
-    inline void apiName( PAPI_SET_NAMESPACE_ENTRY pEntry, wchar_t* output )
+    inline ULONG apiName( PAPI_SET_NAMESPACE_ENTRY pEntry, wchar_t* output )
     {
         memcpy( output, (char*)this + pEntry->NameOffset, pEntry->NameLength );
+        return pEntry->NameLength;
     }
 } API_SET_NAMESPACE_ARRAY, *PAPI_SET_NAMESPACE_ARRAY;
 
@@ -174,8 +176,9 @@ typedef struct _API_SET_NAMESPACE_ARRAY_V2
         return (PAPI_SET_VALUE_ARRAY_V2)((BYTE*)this + pEntry->DataOffset);
     }
 
-    inline void apiName( PAPI_SET_NAMESPACE_ENTRY_V2 pEntry, wchar_t* output )
+    inline ULONG apiName( PAPI_SET_NAMESPACE_ENTRY_V2 pEntry, wchar_t* output )
     {
         memcpy( output, (char*)this + pEntry->NameOffset, pEntry->NameLength );
+        return pEntry->NameLength;
     }
 } API_SET_NAMESPACE_ARRAY_V2, *PAPI_SET_NAMESPACE_ARRAY_V2;

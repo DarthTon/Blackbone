@@ -62,7 +62,7 @@ bool TraceHook::ApplyHook( void* targetFunc,
         if (ctx.hooks.count( (uintptr_t)targetFunc ))
             return false;
         else
-            ctx.hooks.emplace( std::make_pair( (uintptr_t)targetFunc, std::make_pair( (uintptr_t)hookFunc, false ) ) );
+            ctx.hooks.emplace( (uintptr_t)targetFunc, std::make_pair( (uintptr_t)hookFunc, false ) );
     }
     // Create new context
     else
@@ -76,8 +76,8 @@ bool TraceHook::ApplyHook( void* targetFunc,
         ctx.breakValue = _breakPtr;
         ctx.tracePath = tracePath;
 
-        ctx.hooks.emplace( std::make_pair( (uintptr_t)targetFunc, std::make_pair( (uintptr_t)hookFunc, false ) ) );
-        _contexts.emplace( std::make_pair( (uintptr_t)ptrAddress, std::move( ctx ) ) );
+        ctx.hooks.emplace( (uintptr_t)targetFunc, std::make_pair( (uintptr_t)hookFunc, false ) );
+        _contexts.emplace( (uintptr_t)ptrAddress, std::move( ctx ) );
 
         if (_pExptHandler == nullptr)
             _pExptHandler = AddVectoredExceptionHandler( 0, &TraceHook::VecHandler );
@@ -395,13 +395,13 @@ bool TraceHook::RestorePtr( const HookContext& ctx, PEXCEPTION_POINTERS Exceptio
 /// <returns>Number of found frames</returns>
 size_t TraceHook::StackBacktrace( uintptr_t ip, uintptr_t sp, vecStackFrames& results, uintptr_t depth /*= 10 */ )
 {
-    SYSTEM_INFO sysinfo = { { 0 } };
+    SYSTEM_INFO sysinfo = {};
     uintptr_t stack_base = (uintptr_t)((PNT_TIB)NtCurrentTeb())->StackBase;
 
     GetNativeSystemInfo( &sysinfo );
 
     // Store exception address
-    results.emplace_back( std::make_pair( 0, ip ) );
+    results.emplace_back( 0, ip );
 
     // Walk stack
     for (uintptr_t stackPtr = sp; stackPtr < stack_base && results.size() <= depth; stackPtr += sizeof(void*))
@@ -444,7 +444,7 @@ size_t TraceHook::StackBacktrace( uintptr_t ip, uintptr_t sp, vecStackFrames& re
 #ifdef COMPILER_MSVC
             if (Disasm( &info ) > 0 && info.Instruction.BranchType == CallType)
             {
-                results.emplace_back( std::make_pair( stackPtr, stack_val ) );
+                results.emplace_back( stackPtr, stack_val );
                 break;
             }
 #endif // COMPILER_MSVC

@@ -33,7 +33,7 @@ DriverControl& DriverControl::Instance()
 NTSTATUS DriverControl::EnsureLoaded( const std::wstring& path /*= L"" */ )
 {
     // Already open
-    if (_hDriver != INVALID_HANDLE_VALUE)
+    if (_hDriver)
         return STATUS_SUCCESS;
 
     // Try to open handle to existing driver
@@ -44,7 +44,7 @@ NTSTATUS DriverControl::EnsureLoaded( const std::wstring& path /*= L"" */ )
         NULL, OPEN_EXISTING, 0, NULL
         );
 
-    if (_hDriver != INVALID_HANDLE_VALUE)
+    if (_hDriver)
         return _loadStatus = STATUS_SUCCESS;
 
     // Start new instance
@@ -93,7 +93,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
         NULL, OPEN_EXISTING, 0, NULL
         );
 
-    if (_hDriver == INVALID_HANDLE_VALUE)
+    if (!_hDriver)
     {
         _loadStatus = LastNtStatus();
         BLACKBONE_TRACE( L"Failed to open driver handle. Status 0x%X", _loadStatus );
@@ -109,12 +109,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::Unload()
 {
-    if (_hDriver != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle( _hDriver );
-        _hDriver = INVALID_HANDLE_VALUE;
-    }
-
+    _hDriver.reset();
     return UnloadDriver( DRIVER_SVC_NAME );
 }
 
@@ -705,22 +700,25 @@ NTSTATUS DriverControl::UnlinkHandleTable( DWORD pid )
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::EnumMemoryRegions( DWORD pid, std::vector<MEMORY_BASIC_INFORMATION64>& regions )
 {
+    // Not loaded
+    if (_hDriver == INVALID_HANDLE_VALUE)
+    {
+        return STATUS_DEVICE_DOES_NOT_EXIST;
+    }
+
     DWORD bytes = 0;
     ENUM_REGIONS data = { 0 };
-    auto result = (PENUM_REGIONS_RESULT)malloc( sizeof( ENUM_REGIONS_RESULT ) );
+    DWORD size = sizeof( ENUM_REGIONS_RESULT );
+    auto result = reinterpret_cast<PENUM_REGIONS_RESULT>(malloc( size ));
 
     data.pid = pid;
     result->count = 0;
 
-    // Not loaded
-    if (_hDriver == INVALID_HANDLE_VALUE)
-        return STATUS_DEVICE_DOES_NOT_EXIST;
-
-    DeviceIoControl( _hDriver, IOCTL_BLACKBONE_ENUM_REGIONS, &data, sizeof( data ), result, sizeof( ENUM_REGIONS_RESULT ), &bytes, NULL );
+    DeviceIoControl( _hDriver, IOCTL_BLACKBONE_ENUM_REGIONS, &data, sizeof( data ), result, size, &bytes, NULL );
 
     result->count += 100;
-    DWORD size = static_cast<DWORD>(result->count * sizeof( result->regions[0] ) + sizeof( result->count ));
-    result = (PENUM_REGIONS_RESULT)realloc( result, size );
+    size = static_cast<DWORD>(result->count * sizeof( result->regions[0] ) + sizeof( result->count ));
+    result = reinterpret_cast<PENUM_REGIONS_RESULT>(realloc( result, size ));
 
     if (!DeviceIoControl( _hDriver, IOCTL_BLACKBONE_ENUM_REGIONS, &data, sizeof( data ), result, size, &bytes, NULL ))
     {
@@ -741,7 +739,6 @@ NTSTATUS DriverControl::EnumMemoryRegions( DWORD pid, std::vector<MEMORY_BASIC_I
     }
     
     free( result );
-
     return STATUS_SUCCESS;
 }
 

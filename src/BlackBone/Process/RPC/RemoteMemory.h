@@ -150,7 +150,7 @@ private:
     class Process* _process = nullptr;      // Target process
     mapMemoryMap _mapDatabase;              // Region map
     std::wstring _pipeName;                 // Pipe name used to gather hook data
-    HANDLE _hPipe = NULL;                   // Hook pipe handle
+    Handle _hPipe;                          // Hook pipe handle
     HANDLE _targetPipe = NULL;              // Hook pipe handle in target process
     HANDLE _hThread = NULL;                 // Hook thread listener
     PageContext* _pSharedData = nullptr;    // Hook related data, shared between processes

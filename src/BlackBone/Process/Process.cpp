@@ -21,8 +21,7 @@ Process::Process()
     , _nativeLdr( *this )
 {
     // Ensure InitOnce is called
-    auto i = g_Initialized;
-    UNREFERENCED_PARAMETER( i );
+    InitializeOnce();
 }
 
 Process::~Process(void)
@@ -38,12 +37,7 @@ Process::~Process(void)
 NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 {
     Detach();
-
-    auto status = _core.Open( pid, access );
-    if (NT_SUCCESS( status ) && (access & PROCESS_VM_WRITE))
-        status = _remote.CreateRPCEnvironment();
-
-    return status;
+    return _core.Open( pid, access );
 }
 
 /// <summary>
@@ -54,17 +48,7 @@ NTSTATUS Process::Attach( DWORD pid, DWORD access /*= DEFAULT_ACCESS_P*/ )
 NTSTATUS Process::Attach( HANDLE hProc )
 {
     Detach();
-
-    auto status = _core.Open( hProc );
-    if (NT_SUCCESS( status ))
-    {
-        if (!valid())
-            return STATUS_INVALID_HANDLE;
-
-        _remote.CreateRPCEnvironment();
-    }
-
-    return status;
+    return _core.Open( hProc );
 }
 
 /// <summary>
@@ -241,7 +225,7 @@ call_result_t<std::vector<HandleInfo>> Process::EnumHandles()
     for (ULONG i = 0; i < handleInfo->HandleCount; i++)
     {
         HandleInfo info;
-        HANDLE hLocal = NULL;
+        Handle hLocal;
         OBJECT_TYPE_INFORMATION_T* pTypeInfo = nullptr;
         PVOID pNameInfo = nullptr;
         UNICODE_STRING objectName = { 0 };
@@ -269,7 +253,6 @@ call_result_t<std::vector<HandleInfo>> Process::EnumHandles()
         status = SAFE_NATIVE_CALL( NtQueryObject, hLocal, ObjectTypeInformation, pTypeInfo, 0x1000, nullptr );
         if (!NT_SUCCESS( status ))
         {
-            CloseHandle( hLocal );
             continue;
         }
 
@@ -286,7 +269,6 @@ call_result_t<std::vector<HandleInfo>> Process::EnumHandles()
             {
                 free( pTypeInfo );
                 free( pNameInfo );
-                CloseHandle( hLocal );
                 continue;
             }
         }
@@ -328,7 +310,6 @@ call_result_t<std::vector<HandleInfo>> Process::EnumHandles()
 
         free( pTypeInfo );
         free( pNameInfo );
-        CloseHandle( hLocal );
     }
 
     VirtualFree( buffer, 0, MEM_RELEASE );
@@ -343,23 +324,20 @@ call_result_t<std::vector<HandleInfo>> Process::EnumHandles()
 std::vector<DWORD> Process::EnumByName( const std::wstring& name )
 {
     std::vector<DWORD> found;
-    HANDLE hProcSnap = CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 );
+    auto hProcSnap = SnapHandle( CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 ) );
+    if (!hProcSnap)
+        return found;
 
-    if (hProcSnap != INVALID_HANDLE_VALUE)
+    PROCESSENTRY32W tEntry = { 0 };
+    tEntry.dwSize = sizeof( PROCESSENTRY32W );
+
+    // Iterate threads
+    for (BOOL success = Process32FirstW( hProcSnap, &tEntry );
+        success != FALSE;
+        success = Process32NextW( hProcSnap, &tEntry ))
     {
-        PROCESSENTRY32W tEntry = { 0 };
-        tEntry.dwSize = sizeof(PROCESSENTRY32W);
-
-        // Iterate threads
-        for (BOOL success = Process32FirstW( hProcSnap, &tEntry );
-              success == TRUE; 
-              success = Process32NextW( hProcSnap, &tEntry ))
-        {
-            if (name.empty() || _wcsicmp( tEntry.szExeFile, name.c_str() ) == 0)
-                found.emplace_back( tEntry.th32ProcessID );
-        }
-
-        CloseHandle( hProcSnap );
+        if (name.empty() || _wcsicmp( tEntry.szExeFile, name.c_str() ) == 0)
+            found.emplace_back( tEntry.th32ProcessID );
     }
 
     return found;
