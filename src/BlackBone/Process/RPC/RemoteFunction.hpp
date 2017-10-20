@@ -3,6 +3,8 @@
 #include "../../Asm/IAsmHelper.h"
 #include "../Process.h"
 
+#include <type_traits>
+
 // TODO: Find more elegant way to deduce calling convention
 //       than defining each one manually
 
@@ -11,12 +13,6 @@ namespace blackbone
 template<typename R, typename... Args>
 class RemoteFunctionBase
 {
-    template<bool...> 
-    struct bool_pack;
-
-    template<bool... bs>
-    using all_true = std::is_same<bool_pack<bs..., true>, bool_pack<true, bs...>>;
-
 public:
     using ReturnType = std::conditional_t<std::is_same_v<R, void>, int, R>;
 
@@ -42,7 +38,7 @@ public:
         , _conv( conv )
     {
         static_assert(
-            all_true<!std::is_reference_v<Args>...>::value,
+            !std::disjunction_v<std::is_reference<Args>...>,
             "Please replace reference type to pointer type in function type specification"
             );
     }
