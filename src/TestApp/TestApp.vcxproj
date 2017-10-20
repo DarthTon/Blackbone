@@ -580,6 +580,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AsmTest.cpp" />
     <ClCompile Include="DriverTest.cpp" />
     <ClCompile Include="LocalHookTest.cpp" />
     <ClCompile Include="RemoteHookTest.cpp">

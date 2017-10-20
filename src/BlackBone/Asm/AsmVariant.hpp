@@ -6,7 +6,7 @@
 #include "../../../contrib/AsmJit/AsmJit.h"
 #pragma warning(default : 4100)
 
-#include <memory>
+#include <vector>
 
 
 namespace blackbone
@@ -17,7 +17,16 @@ namespace blackbone
 struct AsmVariant
 {
     template<typename T>
-    using cleanup_t = std::decay_t<std::remove_pointer_t<T>>;
+    using cleanup_t = std::remove_cv_t<std::remove_pointer_t<T>>;
+
+    template<typename T, typename S>
+    static constexpr bool is_string_ptr = (std::is_pointer_v<T> && std::is_same_v<cleanup_t<T>, S>);
+
+    template<typename T>
+    static constexpr bool is_number = (std::is_integral_v<T> || std::is_enum_v<T>);
+
+    template<typename T>
+    static constexpr bool is_void_ptr = (std::is_pointer_v<T> && std::is_void_v<cleanup_t<T>>);
 
     enum eType
     {
@@ -35,9 +44,54 @@ struct AsmVariant
 
     template<typename T>
     AsmVariant( T&& arg )
-        : new_imm_val( 0 )
     {
-        Init( std::forward<T>( arg ) );
+        using RAW_T = std::decay_t<T>;
+        constexpr size_t argSize = sizeof( RAW_T );
+
+        // bool, short, int, unsigned long long, etc.
+        if constexpr (is_number<RAW_T>)
+        {
+            set( imm, argSize, static_cast<uint64_t>(arg) );
+        }
+        // char*, const char*, char[], etc.
+        else if constexpr(is_string_ptr<RAW_T, char>)
+        {
+            set( dataPtr, strlen( arg ) + 1, reinterpret_cast<uint64_t>(arg) );
+        }
+        // wchar_t*, const wchar_t*, wchar[], etc.
+        else if constexpr(is_string_ptr<RAW_T, wchar_t>)
+        {
+            set( dataPtr, (wcslen( arg ) + 1) * sizeof( wchar_t ), reinterpret_cast<uint64_t>(arg) );
+        }
+        // void*, const void*, etc.
+        else if constexpr(is_void_ptr<RAW_T>)
+        {
+            set( imm, argSize, reinterpret_cast<uint64_t>(arg) );
+        }
+        // Function pointer
+        else if constexpr(std::is_function_v<cleanup_t<RAW_T>>)
+        {
+            set( imm, argSize, reinterpret_cast<uint64_t>(arg) );
+        }
+        // Arbitrary pointer
+        else if constexpr(std::is_pointer_v<RAW_T>)
+        {
+            set( dataPtr, sizeof( cleanup_t<RAW_T> ), reinterpret_cast<uint64_t>(arg) );
+        }
+        // Arbitrary variable passed by value
+        // Can fit into register
+        else if constexpr (argSize <= sizeof( uintptr_t ))
+        {
+            type = imm;
+            size = argSize;
+            memcpy( &imm_val64, &arg, argSize );
+        }
+        else
+        {
+            buf.resize( argSize );
+            set( dataStruct, argSize, reinterpret_cast<uint64_t>(buf.data()) );
+            memcpy( buf.data(), &arg, argSize );
+        }
     }
 
     // Custom size pointer
@@ -46,82 +100,6 @@ struct AsmVariant
         : type( dataPtr )
         , size( size_ )
         , imm_val64( reinterpret_cast<uint64_t>(ptr) ) { }
-
-    // bool, short, int, unsigned long long, etc.
-    template<typename T>
-    std::enable_if_t<!std::is_pointer_v<T> && (std::is_integral_v<T> || std::is_enum_v<T>)>
-        Init( T arg )
-    {
-        set( imm, sizeof( std::decay_t<T> ), static_cast<uint64_t>(arg) );
-    }
-
-    // char*, const char*, char[], etc.
-    template<typename T>
-    std::enable_if_t<std::is_pointer_v<T> && std::is_same_v<cleanup_t<T>, char>>
-        Init( T arg )
-    {
-        set( dataPtr, strlen( arg ) + 1, reinterpret_cast<uint64_t>(arg) );
-    }
-
-    // wchar_t*, const wchar_t*, wchar[], etc.
-    template<typename T>
-    std::enable_if_t<std::is_pointer_v<T> && std::is_same_v<cleanup_t<T>, wchar_t>>
-        Init( T arg )
-    {
-        set( dataPtr, (wcslen( arg ) + 1) * sizeof( wchar_t ), reinterpret_cast<uint64_t>(arg) );
-    }
-
-    // void*, const void*, etc.
-    template<typename T>
-    std::enable_if_t<std::is_pointer_v<T> && std::is_same_v<cleanup_t<T>, void>>
-        Init( T arg )
-    {
-        set( imm, sizeof( T ), reinterpret_cast<uint64_t>(arg) );
-    }
-
-    // Function pointer
-    template<typename T>
-    std::enable_if_t<std::is_function_v<std::remove_pointer_t<T>>>
-        Init( T arg )
-    {
-        set( imm, sizeof( T ), reinterpret_cast<uint64_t>(arg) );
-    }
-
-    // Arbitrary pointer
-    template<typename T>
-    std::enable_if_t<
-        std::is_pointer_v<T> &&
-        !std::is_function_v<std::remove_pointer_t<T>> &&
-        !std::is_same_v<cleanup_t<T>, void> &&
-        !std::is_same_v<cleanup_t<T>, char> &&
-        !std::is_same_v<cleanup_t<T>, wchar_t>>
-        Init( T arg )
-    {
-        set( dataPtr, sizeof( std::remove_pointer<T>::type ), reinterpret_cast<uint64_t>(arg) );
-    }
-
-    // Arbitrary variable passed by value
-    template<typename T>
-    std::enable_if_t<
-        !std::is_pointer_v<std::decay_t<T>> &&
-        !std::is_integral_v<cleanup_t<T>> &&
-        !std::is_enum_v<cleanup_t<T>>
-        >
-        Init( T&& arg )
-    {
-        // Can fit into register
-        if constexpr (sizeof( T ) <= sizeof( uintptr_t ))
-        {
-            type = imm;
-            memcpy( &imm_val64, &arg, sizeof( T ) );
-        }
-        else
-        {
-            buf.reset( new uint8_t[sizeof( T )] );
-            set( dataStruct, sizeof( T ), reinterpret_cast<uint64_t>(buf.get()) );
-            memcpy( buf.get(), &arg, sizeof( T ) );
-        }  
-    }
 
     BLACKBONE_API AsmVariant( float _imm_fpu )
         : type( imm_float )
@@ -200,7 +178,7 @@ struct AsmVariant
     };
 
     uint64_t new_imm_val = 0;       // Replaced immediate value for dataPtr type
-    std::shared_ptr<uint8_t> buf;   // Value buffer
+    std::vector<std::byte> buf;     // Value buffer
 };
 
 /// <summary>

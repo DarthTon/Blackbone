@@ -10,6 +10,7 @@
     <ClCompile Include="LocalHookTest.cpp" />
     <ClCompile Include="PatternTest.cpp" />
     <ClCompile Include="MultiPtrTest.cpp" />
+    <ClCompile Include="AsmTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Tests.h" />

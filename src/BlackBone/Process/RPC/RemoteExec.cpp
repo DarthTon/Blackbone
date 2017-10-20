@@ -578,9 +578,9 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
         if (arg.type == AsmVariant::imm && arg.size > sizeof( uint32_t ) && a.assembler()->getArch() == asmjit::kArchX86)
         {
             arg.type = AsmVariant::dataStruct;
-            arg.buf.reset( new uint8_t[arg.size] );
-            memcpy( arg.buf.get(), &arg.imm_val64, arg.size );
-            arg.imm_val64 = reinterpret_cast<uint64_t>(arg.buf.get());
+            arg.buf.resize( arg.size );
+            memcpy( arg.buf.data(), &arg.imm_val64, arg.size );
+            arg.imm_val64 = reinterpret_cast<uint64_t>(arg.buf.data());
         }
 
         if (arg.type == AsmVariant::dataStruct || arg.type == AsmVariant::dataPtr)
