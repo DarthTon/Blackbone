@@ -17,96 +17,76 @@
 namespace blackbone
 {
 
-class CustomArgs_t 
+class CustomArgs_t
 {
-private:
-    /// <summary>The buffer.</summary>
-    std::vector< char > _buffer;
-
-    /// <summary>Buffers.</summary>
-    /// <param name="ptr">[in] If non-null, the pointer.</param>
-    /// <param name="size">The size.</param>
-    void buffer( const void* ptr, size_t size )
-    {
-        if( !ptr )
-            return;
-        _buffer.resize( size );
-        memcpy( _buffer.data(), ptr, size );
-    }
-
 public:
-    /// <summary>Default constructor - Deleted</summary>
-    CustomArgs_t() = delete;
-
-    /// <summary>Constructor.</summary>
-    /// <param name="ptr">The pointer.</param>
-    /// <param name="size">The size.</param>
-    CustomArgs_t( const void* ptr, size_t size )
+    void push_back( const void* ptr, size_t size )
     {
-        buffer( ptr, size );
+        append( ptr, size );
     }
 
-    /// <summary>Constructor.</summary>
-    /// <typeparam name="Arg_t">Type of the argument.</typeparam>
-    /// <param name="str">The string.</param>
-    template< typename Arg_t >
-    explicit CustomArgs_t( const std::basic_string< Arg_t >& str )
+    template<typename T>
+    void push_back( const T* ptr )
     {
-        buffer( str.data(), str.size() * sizeof Arg_t );
+        append( ptr, sizeof( T ) );
     }
 
-    /// <summary>Constructor.</summary>
-    /// <typeparam name="Arg_t">Type of the argument.</typeparam>
-    /// <param name="ptr">[in,out] If non-null, the pointer.</param>
-    template< class Arg_t >
-    explicit CustomArgs_t( Arg_t* ptr )
+    template<typename T>
+    void push_back( const std::basic_string<T>& str )
     {
-        buffer( ptr, sizeof Arg_t );
+        append( str.data(), str.size() * sizeof( T ) );
     }
 
-    /// <summary>Constructor.</summary>
-    /// <typeparam name="Arg_t">Type of the argument.</typeparam>
-    /// <param name="cVec">The vector.</param>
-    template< class Arg_t >
-    explicit CustomArgs_t( const std::vector< Arg_t >& cVec )
+    template<class T>
+    void push_back( const std::vector<T>& cVec )
     {
-        buffer( cVec.data(), cVec.size() * sizeof Arg_t );
+        append( cVec.data(), cVec.size() * sizeof( T ) );
     }
 
-    /// <summary>Constructor.</summary>
-    /// <typeparam name="Arg_t">Type of the argument.</typeparam>
-    /// <typeparam name="N">Type of the n.</typeparam>
-    /// <param name="cArray">The array.</param>
-    template< class Arg_t, size_t N >
-    explicit CustomArgs_t( const std::array< Arg_t, N >& cArray )
+    template<class T, size_t N>
+    void push_back( const std::array<T, N>& arr )
     {
-        buffer( cArray.data(), cArray.size() * sizeof Arg_t );
+        append( arr.data(), arr.size() * sizeof( T ) );
     }
 
 #if _MSC_VER >= 1900 
     template<typename... Args>
-    explicit CustomArgs_t( std::tuple<Args...>&& cTuple )
+    void push_back( const std::tuple<Args...>& tpl )
     {
-        tuple_detail::copyTuple( cTuple, _buffer );
+        tuple_detail::copyTuple( tpl, _buffer );
     }
 #endif
-    /// <summary>Gets the size.</summary>
-    /// <returns>An size_t.</returns>
-    size_t size() const {
-        return _buffer.size();
+    /// <summary>
+    /// Get raw data size
+    /// </summary>
+    /// <returns></returns>
+    inline size_t size() const { return _buffer.size(); }
+
+    /// <summary>
+    /// Get raw data
+    /// </summary>
+    /// <returns>Data ptr</returns>
+    inline std::byte* data() { return _buffer.data(); }
+    inline const std::byte* data() const { return _buffer.data(); }
+
+private:
+    /// <summary>
+    /// Append buffer from raw memory
+    /// </summary>
+    /// <param name="ptr">Raw pointer</param>
+    /// <param name="size">Data size</param>
+    void append( const void* ptr, size_t size )
+    {
+        if (ptr)
+        {
+            const auto offset = _buffer.size();
+            _buffer.resize( offset + size );
+            memcpy( _buffer.data() + offset, ptr, size );
+        }
     }
 
-    /// <summary>Gets the data.</summary>
-    /// <returns>null if it fails, else a char*.</returns>
-    char* data() {
-        return _buffer.data();
-    }
-
-    /// <summary>Gets the data.</summary>
-    /// <returns>null if it fails, else a char*.</returns>
-    const char* data() const {
-        return _buffer.data();
-    }
+private:
+    std::vector<std::byte> _buffer;
 };
 
 // Loader flags
@@ -186,7 +166,6 @@ using vecImageCtx = std::vector<ImageContextPtr>;
 /// </summary>
 class MMap
 {
-        
 public:
     BLACKBONE_API MMap( class Process& proc );
     BLACKBONE_API ~MMap( void );
