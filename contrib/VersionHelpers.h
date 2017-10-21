@@ -57,7 +57,7 @@ inline void InitVersion()
         {
         case _WIN32_WINNT_WIN10:
             if (g_WinVer.native.dwBuildNumber >= 16299)
-                g_WinVer.ver = Win10CU;
+                g_WinVer.ver = Win10FC;
             else if (g_WinVer.native.dwBuildNumber >= 15063)
                 g_WinVer.ver = Win10CU;
             else if (g_WinVer.native.dwBuildNumber >= 14393)
