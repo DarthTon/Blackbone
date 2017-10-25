@@ -463,10 +463,12 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, T
     a->GenCall( pLdrLoadDll->procAddress, { 0, 0, modName->ptr(), modName->ptr() + 0x800 } );
     (*a)->ret();
 
+    _proc.remote().CreateRPCEnvironment( Worker_None, true );
+
     // Execute call
     if (pThread != nullptr)
     {
-        if(pThread == _proc.remote().getWorker())
+        if (pThread == _proc.remote().getWorker())
             status = _proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), res );
         else
             status = _proc.remote().ExecInAnyThread( (*a)->make(), (*a)->getCodeSize(), res, pThread );
