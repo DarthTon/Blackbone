@@ -321,35 +321,29 @@ NTSTATUS RemoteExec::CreateRPCEnvironment( WorkerThreadMode mode /*= Worker_None
     DWORD thdID = GetTickCount();       // randomize thread id
     NTSTATUS status = STATUS_SUCCESS;
 
+    auto allocMem = [this]( auto& result, uint32_t size = 0x1000, DWORD prot = PAGE_EXECUTE_READWRITE ) -> NTSTATUS
+    {
+        if (!result.valid())
+        {
+            auto mem = _memory.Allocate( size, prot );
+            if (!mem)
+                return mem.status;
+                
+            result = std::move( *mem );
+        }
+
+        return STATUS_SUCCESS;
+    };
+
     //
     // Allocate environment codecave
     //
-    if (!_workerCode.valid())
-    {
-        auto mem = _memory.Allocate( 0x1000 );
-        if (!mem)
-            return mem.status;
-
-        _workerCode = std::move( mem.result() );
-    }
-
-    if (!_userData.valid())
-    {
-        auto mem = _memory.Allocate( 0x4000, PAGE_READWRITE );
-        if (!mem)
-            return mem.status;
-
-        _userData = std::move( mem.result() );
-    }
-
-    if (!_userCode.valid())
-    {
-        auto mem = _memory.Allocate( 0x1000 );
-        if (!mem)
-            return mem.status;
-
-        _userCode = std::move( mem.result() );
-    }
+    if (!NT_SUCCESS( status = allocMem( _workerCode ) ))
+        return status;
+    if (!NT_SUCCESS( status = allocMem( _userCode ) ))
+        return status;
+    if (!NT_SUCCESS( status = allocMem( _userData, 0x4000, PAGE_READWRITE ) ))
+        return status;
 
     // Create RPC thread
     if (mode == Worker_CreateNew)

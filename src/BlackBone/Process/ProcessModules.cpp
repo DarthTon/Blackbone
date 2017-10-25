@@ -349,9 +349,9 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, 
 /// <param name="modName">Module name to search in</param>
 /// <param name="name_ord">Function name or ordinal</param>
 /// <returns>Export info. If failed procAddress field is 0</returns>
-call_result_t<exportData> ProcessModules::GetExport( const std::wstring_view& modName, const char* name_ord )
+call_result_t<exportData> ProcessModules::GetExport( const std::wstring& modName, const char* name_ord )
 {
-    return GetExport( GetModule( modName.data() ), name_ord );
+    return GetExport( GetModule( modName ), name_ord );
 }
 
 /// <summary>
