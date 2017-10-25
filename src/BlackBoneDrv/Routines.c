@@ -133,8 +133,17 @@ NTSTATUS BBSetProtection( IN PSET_PROC_PROTECTION pProtection )
                 // Dynamic code
                 if (pProtection->dynamicCode != Policy_Keep && dynData.EProcessFlags2 != 0)
                 {
-                    PEPROCESS_FLAGS2 pFlags2 = (PEPROCESS_FLAGS2)((PUCHAR)pProcess + dynData.EProcessFlags2);
-                    pFlags2->DisableDynamicCode = pProtection->dynamicCode;
+                    if (dynData.ver >= WINVER_10_FC)
+                    {
+                        PMITIGATION_FLAGS pFlags2 = (PMITIGATION_FLAGS)((PUCHAR)pProcess + dynData.EProcessFlags2);
+                        pFlags2->DisableDynamicCode = pProtection->dynamicCode;
+                    }
+                    else
+                    {
+                        PEPROCESS_FLAGS2 pFlags2 = (PEPROCESS_FLAGS2)((PUCHAR)pProcess + dynData.EProcessFlags2);
+                        pFlags2->DisableDynamicCode = pProtection->dynamicCode;
+                    }
+
                 }
                 
                 // Binary signature

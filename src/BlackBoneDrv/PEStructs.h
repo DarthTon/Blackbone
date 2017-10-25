@@ -512,4 +512,40 @@ typedef struct _IMAGE_TLS_DIRECTORY32 {
 } IMAGE_TLS_DIRECTORY32;
 typedef IMAGE_TLS_DIRECTORY32 * PIMAGE_TLS_DIRECTORY32;
 
+
+#define ACTCTX_FLAG_PROCESSOR_ARCHITECTURE_VALID    (0x00000001)
+#define ACTCTX_FLAG_LANGID_VALID                    (0x00000002)
+#define ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID        (0x00000004)
+#define ACTCTX_FLAG_RESOURCE_NAME_VALID             (0x00000008)
+#define ACTCTX_FLAG_SET_PROCESS_DEFAULT             (0x00000010)
+#define ACTCTX_FLAG_APPLICATION_NAME_VALID          (0x00000020)
+#define ACTCTX_FLAG_SOURCE_IS_ASSEMBLYREF           (0x00000040)
+#define ACTCTX_FLAG_HMODULE_VALID                   (0x00000080)
+
+typedef struct tagACTCTXW
+{
+    ULONG  cbSize;
+    ULONG  dwFlags;
+    PWCH   lpSource;
+    USHORT wProcessorArchitecture;
+    USHORT wLangId;
+    PWCH   lpAssemblyDirectory;
+    PWCH   lpResourceName;
+    PWCH   lpApplicationName;
+    PVOID  hModule;
+} ACTCTXW, *PACTCTXW;
+
+typedef struct tagACTCTXW32
+{
+    ULONG  cbSize;
+    ULONG  dwFlags;
+    ULONG  lpSource;
+    USHORT wProcessorArchitecture;
+    USHORT wLangId;
+    ULONG  lpAssemblyDirectory;
+    ULONG  lpResourceName;
+    ULONG  lpApplicationName;
+    ULONG  hModule;
+} ACTCTXW32, *PACTCTXW32;
+
 #pragma warning (default : 4201)

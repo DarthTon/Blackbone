@@ -84,6 +84,40 @@ typedef struct _EPROCESS_FLAGS2
     unsigned int DisallowWin32kSystemCalls : 1;
 } EPROCESS_FLAGS2, *PEPROCESS_FLAGS2;
 
+typedef struct _MITIGATION_FLAGS
+{
+    unsigned int ControlFlowGuardEnabled : 1;
+    unsigned int ControlFlowGuardExportSuppressionEnabled : 1;
+    unsigned int ControlFlowGuardStrict : 1;
+    unsigned int DisallowStrippedImages : 1;
+    unsigned int ForceRelocateImages : 1;
+    unsigned int HighEntropyASLREnabled : 1;
+    unsigned int StackRandomizationDisabled : 1;
+    unsigned int ExtensionPointDisable : 1;
+    unsigned int DisableDynamicCode : 1;
+    unsigned int DisableDynamicCodeAllowOptOut : 1;
+    unsigned int DisableDynamicCodeAllowRemoteDowngrade : 1;
+    unsigned int AuditDisableDynamicCode : 1;
+    unsigned int DisallowWin32kSystemCalls : 1;
+    unsigned int AuditDisallowWin32kSystemCalls : 1;
+    unsigned int EnableFilteredWin32kAPIs : 1;
+    unsigned int AuditFilteredWin32kAPIs : 1;
+    unsigned int DisableNonSystemFonts : 1;
+    unsigned int AuditNonSystemFontLoading : 1;
+    unsigned int PreferSystem32Images : 1;
+    unsigned int ProhibitRemoteImageMap : 1;
+    unsigned int AuditProhibitRemoteImageMap : 1;
+    unsigned int ProhibitLowILImageMap : 1;
+    unsigned int AuditProhibitLowILImageMap : 1;
+    unsigned int SignatureMitigationOptIn : 1;
+    unsigned int AuditBlockNonMicrosoftBinaries : 1;
+    unsigned int AuditBlockNonMicrosoftBinariesAllowStore : 1;
+    unsigned int LoaderIntegrityContinuityEnabled : 1;
+    unsigned int AuditLoaderIntegrityContinuity : 1;
+    unsigned int EnableModuleTamperingProtection : 1;
+    unsigned int EnableModuleTamperingProtectionNoInherit : 1;
+} MITIGATION_FLAGS, *PMITIGATION_FLAGS;
+
 typedef union _EXHANDLE
 {
     struct
@@ -502,7 +536,6 @@ typedef union _WOW64_APC_CONTEXT
 
 } WOW64_APC_CONTEXT, *PWOW64_APC_CONTEXT;
 
-
 typedef struct _NON_PAGED_DEBUG_INFO
 {
     USHORT      Signature;
@@ -538,39 +571,3 @@ typedef struct _KLDR_DATA_TABLE_ENTRY
     PVOID LoadedImports;
     PVOID PatchInformation;
 } KLDR_DATA_TABLE_ENTRY, *PKLDR_DATA_TABLE_ENTRY;
-
-
-#define ACTCTX_FLAG_PROCESSOR_ARCHITECTURE_VALID    (0x00000001)
-#define ACTCTX_FLAG_LANGID_VALID                    (0x00000002)
-#define ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID        (0x00000004)
-#define ACTCTX_FLAG_RESOURCE_NAME_VALID             (0x00000008)
-#define ACTCTX_FLAG_SET_PROCESS_DEFAULT             (0x00000010)
-#define ACTCTX_FLAG_APPLICATION_NAME_VALID          (0x00000020)
-#define ACTCTX_FLAG_SOURCE_IS_ASSEMBLYREF           (0x00000040)
-#define ACTCTX_FLAG_HMODULE_VALID                   (0x00000080)
-
-typedef struct tagACTCTXW 
-{
-    ULONG  cbSize;
-    ULONG  dwFlags;
-    PWCH   lpSource;
-    USHORT wProcessorArchitecture;
-    USHORT wLangId;
-    PWCH   lpAssemblyDirectory;
-    PWCH   lpResourceName;
-    PWCH   lpApplicationName;
-    PVOID  hModule;
-} ACTCTXW, *PACTCTXW;
-
-typedef struct tagACTCTXW32
-{
-    ULONG  cbSize;
-    ULONG  dwFlags;
-    ULONG  lpSource;
-    USHORT wProcessorArchitecture;
-    USHORT wLangId;
-    ULONG  lpAssemblyDirectory;
-    ULONG  lpResourceName;
-    ULONG  lpApplicationName;
-    ULONG  hModule;
-} ACTCTXW32, *PACTCTXW32;

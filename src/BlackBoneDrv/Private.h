@@ -143,6 +143,7 @@ typedef enum _WinVer
     WINVER_10    = 0x0A00,
     WINVER_10_AU = 0x0A01,
     WINVER_10_CU = 0x0A02,
+    WINVER_10_FC = 0x0A03,
 } WinVer;
 
 extern PLIST_ENTRY PsLoadedModuleList;

@@ -261,7 +261,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
     #elif defined (_WIN10_)
-        if (ver_short != WINVER_10 && ver_short != WINVER_10_AU && ver_short != WINVER_10_CU)
+        if (ver_short < WINVER_10 || WINVER_10_FC < ver_short)
             return STATUS_NOT_SUPPORTED;
     #endif
 
@@ -332,7 +332,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->ExRemoveTable -= 0x5E;
                 break;
 
-                // Windows 10, build 15063/14393/10586
+                // Windows 10, build 16299/15063/14393/10586
             case WINVER_10:
                 if (verInfo.dwBuildNumber == 10586)
                 {
@@ -346,7 +346,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->PrevMode         = 0x232;
                     pData->ExitStatus       = 0x6E0;
                     pData->MiAllocPage      = 0;
-                    if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable)))
+                    if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable ) ))
                         pData->ExRemoveTable -= 0x5C;
                     break;
                 }
@@ -363,7 +363,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->PrevMode         = 0x232;
                     pData->ExitStatus       = 0x6F0;
                     pData->MiAllocPage      = 0;
-                    if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable)))
+                    if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable ) ))
                         pData->ExRemoveTable -= 0x60;
 
                     status = BBLocatePageTables( pData );
@@ -382,7 +382,26 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->PrevMode         = 0x232;
                     pData->ExitStatus       = 0x6F8;
                     pData->MiAllocPage      = 0;
-                    if (NT_SUCCESS(BBScanSection("PAGE", (PCUCHAR)"\x48\x8B\x47\x20\x48\x83\xC7\x18", 0xCC, 8, (PVOID)&pData->ExRemoveTable)))
+                    if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x8B\x47\x20\x48\x83\xC7\x18", 0xCC, 8, (PVOID)&pData->ExRemoveTable ) ))
+                        pData->ExRemoveTable -= 0x34;
+
+                    status = BBLocatePageTables( pData );
+                    break;
+                }
+                else if (verInfo.dwBuildNumber == 16299)
+                {
+                    pData->ver              = WINVER_10_FC;
+                    pData->KExecOpt         = 0x1BF;
+                    pData->Protection       = 0x6CA;
+                    pData->EProcessFlags2   = 0x828;    // MitigationFlags offset
+                    pData->ObjTable         = 0x418;
+                    pData->VadRoot          = 0x628;
+                    pData->NtCreateThdIndex = 0xBA;
+                    pData->NtTermThdIndex   = 0x53;
+                    pData->PrevMode         = 0x232;
+                    pData->ExitStatus       = 0x700;
+                    pData->MiAllocPage      = 0;
+                    if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x83\xC7\x18\x48\x8B\x17", 0xCC, 7, (PVOID)&pData->ExRemoveTable ) ))
                         pData->ExRemoveTable -= 0x34;
 
                     status = BBLocatePageTables( pData );
@@ -423,7 +442,13 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
     if (pMmGetPhysicalAddress)
     {
         PUCHAR pMiGetPhysicalAddress = *(PLONG)(pMmGetPhysicalAddress + 0xE + 1) + pMmGetPhysicalAddress + 0xE + 5;
-        if (pData->ver >= WINVER_10_CU)
+
+        if (pData->ver >= WINVER_10_FC)
+        {
+            pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x41 + 2);
+            pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x4E + 2);
+        }
+        else if (pData->ver >= WINVER_10_CU)
         {
             pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x43 + 2);
             pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x50 + 2);
