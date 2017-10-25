@@ -44,7 +44,6 @@
   </PropertyGroup>
   <PropertyGroup Label="Globals">
     <ProjectName>BlackBoneDrv</ProjectName>
-    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <PropertyGroup Label="PropertySheets">
     <ConfigurationType>Driver</ConfigurationType>
