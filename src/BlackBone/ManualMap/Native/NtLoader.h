@@ -71,8 +71,9 @@ public:
     /// Unlink module from Ntdll loader
     /// </summary>
     /// <param name="mod">Module data</param>
+    /// <param name="noThread">Don't create new threads during unlink</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool Unlink( const ModuleData& mod );    
+    BLACKBONE_API bool Unlink( const ModuleData& mod, bool noThread = false );
 private:
 
     /// <summary>
@@ -205,9 +206,10 @@ private:
     /// </summary>
     /// <param name="mod">Module data</param>
     /// <param name="ldrEntry">Module LDR entry</param>
+    /// <param name="noThread">Don't create new threads during unlink</param>
     /// <returns>Address of removed record</returns>
     template<typename T>
-    ptr_t UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry );
+    ptr_t UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry, bool noThread = false );
 
     NtLdr( const NtLdr& ) = delete;
     NtLdr& operator =(const NtLdr&) = delete;

@@ -829,8 +829,9 @@ bool NtLdr::FindLdrHeap()
 /// Unlink module from Ntdll loader
 /// </summary>
 /// <param name="mod">Module data</param>
+/// <param name="noThread">Don't create new threads during unlink</param>
 /// <returns>true on success</returns>
-bool NtLdr::Unlink( const ModuleData& mod )
+bool NtLdr::Unlink( const ModuleData& mod, bool noThread /*= false*/ )
 {
     ptr_t ldrEntry = 0;
     auto x64Image = mod.type == mt_mod64;
@@ -845,7 +846,7 @@ bool NtLdr::Unlink( const ModuleData& mod )
     // Unlink from graph
     // TODO: Unlink from _LdrpMappingInfoIndex. Still can't decide if it is required.
     if (IsWindows8OrGreater())
-        ldrEntry = CALL_64_86( x64Image, UnlinkTreeNode, mod, ldrEntry );
+        ldrEntry = CALL_64_86( x64Image, UnlinkTreeNode, mod, ldrEntry, noThread );
 
     return ldrEntry != 0;
 }
@@ -935,9 +936,10 @@ void NtLdr::UnlinkListEntry( ptr_t pListLink )
 /// </summary>
 /// <param name="mod">Module data</param>
 /// <param name="ldrEntry">Module LDR entry</param>
+/// <param name="noThread">Don't create new threads during unlink</param>
 /// <returns>Address of removed record</returns>
 template<typename T>
-ptr_t NtLdr::UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry )
+ptr_t NtLdr::UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry, bool noThread /*= false*/ )
 {
     if (ldrEntry == 0)
         return ldrEntry;
@@ -950,7 +952,7 @@ ptr_t NtLdr::UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry )
         return 0;
 
     a->GenPrologue();
-    a->GenCall( static_cast<uintptr_t>(RtlRbRemoveNode->procAddress),
+    a->GenCall( RtlRbRemoveNode->procAddress,
     {
         _LdrpModuleIndexBase,
         ldrEntry + offsetOf( &_LDR_DATA_TABLE_ENTRY_W8<T>::BaseAddressIndexNode )
@@ -959,7 +961,7 @@ ptr_t NtLdr::UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry )
     _process.remote().AddReturnWithEvent( *a );
     a->GenEpilogue();
 
-    _process.remote().CreateRPCEnvironment( Worker_CreateNew, true );
+    _process.remote().CreateRPCEnvironment( noThread ? Worker_UseExisting : Worker_CreateNew, true );
     _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
 
     return ldrEntry;
