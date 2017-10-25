@@ -119,7 +119,7 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
     assert( _workerThread );
     assert( _hWaitEvent != NULL );
     if (!_workerThread || !_hWaitEvent)
-        return STATUS_INVALID_THREAD;
+        return STATUS_INVALID_PARAMETER;
 
     // Write code
     if (!NT_SUCCESS( status = CopyCode( pCode, size ) ))
