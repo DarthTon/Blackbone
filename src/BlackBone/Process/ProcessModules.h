@@ -127,6 +127,14 @@ public:
     );
 
     /// <summary>
+    /// Get export address. Forwarded exports will be automatically resolved if forward module is present
+    /// </summary>
+    /// <param name="modName">Module name to search in</param>
+    /// <param name="name_ord">Function name or ordinal</param>
+    /// <returns>Export info. If failed procAddress field is 0</returns>
+    BLACKBONE_API call_result_t<exportData> GetExport( const std::wstring_view& modName, const char* name_ord );
+
+    /// <summary>
     /// Get export from ntdll
     /// </summary>
     /// <param name="name_ord">Function name or ordinal</param>

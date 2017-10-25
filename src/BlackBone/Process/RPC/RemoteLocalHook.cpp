@@ -48,7 +48,7 @@ NTSTATUS RemoteLocalHook::SetHook32( ptr_t address, asmjit::Assembler& hook )
     auto& mem = _process.memory();
 
     if (!CopyOldCode( address, false ))
-        return STATUS_UNSUCCESSFUL;
+        return STATUS_PARTIAL_COPY;
 
     _ctx.hook32.codeSize = 5;
     _ctx.hook32.jmp.opcode = 0xE9;

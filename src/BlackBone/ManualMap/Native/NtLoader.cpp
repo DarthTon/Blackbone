@@ -669,7 +669,7 @@ call_result_t<ptr_t> NtLdr::AllocateInHeap( eModType mt, size_t size )
         return mem->ptr();
     }
 
-    return STATUS_UNSUCCESSFUL;
+    return STATUS_ILLEGAL_FUNCTION;
 }
 
 /// <summary>

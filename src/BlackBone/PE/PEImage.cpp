@@ -495,7 +495,7 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
 
         GetTempPathW( ARRAYSIZE( tempDir ), tempDir );
         if (GetTempFileNameW( tempDir, L"ImageManifest", 0, tempPath ) == 0)
-            return STATUS_UNSUCCESSFUL;
+            return STATUS_SXS_CANT_GEN_ACTCTX;
      
         auto hTmpFile = FileHandle( CreateFileW( tempPath, FILE_GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, 0, NULL ) );
         if (hTmpFile != INVALID_HANDLE_VALUE)

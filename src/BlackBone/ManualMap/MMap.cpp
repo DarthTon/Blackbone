@@ -996,7 +996,7 @@ NTSTATUS MMap::EnableExceptions( ImageContextPtr pImage )
         }
     }
     else if (!success)
-        return STATUS_UNSUCCESSFUL;
+        return STATUS_INVALID_EXCEPTION_HANDLER;
 
     // Custom handler not required
     if (pImage->ldrEntry.safeSEH || (pImage->ldrEntry.type == mt_mod64 && (pImage->flags & CreateLdrRef || success)))

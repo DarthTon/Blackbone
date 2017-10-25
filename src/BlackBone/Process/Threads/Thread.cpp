@@ -101,7 +101,7 @@ bool Thread::Suspended()
 /// <returns>Status code</returns>
 NTSTATUS Thread::GetContext( _CONTEXT32& ctx, DWORD flags /*= CONTEXT_ALL*/, bool dontSuspend /*= false*/ )
 {
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    NTSTATUS status = STATUS_INVALID_THREAD;
 
     memset( &ctx, 0x00, sizeof( ctx ) );
     ctx.ContextFlags = flags;
@@ -125,7 +125,7 @@ NTSTATUS Thread::GetContext( _CONTEXT32& ctx, DWORD flags /*= CONTEXT_ALL*/, boo
 /// <returns>Status code</returns>
 NTSTATUS Thread::GetContext( _CONTEXT64& ctx, DWORD flags /*= CONTEXT64_ALL*/, bool dontSuspend /*= false*/ )
 {
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    NTSTATUS status = STATUS_INVALID_THREAD;
 
     memset( &ctx, 0x00, sizeof(ctx) );
     ctx.ContextFlags = flags;
@@ -148,7 +148,7 @@ NTSTATUS Thread::GetContext( _CONTEXT64& ctx, DWORD flags /*= CONTEXT64_ALL*/, b
 /// <returns>Status code</returns>
 NTSTATUS Thread::SetContext( _CONTEXT32& ctx, bool dontSuspend /*= false */ )
 {
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    NTSTATUS status = STATUS_INVALID_THREAD;
     if (dontSuspend || Suspend())
     {
         status = _core->native()->SetThreadContextT( _handle, ctx );
@@ -167,7 +167,7 @@ NTSTATUS Thread::SetContext( _CONTEXT32& ctx, bool dontSuspend /*= false */ )
 /// <returns>Status code</returns>
 NTSTATUS Thread::SetContext( _CONTEXT64& ctx, bool dontSuspend /*= false*/ )
 {
-    NTSTATUS status = STATUS_UNSUCCESSFUL;
+    NTSTATUS status = STATUS_INVALID_THREAD;
     if(dontSuspend || Suspend())
     {
         status = _core->native()->SetThreadContextT( _handle, ctx );

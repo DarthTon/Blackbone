@@ -144,7 +144,7 @@ ThreadPtr ProcessThreads::getMostExecuted()
             continue;
 
         uint64_t time = thread->execTime();
-        if (thread->id() != GetCurrentThreadId() /*&& !thread->Suspended()*/ && time > maxtime)
+        if (thread->id() != GetCurrentThreadId() /*&& !thread->Suspended()*/ && time >= maxtime)
         {
             maxtime = time;
             result = thread;
