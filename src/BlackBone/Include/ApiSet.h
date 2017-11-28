@@ -1,7 +1,6 @@
 #pragma once
 
 #include "Winheaders.h"
-#include <stdio.h>
 
 //
 // Api schema structures

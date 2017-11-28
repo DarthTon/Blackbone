@@ -68,6 +68,11 @@ struct AsmVariant
         {
             set( imm, argSize, reinterpret_cast<uint64_t>(arg) );
         }
+        // dirty hack to threat HWND as a simple pointer
+        else if constexpr(std::is_same_v<RAW_T, HWND>)
+        {
+            set( imm, argSize, reinterpret_cast<uint64_t>(arg) );
+        }
         // Function pointer
         else if constexpr(std::is_function_v<cleanup_t<RAW_T>>)
         {

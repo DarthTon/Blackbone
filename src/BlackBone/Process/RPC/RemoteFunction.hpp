@@ -19,7 +19,15 @@ public:
     struct CallArguments
     {
         CallArguments( const Args&... args )
-            : arguments( { AsmVariant( args )... } ) { }
+            : arguments{ AsmVariant( args )... }
+        { 
+        }
+
+        template<size_t... S>
+        CallArguments( const std::tuple<Args...>& args, std::index_sequence<S...> )
+            : arguments{ std::get<S>( args )... }
+        {
+        }
 
         // Manually set argument to custom value
         void set( int pos, const AsmVariant& newVal )
@@ -124,6 +132,12 @@ public: \
     call_result_t<ReturnType> Call( const Args&... args, ThreadPtr contextThread = nullptr ) \
     { \
         CallArguments a( args... ); \
+        return RemoteFunctionBase::Call( a, contextThread ); \
+    } \
+\
+    call_result_t<ReturnType> Call( const std::tuple<Args...>& args, ThreadPtr contextThread = nullptr ) \
+    { \
+        CallArguments a( args, std::index_sequence_for<Args...>() ); \
         return RemoteFunctionBase::Call( a, contextThread ); \
     } \
 \
