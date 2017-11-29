@@ -9,6 +9,10 @@
 #include <random>
 #include <VersionHelpers.h>
 
+#ifndef STATUS_INVALID_EXCEPTION_HANDLER
+#define STATUS_INVALID_EXCEPTION_HANDLER ((NTSTATUS)0xC00001A5L)
+#endif
+
 namespace blackbone
 {
 
