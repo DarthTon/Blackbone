@@ -8525,7 +8525,7 @@ namespace Catch {
     Section::~Section() {
         if( m_sectionIncluded ) {
             SectionEndInfo endInfo( m_info, m_assertions, m_timer.getElapsedSeconds() );
-            if( std::uncaught_exception() )
+            if( std::uncaught_exceptions() )
                 getResultCapture().sectionEndedEarly( endInfo );
             else
                 getResultCapture().sectionEnded( endInfo );

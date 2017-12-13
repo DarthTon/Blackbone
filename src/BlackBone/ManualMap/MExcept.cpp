@@ -2,7 +2,7 @@
 #include "../Process/Process.h"
 #include "../Include/Macro.h"
 #include "../Misc/Trace.hpp"
-#include "../Misc/PatternLoader.h"
+#include "../Symbols/SymbolData.h"
 #include "../Asm/LDasm.h"
 
 namespace blackbone
@@ -284,11 +284,9 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
         if (!pDecode)
             return pDecode.status;
 
-        auto& data = g_PatternLoader->data();
-
-        replaceStub( newHandler, handlerSize, 0xDEADDA7A, static_cast<uint32_t>(data.LdrpInvertedFunctionTable32) );
+        replaceStub( newHandler, handlerSize, 0xDEADDA7A, static_cast<uint32_t>(g_symbols.LdrpInvertedFunctionTable32) );
         replaceStub( newHandler, handlerSize, 0xDEADC0DE, static_cast<uint32_t>(pDecode->procAddress) );
-        replaceStub( newHandler, handlerSize, 0xDEADC0D2, static_cast<uint32_t>(data.LdrProtectMrdata) );
+        replaceStub( newHandler, handlerSize, 0xDEADC0D2, static_cast<uint32_t>(g_symbols.LdrProtectMrdata) );
     }
 
     // Write handler data into target process

@@ -18,7 +18,7 @@ public:
     BLACKBONE_API PatternSearch( const char* pattern, size_t len = 0 );
     BLACKBONE_API PatternSearch( const uint8_t* pattern, size_t len = 0 );
 
-    BLACKBONE_API ~PatternSearch();
+    BLACKBONE_API ~PatternSearch() = default;
 
     /// <summary>
     /// Default pattern matching with wildcards.
@@ -30,7 +30,13 @@ public:
     /// <param name="out">Found results</param>
     /// <param name="value_offset">Value that will be added to resulting addresses</param>
     /// <returns>Number of found addresses</returns>
-    BLACKBONE_API size_t Search( uint8_t wildcard, void* scanStart, size_t scanSize, std::vector<ptr_t>& out, ptr_t value_offset = 0 );
+    BLACKBONE_API size_t Search( 
+        uint8_t wildcard, 
+        void* scanStart, 
+        size_t scanSize, 
+        std::vector<ptr_t>& out, 
+        ptr_t value_offset = 0 
+        ) const;
 
     /// <summary>
     /// Full pattern match, no wildcards.
@@ -41,7 +47,12 @@ public:
     /// <param name="out">Found results</param>
     /// <param name="value_offset">Value that will be added to resulting addresses</param>
     /// <returns>Number of found addresses</returns>
-    BLACKBONE_API size_t Search( void* scanStart, size_t scanSize, std::vector<ptr_t>& out, ptr_t value_offset = 0 );
+    BLACKBONE_API size_t Search( 
+        void* scanStart, 
+        size_t scanSize, 
+        std::vector<ptr_t>& out, 
+        ptr_t value_offset = 0 
+        ) const;
 
     /// <summary>
     /// Search pattern in remote process
@@ -52,7 +63,13 @@ public:
     /// <param name="scanSize">Size of region to scan</param>
     /// <param name="out">Found results</param>
     /// <returns>Number of found addresses</returns>
-    BLACKBONE_API size_t SearchRemote( class Process& remote, uint8_t wildcard, ptr_t scanStart, size_t scanSize, std::vector<ptr_t>& out );
+    BLACKBONE_API size_t SearchRemote( 
+        class Process& remote, 
+        uint8_t wildcard, 
+        ptr_t scanStart,
+        size_t scanSize, 
+        std::vector<ptr_t>& out 
+        ) const;
 
     /// <summary>
     /// Search pattern in remote process
@@ -62,7 +79,12 @@ public:
     /// <param name="scanSize">Size of region to scan</param>
     /// <param name="out">Found results</param>
     /// <returns>Number of found addresses</returns>
-    BLACKBONE_API size_t SearchRemote( class Process& remote, ptr_t scanStart, size_t scanSize, std::vector<ptr_t>& out );
+    BLACKBONE_API size_t SearchRemote( 
+        class Process& remote, 
+        ptr_t scanStart, 
+        size_t scanSize, 
+        std::vector<ptr_t>& out 
+        ) const;
 
     /// <summary>
     /// Search pattern in whole address space of remote process
@@ -72,7 +94,12 @@ public:
     /// <param name="wildcard">Pattern wildcard</param>
     /// <param name="out">Found results</param>
     /// <returns>Number of found addresses</returns>
-    BLACKBONE_API size_t SearchRemoteWhole( class Process& remote, bool useWildcard, uint8_t wildcard, std::vector<ptr_t>& out );
+    BLACKBONE_API size_t SearchRemoteWhole( 
+        class Process& remote, 
+        bool useWildcard, 
+        uint8_t wildcard, 
+        std::vector<ptr_t>& out 
+        ) const;
 
 private:
     std::vector<uint8_t> _pattern;      // Pattern to search

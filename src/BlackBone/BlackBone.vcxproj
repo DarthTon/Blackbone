@@ -180,7 +180,6 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
     <EnableCppCoreCheck>true</EnableCppCoreCheck>
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Team Tools\Static Analysis Tools\Rule Sets\NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>false</RunCodeAnalysis>
@@ -189,19 +188,16 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
     <EnableCppCoreCheck>true</EnableCppCoreCheck>
     <CodeAnalysisRuleSet>C:\Program Files (x86)\Microsoft Visual Studio\2017\Community\Team Tools\Static Analysis Tools\Rule Sets\NativeRecommendedRules.ruleset</CodeAnalysisRuleSet>
     <RunCodeAnalysis>false</RunCodeAnalysis>
@@ -210,50 +206,42 @@
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|x64'">
     <LinkIncremental>true</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
     <LibraryPath>$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release(XP)|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release(DLL)|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release(XP)|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release(DLL)|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>$(SolutionDir)build\$(Platform)\$(Configuration)\</OutDir>
     <IntDir>$(ProjectDir)\$(Platform)\$(Configuration)\</IntDir>
-    <IncludePath>$(ProjectDir)..\..\contrib;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -270,6 +258,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -278,6 +267,14 @@
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <Lib>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|Win32'">
     <ClCompile>
@@ -293,6 +290,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -301,6 +299,14 @@
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <Lib>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|Win32'">
     <ClCompile>
@@ -316,17 +322,23 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(ProjectDir)..\..\contrib\BeaEngine\Win32\Dll\BeaEngineCheetah.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;$(ProjectDir)..\..\contrib\BeaEngine\Win32\Dll\BeaEngineCheetah.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -342,6 +354,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -350,6 +363,14 @@
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <Lib>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|x64'">
     <ClCompile>
@@ -363,6 +384,7 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -371,6 +393,14 @@
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <Lib>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|x64'">
     <ClCompile>
@@ -384,15 +414,21 @@
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>$(ProjectDir)..\..\contrib\BeaEngine\Win64\Dll\BeaEngineCheetah64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;$(ProjectDir)..\..\contrib\BeaEngine\Win64\Dll\BeaEngineCheetah64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -412,6 +448,7 @@
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -422,6 +459,14 @@
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <Lib>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(XP)|Win32'">
     <ClCompile>
@@ -441,6 +486,7 @@
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -451,6 +497,14 @@
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <Lib>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(DLL)|Win32'">
     <ClCompile>
@@ -470,20 +524,26 @@
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>$(ProjectDir)..\..\contrib\BeaEngine\Win32\Dll\BeaEngineCheetah.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;$(ProjectDir)..\..\contrib\BeaEngine\Win32\Dll\BeaEngineCheetah.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ShowProgress>NotSet</ShowProgress>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -499,6 +559,7 @@
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -509,6 +570,14 @@
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <Lib>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(XP)|x64'">
     <ClCompile>
@@ -524,6 +593,7 @@
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -534,6 +604,14 @@
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <Lib>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Lib>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(DLL)|x64'">
     <ClCompile>
@@ -549,17 +627,23 @@
       <DisableSpecificWarnings>4100</DisableSpecificWarnings>
       <LanguageStandard>stdcpplatest</LanguageStandard>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalIncludeDirectories>$(VsInstallDir)DIA SDK\include;$(ProjectDir)..\..\contrib;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>$(ProjectDir)..\..\contrib\BeaEngine\Win64\Dll\BeaEngineCheetah64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>diaguids.lib;Ole32.lib;$(ProjectDir)..\..\contrib\BeaEngine\Win64\Dll\BeaEngineCheetah64.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VsInstallDir)DIA SDK\lib\amd64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ProjectReference>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
+    <PostBuildEvent>
+      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\contrib\AsmJit\base\assembler.cpp" />
@@ -621,7 +705,6 @@
     <ClCompile Include="ManualMap\Native\NtLoader.cpp" />
     <ClCompile Include="Misc\InitOnce.cpp" />
     <ClCompile Include="Misc\NameResolve.cpp" />
-    <ClCompile Include="Misc\PatternLoader.cpp" />
     <ClCompile Include="Misc\Utils.cpp" />
     <ClCompile Include="Patterns\PatternSearch.cpp" />
     <ClCompile Include="PE\ImageNET.cpp" />
@@ -650,6 +733,9 @@
     <ClCompile Include="Subsystem\NativeSubsystem.cpp" />
     <ClCompile Include="Subsystem\Wow64Subsystem.cpp" />
     <ClCompile Include="Subsystem\x86Subsystem.cpp" />
+    <ClCompile Include="Symbols\PatternLoader.cpp" />
+    <ClCompile Include="Symbols\PDBHelper.cpp" />
+    <ClCompile Include="Symbols\SymbolLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\contrib\AsmJit\apibegin.h" />
@@ -730,7 +816,6 @@
     <ClInclude Include="Misc\DynImport.h" />
     <ClInclude Include="Misc\InitOnce.h" />
     <ClInclude Include="Misc\NameResolve.h" />
-    <ClInclude Include="Misc\PatternLoader.h" />
     <ClInclude Include="Misc\Thunk.hpp" />
     <ClInclude Include="Misc\Trace.hpp" />
     <ClInclude Include="Misc\Utils.h" />
@@ -754,6 +839,10 @@
     <ClInclude Include="Subsystem\NativeSubsystem.h" />
     <ClInclude Include="Subsystem\Wow64Subsystem.h" />
     <ClInclude Include="Subsystem\x86Subsystem.h" />
+    <ClInclude Include="Symbols\PatternLoader.h" />
+    <ClInclude Include="Symbols\PDBHelper.h" />
+    <ClInclude Include="Symbols\SymbolLoader.h" />
+    <ClInclude Include="Symbols\SymbolData.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -5,7 +5,7 @@
 #include "../../../contrib/VersionHelpers.h"
 
 #include "DynImport.h"
-#include "PatternLoader.h"
+#include "../Symbols/SymbolLoader.h"
 #include "NameResolve.h"
 
 #include <string>
@@ -33,8 +33,8 @@ public:
             GrantPriviledge( L"SeLoadDriverPrivilege" );
             LoadFuncs();
 
-            g_PatternLoader = std::make_unique<PatternLoader>();
-            g_PatternLoader->DoSearch();
+            SymbolLoader sl;
+            sl.Load( g_symbols );
 
             NameResolve::Instance().Initialize();
         }
@@ -120,8 +120,6 @@ public:
 private:
     static volatile long _done;
 };
-
-std::unique_ptr<PatternLoader> g_PatternLoader;
 
 /// <summary>
 /// Exported InitOnce wrapper

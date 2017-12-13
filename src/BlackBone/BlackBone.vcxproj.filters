@@ -46,6 +46,9 @@
     <Filter Include="Subsystem">
       <UniqueIdentifier>{7eb59189-daeb-47d1-9fa8-c9e246b22039}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Symbols">
+      <UniqueIdentifier>{e666a795-e3de-4277-9223-b220c8d109ed}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Subsystem\NativeSubsystem.cpp">
@@ -192,10 +195,16 @@
     <ClCompile Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.cpp">
       <Filter>Subsystem</Filter>
     </ClCompile>
-    <ClCompile Include="Misc\PatternLoader.cpp">
-      <Filter>Misc</Filter>
-    </ClCompile>
     <ClCompile Include="DllMain.cpp" />
+    <ClCompile Include="Symbols\SymbolLoader.cpp">
+      <Filter>Symbols</Filter>
+    </ClCompile>
+    <ClCompile Include="Symbols\PatternLoader.cpp">
+      <Filter>Symbols</Filter>
+    </ClCompile>
+    <ClCompile Include="Symbols\PDBHelper.cpp">
+      <Filter>Symbols</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
@@ -454,11 +463,20 @@
     <ClInclude Include="Include\NativeEnums.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="Misc\PatternLoader.h">
-      <Filter>Misc</Filter>
-    </ClInclude>
     <ClInclude Include="Include\HandleGuard.h">
       <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Symbols\SymbolData.h">
+      <Filter>Symbols</Filter>
+    </ClInclude>
+    <ClInclude Include="Symbols\SymbolLoader.h">
+      <Filter>Symbols</Filter>
+    </ClInclude>
+    <ClInclude Include="Symbols\PatternLoader.h">
+      <Filter>Symbols</Filter>
+    </ClInclude>
+    <ClInclude Include="Symbols\PDBHelper.h">
+      <Filter>Symbols</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

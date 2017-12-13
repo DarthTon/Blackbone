@@ -4,7 +4,7 @@
 #include "../../Misc/Utils.h"
 #include "../../Misc/DynImport.h"
 #include "../../Misc/trace.hpp"
-#include "../../Misc/PatternLoader.h"
+#include "../../Symbols/SymbolData.h"
 
 #include "../contrib/VersionHelpers.h"
 
@@ -163,12 +163,12 @@ NTSTATUS NtLdr::AddStaticTLSEntry( const NtLdrEntry& mod, ptr_t tlsPtr )
     ptr_t LdrpHandleTlsData = 0;
     if (mod.type == mt_mod64)
     {
-        LdrpHandleTlsData = g_PatternLoader->data().LdrpHandleTlsData64;
+        LdrpHandleTlsData = g_symbols.LdrpHandleTlsData64;
         pNode = SetNode<_LDR_DATA_TABLE_ENTRY_BASE64>( pNode, mod.baseAddress );
     }
     else
     {
-        LdrpHandleTlsData = g_PatternLoader->data().LdrpHandleTlsData32;
+        LdrpHandleTlsData = g_symbols.LdrpHandleTlsData32;
         pNode = SetNode<_LDR_DATA_TABLE_ENTRY_BASE32>( pNode, mod.baseAddress );
     }
 
@@ -231,12 +231,12 @@ NTSTATUS NtLdr::AddStaticTLSEntry( const NtLdrEntry& mod, ptr_t tlsPtr )
 /// <returns>true on success</returns>
 bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
 { 
-    ptr_t RtlInsertInvertedFunctionTable = g_PatternLoader->data().RtlInsertInvertedFunctionTable64;
-    ptr_t LdrpInvertedFunctionTable = g_PatternLoader->data().LdrpInvertedFunctionTable64;
+    ptr_t RtlInsertInvertedFunctionTable = g_symbols.RtlInsertInvertedFunctionTable64;
+    ptr_t LdrpInvertedFunctionTable = g_symbols.LdrpInvertedFunctionTable64;
     if (mod.type == mt_mod32)
     {
-        RtlInsertInvertedFunctionTable = g_PatternLoader->data().RtlInsertInvertedFunctionTable32;
-        LdrpInvertedFunctionTable = g_PatternLoader->data().LdrpInvertedFunctionTable32;
+        RtlInsertInvertedFunctionTable = g_symbols.RtlInsertInvertedFunctionTable32;
+        LdrpInvertedFunctionTable = g_symbols.LdrpInvertedFunctionTable32;
     }
 
     // Invalid addresses. Probably pattern scan has failed

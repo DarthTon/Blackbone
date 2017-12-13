@@ -4,7 +4,7 @@
 #include "RPC/RemoteExec.h"
 #include "../Misc/NameResolve.h"
 #include "../Misc/Utils.h"
-#include "../Misc/PatternLoader.h"
+#include "../Symbols/SymbolData.h"
 #include "../Asm/AsmFactory.h"
 
 #include <memory>
@@ -445,7 +445,7 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, T
     if (switchMode == ForceSwitch && !_ldrPatched && IsWindows7OrGreater() && !IsWindows8OrGreater())
     {
         uint8_t patch[] = { 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-        auto patchBase = g_PatternLoader->data().LdrKernel32PatchAddress;
+        auto patchBase = g_symbols.LdrKernel32PatchAddress;
 
         if (patchBase != 0)
         {

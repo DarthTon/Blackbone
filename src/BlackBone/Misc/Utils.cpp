@@ -136,11 +136,14 @@ std::wstring Utils::GetExeDirectory()
 /// </summary>
 /// <param name="length">Desired length. 0 - random length from 5 to 15</param>
 /// <returns>Generated string</returns>
+
+// VS 15.5 update crashes on "alphabet[dist( rd )]" in x64 release build
+#pragma optimize("", off)
 std::wstring Utils::RandomANString( int length /*= 0*/ )
 {
-    static const wchar_t alphabet[] = L"ABCDEFGHIJKLMNOPQRSTUVWXYZbcdefghijklmnopqrstuvwxyz1234567890";
+    static constexpr wchar_t alphabet[] = L"ABCDEFGHIJKLMNOPQRSTUVWXYZbcdefghijklmnopqrstuvwxyz1234567890";
     static std::random_device rd;
-    static std::uniform_int_distribution<> dist( 0, ARRAYSIZE(alphabet) - 2 );
+    static std::uniform_int_distribution<> dist( 0, _countof( alphabet ) - 2 );
     static std::uniform_int_distribution<> dist_len( 5, 15 );
     std::wstring result;
 
@@ -149,10 +152,13 @@ std::wstring Utils::RandomANString( int length /*= 0*/ )
         length = dist_len( rd );
 
     for (int i = 0; i < length; i++)
+    {
         result.push_back( alphabet[dist( rd )] );
+    }
 
     return result;
 }
+#pragma optimize("", on)
 
 /// <summary>
 /// Cast string characters to lower case

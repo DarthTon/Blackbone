@@ -32,7 +32,7 @@ public:
         // Manually set argument to custom value
         void set( int pos, const AsmVariant& newVal )
         {
-            if (arguments.size() > (size_t)pos)
+            if (arguments.size() > static_cast<size_t>(pos))
                 arguments[pos] = newVal;
         }
 
@@ -46,8 +46,8 @@ public:
         , _conv( conv )
     {
         static_assert(
-            !std::disjunction_v<std::is_reference<Args>...>,
-            "Please replace reference type to pointer type in function type specification"
+            (... && !std::is_reference_v<Args>),
+            "Please replace reference type with pointer type in function type specification"
             );
     }
 
