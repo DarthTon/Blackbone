@@ -59,7 +59,7 @@ NTSTATUS SymbolLoader::Load( SymbolData& result )
     }
 
     // Get addresses from pdb
-    /*if (SUCCEEDED( hr ))
+    if (SUCCEEDED( hr ))
     {
         sym32.GetSymAddress( L"LdrpHandleTlsData", result.LdrpHandleTlsData32 );
         sym64.GetSymAddress( L"LdrpHandleTlsData", result.LdrpHandleTlsData64 );
@@ -70,8 +70,11 @@ NTSTATUS SymbolLoader::Load( SymbolData& result )
         sym32.GetSymAddress( L"RtlInsertInvertedFunctionTable", result.RtlInsertInvertedFunctionTable32 );
         sym64.GetSymAddress( L"RtlInsertInvertedFunctionTable", result.RtlInsertInvertedFunctionTable64 );
 
+        sym32.GetSymAddress( L"LdrpReleaseTlsEntry", result.LdrpReleaseTlsEntry32 );
+        sym64.GetSymAddress( L"LdrpReleaseTlsEntry", result.LdrpReleaseTlsEntry64 );
+
         sym32.GetSymAddress( L"LdrProtectMrdata", result.LdrProtectMrdata );
-    }*/
+    }
    
     // Fill missing symbols from patterns
     return ScanSymbolPatterns( ntdll32, ntdll64, result );;

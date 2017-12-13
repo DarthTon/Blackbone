@@ -17,6 +17,8 @@ struct SymbolData
     ptr_t LdrpInvertedFunctionTable64 = 0;          // LdrpInvertedFunctionTable address
     ptr_t RtlInsertInvertedFunctionTable32 = 0;     // RtlInsertInvertedFunctionTable address
     ptr_t RtlInsertInvertedFunctionTable64 = 0;     // RtlInsertInvertedFunctionTable address
+    ptr_t LdrpReleaseTlsEntry32 = 0;                // LdrpReleaseTlsEntry address
+    ptr_t LdrpReleaseTlsEntry64 = 0;                // LdrpReleaseTlsEntry address
     ptr_t LdrProtectMrdata = 0;                     // LdrProtectMrdata address
 };
 

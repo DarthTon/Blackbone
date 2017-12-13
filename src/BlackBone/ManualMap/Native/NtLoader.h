@@ -57,7 +57,7 @@ public:
     /// <param name="mod">Module data</param>
     /// <param name="tlsPtr">TLS directory of target image</param>
     /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS AddStaticTLSEntry( const NtLdrEntry& mod, ptr_t tlsPtr );
+    BLACKBONE_API NTSTATUS AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr );
 
     /// <summary>
     /// Create module record in LdrpInvertedFunctionTable
@@ -66,6 +66,14 @@ public:
     /// <param name="mod">Module data</param>
     /// <returns>true on success</returns>
     BLACKBONE_API bool InsertInvertedFunctionTable( NtLdrEntry& mod );
+
+    /// <summary>
+    /// Free static TLS
+    /// </summary>
+    /// <param name="mod">Target module</param>
+    /// <param name="noThread">Don't create new threads during remote call</param>
+    /// <returns>Status code</returns>
+    BLACKBONE_API NTSTATUS UnloadTLS( const NtLdrEntry& mod, bool noThread = false );
 
     /// <summary>
     /// Unlink module from Ntdll loader

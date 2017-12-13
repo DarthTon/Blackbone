@@ -520,9 +520,11 @@ NTSTATUS MMap::UnmapAllModules()
         if (!(pImage->flags & NoExceptions))
             DisableExceptions( pImage );
 
+        _process.nativeLdr().UnloadTLS( pImage->ldrEntry );
+
         // Remove from loader
         if (pImage->ldrEntry.flags != Ldr_None)
-            _process.modules().Unlink( pImage->ldrEntry );
+            _process.nativeLdr().Unlink( pImage->ldrEntry );
 
         // Free memory
         pImage->imgMem.Free();
