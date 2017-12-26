@@ -22,6 +22,6 @@ struct SymbolData
     ptr_t LdrProtectMrdata = 0;                     // LdrProtectMrdata address
 };
 
-inline SymbolData g_symbols;
+extern SymbolData g_symbols;
 
 }

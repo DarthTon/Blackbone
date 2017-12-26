@@ -205,6 +205,9 @@
     <ClCompile Include="Symbols\PDBHelper.cpp">
       <Filter>Symbols</Filter>
     </ClCompile>
+    <ClCompile Include="Symbols\SymbolData.cpp">
+      <Filter>Symbols</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
