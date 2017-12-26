@@ -272,8 +272,8 @@
       <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|Win32'">
@@ -368,8 +368,8 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
       <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|x64'">
@@ -735,6 +735,7 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     <ClCompile Include="Subsystem\x86Subsystem.cpp" />
     <ClCompile Include="Symbols\PatternLoader.cpp" />
     <ClCompile Include="Symbols\PDBHelper.cpp" />
+    <ClCompile Include="Symbols\SymbolData.cpp" />
     <ClCompile Include="Symbols\SymbolLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
