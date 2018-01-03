@@ -77,7 +77,7 @@ public:
     /// Otherwise function will fail if there is at least one non-committed page in region.
     /// </param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS Read( std::vector<ptr_t>&& adrList, size_t dwSize, PVOID pResult, bool handleHoles = false );
+    BLACKBONE_API NTSTATUS Read( const std::vector<ptr_t>& adrList, size_t dwSize, PVOID pResult, bool handleHoles = false );
 
     /// <summary>
     /// Write data
@@ -95,7 +95,7 @@ public:
     /// <param name="dwSize">Size of data to write</param>
     /// <param name="pData">Buffer to write</param>
     /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS Write( std::vector<ptr_t>&& adrList, size_t dwSize, const void* pData );
+    BLACKBONE_API NTSTATUS Write( const std::vector<ptr_t>& adrList, size_t dwSize, const void* pData );
 
     /// <summary>
     /// Read data
