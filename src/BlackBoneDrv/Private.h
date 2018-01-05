@@ -155,6 +155,7 @@ extern MMPTE ValidKernelPte;
 typedef struct _DYNAMIC_DATA
 {
     WinVer  ver;            // OS version
+    ULONG   buildNo;        // OS build revision
     BOOLEAN correctBuild;   // OS kernel build number is correct and supported
 
     ULONG KExecOpt;         // KPROCESS::ExecuteOptions 

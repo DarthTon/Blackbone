@@ -159,29 +159,36 @@ NTSTATUS BBScanSection( IN PCCHAR section, IN PCUCHAR pattern, IN UCHAR wildcard
 NTSTATUS BBGetBuildNO( OUT PULONG pBuildNo )
 {
     ASSERT( pBuildNo != NULL );
-    if (pBuildNo == 0)
+    if (pBuildNo == NULL)
         return STATUS_INVALID_PARAMETER;
 
     NTSTATUS status = STATUS_SUCCESS;
-    UNICODE_STRING strRegKey = { 0 };
-    UNICODE_STRING strRegValue = { 0 };
+    UNICODE_STRING strRegKey = RTL_CONSTANT_STRING( L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion" );
+    UNICODE_STRING strRegValue = RTL_CONSTANT_STRING( L"BuildLabEx" );
+    UNICODE_STRING strRegValue10 = RTL_CONSTANT_STRING( L"UBR" );
     UNICODE_STRING strVerVal = { 0 };
     HANDLE hKey = NULL;
     OBJECT_ATTRIBUTES keyAttr = { 0 };
-    RtlUnicodeStringInit( &strRegKey, L"\\Registry\\Machine\\Software\\Microsoft\\Windows NT\\CurrentVersion" );
-    RtlUnicodeStringInit( &strRegValue, L"BuildLabEx" );
 
     InitializeObjectAttributes( &keyAttr, &strRegKey, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, NULL, NULL );
 
     status = ZwOpenKey( &hKey, KEY_READ, &keyAttr );
     if (NT_SUCCESS( status ))
     {
-        PKEY_VALUE_FULL_INFORMATION pValueInfo = ExAllocatePoolWithTag( PagedPool, 0x1000, BB_POOL_TAG );
+        PKEY_VALUE_FULL_INFORMATION pValueInfo = ExAllocatePoolWithTag( PagedPool, PAGE_SIZE, BB_POOL_TAG );
         ULONG bytes = 0;
 
         if (pValueInfo)
         {
-            status = ZwQueryValueKey( hKey, &strRegValue, KeyValueFullInformation, pValueInfo, 0x1000, &bytes );
+            // Try query UBR value
+            status = ZwQueryValueKey( hKey, &strRegValue10, KeyValueFullInformation, pValueInfo, PAGE_SIZE, &bytes );
+            if (NT_SUCCESS( status ))
+            {
+                *pBuildNo = *(PULONG)((PUCHAR)pValueInfo + pValueInfo->DataOffset);
+                goto skip1;
+            }
+
+            status = ZwQueryValueKey( hKey, &strRegValue, KeyValueFullInformation, pValueInfo, PAGE_SIZE, &bytes );
             if (NT_SUCCESS( status ))
             {
                 PWCHAR pData = (PWCHAR)((PUCHAR)pValueInfo->Name + pValueInfo->NameLength);
@@ -229,7 +236,6 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
 {
     NTSTATUS status = STATUS_SUCCESS;
     RTL_OSVERSIONINFOEXW verInfo = { 0 };
-    ULONG buildNo = 0;
 
     if (pData == NULL)
         return STATUS_INVALID_ADDRESS;
@@ -247,7 +253,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         pData->ver = (WinVer)ver_short;
 
         // Get kernel build number
-        status = BBGetBuildNO( &buildNo );
+        status = BBGetBuildNO( &pData->buildNo );
 
         // Validate current driver version
         pData->correctBuild = TRUE;
@@ -271,7 +277,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
             verInfo.dwMinorVersion,
             verInfo.dwBuildNumber,
             verInfo.wServicePackMajor,
-            buildNo,
+            pData->buildNo,
             ver_short
             );
 
@@ -445,18 +451,44 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
 
         if (pData->ver >= WINVER_10_FC)
         {
-            pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x41 + 2);
-            pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x4E + 2);
+            // Meltdown fix
+            if (pData->buildNo >= 192)
+            {
+                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x4B + 2);
+                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x58 + 2);
+            }
+            else
+            {
+                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x41 + 2);
+                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x4E + 2);
+            }
         }
         else if (pData->ver >= WINVER_10_CU)
         {
-            pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x43 + 2);
-            pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x50 + 2);
+            // Meltdown fix
+            if (pData->buildNo >= 850)
+            {
+                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x4B + 2);
+                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x58 + 2);
+            }
+            else
+            {
+                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x43 + 2);
+                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x50 + 2);
+            }
         }
         else
         {
-            pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x49 + 2);
-            pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x56 + 2);
+            // Meltdown fix
+            if (pData->buildNo >= 850)
+            {
+                // TODO
+            }
+            else
+            {
+                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x49 + 2);
+                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x56 + 2);
+            }
         }
 
         DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
