@@ -66,8 +66,8 @@ public:
     /// Get raw data
     /// </summary>
     /// <returns>Data ptr</returns>
-    inline std::byte* data() { return _buffer.data(); }
-    inline const std::byte* data() const { return _buffer.data(); }
+    inline uint8_t* data() { return _buffer.data(); }
+    inline const uint8_t* data() const { return _buffer.data(); }
 
 private:
     /// <summary>
@@ -86,7 +86,7 @@ private:
     }
 
 private:
-    std::vector<std::byte> _buffer;
+    std::vector<uint8_t> _buffer;
 };
 
 // Loader flags

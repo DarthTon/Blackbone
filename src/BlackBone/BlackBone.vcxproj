@@ -304,8 +304,8 @@ xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command
       <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|Win32'">
@@ -336,8 +336,8 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -398,8 +398,8 @@ xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command
       <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|x64'">
@@ -426,8 +426,8 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -464,8 +464,8 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
       <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(XP)|Win32'">
@@ -502,8 +502,8 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
       <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(DLL)|Win32'">
@@ -541,8 +541,8 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -575,8 +575,8 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
       <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(XP)|x64'">
@@ -609,8 +609,8 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
       <AdditionalDependencies>diaguids.lib;Ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Lib>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(DLL)|x64'">
@@ -641,8 +641,8 @@ xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
       <LinkLibraryDependencies>true</LinkLibraryDependencies>
     </ProjectReference>
     <PostBuildEvent>
-      <Command>xcopy "$(SolutionDir)DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
-xcopy "$(SolutionDir)DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)..\..\DIA\$(Platform)\msdia140.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)..\..\DIA\$(Platform)\symsrv.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>

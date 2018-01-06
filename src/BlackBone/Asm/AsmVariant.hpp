@@ -183,7 +183,7 @@ struct AsmVariant
     };
 
     uint64_t new_imm_val = 0;       // Replaced immediate value for dataPtr type
-    std::vector<std::byte> buf;     // Value buffer
+    std::vector<uint8_t> buf;       // Value buffer
 };
 
 /// <summary>
