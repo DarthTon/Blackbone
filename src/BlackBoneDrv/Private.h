@@ -136,14 +136,14 @@ typedef PULONG PWIN32_PROTECTION_MASK;
 
 typedef enum _WinVer
 {
-    WINVER_7     = 0x0610,
-    WINVER_7_SP1 = 0x0611,
-    WINVER_8     = 0x0620,
-    WINVER_81    = 0x0630,
-    WINVER_10    = 0x0A00,
-    WINVER_10_AU = 0x0A01,
-    WINVER_10_CU = 0x0A02,
-    WINVER_10_FC = 0x0A03,
+    WINVER_7      = 0x0610,
+    WINVER_7_SP1  = 0x0611,
+    WINVER_8      = 0x0620,
+    WINVER_81     = 0x0630,
+    WINVER_10     = 0x0A00,
+    WINVER_10_RS1 = 0x0A01, // Anniversary update
+    WINVER_10_RS2 = 0x0A02, // Creators update
+    WINVER_10_RS3 = 0x0A03, // Fall creators update
 } WinVer;
 
 extern PLIST_ENTRY PsLoadedModuleList;

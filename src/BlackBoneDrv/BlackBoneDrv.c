@@ -267,7 +267,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
     #elif defined (_WIN10_)
-        if (ver_short < WINVER_10 || WINVER_10_FC < ver_short)
+        if (ver_short < WINVER_10 || WINVER_10_RS3 < ver_short)
             return STATUS_NOT_SUPPORTED;
     #endif
 
@@ -358,7 +358,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 }
                 else if (verInfo.dwBuildNumber == 14393)
                 {
-                    pData->ver              = WINVER_10_AU;
+                    pData->ver              = WINVER_10_RS1;
                     pData->KExecOpt         = 0x1BF;
                     pData->Protection       = 0x6C2;
                     pData->EProcessFlags2   = 0x300;
@@ -377,7 +377,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 }
                 else if (verInfo.dwBuildNumber == 15063)
                 {
-                    pData->ver              = WINVER_10_CU;
+                    pData->ver              = WINVER_10_RS2;
                     pData->KExecOpt         = 0x1BF;
                     pData->Protection       = 0x6CA;
                     pData->EProcessFlags2   = 0x300;
@@ -396,7 +396,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 }
                 else if (verInfo.dwBuildNumber == 16299)
                 {
-                    pData->ver              = WINVER_10_FC;
+                    pData->ver              = WINVER_10_RS3;
                     pData->KExecOpt         = 0x1BF;
                     pData->Protection       = 0x6CA;
                     pData->EProcessFlags2   = 0x828;    // MitigationFlags offset
@@ -437,59 +437,61 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
 }
 
 /// <summary>
+/// PDE/PTE dynamic code offsets
+/// </summary>
+typedef struct _TABLE_OFFSETS
+{
+    int PDE;
+    int PTE;
+} TABLE_OFFSETS, *PTABLE_OFFSETS;
+
+/// <summary>
+/// Pre/Post 'meltdown' patch offsets
+/// </summary>
+typedef struct _TABLE_OFFSETS_MELT
+{
+    // selector[0] - offsets for builds before 'meltdown' patch
+    // selector[1] - offsets for builds after  'meltdown' patch
+    TABLE_OFFSETS selector[2];  
+} TABLE_OFFSETS_MELT, *PTABLE_OFFSETS_MELT;
+
+/// <summary>
 /// Get relocated PTE and PDE bases
 /// </summary>
 /// <param name="pData">Dynamic data</param>
 /// <returns>Status code</returns>
 NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
 {
+    ASSERT( pData->ver >= WINVER_10_RS1 );
+
+    const int index = pData->ver & 0xFF;
+    const TABLE_OFFSETS_MELT offsets[4] =
+    {
+        { 0, 0, 0, 0 },             // No updates
+        { 0x49, 0x56, 0x52, 0x5F }, // WINVER_10_AU
+        { 0x43, 0x50, 0x4B, 0x58 }, // WINVER_10_CU
+        { 0x41, 0x4E, 0x4B, 0x58 }  // WINVER_10_FC
+    };
+
+    const ULONG patchThreshold[] =
+    {
+        0,      // No updates
+        2007,   // WINVER_10_AU
+        850,    // WINVER_10_CU
+        192     // WINVER_10_FC
+    };
+
     UNICODE_STRING uName = RTL_CONSTANT_STRING( L"MmGetPhysicalAddress" );
     PUCHAR pMmGetPhysicalAddress = MmGetSystemRoutineAddress( &uName );
     if (pMmGetPhysicalAddress)
     {
         PUCHAR pMiGetPhysicalAddress = *(PLONG)(pMmGetPhysicalAddress + 0xE + 1) + pMmGetPhysicalAddress + 0xE + 5;
 
-        if (pData->ver >= WINVER_10_FC)
-        {
-            // Meltdown fix
-            if (pData->buildNo >= 192)
-            {
-                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x4B + 2);
-                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x58 + 2);
-            }
-            else
-            {
-                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x41 + 2);
-                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x4E + 2);
-            }
-        }
-        else if (pData->ver >= WINVER_10_CU)
-        {
-            // Meltdown fix
-            if (pData->buildNo >= 850)
-            {
-                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x4B + 2);
-                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x58 + 2);
-            }
-            else
-            {
-                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x43 + 2);
-                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x50 + 2);
-            }
-        }
-        else
-        {
-            // Meltdown fix
-            if (pData->buildNo >= 850)
-            {
-                // TODO
-            }
-            else
-            {
-                pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x49 + 2);
-                pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + 0x56 + 2);
-            }
-        }
+        // Meltdown fix check
+        const int melt = (pData->buildNo >= patchThreshold[index]) ? 1 : 0;
+
+        pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + offsets[index].selector[melt].PDE + 2);
+        pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + offsets[index].selector[melt].PTE + 2);
 
         DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
         return STATUS_SUCCESS;

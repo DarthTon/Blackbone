@@ -133,7 +133,7 @@ NTSTATUS BBSetProtection( IN PSET_PROC_PROTECTION pProtection )
                 // Dynamic code
                 if (pProtection->dynamicCode != Policy_Keep && dynData.EProcessFlags2 != 0)
                 {
-                    if (dynData.ver >= WINVER_10_FC)
+                    if (dynData.ver >= WINVER_10_RS3)
                     {
                         PMITIGATION_FLAGS pFlags2 = (PMITIGATION_FLAGS)((PUCHAR)pProcess + dynData.EProcessFlags2);
                         pFlags2->DisableDynamicCode = pProtection->dynamicCode;
