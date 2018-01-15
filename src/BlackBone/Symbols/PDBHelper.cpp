@@ -25,10 +25,10 @@ PDBHelper::PDBHelper()
     wchar_t path[MAX_PATH] = { };
     if (GetEnvironmentVariableW( L"_NT_SYMBOL_PATH", path, _countof( path ) ) == 0)
     {
-        if (GetTempPathW( _countof( path ), path ) != -1)
+        if (GetTempPathW( _countof( path ), path ) != 0)
         {
             std::wstringstream wss;
-            wss << L"srv*" << path << L"Symbols*https://msdl.microsoft.com/download/symbols";
+            wss << L"srv*" << path << L"Symbols*http://msdl.microsoft.com/download/symbols";
             _sympath = wss.str();
         }
     }
