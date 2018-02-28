@@ -14,7 +14,7 @@ namespace blackbone
 /// <summary>
 /// Get rid of EXECUTABLE flag if DEP isn't enabled
 /// </summary>
-/// <param name="prot">Memry protection flags</param>
+/// <param name="prot">Memory protection flags</param>
 /// <param name="bDEP">DEP flag</param>
 /// <returns>New protection flags</returns>
 inline DWORD CastProtection( DWORD prot, bool bDEP )
