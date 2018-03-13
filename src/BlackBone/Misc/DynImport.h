@@ -28,7 +28,7 @@ public:
     /// <param name="name">Function name</param>
     /// <returns>Function pointer</returns>
     template<typename T>
-    inline T get( const std::string& name ) 
+    T get( const std::string& name ) 
     {
         InitializeOnce();
 
@@ -49,7 +49,7 @@ public:
     /// <param name="...args">Function args</param>
     /// <returns>Function result or STATUS_ORDINAL_NOT_FOUND if import not found</returns>
     template<typename T, typename... Args>
-    inline NTSTATUS safeNativeCall( const std::string& name, Args&&... args )
+    NTSTATUS safeNativeCall( const std::string& name, Args&&... args )
     {
         auto pfn = DynImport::get<T>( name );
         return pfn ? pfn( std::forward<Args>( args )... ) : STATUS_ORDINAL_NOT_FOUND;
@@ -63,10 +63,10 @@ public:
     /// <param name="...args">Function args</param>
     /// <returns>Function result or 0 if import not found</returns>
     template<typename T, typename... Args>
-    inline auto safeCall( const std::string& name, Args&&... args )
+    auto safeCall( const std::string& name, Args&&... args )
     {
         auto pfn = DynImport::get<T>( name );
-        return pfn ? pfn( std::forward<Args>( args )... ) : std::result_of_t<T( Args... )>();
+		return pfn ? pfn( std::forward<Args>( args )... ) : std::invoke_result_t<T, Args...>();
     }
 
     /// <summary>
