@@ -49,6 +49,9 @@
     <Filter Include="Symbols">
       <UniqueIdentifier>{e666a795-e3de-4277-9223-b220c8d109ed}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Syscalls">
+      <UniqueIdentifier>{8ce61b72-1088-4cd7-b7a9-e7cdb027304e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Subsystem\NativeSubsystem.cpp">
@@ -481,5 +484,16 @@
     <ClInclude Include="Symbols\PDBHelper.h">
       <Filter>Symbols</Filter>
     </ClInclude>
+    <ClInclude Include="Syscalls\Syscall.h">
+      <Filter>Syscalls</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <MASM Include="Syscalls\Syscall64.asm">
+      <Filter>Syscalls</Filter>
+    </MASM>
+    <MASM Include="Syscalls\Syscall32.asm">
+      <Filter>Syscalls</Filter>
+    </MASM>
   </ItemGroup>
 </Project>

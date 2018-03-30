@@ -11,6 +11,7 @@
     <ClCompile Include="PatternTest.cpp" />
     <ClCompile Include="MultiPtrTest.cpp" />
     <ClCompile Include="AsmTest.cpp" />
+    <ClCompile Include="SyscallTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Tests.h" />
