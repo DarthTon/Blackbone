@@ -10,6 +10,20 @@
 
 namespace blackbone
 {
+
+    
+template <int n>
+using const_int = std::integral_constant<int, n>;
+
+template<typename T>
+constexpr bool is32bit = std::is_same_v<T, uint32_t>;
+
+template<typename T, typename T32, typename T64>
+using type_32_64 = std::conditional_t<is32bit<T>, T32, T64>;
+
+template<typename T, int v32, int v64>
+constexpr int int_32_64 = std::conditional_t<is32bit<T>, const_int<v32>, const_int<v64>>::value;
+
 // nonstandard extension used : nameless struct/union
 #pragma warning(disable : 4201)
 
@@ -58,9 +72,42 @@ struct _GDI_TEB_BATCH_T
 };
 
 template <typename T>
+struct _ACTIVATION_CONTEXT_STACK_T
+{
+    T ActiveFrame;
+    _LIST_ENTRY_T<T> FrameListCache;
+    uint32_t Flags;
+    uint32_t NextCookieSequenceNumber;
+    uint32_t StackId;
+};
+
+template <typename T>
 struct _TEB_T
 {
-    using type = T;
+    struct Specific32_1
+    {
+        uint8_t InstrumentationCallbackDisabled;
+        uint8_t SpareBytes[23];
+        uint32_t TxFsContext;
+    };
+
+    struct Specific64_1
+    {
+        uint32_t TxFsContext;
+        uint32_t InstrumentationCallbackDisabled;
+    };
+
+    struct Specific64_2
+    {
+        T TlsExpansionSlots;
+        T DeallocationBStore;
+        T BStoreLimit;
+    };
+
+    struct Specific32_2
+    {
+        T TlsExpansionSlots;
+    };
 
     _NT_TIB_T<T> NtTib;
     T EnvironmentPointer;
@@ -73,15 +120,23 @@ struct _TEB_T
     T CsrClientThread;
     T Win32ThreadInfo;
     uint32_t User32Reserved[26];
-    T UserReserved[5];
+    uint32_t UserReserved[5];
     T WOW32Reserved;
     uint32_t CurrentLocale;
     uint32_t FpSoftwareStatusRegister;
-    T SystemReserved1[54];
+    T ReservedForDebuggerInstrumentation[16];
+    T SystemReserved1[int_32_64<T, 26, 30>];
+    uint8_t PlaceholderCompatibilityMode;
+    uint8_t PlaceholderReserved[11];
+    uint32_t ProxiedProcessId;
+    _ACTIVATION_CONTEXT_STACK_T<T> ActivationStack;
+    uint8_t WorkingOnBehalfTicket[8];
     uint32_t ExceptionCode;
     T ActivationContextStackPointer;
-    uint8_t SpareBytes[36];
-    uint32_t TxFsContext;
+    T InstrumentationCallbackSp;
+    T InstrumentationCallbackPreviousPc;
+    T InstrumentationCallbackPreviousSp;
+    type_32_64<T, Specific32_1, Specific64_1> spec1;
     _GDI_TEB_BATCH_T<T> GdiTebBatch;
     _CLIENT_ID_T<T> RealClientId;
     T GdiCachedProcessHandle;
@@ -97,9 +152,9 @@ struct _TEB_T
     T glTable;
     T glCurrentRC;
     T glContext;
-    uint32_t LastStatusValue;
+    uint32_t LastStatusValue;  
     _UNICODE_STRING_T<T> StaticUnicodeString;
-    wchar_t StaticUnicodeBuffer[261];
+    wchar_t StaticUnicodeBuffer[261];  
     T DeallocationStack;
     T TlsSlots[64];
     _LIST_ENTRY_T<T> TlsLinks;
@@ -107,24 +162,22 @@ struct _TEB_T
     T ReservedForNtRpc;
     T DbgSsReserved[2];
     uint32_t HardErrorMode; 
-    T Instrumentation[11];
-    _GUID ActivityId;
+    T Instrumentation[int_32_64<T, 9, 11>];
+    GUID ActivityId;
     T SubProcessTag;
     T PerflibData;
     T EtwTraceData;
     T WinSockData;
     uint32_t GdiBatchCount;             // TEB64 pointer
     uint32_t IdealProcessorValue;
-    uint32_t GuaranteedStackBytes;
+    uint32_t GuaranteedStackBytes;   
     T ReservedForPerf;
     T ReservedForOle;
-    uint32_t WaitingOnLoaderLock;
+    uint32_t WaitingOnLoaderLock; 
     T SavedPriorityState;
     T ReservedForCodeCoverage;
     T ThreadPoolData;
-    T TlsExpansionSlots;
-    T DeallocationBStore;
-    T BStoreLimit;
+    type_32_64<T, Specific32_2, Specific64_2> spec2;
     uint32_t MuiGeneration;
     uint32_t IsImpersonating;
     T NlsCache;
@@ -139,29 +192,44 @@ struct _TEB_T
     T MergedPrefLanguages;
     uint32_t MuiImpersonation;
     uint16_t CrossTebFlags;
-    uint16_t SameTebFlags;
-    T TxnScopeEnterCallback;
-    T TxnScopeExitCallback;
-    T TxnScopeContext;
-    uint32_t LockCount;
-    uint32_t SpareUlong0; 
-    T ResourceRetValue;
+    union
+    {
+        uint16_t SameTebFlags;
+        struct
+        {
+            uint16_t SafeThunkCall : 1;
+            uint16_t InDebugPrint : 1;
+            uint16_t HasFiberData : 1;
+            uint16_t SkipThreadAttach : 1;
+            uint16_t WerInShipAssertCode : 1;
+            uint16_t RanProcessInit : 1;
+            uint16_t ClonedThread : 1;
+            uint16_t SuppressDebugMsg : 1;
+            uint16_t DisableUserStackWalk : 1;
+            uint16_t RtlExceptionAttached : 1;
+            uint16_t InitialThread : 1;
+            uint16_t SessionAware : 1;
+            uint16_t LoadOwner : 1;
+            uint16_t LoaderWorker : 1;
+            uint16_t SkipLoaderInit : 1;
+            uint16_t SpareSameTebBits : 1;
+        };
+    };
+    T TxnScopeEnterCallback;  
+    T TxnScopeExitCallback;  
+    T TxnScopeContext;  
+    uint32_t LockCount;  
+    uint32_t WowTebOffset;   
+    T ResourceRetValue;  
     T ReservedForWdf;
+    uint64_t ReservedForCrt;
+    GUID EffectiveContainerId;
 };
 
 template<typename T>
 struct _PEB_T
 {
-    static_assert(
-        std::is_same<T, uint32_t>::value || std::is_same<T, uint64_t>::value, 
-        "T must be uint32_t or uint64_t"
-        );
-
-    using type = T;
-    using const34 = std::integral_constant<int, 34>;
-    using const60 = std::integral_constant<int, 60>;
-    using is32Bit = std::integral_constant<bool, std::is_same_v<T, uint32_t>>;
-    using BufferSize_t = std::conditional_t<is32Bit::value, const34, const60>;
+    static_assert( std::is_same_v<T, uint32_t> || std::is_same_v<T, uint64_t>, "T must be uint32_t or uint64_t" );
 
     uint8_t InheritedAddressSpace;
     uint8_t ReadImageFileExecOptions;
@@ -255,7 +323,7 @@ struct _PEB_T
         T Padding4;
     };
     T ActiveProcessAffinityMask;
-    uint32_t GdiHandleBuffer[BufferSize_t::value];
+    uint32_t GdiHandleBuffer[int_32_64<T, 34, 60>];
     T PostProcessInitRoutine;
     T TlsExpansionBitmap;
     uint32_t TlsExpansionBitmapBits[32];
