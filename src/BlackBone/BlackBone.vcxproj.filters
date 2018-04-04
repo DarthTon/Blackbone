@@ -496,4 +496,7 @@
       <Filter>Syscalls</Filter>
     </MASM>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Exports.def" />
+  </ItemGroup>
 </Project>
