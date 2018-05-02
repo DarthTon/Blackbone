@@ -24,7 +24,7 @@ TEST_CASE( "08. Driver" )
     MEMORY_BASIC_INFORMATION64 memInfo = { 0 };
 
     // Disable DEP, x86 only;
-    if (!proc.barrier().targetWow64)
+    if (proc.barrier().targetWow64)
     {
         status = Driver().DisableDEP( GetCurrentProcessId() );
         SAFE_CALL( GetProcessDEPPolicy, GetCurrentProcess(), &depFlags, &perm );
