@@ -69,11 +69,11 @@ void FindPattern( const ScanParams& scan32, const ScanParams& scan64, const Offs
 /// <param name="result">Result</param>
 void OSFillPatterns( std::unordered_map<ptr_t*, OffsetData>& patterns, SymbolData& result )
 {
-    if (IsWindows10FallCreatorsOrGreater())
+    if (IsWindows10RS3OrGreater())
     {
         // LdrpHandleTlsData
         // 74 33 44 8D 43 09
-        patterns.emplace( &result.LdrpHandleTlsData64, OffsetData{ "\x74\x33\x44\x8d\x43\x09", true, 0x43 } );
+        patterns.emplace( &result.LdrpHandleTlsData64, OffsetData{ "\x74\x33\x44\x8d\x43\x09", true, IsWindows10RS4OrGreater() ? 0x44 : 0x43 } );
 
         // RtlInsertInvertedFunctionTable
         // 8B FA 49 8D 43 20
@@ -92,14 +92,15 @@ void OSFillPatterns( std::unordered_map<ptr_t*, OffsetData>& patterns, SymbolDat
         patterns.emplace( &result.LdrpInvertedFunctionTable32, OffsetData{ "\x33\xF6\x46\x3B\xC6", false, -1, -0x1B } );
 
         // LdrpHandleTlsData
-        // 8B C1 8D 4D BC 51
-        patterns.emplace( &result.LdrpHandleTlsData32, OffsetData{ "\x8b\xc1\x8d\x4d\xbc\x51", false, 0x18 } );
+        // 8B C1 8D 4D AC/BC 51
+        const auto pattern = IsWindows10RS4OrGreater() ? "\x8b\xc1\x8d\x4d\xac\x51" : "\x8b\xc1\x8d\x4d\xbc\x51";
+        patterns.emplace( &result.LdrpHandleTlsData32, OffsetData{ pattern, false, 0x18 } );
 
         // LdrProtectMrdata
         // 75 24 85 F6 75 08
         patterns.emplace( &result.LdrProtectMrdata, OffsetData{ "\x75\x24\x85\xf6\x75\x08", false, 0x1C } );
     }
-    else if (IsWindows10CreatorsOrGreater())
+    else if (IsWindows10RS2OrGreater())
     {
         // LdrpHandleTlsData
         // 74 33 44 8D 43 09
@@ -241,7 +242,7 @@ NTSTATUS ScanSymbolPatterns( const pe::PEImage& ntdll32, const pe::PEImage& ntdl
     }
 
     // Retry with old patterns
-    if (result.RtlInsertInvertedFunctionTable32 == 0 && IsWindows8Point1OrGreater() && !IsWindows10CreatorsOrGreater())
+    if (result.RtlInsertInvertedFunctionTable32 == 0 && IsWindows8Point1OrGreater() && !IsWindows10RS2OrGreater())
     {
         // RtlInsertInvertedFunctionTable
         // 8D 45 F4 89 55 F8 50 8D 55 FC
