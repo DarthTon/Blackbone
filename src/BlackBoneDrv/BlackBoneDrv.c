@@ -257,19 +257,19 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
 
         // Validate current driver version
         pData->correctBuild = TRUE;
-    #if defined(_WIN7_)
+#if defined(_WIN7_)
         if (ver_short != WINVER_7 && ver_short != WINVER_7_SP1)
             return STATUS_NOT_SUPPORTED;
-    #elif defined(_WIN8_)
+#elif defined(_WIN8_)
         if (ver_short != WINVER_8)
             return STATUS_NOT_SUPPORTED;
-    #elif defined (_WIN81_)
+#elif defined (_WIN81_)
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
-    #elif defined (_WIN10_)
-        if (ver_short < WINVER_10 || WINVER_10_RS3 < ver_short)
+#elif defined (_WIN10_)
+        if (ver_short < WINVER_10 || WINVER_10_RS4 < ver_short)
             return STATUS_NOT_SUPPORTED;
-    #endif
+#endif
 
         DPRINT( 
             "BlackBone: OS version %d.%d.%d.%d.%d - 0x%x\n",
@@ -413,6 +413,25 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     status = BBLocatePageTables( pData );
                     break;
                 }
+                else if (verInfo.dwBuildNumber == 17134)
+                {
+                    pData->ver              = WINVER_10_RS4;
+                    pData->KExecOpt         = 0x1BF;
+                    pData->Protection       = 0x6CA;
+                    pData->EProcessFlags2   = 0x828;    // MitigationFlags offset
+                    pData->ObjTable         = 0x418;
+                    pData->VadRoot          = 0x628;
+                    pData->NtCreateThdIndex = 0xBB;
+                    pData->NtTermThdIndex   = 0x53;
+                    pData->PrevMode         = 0x232;
+                    pData->ExitStatus       = 0x700;
+                    pData->MiAllocPage      = 0;
+                    if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x83\xC7\x18\x48\x8B\x17", 0xCC, 7, (PVOID)&pData->ExRemoveTable ) ))
+                        pData->ExRemoveTable -= 0x34;
+
+                    status = BBLocatePageTables( pData );
+                    break;
+                }
                 else
                 {
                     return STATUS_NOT_SUPPORTED;
@@ -464,37 +483,55 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
 {
     ASSERT( pData->ver >= WINVER_10_RS1 );
 
-    const int index = pData->ver & 0xFF;
-    const TABLE_OFFSETS_MELT offsets[4] =
+    if (pData->ver >= WINVER_10_RS4)
     {
-        { 0, 0, 0, 0 },             // No updates
-        { 0x49, 0x56, 0x52, 0x5F }, // WINVER_10_AU
-        { 0x43, 0x50, 0x4B, 0x58 }, // WINVER_10_CU
-        { 0x41, 0x4E, 0x4B, 0x58 }  // WINVER_10_FC
-    };
+        UNICODE_STRING uName = RTL_CONSTANT_STRING( L"ExFreePoolWithTag" );
+        PUCHAR pExFreePoolWithTag = MmGetSystemRoutineAddress( &uName );
+        if (pExFreePoolWithTag)
+        {
+            pData->DYN_PDE_BASE = *(PULONG_PTR)(pExFreePoolWithTag + 0x32D + 2);
+            pData->DYN_PTE_BASE = *(PULONG_PTR)(pExFreePoolWithTag + 0x6A9 + 2);
 
-    const ULONG patchThreshold[] =
+            DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
+            return STATUS_SUCCESS;
+        }
+    }
+    else
     {
-        0,      // No updates
-        2007,   // WINVER_10_AU
-        850,    // WINVER_10_CU
-        192     // WINVER_10_FC
-    };
+        const int index = pData->ver & 0xFF;
+        const TABLE_OFFSETS_MELT offsets[] =
+        {
+            { 0, 0, 0, 0 },             // No updates
+            { 0x49, 0x56, 0x52, 0x5F }, // WINVER_10_RS1
+            { 0x43, 0x50, 0x4B, 0x58 }, // WINVER_10_RS2
+            { 0x41, 0x4E, 0x4B, 0x58 }, // WINVER_10_RS3
+            { 0x41, 0x4E, 0x4B, 0x58 }  // WINVER_10_RS4
+        };
 
-    UNICODE_STRING uName = RTL_CONSTANT_STRING( L"MmGetPhysicalAddress" );
-    PUCHAR pMmGetPhysicalAddress = MmGetSystemRoutineAddress( &uName );
-    if (pMmGetPhysicalAddress)
-    {
-        PUCHAR pMiGetPhysicalAddress = *(PLONG)(pMmGetPhysicalAddress + 0xE + 1) + pMmGetPhysicalAddress + 0xE + 5;
+        const ULONG patchThreshold[] =
+        {
+            0,      // No updates
+            2007,   // WINVER_10_RS1
+            850,    // WINVER_10_RS2
+            192,    // WINVER_10_RS3
+            0       // WINVER_10_RS4
+        };
 
-        // Meltdown fix check
-        const int melt = (pData->buildNo >= patchThreshold[index]) ? 1 : 0;
+        UNICODE_STRING uName = RTL_CONSTANT_STRING( L"MmGetPhysicalAddress" );
+        PUCHAR pMmGetPhysicalAddress = MmGetSystemRoutineAddress( &uName );
+        if (pMmGetPhysicalAddress)
+        {
+            PUCHAR pMiGetPhysicalAddress = *(PLONG)(pMmGetPhysicalAddress + 0xE + 1) + pMmGetPhysicalAddress + 0xE + 5;
 
-        pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + offsets[index].selector[melt].PDE + 2);
-        pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + offsets[index].selector[melt].PTE + 2);
+            // Meltdown fix check
+            const int melt = (pData->buildNo >= patchThreshold[index]) ? 1 : 0;
 
-        DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
-        return STATUS_SUCCESS;
+            pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + offsets[index].selector[melt].PDE + 2);
+            pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + offsets[index].selector[melt].PTE + 2);
+
+            DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
+            return STATUS_SUCCESS;
+        }
     }
 
     DPRINT( "BlackBone: PDE_BASE/PTE_BASE not found \n" );
