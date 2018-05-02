@@ -815,8 +815,8 @@ void* __fastcall ResolveJmp( void *Proc )
     // Recursive unwind
     if (Length == 5 && data.opcd_size == 1 && *pOpcode == 0xE9)
     {
-        uint32_t delta = *(uint32_t*)((size_t)Proc + data.opcd_size);
-        return ResolveJmp( (void*)((size_t)Proc + delta + Length) );
+        uint32_t delta = *(int32_t*)((uintptr_t)Proc + data.opcd_size);
+        return ResolveJmp( (void*)((uintptr_t)Proc + delta + Length) );
     }
 
     return Proc;
