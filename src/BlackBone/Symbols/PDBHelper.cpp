@@ -96,15 +96,17 @@ HRESULT PDBHelper::CoCreateDiaDataSource()
         HMODULE hMod = LoadLibraryW( L"msdia140.dll" );
         if (!hMod)
         {
-            BLACKBONE_TRACE( "PDB: Failed to load msdia140.dll, error 0x08%x", GetLastError() );
-            return HRESULT_FROM_WIN32( GetLastError() );
+            const auto err = GetLastError();
+            BLACKBONE_TRACE( "PDB: Failed to load msdia140.dll, error 0x08%x", err );
+            return HRESULT_FROM_WIN32( err );
         }
 
         auto DllGetClassObject = reinterpret_cast<BOOL( WINAPI* )(REFCLSID, REFIID, LPVOID)>(GetProcAddress( hMod, "DllGetClassObject" ));
         if (!DllGetClassObject)
         {
+            const auto err = GetLastError();
             BLACKBONE_TRACE( "PDB: Failed to get DllGetClassObject from msdia140.dll" );
-            return HRESULT_FROM_WIN32( GetLastError() );
+            return HRESULT_FROM_WIN32( err );
         }
 
         CComPtr<IClassFactory> classFactory;
