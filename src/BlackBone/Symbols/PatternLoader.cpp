@@ -141,11 +141,7 @@ void OSFillPatterns( std::unordered_map<ptr_t*, OffsetData>& patterns, SymbolDat
         // RtlInsertInvertedFunctionTable
         // 53 56 57 8B DA 8B F9 50
         patterns.emplace( &result.RtlInsertInvertedFunctionTable32, OffsetData{ "\x53\x56\x57\x8b\xda\x8b\xf9\x50", false, 0xB } );
-
-        if (IsWindows10OrGreater())
-            patterns.emplace( &result.LdrpInvertedFunctionTable32, OffsetData{ "\x53\x56\x57\x8b\xda\x8b\xf9\x50", false, -1, 0x22 } );
-        else
-            patterns.emplace( &result.LdrpInvertedFunctionTable32, OffsetData{ "\x53\x56\x57\x8b\xda\x8b\xf9\x50", false, -1, 0x23 } );
+        patterns.emplace( &result.LdrpInvertedFunctionTable32, OffsetData{ "\x53\x56\x57\x8b\xda\x8b\xf9\x50", false, -1, IsWindows10OrGreater() ? 0x22 : 0x23 } );
 
         // LdrpHandleTlsData
         // 50 6A 09 6A 01 8B C1
@@ -172,13 +168,16 @@ void OSFillPatterns( std::unordered_map<ptr_t*, OffsetData>& patterns, SymbolDat
     }
     else if (IsWindows7OrGreater())
     {
+        const bool update1 = WinVer().revision > 24059;
+
         // LdrpHandleTlsData
         // 41 B8 09 00 00 00 48 8D 44 24 38
-        patterns.emplace( &result.LdrpHandleTlsData64, OffsetData{ PatternSearch( "\x41\xb8\x09\x00\x00\x00\x48\x8d\x44\x24\x38", 11 ), true, 0x27 } );
+        patterns.emplace( &result.LdrpHandleTlsData64, OffsetData{ PatternSearch( "\x41\xb8\x09\x00\x00\x00\x48\x8d\x44\x24\x38", 11 ), true, update1 ? 0x23 : 0x27 } );
 
         // LdrpFindOrMapDll patch address
-        // 48 8D 8C 24 98 00 00 00 41 b0 01
-        patterns.emplace( &result.LdrKernel32PatchAddress, OffsetData{ PatternSearch( "\x48\x8D\x8C\x24\x98\x00\x00\x00\x41\xb0\x01", 11 ), true, -0x12 } );
+        // 48 8D 8C 24 98/90 00 00 00 41 B0 01
+        auto pattern = update1 ? "\x48\x8D\x8C\x24\x90\x00\x00\x00\x41\xb0\x01" : "\x48\x8D\x8C\x24\x98\x00\x00\x00\x41\xb0\x01";
+        patterns.emplace( &result.LdrKernel32PatchAddress, OffsetData{ PatternSearch( pattern, 11 ), true, -0x12 } );
 
         // KiUserApcDispatcher patch address
         // 48 8B 4C 24 18 48 8B C1 4C

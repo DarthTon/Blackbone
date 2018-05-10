@@ -1,4 +1,5 @@
 #pragma once
+#include <string>
 
 #define VERSIONHELPERAPI inline bool
 
@@ -44,6 +45,7 @@ enum eVerShort
 struct WinVersion
 {
     eVerShort ver = WinUnsupported;
+    uint32_t revision = 0;
     RTL_OSVERSIONINFOEXW native = { };
 };
 
@@ -51,6 +53,35 @@ inline WinVersion& WinVer()
 {
     static WinVersion g_WinVer;
     return g_WinVer;
+}
+
+inline uint32_t GetRevision()
+{
+    HKEY hKey = NULL;
+
+    if (RegOpenKeyEx( HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0, KEY_QUERY_VALUE, &hKey ) == 0)
+    {
+        wchar_t data[MAX_PATH] = {};
+        DWORD dataSize = sizeof( data );
+        DWORD type = REG_SZ;
+
+        if (RegQueryValueExW( hKey, L"BuildLabEx", nullptr, &type, reinterpret_cast<LPBYTE>(data), &dataSize ) == 0)
+        {
+            std::wstring buildStr = data;
+            size_t first = buildStr.find( L'.' );
+            size_t second = buildStr.find( L'.', first + 1 );
+
+            if (second > first && first != buildStr.npos)
+            {
+                RegCloseKey( hKey );
+                return std::wcstol( buildStr.substr( first + 1, second - first - 1 ).c_str(), nullptr, 10 );
+            }
+        }
+
+        RegCloseKey( hKey );
+    }
+
+    return 0;
 }
 
 inline void InitVersion()
@@ -102,6 +133,8 @@ inline void InitVersion()
             g_WinVer.ver = WinUnsupported;
         }
     }
+
+    g_WinVer.revision = GetRevision();
 }
 
 
