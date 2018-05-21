@@ -7,7 +7,7 @@ namespace blackbone
 /// <summary>
 /// Strong exception guarantee
 /// </summary>
-template<typename handle_t, typename close_t, close_t close_fn, handle_t zero_handle>
+template<typename handle_t, auto close_fn, handle_t zero_handle>
 class HandleGuard
 {
 public:
@@ -80,11 +80,11 @@ private:
     handle_t _handle;
 };
 
-using Handle        = HandleGuard<HANDLE, decltype(&CloseHandle), &CloseHandle, nullptr>;
-using FileHandle    = HandleGuard<HANDLE, decltype(&CloseHandle), &CloseHandle, INVALID_HANDLE_VALUE>;
-using ACtxHandle    = HandleGuard<HANDLE, decltype(&ReleaseActCtx), &ReleaseActCtx, INVALID_HANDLE_VALUE>;
-using FileMapHandle = HandleGuard<void*, decltype(&UnmapViewOfFile), &UnmapViewOfFile, nullptr>;
+using Handle        = HandleGuard<HANDLE, &CloseHandle, nullptr>;
+using FileHandle    = HandleGuard<HANDLE, &CloseHandle, INVALID_HANDLE_VALUE>;
+using ACtxHandle    = HandleGuard<HANDLE, &ReleaseActCtx, INVALID_HANDLE_VALUE>;
+using FileMapHandle = HandleGuard<void*,  &UnmapViewOfFile, nullptr>;
 using SnapHandle    = FileHandle;
-
+using RegHandle     = HandleGuard<HKEY,   &RegCloseKey, nullptr>;
 
 }
