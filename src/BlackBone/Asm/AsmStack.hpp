@@ -2,7 +2,7 @@
 
 #pragma warning(push)
 #pragma warning(disable : 4100)
-#include "../../../contrib/AsmJit/AsmJit.h"
+#include "../../3rd_party/AsmJit/AsmJit.h"
 #pragma warning(pop)
 
 #include "../Include/Macro.h"

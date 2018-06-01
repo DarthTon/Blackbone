@@ -3,7 +3,7 @@
 #include "../../Misc/DynImport.h"
 #include "../../Symbols/SymbolData.h"
 
-#include <VersionHelpers.h>
+#include <3rd_party/VersionApi.h>
 #include <sddl.h>
 #include <AccCtrl.h>
 #include <Aclapi.h>

@@ -135,58 +135,58 @@
     <ClCompile Include="PE\PEImage.cpp">
       <Filter>PE</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86assembler.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86assembler.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86cpuinfo.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86cpuinfo.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86inst.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86inst.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86operand.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86operand.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\x86\x86operand_regs.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86operand_regs.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\assembler.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\assembler.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\codegen.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\codegen.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\constpool.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\constpool.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\containers.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\containers.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\cpuinfo.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\cpuinfo.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\cputicks.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\cputicks.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\error.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\error.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\globals.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\globals.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\operand.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\operand.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\runtime.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\runtime.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\string.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\string.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\vmem.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\vmem.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\AsmJit\base\zone.cpp">
+    <ClCompile Include="..\3rd_party\AsmJit\base\zone.cpp">
       <Filter>AsmJit\Core</Filter>
     </ClCompile>
     <ClCompile Include="Process\RPC\RemoteLocalHook.cpp">
@@ -195,7 +195,7 @@
     <ClCompile Include="Misc\InitOnce.cpp">
       <Filter>Misc</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.cpp">
+    <ClCompile Include="..\3rd_party\rewolf-wow64ext\src\wow64ext.cpp">
       <Filter>Subsystem</Filter>
     </ClCompile>
     <ClCompile Include="DllMain.cpp" />
@@ -358,85 +358,85 @@
     <ClInclude Include="Misc\Thunk.hpp">
       <Filter>Misc</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86assembler.h">
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86assembler.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86cpuinfo.h">
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86cpuinfo.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86inst.h">
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86inst.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86\x86operand.h">
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86operand.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\apibegin.h">
+    <ClInclude Include="..\3rd_party\AsmJit\apibegin.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\apiend.h">
+    <ClInclude Include="..\3rd_party\AsmJit\apiend.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\asmjit.h">
+    <ClInclude Include="..\3rd_party\AsmJit\asmjit.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\build.h">
+    <ClInclude Include="..\3rd_party\AsmJit\build.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\config.h">
+    <ClInclude Include="..\3rd_party\AsmJit\config.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\host.h">
+    <ClInclude Include="..\3rd_party\AsmJit\host.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\x86.h">
+    <ClInclude Include="..\3rd_party\AsmJit\x86.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\assembler.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\assembler.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\codegen.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\codegen.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\constpool.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\constpool.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\containers.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\containers.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\cpuinfo.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\cpuinfo.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\cputicks.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\cputicks.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\error.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\error.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\globals.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\globals.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\lock.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\lock.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\operand.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\operand.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\runtime.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\runtime.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\string.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\string.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\vectypes.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\vectypes.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\vmem.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\vmem.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\AsmJit\base\zone.h">
+    <ClInclude Include="..\3rd_party\AsmJit\base\zone.h">
       <Filter>AsmJit\Core</Filter>
     </ClInclude>
     <ClInclude Include="Process\RPC\RemoteLocalHook.h">
@@ -454,7 +454,7 @@
     <ClInclude Include="Misc\InitOnce.h">
       <Filter>Misc</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\contrib\rewolf-wow64ext\src\wow64ext.h">
+    <ClInclude Include="..\3rd_party\rewolf-wow64ext\src\wow64ext.h">
       <Filter>Subsystem</Filter>
     </ClInclude>
     <ClInclude Include="Include\CallResult.h">

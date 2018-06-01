@@ -2,7 +2,7 @@
 #include "../Include/Winheaders.h"
 #include "../Patterns/PatternSearch.h"
 #include "../Misc/Trace.hpp"
-#include "VersionHelpers.h"
+#include <3rd_party/VersionApi.h>
 
 #include <memory>
 #include <unordered_map>

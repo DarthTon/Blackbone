@@ -1,5 +1,5 @@
 #include "Tests.h"
-#include "../../contrib/VersionHelpers.h"
+#include "../3rd_party/VersionApi.h"
 
 std::set<std::wstring> nativeMods, modList;
 

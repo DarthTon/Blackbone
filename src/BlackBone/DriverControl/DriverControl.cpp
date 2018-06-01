@@ -3,7 +3,7 @@
 #include "../Misc/Trace.hpp"
 #include "../Misc/DynImport.h"
 
-#include "VersionHelpers.h"
+#include <3rd_party/VersionApi.h>
 
 namespace blackbone
 {
