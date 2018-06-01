@@ -7,7 +7,7 @@
 #include "../DriverControl/DriverControl.h"
 
 #include <random>
-#include <VersionHelpers.h>
+#include <3rd_party/VersionApi.h>
 
 #ifndef STATUS_INVALID_EXCEPTION_HANDLER
 #define STATUS_INVALID_EXCEPTION_HANDLER ((NTSTATUS)0xC00001A5L)

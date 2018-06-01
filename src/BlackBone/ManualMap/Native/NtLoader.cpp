@@ -6,7 +6,7 @@
 #include "../../Misc/trace.hpp"
 #include "../../Symbols/SymbolData.h"
 
-#include "../contrib/VersionHelpers.h"
+#include <3rd_party/VersionApi.h>
 
 namespace blackbone
 {

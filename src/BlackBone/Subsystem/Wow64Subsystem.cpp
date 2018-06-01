@@ -1,7 +1,7 @@
 #include "Wow64Subsystem.h"
 #include "../Misc/DynImport.h"
 #include "../Include/Macro.h"
-#include <rewolf-wow64ext/src/wow64ext.h>
+#include <3rd_party/rewolf-wow64ext/src/wow64ext.h>
 
 namespace blackbone
 {

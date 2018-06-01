@@ -297,6 +297,7 @@ DWORD RemoteHook::EventThread()
     if (_debugPID != 0)
     {
         DebugActiveProcessStop( _debugPID );
+
         _debugPID = 0;
     }
 

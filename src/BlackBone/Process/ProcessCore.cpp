@@ -2,7 +2,7 @@
 #include "ProcessCore.h"
 #include "../Misc/DynImport.h"
 #include "../Include/Macro.h"
-#include <VersionHelpers.h>
+#include <3rd_party/VersionApi.h>
 
 namespace blackbone
 {

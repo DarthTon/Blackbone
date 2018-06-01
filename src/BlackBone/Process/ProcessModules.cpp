@@ -15,7 +15,7 @@
 #include <metahost.h>
 #endif
 
-#include <VersionHelpers.h>
+#include <3rd_party/VersionApi.h>
 
 namespace blackbone
 {

@@ -7,7 +7,7 @@
 
 #include <stdint.h>
 #include <algorithm>
-#include <VersionHelpers.h>
+#include <3rd_party/VersionApi.h>
 
 namespace blackbone
 {
