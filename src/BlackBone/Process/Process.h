@@ -201,18 +201,18 @@ public:
     //
     // Subroutines
     //
-    BLACKBONE_API inline ProcessCore&     core()       { return _core;       }  // Core routines and native 
-    BLACKBONE_API inline ProcessMemory&   memory()     { return _memory;     }  // Memory manipulations
-    BLACKBONE_API inline ProcessModules&  modules()    { return _modules;    }  // Module management
-    BLACKBONE_API inline ProcessThreads&  threads()    { return _threads;    }  // Threads
-    BLACKBONE_API inline RemoteHook&      hooks()      { return _hooks;      }  // Hooking code remotely
-    BLACKBONE_API inline RemoteLocalHook& localHooks() { return _localHooks; }  // Hooking code remotely
-    BLACKBONE_API inline RemoteExec&      remote()     { return _remote;     }  // Remote code execution
-    BLACKBONE_API inline MMap&            mmap()       { return _mmap;       }  // Manual module mapping
-    BLACKBONE_API inline NtLdr&           nativeLdr()  { return _nativeLdr;  }  // Native loader routines
+    BLACKBONE_API ProcessCore&     core()       { return _core;       }  // Core routines and native 
+    BLACKBONE_API ProcessMemory&   memory()     { return _memory;     }  // Memory manipulations
+    BLACKBONE_API ProcessModules&  modules()    { return _modules;    }  // Module management
+    BLACKBONE_API ProcessThreads&  threads()    { return _threads;    }  // Threads
+    BLACKBONE_API RemoteHook&      hooks()      { return _hooks;      }  // Hooking code remotely
+    BLACKBONE_API RemoteLocalHook& localHooks() { return _localHooks; }  // Hooking code locally
+    BLACKBONE_API RemoteExec&      remote()     { return _remote;     }  // Remote code execution
+    BLACKBONE_API MMap&            mmap()       { return _mmap;       }  // Manual module mapping
+    BLACKBONE_API NtLdr&           nativeLdr()  { return _nativeLdr;  }  // Native loader routines
 
     // Sugar
-    BLACKBONE_API inline const Wow64Barrier& barrier() const { return _core._native->GetWow64Barrier(); }
+    BLACKBONE_API const Wow64Barrier& barrier() const { return _core._native->GetWow64Barrier(); }
 
 private:
     Process(const Process&) = delete;

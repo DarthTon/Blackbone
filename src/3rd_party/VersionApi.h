@@ -49,13 +49,13 @@ struct WinVersion
     RTL_OSVERSIONINFOEXW native = { };
 };
 
-inline WinVersion& WinVer()
+BLACKBONE_API inline WinVersion& WinVer()
 {
     static WinVersion g_WinVer;
     return g_WinVer;
 }
 
-inline uint32_t GetRevision()
+BLACKBONE_API inline uint32_t GetRevision()
 {
     HKEY hKey = NULL;
 
@@ -84,7 +84,7 @@ inline uint32_t GetRevision()
     return 0;
 }
 
-inline void InitVersion()
+BLACKBONE_API inline void InitVersion()
 {
     auto& g_WinVer = WinVer();
     g_WinVer.native.dwOSVersionInfoSize = sizeof( g_WinVer.native );
@@ -137,7 +137,6 @@ inline void InitVersion()
     g_WinVer.revision = GetRevision();
 }
 
-
 VERSIONHELPERAPI
 IsWindowsVersionOrGreater( WORD wMajorVersion, WORD wMinorVersion, WORD wServicePackMajor, DWORD dwBuild )
 {
@@ -166,11 +165,13 @@ IsWindowsVersionOrGreater( WORD wMajorVersion, WORD wMinorVersion, WORD wService
     return false;
 }
 
+BLACKBONE_API
 VERSIONHELPERAPI
 IsWindowsXPOrGreater()
 {
     return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WINXP ), LOBYTE( _WIN32_WINNT_WINXP ), 0, 0 );
 }
+
 
 VERSIONHELPERAPI
 IsWindowsXPSP1OrGreater()

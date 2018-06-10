@@ -16,11 +16,14 @@ namespace blackbone
 class DynImport
 {
 public:
-    static DynImport& Instance()
+    BLACKBONE_API static DynImport& Instance()
     {
         static DynImport instance;
         return instance;
     }
+
+    DynImport() = default;
+    DynImport( const DynImport& ) = delete;
 
     /// <summary>
     /// Get dll function
@@ -100,10 +103,6 @@ public:
 
         return nullptr;
     }
-
-private:
-    DynImport() = default;
-    DynImport( const DynImport& ) = delete;
 
 private:
     std::unordered_map<std::string, FARPROC> _funcs;    // function database

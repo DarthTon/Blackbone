@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../Include/CallResult.h"
 #include "../../Asm/IAsmHelper.h"
 #include "../Process.h"
 
@@ -27,6 +28,17 @@ public:
         CallArguments( const std::tuple<Args...>& args, std::index_sequence<S...> )
             : arguments{ std::get<S>( args )... }
         {
+        }
+
+        CallArguments( const std::initializer_list<AsmVariant>& args )
+            : arguments{ args }
+        {
+            // Since initializer_list can't be moved from, dataStruct types must be fixed
+            for (auto& arg : arguments)
+            {
+                if (!arg.buf.empty())
+                    arg.imm_val = reinterpret_cast<uintptr_t>(arg.buf.data());
+            }
         }
 
         // Manually set argument to custom value
@@ -108,6 +120,9 @@ public:
         return call_result_t<ReturnType>( result, STATUS_SUCCESS );
     }
 
+    bool valid() const { return _ptr != 0; }
+    explicit operator bool() const { return valid(); }
+
 private:
     Process& _process;
     ptr_t _ptr = 0;
@@ -129,10 +144,10 @@ public: \
     RemoteFunction( Process& proc, R( *ptr )(Args...) ) \
         : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr), CALL_DEF ) { } \
 \
-    call_result_t<ReturnType> Call( const Args&... args, ThreadPtr contextThread = nullptr ) \
+    call_result_t<ReturnType> Call( const Args&... args ) \
     { \
         CallArguments a( args... ); \
-        return RemoteFunctionBase::Call( a, contextThread ); \
+        return RemoteFunctionBase::Call( a ); \
     } \
 \
     call_result_t<ReturnType> Call( const std::tuple<Args...>& args, ThreadPtr contextThread = nullptr ) \
@@ -141,10 +156,40 @@ public: \
         return RemoteFunctionBase::Call( a, contextThread ); \
     } \
 \
+    call_result_t<ReturnType> Call( const std::initializer_list<AsmVariant>& args, ThreadPtr contextThread = nullptr ) \
+    { \
+        CallArguments a( args ); \
+        return RemoteFunctionBase::Call( a, contextThread ); \
+    } \
+\
     call_result_t<ReturnType> Call( CallArguments& args, ThreadPtr contextThread = nullptr ) \
     { \
         return RemoteFunctionBase::Call( args, contextThread ); \
     } \
+\
+    call_result_t<ReturnType> operator()( const Args&... args ) \
+    { \
+        CallArguments a( args... ); \
+        return RemoteFunctionBase::Call( a ); \
+    } \
+\
+    auto MakeArguments( const Args&... args ) \
+    { \
+        return RemoteFunctionBase::CallArguments( args... ); \
+    } \
+\
+    auto MakeArguments( const std::initializer_list<AsmVariant>& args ) \
+    { \
+        return RemoteFunctionBase::CallArguments( args ); \
+    } \
+\
+    auto MakeArguments( const std::tuple<Args...>& args  ) \
+    { \
+        return RemoteFunctionBase::CallArguments( args, std::index_sequence_for<Args...>() ); \
+    } \
+\
+    bool valid() const { return RemoteFunctionBase::valid(); } \
+    explicit operator bool() { return RemoteFunctionBase::valid(); } \
 };
 
 //
@@ -158,5 +203,40 @@ DECLPFN( __stdcall,  cc_stdcall  );
 DECLPFN( __thiscall, cc_thiscall );
 DECLPFN( __fastcall, cc_fastcall );
 #endif
+
+/// <summary>
+/// Get remote function object
+/// </summary>
+/// <param name="ptr">Function address in the remote process</param>
+/// <returns>Function object</returns>
+template<typename T>
+RemoteFunction<T> MakeRemoteFunction( Process& process, ptr_t ptr )
+{
+    return RemoteFunction<T>( process, ptr );
+}
+
+/// <summary>
+/// Get remote function object
+/// </summary>
+/// <param name="ptr">Function address in the remote process</param>
+/// <returns>Function object</returns>
+template<typename T>
+RemoteFunction<T> MakeRemoteFunction( Process& process, T ptr )
+{
+    return RemoteFunction<T>( process, ptr );
+}
+
+/// <summary>
+/// Get remote function object
+/// </summary>
+/// <param name="modName">Remote module name</param>
+/// <param name="name_ord">Function name or ordinal</param>
+/// <returns>Function object</returns>
+template<typename T>
+RemoteFunction<T> MakeRemoteFunction( Process& process, const std::wstring& modName, const char* name_ord )
+{
+    auto ptr = process.modules().GetExport( modName, name_ord );
+    return RemoteFunction<T>( process, ptr ? ptr->procAddress : 0 );
+}
 
 }

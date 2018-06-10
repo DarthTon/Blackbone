@@ -194,7 +194,6 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
 {
     switch (arg.type)
     {
-
     case AsmVariant::imm:
     case AsmVariant::structRet:
         // TODO: resolve 64bit imm values instead of ignoring high bits
@@ -202,7 +201,7 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
         break;
 
     case AsmVariant::dataPtr:
-        PushArgp( arg.new_imm_val, regidx );
+        PushArgp( arg.new_imm_val != 0 ? arg.new_imm_val : arg.imm_val, regidx );
         break;
 
         // Copy argument onto stack   
