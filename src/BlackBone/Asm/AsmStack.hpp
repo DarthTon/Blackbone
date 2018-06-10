@@ -32,11 +32,13 @@ public:
     /// <returns>Variable memory object</returns>
     BLACKBONE_API asmjit::Mem AllocVar( int32_t size )
     {
+        bool x64 = _pAsm->getArch() == asmjit::kArch::kArchX64;
+
         // Align on word length
-        size = static_cast<int32_t>(Align( size, sizeof( uint64_t ) ));
+        size = static_cast<int32_t>(Align( size, x64 ? sizeof( uint64_t ) : sizeof( uint32_t ) ));
 
         asmjit::Mem val;
-        if (_pAsm->getArch() == asmjit::kArch::kArchX64)
+        if (x64)
             val = asmjit::Mem( _pAsm->zsp, disp_ofst, size );
         else
             val = asmjit::Mem( _pAsm->zbp, -disp_ofst - size, size );

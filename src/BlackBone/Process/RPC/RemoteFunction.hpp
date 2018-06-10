@@ -29,6 +29,17 @@ public:
         {
         }
 
+        CallArguments( const std::initializer_list<AsmVariant>& args )
+            : arguments{ args }
+        {
+            // Since initializer_list can't be moved from, dataStruct types must be fixed
+            for (auto& arg : arguments)
+            {
+                if (!arg.buf.empty())
+                    arg.imm_val = reinterpret_cast<uintptr_t>(arg.buf.data());
+            }
+        }
+
         // Manually set argument to custom value
         void set( int pos, const AsmVariant& newVal )
         {
@@ -129,10 +140,10 @@ public: \
     RemoteFunction( Process& proc, R( *ptr )(Args...) ) \
         : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr), CALL_DEF ) { } \
 \
-    call_result_t<ReturnType> Call( const Args&... args, ThreadPtr contextThread = nullptr ) \
+    call_result_t<ReturnType> Call( const Args&... args ) \
     { \
         CallArguments a( args... ); \
-        return RemoteFunctionBase::Call( a, contextThread ); \
+        return RemoteFunctionBase::Call( a ); \
     } \
 \
     call_result_t<ReturnType> Call( const std::tuple<Args...>& args, ThreadPtr contextThread = nullptr ) \
@@ -141,9 +152,21 @@ public: \
         return RemoteFunctionBase::Call( a, contextThread ); \
     } \
 \
+    call_result_t<ReturnType> Call( const std::initializer_list<AsmVariant>& args, ThreadPtr contextThread = nullptr ) \
+    { \
+        CallArguments a( args ); \
+        return RemoteFunctionBase::Call( a, contextThread ); \
+    } \
+\
     call_result_t<ReturnType> Call( CallArguments& args, ThreadPtr contextThread = nullptr ) \
     { \
         return RemoteFunctionBase::Call( args, contextThread ); \
+    } \
+\
+    call_result_t<ReturnType> operator()( const Args&... args ) \
+    { \
+        CallArguments a( args... ); \
+        return RemoteFunctionBase::Call( a ); \
     } \
 };
 

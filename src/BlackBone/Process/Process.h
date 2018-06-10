@@ -206,7 +206,7 @@ public:
     BLACKBONE_API inline ProcessModules&  modules()    { return _modules;    }  // Module management
     BLACKBONE_API inline ProcessThreads&  threads()    { return _threads;    }  // Threads
     BLACKBONE_API inline RemoteHook&      hooks()      { return _hooks;      }  // Hooking code remotely
-    BLACKBONE_API inline RemoteLocalHook& localHooks() { return _localHooks; }  // Hooking code remotely
+    BLACKBONE_API inline RemoteLocalHook& localHooks() { return _localHooks; }  // Hooking code locally
     BLACKBONE_API inline RemoteExec&      remote()     { return _remote;     }  // Remote code execution
     BLACKBONE_API inline MMap&            mmap()       { return _mmap;       }  // Manual module mapping
     BLACKBONE_API inline NtLdr&           nativeLdr()  { return _nativeLdr;  }  // Native loader routines
