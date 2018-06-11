@@ -9,14 +9,11 @@ image: Visual Studio 2017
 clone_folder: c:\projects\blackbone
 
 platform: 
-  - Win32
   - x64
 
 configuration: 
   - Debug
-  - Debug(DLL)
   - Release
-  - Release(DLL)
   
 build:
   parallel: true
