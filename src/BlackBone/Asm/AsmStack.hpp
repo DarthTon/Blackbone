@@ -1,7 +1,7 @@
 #pragma once
 
 #pragma warning(push)
-#pragma warning(disable : 4100)
+#pragma warning(disable : 4100 4804 4245)
 #include "../../3rd_party/AsmJit/AsmJit.h"
 #pragma warning(pop)
 
@@ -17,12 +17,9 @@ class AsmStackAllocator
 public:
     BLACKBONE_API AsmStackAllocator( asmjit::X86Assembler* pAsm, int32_t baseval = 0x28 )
         : _pAsm( pAsm )
-        , disp_ofst( sizeof( uint64_t ) )
+        , _isX64( pAsm->getCode()->getArchType() == asmjit::ArchInfo::kTypeX64 )
+        , _disp_ofst( _isX64 ? baseval : sizeof( uint64_t ) )
     {
-        if (pAsm->getArch() == asmjit::kArch::kArchX64)
-            disp_ofst = baseval;
-        else
-            baseval = 0;
     }
 
     /// <summary>
@@ -30,21 +27,15 @@ public:
     /// </summary>
     /// <param name="size">Variable size</param>
     /// <returns>Variable memory object</returns>
-    BLACKBONE_API asmjit::Mem AllocVar( int32_t size )
+    BLACKBONE_API asmjit::X86Mem AllocVar( int32_t size )
     {
-        bool x64 = _pAsm->getArch() == asmjit::kArch::kArchX64;
-
         // Align on word length
-        size = static_cast<int32_t>(Align( size, x64 ? sizeof( uint64_t ) : sizeof( uint32_t ) ));
+        size = static_cast<int32_t>(Align( size, _isX64 ? sizeof( uint64_t ) : sizeof( uint32_t ) ));
+        _disp_ofst += size;
 
-        asmjit::Mem val;
-        if (x64)
-            val = asmjit::Mem( _pAsm->zsp, disp_ofst, size );
-        else
-            val = asmjit::Mem( _pAsm->zbp, -disp_ofst - size, size );
-
-        disp_ofst += size;
-        return val;
+        return _isX64
+            ? asmjit::X86Mem( _pAsm->zsp(), _disp_ofst, size )
+            : asmjit::X86Mem( _pAsm->zbp(), -_disp_ofst - size, size );
     }
 
     /// <summary>
@@ -54,16 +45,15 @@ public:
     /// <param name="count">Array elements count.</param>
     /// <param name="size">Element size.</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool AllocArray( asmjit::Mem arr[], int count, int32_t size )
+    BLACKBONE_API bool AllocArray( asmjit::X86Mem arr[], int count, int32_t size )
     {
         for (int i = 0; i < count; i++)
         {
-            if (_pAsm->getArch() == asmjit::kArch::kArchX64)
-                arr[i] = asmjit::Mem( _pAsm->zsp, disp_ofst, size );
-            else
-                arr[i] = asmjit::Mem( _pAsm->zbp, -disp_ofst - size, size );
+            _disp_ofst += size;
 
-            disp_ofst += size;
+            arr[i] = _isX64
+                ? asmjit::X86Mem( _pAsm->zsp(), _disp_ofst, size )
+                : asmjit::X86Mem( _pAsm->zbp(), -_disp_ofst - size, size );
         }
 
         return true;
@@ -73,21 +63,22 @@ public:
     /// Get total size of all stack variables
     /// </summary>
     /// <returns></returns>
-    BLACKBONE_API inline intptr_t getTotalSize() const { return disp_ofst; };
+    BLACKBONE_API intptr_t getTotalSize() const { return _disp_ofst; };
 
 private:
     asmjit::X86Assembler* _pAsm;    // Underlying assembler
-    int32_t disp_ofst;              // Next variable stack offset
+    bool _isX64;                    // Architecture is x64
+    int32_t _disp_ofst;             // Next variable stack offset
 };
 
 //
 //  Helpers
 //
-#define ALLOC_STACK_VAR(worker, name, type) asmjit::Mem name( worker.AllocVar( sizeof(type) ) );
-#define ALLOC_STACK_VAR_S(worker, name, size) asmjit::Mem name( worker.AllocVar( size ) );
+#define ALLOC_STACK_VAR(worker, name, type) asmjit::X86Mem name( worker.AllocVar( sizeof(type) ) );
+#define ALLOC_STACK_VAR_S(worker, name, size) asmjit::X86Mem name( worker.AllocVar( size ) );
 
 #define ALLOC_STACK_ARRAY(worker, name, type, count) \
-    asmjit::Mem name[count]; \
+    asmjit::X86Mem name[count]; \
     worker.AllocArray( name, count, sizeof(type) );
 
 }

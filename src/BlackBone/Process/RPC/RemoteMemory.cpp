@@ -349,27 +349,27 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
 
     a.GenPrologue();
     a.EnableX64CallStack( false );
-    a->sub( asmjit::host::rsp, stack_size );
+    a->sub( asmjit::x86::rsp, stack_size );
 
     // Call original function
     for (int i = 0; i < argc[opType] - 4; i++)
     {
-        a->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rsp, (int32_t)stack_size + 0x8 + 0x20 + i * 8 ) );
-        a->mov( asmjit::host::qword_ptr( asmjit::host::rsp, 0x20 + i * 8 ), asmjit::host::rax );
+        a->mov( asmjit::x86::rax, asmjit::x86::qword_ptr( asmjit::x86::rsp, (int32_t)stack_size + 0x8 + 0x20 + i * 8 ) );
+        a->mov( asmjit::x86::qword_ptr( asmjit::x86::rsp, 0x20 + i * 8 ), asmjit::x86::rax );
     }
 
-    a->mov( asmjit::host::rax, _targetShare + hookDataOfs + FIELD_OFFSET( HookData, original_code ) );
-    a->call( asmjit::host::rax );
+    a->mov( asmjit::x86::rax, _targetShare + hookDataOfs + FIELD_OFFSET( HookData, original_code ) );
+    a->call( asmjit::x86::rax );
 
     // Test if call was successful
-    a->test( asmjit::host::rax, asmjit::host::rax );
+    a->test( asmjit::x86::rax, asmjit::x86::rax );
     a->jnz( skip1 );
 
     // Test if memory was committed
     if (opType == MemVirtualAlloc)
     {
-        a->mov( asmjit::host::eax, asmjit::host::dword_ptr( asmjit::host::rsp, (int32_t)stack_size + 0x8 + 0x20 ) );
-        a->cmp( asmjit::host::eax, MEM_COMMIT );
+        a->mov( asmjit::x86::eax, asmjit::x86::dword_ptr( asmjit::x86::rsp, (int32_t)stack_size + 0x8 + 0x20 ) );
+        a->cmp( asmjit::x86::eax, MEM_COMMIT );
         a->jne( skip1 );
     }
 
@@ -377,35 +377,35 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     a.GenCall( (uintptr_t)pEnterCS.procAddress, { _targetShare + FIELD_OFFSET( PageContext, csLock ) } );
 
     // Storage pointer
-    a->lea( asmjit::host::rdx, data );
+    a->lea( asmjit::x86::rdx, data );
 
     // Allocation address
     if (allocIdx[opType] > 3)
-        a->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rsp, (int32_t)stack_size + 0x8 + 0x20 + (allocIdx[opType] - 4) * 8 ) );
+        a->mov( asmjit::x86::rax, asmjit::x86::qword_ptr( asmjit::x86::rsp, (int32_t)stack_size + 0x8 + 0x20 + (allocIdx[opType] - 4) * 8 ) );
     else
-        a->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rsp, (int32_t)stack_size + 0x8 + allocIdx[opType] * 8 ) );
+        a->mov( asmjit::x86::rax, asmjit::x86::qword_ptr( asmjit::x86::rsp, (int32_t)stack_size + 0x8 + allocIdx[opType] * 8 ) );
 
     if (opType != MemUnmapSection)
-        a->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rax ) );
+        a->mov( asmjit::x86::rax, asmjit::x86::qword_ptr( asmjit::x86::rax ) );
 
-    a->mov( asmjit::host::qword_ptr( asmjit::host::rdx, FIELD_OFFSET( OperationData, allocAddress ) ), asmjit::host::rax );
+    a->mov( asmjit::x86::qword_ptr( asmjit::x86::rdx, FIELD_OFFSET( OperationData, allocAddress ) ), asmjit::x86::rax );
 
     if (sizeIdx[opType] != -1)
     {
         // Region size
         if (sizeIdx[opType] > 3)
-            a->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rsp, (int32_t)stack_size + 0x8 + 0x20 + (sizeIdx[opType] - 4) * 8 ) );
+            a->mov( asmjit::x86::rax, asmjit::x86::qword_ptr( asmjit::x86::rsp, (int32_t)stack_size + 0x8 + 0x20 + (sizeIdx[opType] - 4) * 8 ) );
         else
-            a->mov( asmjit::host::rax, asmjit::host::qword_ptr( asmjit::host::rsp, (int32_t)stack_size + 0x8 + sizeIdx[opType] * 8 ) );
+            a->mov( asmjit::x86::rax, asmjit::x86::qword_ptr( asmjit::x86::rsp, (int32_t)stack_size + 0x8 + sizeIdx[opType] * 8 ) );
 
-        a->mov( asmjit::host::eax, asmjit::host::dword_ptr( asmjit::host::rax ) );
-        a->mov( asmjit::host::dword_ptr( asmjit::host::rdx, FIELD_OFFSET( OperationData, allocSize ) ), asmjit::host::eax );
+        a->mov( asmjit::x86::eax, asmjit::x86::dword_ptr( asmjit::x86::rax ) );
+        a->mov( asmjit::x86::dword_ptr( asmjit::x86::rdx, FIELD_OFFSET( OperationData, allocSize ) ), asmjit::x86::eax );
     }
     else
-        a->mov( asmjit::host::dword_ptr( asmjit::host::rdx, FIELD_OFFSET( OperationData, allocSize ) ), 0 );
+        a->mov( asmjit::x86::dword_ptr( asmjit::x86::rdx, FIELD_OFFSET( OperationData, allocSize ) ), 0 );
 
     // Operation type
-    a->mov( asmjit::host::dword_ptr( asmjit::host::rdx, FIELD_OFFSET( OperationData, allocType ) ), opType );
+    a->mov( asmjit::x86::dword_ptr( asmjit::x86::rdx, FIELD_OFFSET( OperationData, allocType ) ), opType );
 
     a.GenCall( (uintptr_t)pWrite.procAddress, { (uint64_t)_targetPipe, &data, sizeof( OperationData ), &junk, 0 } );
 
@@ -413,14 +413,16 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     a.GenCall( (uintptr_t)pLeaveCS.procAddress, { _targetShare + FIELD_OFFSET( PageContext, csLock ) } );
 
     // Ignore return value
-    a->xor_( asmjit::host::rax, asmjit::host::rax );
+    a->xor_( asmjit::x86::rax, asmjit::x86::rax );
 
     a->bind( skip1 );
-    a->add( asmjit::host::rsp, stack_size );
+    a->add( asmjit::x86::rsp, stack_size );
     a->ret();
 
-    a->setBaseAddress( _targetShare + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
-    a->relocCode( (uint8_t*)_pSharedData + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
+    a.relocate(
+        (uint8_t*)_pSharedData + hookDataOfs + FIELD_OFFSET( HookData, hook_code ),
+        _targetShare + hookDataOfs + FIELD_OFFSET( HookData, hook_code )
+    );
 }
 
 /// <summary>
@@ -473,23 +475,23 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).result( exportData() ).procAddress;
 
     a.GenPrologue();
-    a->sub( asmjit::host::esp, sa.getTotalSize() );
+    a->sub( asmjit::x86::esp, sa.getTotalSize() );
 
     // Call original
     for (int i = 0; i < argc[opType]; i++)
-        a->push( asmjit::host::dword_ptr( asmjit::host::ebp, (argc[opType] - i) * 4 + 4 ) );
+        a->push( asmjit::x86::dword_ptr( asmjit::x86::ebp, (argc[opType] - i) * 4 + 4 ) );
 
     a->call( _targetShare + hookDataOfs + FIELD_OFFSET( HookData, original_code ) );
 
     // Test if call was successful
-    a->test( asmjit::host::eax, asmjit::host::eax );
+    a->test( asmjit::x86::eax, asmjit::x86::eax );
     a->jnz( skip1 );
 
     if (testIdx[opType] != -1)
     {
         // Test if memory was committed
-        a->mov( asmjit::host::eax, asmjit::host::dword_ptr( asmjit::host::ebp, 8 + testIdx[opType] * 4 ) );
-        a->cmp( asmjit::host::eax, MEM_COMMIT );
+        a->mov( asmjit::x86::eax, asmjit::x86::dword_ptr( asmjit::x86::ebp, 8 + testIdx[opType] * 4 ) );
+        a->cmp( asmjit::x86::eax, MEM_COMMIT );
         a->jne( skip1 );
     }
 
@@ -497,44 +499,46 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     a.GenCall( (uintptr_t)pEnterCS, { (uintptr_t)_targetShare + FIELD_OFFSET( PageContext, csLock ) } );
 
     // Storage pointer
-    a->lea( asmjit::host::edx, data );
+    a->lea( asmjit::x86::edx, data );
     
     //
     // Allocation address
     //
-    a->mov( asmjit::host::eax, asmjit::host::dword_ptr( asmjit::host::ebp, 8 + 4 * allocIdx[opType] ) );
+    a->mov( asmjit::x86::eax, asmjit::x86::dword_ptr( asmjit::x86::ebp, 8 + 4 * allocIdx[opType] ) );
     if (opType != MemUnmapSection)
-        a->mov( asmjit::host::eax, asmjit::host::dword_ptr( asmjit::host::eax ) );
-    a->mov( asmjit::host::dword_ptr( asmjit::host::edx, FIELD_OFFSET( OperationData, allocAddress ) ), asmjit::host::eax );
-    a->mov( asmjit::host::dword_ptr( asmjit::host::edx, FIELD_OFFSET( OperationData, allocAddress ) + 4 ), 0 );
+        a->mov( asmjit::x86::eax, asmjit::x86::dword_ptr( asmjit::x86::eax ) );
+    a->mov( asmjit::x86::dword_ptr( asmjit::x86::edx, FIELD_OFFSET( OperationData, allocAddress ) ), asmjit::x86::eax );
+    a->mov( asmjit::x86::dword_ptr( asmjit::x86::edx, FIELD_OFFSET( OperationData, allocAddress ) + 4 ), 0 );
 
     //
     // Region size
     //
     if (sizeIdx[opType] != -1)
     {
-        a->mov( asmjit::host::eax, asmjit::host::dword_ptr( asmjit::host::ebp, 8 + 4 * sizeIdx[opType] ) );
-        a->mov( asmjit::host::eax, asmjit::host::dword_ptr( asmjit::host::eax ) );
+        a->mov( asmjit::x86::eax, asmjit::x86::dword_ptr( asmjit::x86::ebp, 8 + 4 * sizeIdx[opType] ) );
+        a->mov( asmjit::x86::eax, asmjit::x86::dword_ptr( asmjit::x86::eax ) );
     }
     else
-        a->xor_( asmjit::host::eax, asmjit::host::eax );
+        a->xor_( asmjit::x86::eax, asmjit::x86::eax );
 
-    a->mov( asmjit::host::dword_ptr( asmjit::host::edx, FIELD_OFFSET( OperationData, allocSize ) ), asmjit::host::eax );
+    a->mov( asmjit::x86::dword_ptr( asmjit::x86::edx, FIELD_OFFSET( OperationData, allocSize ) ), asmjit::x86::eax );
 
     // Operation type
-    a->mov( asmjit::host::dword_ptr( asmjit::host::edx, FIELD_OFFSET( OperationData, allocType ) ), opType );
+    a->mov( asmjit::x86::dword_ptr( asmjit::x86::edx, FIELD_OFFSET( OperationData, allocType ) ), opType );
 
-    a.GenCall( (uintptr_t)pWrite, { (uintptr_t)_targetPipe, asmjit::host::edx, sizeof( OperationData ), &junk, 0 } );
+    a.GenCall( (uintptr_t)pWrite, { (uintptr_t)_targetPipe, asmjit::x86::edx, sizeof( OperationData ), &junk, 0 } );
     a.GenCall( (uintptr_t)pLeaveCS, { (uintptr_t)_targetShare + FIELD_OFFSET( PageContext, csLock ) } );
 
     // Ignore return value
-    a->xor_( asmjit::host::eax, asmjit::host::eax );
+    a->xor_( asmjit::x86::eax, asmjit::x86::eax );
 
     a->bind( skip1 );
     a.GenEpilogue( false, argc[opType] * 4 );
 
-    a->setBaseAddress( _targetShare + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
-    a->relocCode( (uint8_t*)_pSharedData + hookDataOfs + FIELD_OFFSET( HookData, hook_code ) );
+    a.relocate(
+        (uint8_t*)_pSharedData + hookDataOfs + FIELD_OFFSET( HookData, hook_code ),
+        _targetShare + hookDataOfs + FIELD_OFFSET( HookData, hook_code )
+    );
 }
 
 /// <summary>

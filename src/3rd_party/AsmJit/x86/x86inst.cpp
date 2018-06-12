@@ -4,18 +4,40 @@
 // [License]
 // Zlib - See LICENSE.md file in the package.
 
+// ----------------------------------------------------------------------------
+// IMPORTANT: AsmJit now uses an external instruction database to populate
+// static tables within this file. Perform the following steps to regenerate
+// all tables enclosed by ${...}:
+//
+//   1. Install node.js environment <https://nodejs.org>
+//   2. Go to asmjit/tools directory
+//   3. Install either asmdb package by executing `npm install asmdb` or get
+//      the latest asmdb from <https://github.com/asmjit/asmdb> and copy/link
+//      the `asmdb` directory to `asmjit/tools/asmdb`.
+//   4. Execute `node generate-x86.js`
+//
+// Instruction encoding and opcodes were added to the `x86inst.cpp` database
+// manually in the past and they are not updated by the script as they seem
+// consistent. However, everything else is updated including instruction
+// operands and tables required to validate them, instruction read/write
+// information (including registers and flags), and all indexes to all tables.
+// ----------------------------------------------------------------------------
+
 // [Export]
 #define ASMJIT_EXPORTS
 
 // [Guard]
-#include "../build.h"
-#if defined(ASMJIT_BUILD_X86) || defined(ASMJIT_BUILD_X64)
+#include "../asmjit_build.h"
+#if defined(ASMJIT_BUILD_X86)
 
-// [Dependencies - AsmJit]
+// [Dependencies]
+#include "../base/cpuinfo.h"
+#include "../base/utils.h"
 #include "../x86/x86inst.h"
+#include "../x86/x86operand.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -24,4948 +46,3685 @@ namespace asmjit {
 // ============================================================================
 
 //! \internal
-enum {
-  kX86InstTable_L__ = (0) << kX86InstOpCode_L_Shift,
-  kX86InstTable_L_I = (0) << kX86InstOpCode_L_Shift,
-  kX86InstTable_L_0 = (0) << kX86InstOpCode_L_Shift,
-  kX86InstTable_L_L = (1) << kX86InstOpCode_L_Shift,
+enum ODATA_ {
+  // PREFIX.
+  ODATA_000000  = X86Inst::kOpCode_PP_00 | X86Inst::kOpCode_MM_00,
+  ODATA_000F00  = X86Inst::kOpCode_PP_00 | X86Inst::kOpCode_MM_0F,
+  ODATA_000F01  = X86Inst::kOpCode_PP_00 | X86Inst::kOpCode_MM_0F01,
+  ODATA_000F38  = X86Inst::kOpCode_PP_00 | X86Inst::kOpCode_MM_0F38,
+  ODATA_000F3A  = X86Inst::kOpCode_PP_00 | X86Inst::kOpCode_MM_0F3A,
+  ODATA_660000  = X86Inst::kOpCode_PP_66 | X86Inst::kOpCode_MM_00,
+  ODATA_660F00  = X86Inst::kOpCode_PP_66 | X86Inst::kOpCode_MM_0F,
+  ODATA_660F38  = X86Inst::kOpCode_PP_66 | X86Inst::kOpCode_MM_0F38,
+  ODATA_660F3A  = X86Inst::kOpCode_PP_66 | X86Inst::kOpCode_MM_0F3A,
+  ODATA_F20000  = X86Inst::kOpCode_PP_F2 | X86Inst::kOpCode_MM_00,
+  ODATA_F20F00  = X86Inst::kOpCode_PP_F2 | X86Inst::kOpCode_MM_0F,
+  ODATA_F20F38  = X86Inst::kOpCode_PP_F2 | X86Inst::kOpCode_MM_0F38,
+  ODATA_F20F3A  = X86Inst::kOpCode_PP_F2 | X86Inst::kOpCode_MM_0F3A,
+  ODATA_F30000  = X86Inst::kOpCode_PP_F3 | X86Inst::kOpCode_MM_00,
+  ODATA_F30F00  = X86Inst::kOpCode_PP_F3 | X86Inst::kOpCode_MM_0F,
+  ODATA_F30F38  = X86Inst::kOpCode_PP_F3 | X86Inst::kOpCode_MM_0F38,
+  ODATA_F30F3A  = X86Inst::kOpCode_PP_F3 | X86Inst::kOpCode_MM_0F3A,
+  ODATA_000F0F  = X86Inst::kOpCode_PP_00 | X86Inst::kOpCode_MM_0F, // 3DNOW, special case.
 
-  kX86InstTable_W__ = (0) << kX86InstOpCode_W_Shift,
-  kX86InstTable_W_I = (0) << kX86InstOpCode_W_Shift,
-  kX86InstTable_W_0 = (0) << kX86InstOpCode_W_Shift,
-  kX86InstTable_W_1 = (1) << kX86InstOpCode_W_Shift,
-  kX86InstTable_W_W = (1) << kX86InstOpCode_W_Shift,
+  ODATA_FPU_00  = X86Inst::kOpCode_PP_00,
+  ODATA_FPU_9B  = X86Inst::kOpCode_PP_9B,
 
-  kX86InstTable_E__ = (0) << kX86InstOpCode_EW_Shift,
-  kX86InstTable_E_I = (0) << kX86InstOpCode_EW_Shift,
-  kX86InstTable_E_0 = (0) << kX86InstOpCode_EW_Shift,
-  kX86InstTable_E_1 = (1) << kX86InstOpCode_EW_Shift
+  ODATA_XOP_M8  = X86Inst::kOpCode_MM_XOP08,
+  ODATA_XOP_M9  = X86Inst::kOpCode_MM_XOP09,
+
+  ODATA_O__     = 0,
+  ODATA_O_0     = 0 << X86Inst::kOpCode_O_Shift,
+  ODATA_O_1     = 1 << X86Inst::kOpCode_O_Shift,
+  ODATA_O_2     = 2 << X86Inst::kOpCode_O_Shift,
+  ODATA_O_3     = 3 << X86Inst::kOpCode_O_Shift,
+  ODATA_O_4     = 4 << X86Inst::kOpCode_O_Shift,
+  ODATA_O_5     = 5 << X86Inst::kOpCode_O_Shift,
+  ODATA_O_6     = 6 << X86Inst::kOpCode_O_Shift,
+  ODATA_O_7     = 7 << X86Inst::kOpCode_O_Shift,
+
+  // REX/VEX.
+  ODATA_LL__    = 0,                                  // L is unspecified.
+  ODATA_LL_x    = 0,                                  // L is based on operand(s).
+  ODATA_LL_I    = 0,                                  // L is ignored (LIG).
+  ODATA_LL_0    = 0,                                  // L has to be zero (L.128).
+  ODATA_LL_1    = X86Inst::kOpCode_LL_256,            // L has to be one (L.256).
+  ODATA_LL_2    = X86Inst::kOpCode_LL_512,            // L has to be two (L.512).
+
+  ODATA_W__     = 0,                                  // W is unspecified.
+  ODATA_W_x     = 0,                                  // W is based on operand(s).
+  ODATA_W_I     = 0,                                  // W is ignored (WIG).
+  ODATA_W_0     = 0,                                  // W has to be zero (W0).
+  ODATA_W_1     = X86Inst::kOpCode_W,                 // W has to be one (W1).
+
+  // EVEX.
+  ODATA_EvexW__ = 0,                                  // Not EVEX instruction.
+  ODATA_EvexW_x = 0,                                  // EVEX.W is based on operand(s).
+  ODATA_EvexW_I = 0,                                  // EVEX.W is ignored     (EVEX.WIG).
+  ODATA_EvexW_0 = 0,                                  // EVEX.W has to be zero (EVEX.W0).
+  ODATA_EvexW_1 = X86Inst::kOpCode_EW,                // EVEX.W has to be one  (EVEX.W1).
+
+  ODATA_N__      = 0,                                 // Base element size not used.
+  ODATA_N_0      = 0 << X86Inst::kOpCode_CDSHL_Shift, // N << 0 (BYTE).
+  ODATA_N_1      = 1 << X86Inst::kOpCode_CDSHL_Shift, // N << 1 (WORD).
+  ODATA_N_2      = 2 << X86Inst::kOpCode_CDSHL_Shift, // N << 2 (DWORD).
+  ODATA_N_3      = 3 << X86Inst::kOpCode_CDSHL_Shift, // N << 3 (QWORD).
+  ODATA_N_4      = 4 << X86Inst::kOpCode_CDSHL_Shift, // N << 4 (OWORD).
+  ODATA_N_5      = 5 << X86Inst::kOpCode_CDSHL_Shift, // N << 5 (YWORD).
+
+  ODATA_TT__     = 0,
+  ODATA_TT_FV    = X86Inst::kOpCode_CDTT_FV,
+  ODATA_TT_HV    = X86Inst::kOpCode_CDTT_HV,
+  ODATA_TT_FVM   = X86Inst::kOpCode_CDTT_FVM,
+  ODATA_TT_T1S   = X86Inst::kOpCode_CDTT_T1S,
+  ODATA_TT_T1F   = X86Inst::kOpCode_CDTT_T1F,
+  ODATA_TT_T1W   = X86Inst::kOpCode_CDTT_T1W,
+  ODATA_TT_T2    = X86Inst::kOpCode_CDTT_T2,
+  ODATA_TT_T4    = X86Inst::kOpCode_CDTT_T4,
+  ODATA_TT_T8    = X86Inst::kOpCode_CDTT_T8,
+  ODATA_TT_HVM   = X86Inst::kOpCode_CDTT_HVM,
+  ODATA_TT_OVM   = X86Inst::kOpCode_CDTT_OVM,
+  ODATA_TT_QVM   = X86Inst::kOpCode_CDTT_QVM,
+  ODATA_TT_128   = X86Inst::kOpCode_CDTT_128,
+  ODATA_TT_DUP   = X86Inst::kOpCode_CDTT_DUP,
+  ODATA_TT_T4X   = X86Inst::kOpCode_CDTT_T1_4X
 };
-
-//! \internal
-//!
-//! Combined flags.
-enum kX86InstOpInternal {
-  kX86InstOpI        = kX86InstOpImm,
-  kX86InstOpL        = kX86InstOpLabel,
-  kX86InstOpLbImm    = kX86InstOpLabel | kX86InstOpImm,
-
-  kX86InstOpGwb      = kX86InstOpGw    | kX86InstOpGb,
-  kX86InstOpGqd      = kX86InstOpGq    | kX86InstOpGd,
-  kX86InstOpGqdw     = kX86InstOpGq    | kX86InstOpGd | kX86InstOpGw,
-  kX86InstOpGqdwb    = kX86InstOpGq    | kX86InstOpGd | kX86InstOpGw | kX86InstOpGb,
-
-  kX86InstOpGbMem    = kX86InstOpGb    | kX86InstOpMem,
-  kX86InstOpGwMem    = kX86InstOpGw    | kX86InstOpMem,
-  kX86InstOpGdMem    = kX86InstOpGd    | kX86InstOpMem,
-  kX86InstOpGqMem    = kX86InstOpGq    | kX86InstOpMem,
-  kX86InstOpGwbMem   = kX86InstOpGwb   | kX86InstOpMem,
-  kX86InstOpGqdMem   = kX86InstOpGqd   | kX86InstOpMem,
-  kX86InstOpGqdwMem  = kX86InstOpGqdw  | kX86InstOpMem,
-  kX86InstOpGqdwbMem = kX86InstOpGqdwb | kX86InstOpMem,
-
-  kX86InstOpFpMem    = kX86InstOpFp    | kX86InstOpMem,
-  kX86InstOpMmMem    = kX86InstOpMm    | kX86InstOpMem,
-  kX86InstOpKMem     = kX86InstOpK     | kX86InstOpMem,
-  kX86InstOpXmmMem   = kX86InstOpXmm   | kX86InstOpMem,
-  kX86InstOpYmmMem   = kX86InstOpYmm   | kX86InstOpMem,
-  kX86InstOpZmmMem   = kX86InstOpZmm   | kX86InstOpMem,
-
-  kX86InstOpMmXmm    = kX86InstOpMm    | kX86InstOpXmm,
-  kX86InstOpMmXmmMem = kX86InstOpMmXmm | kX86InstOpMem,
-
-  kX86InstOpXy       = kX86InstOpXmm   | kX86InstOpYmm,
-  kX86InstOpXyMem    = kX86InstOpXy    | kX86InstOpMem,
-
-  kX86InstOpXyz      = kX86InstOpXy    | kX86InstOpZmm,
-  kX86InstOpXyzMem   = kX86InstOpXyz   | kX86InstOpMem
-};
-
-//! \internal
-//!
-//! X86/X64 Instruction AVX-512 flags (combined).
-ASMJIT_ENUM(kX86InstFlagsInternal) {
-  // FPU.
-  kX86InstFlagMem2_4           = kX86InstFlagMem2        | kX86InstFlagMem4,
-  kX86InstFlagMem2_4_8         = kX86InstFlagMem2_4      | kX86InstFlagMem8,
-  kX86InstFlagMem4_8           = kX86InstFlagMem4        | kX86InstFlagMem8,
-  kX86InstFlagMem4_8_10        = kX86InstFlagMem4_8      | kX86InstFlagMem10
-};
-
-// ============================================================================
-// [Macros]
-// ============================================================================
-
-#if !defined(ASMJIT_DISABLE_NAMES)
-# define INST_NAME_INDEX(_Code_) _Code_##_NameIndex
-#else
-# define INST_NAME_INDEX(_Code_) 0
-#endif
-
-// Undefined. Used to distinguish between zero and field that is not used.
-#define U 0
-
-// Instruction opcodes.
-#define O_000000(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_00 | kX86InstOpCode_MM_00   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_000F00(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_00 | kX86InstOpCode_MM_0F   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_000F01(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_00 | kX86InstOpCode_MM_0F01 | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_000F0F(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_00 | kX86InstOpCode_MM_0F   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_000F38(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_00 | kX86InstOpCode_MM_0F38 | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_000F3A(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_00 | kX86InstOpCode_MM_0F3A | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_660000(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_66 | kX86InstOpCode_MM_00   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_660F00(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_66 | kX86InstOpCode_MM_0F   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_660F38(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_66 | kX86InstOpCode_MM_0F38 | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_660F3A(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_66 | kX86InstOpCode_MM_0F3A | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_9B0000(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_9B | kX86InstOpCode_MM_00   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_F20000(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_F2 | kX86InstOpCode_MM_00   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_F20F00(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_F2 | kX86InstOpCode_MM_0F   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_F20F38(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_F2 | kX86InstOpCode_MM_0F38 | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_F20F3A(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_F2 | kX86InstOpCode_MM_0F3A | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_F30000(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_F3 | kX86InstOpCode_MM_00   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_F30F00(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_F3 | kX86InstOpCode_MM_0F   | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_F30F38(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_F3 | kX86InstOpCode_MM_0F38 | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_F30F3A(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_F3 | kX86InstOpCode_MM_0F3A | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-
-#define O_00_M08(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_00 | kX86InstOpCode_MM_01000| (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_00_M09(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_00 | kX86InstOpCode_MM_01001| (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-#define O_66_M03(_OpCode_, _O_, _L_, _W_, _EVEX_W_) (kX86InstOpCode_PP_66 | kX86InstOpCode_MM_00011| (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift) | kX86InstTable_L_##_L_ | kX86InstTable_W_##_W_ | kX86InstTable_E_##_EVEX_W_)
-
-#define O_00_X(_OpCode_, _O_) (kX86InstOpCode_PP_00 | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift))
-#define O_9B_X(_OpCode_, _O_) (kX86InstOpCode_PP_9B | (0x##_OpCode_) | ((_O_) << kX86InstOpCode_O_Shift))
-
-// Instruction Encoding `Enc(...)`.
-#define Enc(_Id_) kX86InstEncodingId##_Id_
-
-// Instruction Flags `F(...)` and AVX-512 `AVX(...)`flags.
-#define F(_Flags_) kX86InstFlag##_Flags_
-
-#define A(_Flags_) kX86InstFlagAvx512##_Flags_
-
-// Instruction EFLAGS `E(OSZAPCDX)`.
-#define EF(_Flags_) 0
-
-// Instruction Operands' Flags `O(...)`.
-#define O(_Op_) kX86InstOp##_Op_
-
-// Defines an X86/X64 instruction.
-#define INST(_Id_, _Name_, _OpCode0_, _OpCode1_, _Encoding_, _IFlags_, _EFlags_, _WriteIndex_, _WriteSize_, _Op0_, _Op_, _Op2_, _Op3_, _Op4_) \
-  { INST_NAME_INDEX(_Id_), _Id_##_ExtendedIndex, _OpCode0_ }
 
 // ============================================================================
 // [asmjit::X86Inst]
 // ============================================================================
 
-// ${X86InstData:Begin}
-// Automatically generated, do not edit.
-#if !defined(ASMJIT_DISABLE_NAMES)
-const char _x86InstName[] =
-  "\0"
-  "adc\0"
-  "add\0"
-  "addpd\0"
-  "addps\0"
-  "addsd\0"
-  "addss\0"
-  "addsubpd\0"
-  "addsubps\0"
-  "aesdec\0"
-  "aesdeclast\0"
-  "aesenc\0"
-  "aesenclast\0"
-  "aesimc\0"
-  "aeskeygenassist\0"
-  "and\0"
-  "andn\0"
-  "andnpd\0"
-  "andnps\0"
-  "andpd\0"
-  "andps\0"
-  "bextr\0"
-  "blendpd\0"
-  "blendps\0"
-  "blendvpd\0"
-  "blendvps\0"
-  "blsi\0"
-  "blsmsk\0"
-  "blsr\0"
-  "bsf\0"
-  "bsr\0"
-  "bswap\0"
-  "bt\0"
-  "btc\0"
-  "btr\0"
-  "bts\0"
-  "bzhi\0"
-  "call\0"
-  "cbw\0"
-  "cdq\0"
-  "cdqe\0"
-  "clc\0"
-  "cld\0"
-  "clflush\0"
-  "cmc\0"
-  "cmova\0"
-  "cmovae\0"
-  "cmovb\0"
-  "cmovbe\0"
-  "cmovc\0"
-  "cmove\0"
-  "cmovg\0"
-  "cmovge\0"
-  "cmovl\0"
-  "cmovle\0"
-  "cmovna\0"
-  "cmovnae\0"
-  "cmovnb\0"
-  "cmovnbe\0"
-  "cmovnc\0"
-  "cmovne\0"
-  "cmovng\0"
-  "cmovnge\0"
-  "cmovnl\0"
-  "cmovnle\0"
-  "cmovno\0"
-  "cmovnp\0"
-  "cmovns\0"
-  "cmovnz\0"
-  "cmovo\0"
-  "cmovp\0"
-  "cmovpe\0"
-  "cmovpo\0"
-  "cmovs\0"
-  "cmovz\0"
-  "cmp\0"
-  "cmppd\0"
-  "cmpps\0"
-  "cmps_b\0"
-  "cmps_d\0"
-  "cmps_q\0"
-  "cmps_w\0"
-  "cmpsd\0"
-  "cmpss\0"
-  "cmpxchg\0"
-  "cmpxchg16b\0"
-  "cmpxchg8b\0"
-  "comisd\0"
-  "comiss\0"
-  "cpuid\0"
-  "cqo\0"
-  "crc32\0"
-  "cvtdq2pd\0"
-  "cvtdq2ps\0"
-  "cvtpd2dq\0"
-  "cvtpd2pi\0"
-  "cvtpd2ps\0"
-  "cvtpi2pd\0"
-  "cvtpi2ps\0"
-  "cvtps2dq\0"
-  "cvtps2pd\0"
-  "cvtps2pi\0"
-  "cvtsd2si\0"
-  "cvtsd2ss\0"
-  "cvtsi2sd\0"
-  "cvtsi2ss\0"
-  "cvtss2sd\0"
-  "cvtss2si\0"
-  "cvttpd2dq\0"
-  "cvttpd2pi\0"
-  "cvttps2dq\0"
-  "cvttps2pi\0"
-  "cvttsd2si\0"
-  "cvttss2si\0"
-  "cwd\0"
-  "cwde\0"
-  "daa\0"
-  "das\0"
-  "dec\0"
-  "div\0"
-  "divpd\0"
-  "divps\0"
-  "divsd\0"
-  "divss\0"
-  "dppd\0"
-  "dpps\0"
-  "emms\0"
-  "enter\0"
-  "extractps\0"
-  "extrq\0"
-  "f2xm1\0"
-  "fabs\0"
-  "fadd\0"
-  "faddp\0"
-  "fbld\0"
-  "fbstp\0"
-  "fchs\0"
-  "fclex\0"
-  "fcmovb\0"
-  "fcmovbe\0"
-  "fcmove\0"
-  "fcmovnb\0"
-  "fcmovnbe\0"
-  "fcmovne\0"
-  "fcmovnu\0"
-  "fcmovu\0"
-  "fcom\0"
-  "fcomi\0"
-  "fcomip\0"
-  "fcomp\0"
-  "fcompp\0"
-  "fcos\0"
-  "fdecstp\0"
-  "fdiv\0"
-  "fdivp\0"
-  "fdivr\0"
-  "fdivrp\0"
-  "femms\0"
-  "ffree\0"
-  "fiadd\0"
-  "ficom\0"
-  "ficomp\0"
-  "fidiv\0"
-  "fidivr\0"
-  "fild\0"
-  "fimul\0"
-  "fincstp\0"
-  "finit\0"
-  "fist\0"
-  "fistp\0"
-  "fisttp\0"
-  "fisub\0"
-  "fisubr\0"
-  "fld\0"
-  "fld1\0"
-  "fldcw\0"
-  "fldenv\0"
-  "fldl2e\0"
-  "fldl2t\0"
-  "fldlg2\0"
-  "fldln2\0"
-  "fldpi\0"
-  "fldz\0"
-  "fmul\0"
-  "fmulp\0"
-  "fnclex\0"
-  "fninit\0"
-  "fnop\0"
-  "fnsave\0"
-  "fnstcw\0"
-  "fnstenv\0"
-  "fnstsw\0"
-  "fpatan\0"
-  "fprem\0"
-  "fprem1\0"
-  "fptan\0"
-  "frndint\0"
-  "frstor\0"
-  "fsave\0"
-  "fscale\0"
-  "fsin\0"
-  "fsincos\0"
-  "fsqrt\0"
-  "fst\0"
-  "fstcw\0"
-  "fstenv\0"
-  "fstp\0"
-  "fstsw\0"
-  "fsub\0"
-  "fsubp\0"
-  "fsubr\0"
-  "fsubrp\0"
-  "ftst\0"
-  "fucom\0"
-  "fucomi\0"
-  "fucomip\0"
-  "fucomp\0"
-  "fucompp\0"
-  "fwait\0"
-  "fxam\0"
-  "fxch\0"
-  "fxrstor\0"
-  "fxsave\0"
-  "fxtract\0"
-  "fyl2x\0"
-  "fyl2xp1\0"
-  "haddpd\0"
-  "haddps\0"
-  "hsubpd\0"
-  "hsubps\0"
-  "idiv\0"
-  "imul\0"
-  "inc\0"
-  "insertps\0"
-  "insertq\0"
-  "int\0"
-  "ja\0"
-  "jae\0"
-  "jb\0"
-  "jbe\0"
-  "jc\0"
-  "je\0"
-  "jg\0"
-  "jge\0"
-  "jl\0"
-  "jle\0"
-  "jna\0"
-  "jnae\0"
-  "jnb\0"
-  "jnbe\0"
-  "jnc\0"
-  "jne\0"
-  "jng\0"
-  "jnge\0"
-  "jnl\0"
-  "jnle\0"
-  "jno\0"
-  "jnp\0"
-  "jns\0"
-  "jnz\0"
-  "jo\0"
-  "jp\0"
-  "jpe\0"
-  "jpo\0"
-  "js\0"
-  "jz\0"
-  "jecxz\0"
-  "jmp\0"
-  "lahf\0"
-  "lddqu\0"
-  "ldmxcsr\0"
-  "lea\0"
-  "leave\0"
-  "lfence\0"
-  "lods_b\0"
-  "lods_d\0"
-  "lods_q\0"
-  "lods_w\0"
-  "lzcnt\0"
-  "maskmovdqu\0"
-  "maskmovq\0"
-  "maxpd\0"
-  "maxps\0"
-  "maxsd\0"
-  "maxss\0"
-  "mfence\0"
-  "minpd\0"
-  "minps\0"
-  "minsd\0"
-  "minss\0"
-  "monitor\0"
-  "mov\0"
-  "mov_ptr\0"
-  "movapd\0"
-  "movaps\0"
-  "movbe\0"
-  "movd\0"
-  "movddup\0"
-  "movdq2q\0"
-  "movdqa\0"
-  "movdqu\0"
-  "movhlps\0"
-  "movhpd\0"
-  "movhps\0"
-  "movlhps\0"
-  "movlpd\0"
-  "movlps\0"
-  "movmskpd\0"
-  "movmskps\0"
-  "movntdq\0"
-  "movntdqa\0"
-  "movnti\0"
-  "movntpd\0"
-  "movntps\0"
-  "movntq\0"
-  "movntsd\0"
-  "movntss\0"
-  "movq\0"
-  "movq2dq\0"
-  "movs_b\0"
-  "movs_d\0"
-  "movs_q\0"
-  "movs_w\0"
-  "movsd\0"
-  "movshdup\0"
-  "movsldup\0"
-  "movss\0"
-  "movsx\0"
-  "movsxd\0"
-  "movupd\0"
-  "movups\0"
-  "movzx\0"
-  "mpsadbw\0"
-  "mul\0"
-  "mulpd\0"
-  "mulps\0"
-  "mulsd\0"
-  "mulss\0"
-  "mulx\0"
-  "mwait\0"
-  "neg\0"
-  "nop\0"
-  "not\0"
-  "or\0"
-  "orpd\0"
-  "orps\0"
-  "pabsb\0"
-  "pabsd\0"
-  "pabsw\0"
-  "packssdw\0"
-  "packsswb\0"
-  "packusdw\0"
-  "packuswb\0"
-  "paddb\0"
-  "paddd\0"
-  "paddq\0"
-  "paddsb\0"
-  "paddsw\0"
-  "paddusb\0"
-  "paddusw\0"
-  "paddw\0"
-  "palignr\0"
-  "pand\0"
-  "pandn\0"
-  "pause\0"
-  "pavgb\0"
-  "pavgw\0"
-  "pblendvb\0"
-  "pblendw\0"
-  "pclmulqdq\0"
-  "pcmpeqb\0"
-  "pcmpeqd\0"
-  "pcmpeqq\0"
-  "pcmpeqw\0"
-  "pcmpestri\0"
-  "pcmpestrm\0"
-  "pcmpgtb\0"
-  "pcmpgtd\0"
-  "pcmpgtq\0"
-  "pcmpgtw\0"
-  "pcmpistri\0"
-  "pcmpistrm\0"
-  "pdep\0"
-  "pext\0"
-  "pextrb\0"
-  "pextrd\0"
-  "pextrq\0"
-  "pextrw\0"
-  "pf2id\0"
-  "pf2iw\0"
-  "pfacc\0"
-  "pfadd\0"
-  "pfcmpeq\0"
-  "pfcmpge\0"
-  "pfcmpgt\0"
-  "pfmax\0"
-  "pfmin\0"
-  "pfmul\0"
-  "pfnacc\0"
-  "pfpnacc\0"
-  "pfrcp\0"
-  "pfrcpit1\0"
-  "pfrcpit2\0"
-  "pfrsqit1\0"
-  "pfrsqrt\0"
-  "pfsub\0"
-  "pfsubr\0"
-  "phaddd\0"
-  "phaddsw\0"
-  "phaddw\0"
-  "phminposuw\0"
-  "phsubd\0"
-  "phsubsw\0"
-  "phsubw\0"
-  "pi2fd\0"
-  "pi2fw\0"
-  "pinsrb\0"
-  "pinsrd\0"
-  "pinsrq\0"
-  "pinsrw\0"
-  "pmaddubsw\0"
-  "pmaddwd\0"
-  "pmaxsb\0"
-  "pmaxsd\0"
-  "pmaxsw\0"
-  "pmaxub\0"
-  "pmaxud\0"
-  "pmaxuw\0"
-  "pminsb\0"
-  "pminsd\0"
-  "pminsw\0"
-  "pminub\0"
-  "pminud\0"
-  "pminuw\0"
-  "pmovmskb\0"
-  "pmovsxbd\0"
-  "pmovsxbq\0"
-  "pmovsxbw\0"
-  "pmovsxdq\0"
-  "pmovsxwd\0"
-  "pmovsxwq\0"
-  "pmovzxbd\0"
-  "pmovzxbq\0"
-  "pmovzxbw\0"
-  "pmovzxdq\0"
-  "pmovzxwd\0"
-  "pmovzxwq\0"
-  "pmuldq\0"
-  "pmulhrsw\0"
-  "pmulhuw\0"
-  "pmulhw\0"
-  "pmulld\0"
-  "pmullw\0"
-  "pmuludq\0"
-  "pop\0"
-  "popa\0"
-  "popcnt\0"
-  "popf\0"
-  "por\0"
-  "prefetch\0"
-  "prefetch_3dnow\0"
-  "prefetchw_3dnow\0"
-  "psadbw\0"
-  "pshufb\0"
-  "pshufd\0"
-  "pshufhw\0"
-  "pshuflw\0"
-  "pshufw\0"
-  "psignb\0"
-  "psignd\0"
-  "psignw\0"
-  "pslld\0"
-  "pslldq\0"
-  "psllq\0"
-  "psllw\0"
-  "psrad\0"
-  "psraw\0"
-  "psrld\0"
-  "psrldq\0"
-  "psrlq\0"
-  "psrlw\0"
-  "psubb\0"
-  "psubd\0"
-  "psubq\0"
-  "psubsb\0"
-  "psubsw\0"
-  "psubusb\0"
-  "psubusw\0"
-  "psubw\0"
-  "pswapd\0"
-  "ptest\0"
-  "punpckhbw\0"
-  "punpckhdq\0"
-  "punpckhqdq\0"
-  "punpckhwd\0"
-  "punpcklbw\0"
-  "punpckldq\0"
-  "punpcklqdq\0"
-  "punpcklwd\0"
-  "push\0"
-  "pusha\0"
-  "pushf\0"
-  "pxor\0"
-  "rcl\0"
-  "rcpps\0"
-  "rcpss\0"
-  "rcr\0"
-  "rdfsbase\0"
-  "rdgsbase\0"
-  "rdrand\0"
-  "rdtsc\0"
-  "rdtscp\0"
-  "rep lods_b\0"
-  "rep lods_d\0"
-  "rep lods_q\0"
-  "rep lods_w\0"
-  "rep movs_b\0"
-  "rep movs_d\0"
-  "rep movs_q\0"
-  "rep movs_w\0"
-  "rep stos_b\0"
-  "rep stos_d\0"
-  "rep stos_q\0"
-  "rep stos_w\0"
-  "repe cmps_b\0"
-  "repe cmps_d\0"
-  "repe cmps_q\0"
-  "repe cmps_w\0"
-  "repe scas_b\0"
-  "repe scas_d\0"
-  "repe scas_q\0"
-  "repe scas_w\0"
-  "repne cmps_b\0"
-  "repne cmps_d\0"
-  "repne cmps_q\0"
-  "repne cmps_w\0"
-  "repne scas_b\0"
-  "repne scas_d\0"
-  "repne scas_q\0"
-  "repne scas_w\0"
-  "ret\0"
-  "rol\0"
-  "ror\0"
-  "rorx\0"
-  "roundpd\0"
-  "roundps\0"
-  "roundsd\0"
-  "roundss\0"
-  "rsqrtps\0"
-  "rsqrtss\0"
-  "sahf\0"
-  "sal\0"
-  "sar\0"
-  "sarx\0"
-  "sbb\0"
-  "scas_b\0"
-  "scas_d\0"
-  "scas_q\0"
-  "scas_w\0"
-  "seta\0"
-  "setae\0"
-  "setb\0"
-  "setbe\0"
-  "setc\0"
-  "sete\0"
-  "setg\0"
-  "setge\0"
-  "setl\0"
-  "setle\0"
-  "setna\0"
-  "setnae\0"
-  "setnb\0"
-  "setnbe\0"
-  "setnc\0"
-  "setne\0"
-  "setng\0"
-  "setnge\0"
-  "setnl\0"
-  "setnle\0"
-  "setno\0"
-  "setnp\0"
-  "setns\0"
-  "setnz\0"
-  "seto\0"
-  "setp\0"
-  "setpe\0"
-  "setpo\0"
-  "sets\0"
-  "setz\0"
-  "sfence\0"
-  "shl\0"
-  "shld\0"
-  "shlx\0"
-  "shr\0"
-  "shrd\0"
-  "shrx\0"
-  "shufpd\0"
-  "shufps\0"
-  "sqrtpd\0"
-  "sqrtps\0"
-  "sqrtsd\0"
-  "sqrtss\0"
-  "stc\0"
-  "std\0"
-  "stmxcsr\0"
-  "stos_b\0"
-  "stos_d\0"
-  "stos_q\0"
-  "stos_w\0"
-  "sub\0"
-  "subpd\0"
-  "subps\0"
-  "subsd\0"
-  "subss\0"
-  "test\0"
-  "tzcnt\0"
-  "ucomisd\0"
-  "ucomiss\0"
-  "ud2\0"
-  "unpckhpd\0"
-  "unpckhps\0"
-  "unpcklpd\0"
-  "unpcklps\0"
-  "vaddpd\0"
-  "vaddps\0"
-  "vaddsd\0"
-  "vaddss\0"
-  "vaddsubpd\0"
-  "vaddsubps\0"
-  "vaesdec\0"
-  "vaesdeclast\0"
-  "vaesenc\0"
-  "vaesenclast\0"
-  "vaesimc\0"
-  "vaeskeygenassist\0"
-  "vandnpd\0"
-  "vandnps\0"
-  "vandpd\0"
-  "vandps\0"
-  "vblendpd\0"
-  "vblendps\0"
-  "vblendvpd\0"
-  "vblendvps\0"
-  "vbroadcastf128\0"
-  "vbroadcasti128\0"
-  "vbroadcastsd\0"
-  "vbroadcastss\0"
-  "vcmppd\0"
-  "vcmpps\0"
-  "vcmpsd\0"
-  "vcmpss\0"
-  "vcomisd\0"
-  "vcomiss\0"
-  "vcvtdq2pd\0"
-  "vcvtdq2ps\0"
-  "vcvtpd2dq\0"
-  "vcvtpd2ps\0"
-  "vcvtph2ps\0"
-  "vcvtps2dq\0"
-  "vcvtps2pd\0"
-  "vcvtps2ph\0"
-  "vcvtsd2si\0"
-  "vcvtsd2ss\0"
-  "vcvtsi2sd\0"
-  "vcvtsi2ss\0"
-  "vcvtss2sd\0"
-  "vcvtss2si\0"
-  "vcvttpd2dq\0"
-  "vcvttps2dq\0"
-  "vcvttsd2si\0"
-  "vcvttss2si\0"
-  "vdivpd\0"
-  "vdivps\0"
-  "vdivsd\0"
-  "vdivss\0"
-  "vdppd\0"
-  "vdpps\0"
-  "vextractf128\0"
-  "vextracti128\0"
-  "vextractps\0"
-  "vfmadd132pd\0"
-  "vfmadd132ps\0"
-  "vfmadd132sd\0"
-  "vfmadd132ss\0"
-  "vfmadd213pd\0"
-  "vfmadd213ps\0"
-  "vfmadd213sd\0"
-  "vfmadd213ss\0"
-  "vfmadd231pd\0"
-  "vfmadd231ps\0"
-  "vfmadd231sd\0"
-  "vfmadd231ss\0"
-  "vfmaddpd\0"
-  "vfmaddps\0"
-  "vfmaddsd\0"
-  "vfmaddss\0"
-  "vfmaddsub132pd\0"
-  "vfmaddsub132ps\0"
-  "vfmaddsub213pd\0"
-  "vfmaddsub213ps\0"
-  "vfmaddsub231pd\0"
-  "vfmaddsub231ps\0"
-  "vfmaddsubpd\0"
-  "vfmaddsubps\0"
-  "vfmsub132pd\0"
-  "vfmsub132ps\0"
-  "vfmsub132sd\0"
-  "vfmsub132ss\0"
-  "vfmsub213pd\0"
-  "vfmsub213ps\0"
-  "vfmsub213sd\0"
-  "vfmsub213ss\0"
-  "vfmsub231pd\0"
-  "vfmsub231ps\0"
-  "vfmsub231sd\0"
-  "vfmsub231ss\0"
-  "vfmsubadd132pd\0"
-  "vfmsubadd132ps\0"
-  "vfmsubadd213pd\0"
-  "vfmsubadd213ps\0"
-  "vfmsubadd231pd\0"
-  "vfmsubadd231ps\0"
-  "vfmsubaddpd\0"
-  "vfmsubaddps\0"
-  "vfmsubpd\0"
-  "vfmsubps\0"
-  "vfmsubsd\0"
-  "vfmsubss\0"
-  "vfnmadd132pd\0"
-  "vfnmadd132ps\0"
-  "vfnmadd132sd\0"
-  "vfnmadd132ss\0"
-  "vfnmadd213pd\0"
-  "vfnmadd213ps\0"
-  "vfnmadd213sd\0"
-  "vfnmadd213ss\0"
-  "vfnmadd231pd\0"
-  "vfnmadd231ps\0"
-  "vfnmadd231sd\0"
-  "vfnmadd231ss\0"
-  "vfnmaddpd\0"
-  "vfnmaddps\0"
-  "vfnmaddsd\0"
-  "vfnmaddss\0"
-  "vfnmsub132pd\0"
-  "vfnmsub132ps\0"
-  "vfnmsub132sd\0"
-  "vfnmsub132ss\0"
-  "vfnmsub213pd\0"
-  "vfnmsub213ps\0"
-  "vfnmsub213sd\0"
-  "vfnmsub213ss\0"
-  "vfnmsub231pd\0"
-  "vfnmsub231ps\0"
-  "vfnmsub231sd\0"
-  "vfnmsub231ss\0"
-  "vfnmsubpd\0"
-  "vfnmsubps\0"
-  "vfnmsubsd\0"
-  "vfnmsubss\0"
-  "vfrczpd\0"
-  "vfrczps\0"
-  "vfrczsd\0"
-  "vfrczss\0"
-  "vgatherdpd\0"
-  "vgatherdps\0"
-  "vgatherqpd\0"
-  "vgatherqps\0"
-  "vhaddpd\0"
-  "vhaddps\0"
-  "vhsubpd\0"
-  "vhsubps\0"
-  "vinsertf128\0"
-  "vinserti128\0"
-  "vinsertps\0"
-  "vlddqu\0"
-  "vldmxcsr\0"
-  "vmaskmovdqu\0"
-  "vmaskmovpd\0"
-  "vmaskmovps\0"
-  "vmaxpd\0"
-  "vmaxps\0"
-  "vmaxsd\0"
-  "vmaxss\0"
-  "vminpd\0"
-  "vminps\0"
-  "vminsd\0"
-  "vminss\0"
-  "vmovapd\0"
-  "vmovaps\0"
-  "vmovd\0"
-  "vmovddup\0"
-  "vmovdqa\0"
-  "vmovdqu\0"
-  "vmovhlps\0"
-  "vmovhpd\0"
-  "vmovhps\0"
-  "vmovlhps\0"
-  "vmovlpd\0"
-  "vmovlps\0"
-  "vmovmskpd\0"
-  "vmovmskps\0"
-  "vmovntdq\0"
-  "vmovntdqa\0"
-  "vmovntpd\0"
-  "vmovntps\0"
-  "vmovq\0"
-  "vmovsd\0"
-  "vmovshdup\0"
-  "vmovsldup\0"
-  "vmovss\0"
-  "vmovupd\0"
-  "vmovups\0"
-  "vmpsadbw\0"
-  "vmulpd\0"
-  "vmulps\0"
-  "vmulsd\0"
-  "vmulss\0"
-  "vorpd\0"
-  "vorps\0"
-  "vpabsb\0"
-  "vpabsd\0"
-  "vpabsw\0"
-  "vpackssdw\0"
-  "vpacksswb\0"
-  "vpackusdw\0"
-  "vpackuswb\0"
-  "vpaddb\0"
-  "vpaddd\0"
-  "vpaddq\0"
-  "vpaddsb\0"
-  "vpaddsw\0"
-  "vpaddusb\0"
-  "vpaddusw\0"
-  "vpaddw\0"
-  "vpalignr\0"
-  "vpand\0"
-  "vpandn\0"
-  "vpavgb\0"
-  "vpavgw\0"
-  "vpblendd\0"
-  "vpblendvb\0"
-  "vpblendw\0"
-  "vpbroadcastb\0"
-  "vpbroadcastd\0"
-  "vpbroadcastq\0"
-  "vpbroadcastw\0"
-  "vpclmulqdq\0"
-  "vpcmov\0"
-  "vpcmpeqb\0"
-  "vpcmpeqd\0"
-  "vpcmpeqq\0"
-  "vpcmpeqw\0"
-  "vpcmpestri\0"
-  "vpcmpestrm\0"
-  "vpcmpgtb\0"
-  "vpcmpgtd\0"
-  "vpcmpgtq\0"
-  "vpcmpgtw\0"
-  "vpcmpistri\0"
-  "vpcmpistrm\0"
-  "vpcomb\0"
-  "vpcomd\0"
-  "vpcomq\0"
-  "vpcomub\0"
-  "vpcomud\0"
-  "vpcomuq\0"
-  "vpcomuw\0"
-  "vpcomw\0"
-  "vperm2f128\0"
-  "vperm2i128\0"
-  "vpermd\0"
-  "vpermil2pd\0"
-  "vpermil2ps\0"
-  "vpermilpd\0"
-  "vpermilps\0"
-  "vpermpd\0"
-  "vpermps\0"
-  "vpermq\0"
-  "vpextrb\0"
-  "vpextrd\0"
-  "vpextrq\0"
-  "vpextrw\0"
-  "vpgatherdd\0"
-  "vpgatherdq\0"
-  "vpgatherqd\0"
-  "vpgatherqq\0"
-  "vphaddbd\0"
-  "vphaddbq\0"
-  "vphaddbw\0"
-  "vphaddd\0"
-  "vphadddq\0"
-  "vphaddsw\0"
-  "vphaddubd\0"
-  "vphaddubq\0"
-  "vphaddubw\0"
-  "vphaddudq\0"
-  "vphadduwd\0"
-  "vphadduwq\0"
-  "vphaddw\0"
-  "vphaddwd\0"
-  "vphaddwq\0"
-  "vphminposuw\0"
-  "vphsubbw\0"
-  "vphsubd\0"
-  "vphsubdq\0"
-  "vphsubsw\0"
-  "vphsubw\0"
-  "vphsubwd\0"
-  "vpinsrb\0"
-  "vpinsrd\0"
-  "vpinsrq\0"
-  "vpinsrw\0"
-  "vpmacsdd\0"
-  "vpmacsdqh\0"
-  "vpmacsdql\0"
-  "vpmacssdd\0"
-  "vpmacssdqh\0"
-  "vpmacssdql\0"
-  "vpmacsswd\0"
-  "vpmacssww\0"
-  "vpmacswd\0"
-  "vpmacsww\0"
-  "vpmadcsswd\0"
-  "vpmadcswd\0"
-  "vpmaddubsw\0"
-  "vpmaddwd\0"
-  "vpmaskmovd\0"
-  "vpmaskmovq\0"
-  "vpmaxsb\0"
-  "vpmaxsd\0"
-  "vpmaxsw\0"
-  "vpmaxub\0"
-  "vpmaxud\0"
-  "vpmaxuw\0"
-  "vpminsb\0"
-  "vpminsd\0"
-  "vpminsw\0"
-  "vpminub\0"
-  "vpminud\0"
-  "vpminuw\0"
-  "vpmovmskb\0"
-  "vpmovsxbd\0"
-  "vpmovsxbq\0"
-  "vpmovsxbw\0"
-  "vpmovsxdq\0"
-  "vpmovsxwd\0"
-  "vpmovsxwq\0"
-  "vpmovzxbd\0"
-  "vpmovzxbq\0"
-  "vpmovzxbw\0"
-  "vpmovzxdq\0"
-  "vpmovzxwd\0"
-  "vpmovzxwq\0"
-  "vpmuldq\0"
-  "vpmulhrsw\0"
-  "vpmulhuw\0"
-  "vpmulhw\0"
-  "vpmulld\0"
-  "vpmullw\0"
-  "vpmuludq\0"
-  "vpor\0"
-  "vpperm\0"
-  "vprotb\0"
-  "vprotd\0"
-  "vprotq\0"
-  "vprotw\0"
-  "vpsadbw\0"
-  "vpshab\0"
-  "vpshad\0"
-  "vpshaq\0"
-  "vpshaw\0"
-  "vpshlb\0"
-  "vpshld\0"
-  "vpshlq\0"
-  "vpshlw\0"
-  "vpshufb\0"
-  "vpshufd\0"
-  "vpshufhw\0"
-  "vpshuflw\0"
-  "vpsignb\0"
-  "vpsignd\0"
-  "vpsignw\0"
-  "vpslld\0"
-  "vpslldq\0"
-  "vpsllq\0"
-  "vpsllvd\0"
-  "vpsllvq\0"
-  "vpsllw\0"
-  "vpsrad\0"
-  "vpsravd\0"
-  "vpsraw\0"
-  "vpsrld\0"
-  "vpsrldq\0"
-  "vpsrlq\0"
-  "vpsrlvd\0"
-  "vpsrlvq\0"
-  "vpsrlw\0"
-  "vpsubb\0"
-  "vpsubd\0"
-  "vpsubq\0"
-  "vpsubsb\0"
-  "vpsubsw\0"
-  "vpsubusb\0"
-  "vpsubusw\0"
-  "vpsubw\0"
-  "vptest\0"
-  "vpunpckhbw\0"
-  "vpunpckhdq\0"
-  "vpunpckhqdq\0"
-  "vpunpckhwd\0"
-  "vpunpcklbw\0"
-  "vpunpckldq\0"
-  "vpunpcklqdq\0"
-  "vpunpcklwd\0"
-  "vpxor\0"
-  "vrcpps\0"
-  "vrcpss\0"
-  "vroundpd\0"
-  "vroundps\0"
-  "vroundsd\0"
-  "vroundss\0"
-  "vrsqrtps\0"
-  "vrsqrtss\0"
-  "vshufpd\0"
-  "vshufps\0"
-  "vsqrtpd\0"
-  "vsqrtps\0"
-  "vsqrtsd\0"
-  "vsqrtss\0"
-  "vstmxcsr\0"
-  "vsubpd\0"
-  "vsubps\0"
-  "vsubsd\0"
-  "vsubss\0"
-  "vtestpd\0"
-  "vtestps\0"
-  "vucomisd\0"
-  "vucomiss\0"
-  "vunpckhpd\0"
-  "vunpckhps\0"
-  "vunpcklpd\0"
-  "vunpcklps\0"
-  "vxorpd\0"
-  "vxorps\0"
-  "vzeroall\0"
-  "vzeroupper\0"
-  "wrfsbase\0"
-  "wrgsbase\0"
-  "xadd\0"
-  "xchg\0"
-  "xgetbv\0"
-  "xor\0"
-  "xorpd\0"
-  "xorps\0"
-  "xrstor\0"
-  "xrstor64\0"
-  "xsave\0"
-  "xsave64\0"
-  "xsaveopt\0"
-  "xsaveopt64\0"
-  "xsetbv\0";
+// Instruction opcode definitions:
+//   - `O` encodes X86|MMX|SSE instructions.
+//   - `V` encodes VEX|XOP|EVEX instructions.
+#define O_ENCODE(VEX, PREFIX, OPCODE, O, L, W, EvexW, N, TT) \
+  ((PREFIX) | (OPCODE) | (O) | (L) | (W) | (EvexW) | (N) | (TT) | \
+   (VEX && ((PREFIX) & X86Inst::kOpCode_MM_Mask) != X86Inst::kOpCode_MM_0F ? int(X86Inst::kOpCode_MM_ForceVex3) : 0))
 
-// Automatically generated, do not edit.
-enum kX86InstAlphaIndex {
-  kX86InstAlphaIndexFirst = 'a',
-  kX86InstAlphaIndexLast = 'z',
-  kX86InstAlphaIndexInvalid = 0xFFFF
+#define O(PREFIX, OPCODE, O, LL, W, EvexW, N, TT) (O_ENCODE(0, ODATA_##PREFIX, 0x##OPCODE, ODATA_O_##O, ODATA_LL_##LL, ODATA_W_##W, ODATA_EvexW_##EvexW, ODATA_N_##N, ODATA_TT_##TT))
+#define V(PREFIX, OPCODE, O, LL, W, EvexW, N, TT) (O_ENCODE(1, ODATA_##PREFIX, 0x##OPCODE, ODATA_O_##O, ODATA_LL_##LL, ODATA_W_##W, ODATA_EvexW_##EvexW, ODATA_N_##N, ODATA_TT_##TT))
+
+#define O_FPU(PREFIX, OPCODE, O) (ODATA_FPU_##PREFIX | (0x##OPCODE & 0xFFU) | ((0x##OPCODE >> 8) << X86Inst::kOpCode_FPU_2B_Shift) | ODATA_O_##O)
+
+// Don't store `_nameDataIndex` if instruction names are disabled. Since some
+// APIs can use `_nameDataIndex` it's much safer if it's zero if it's not used.
+#if defined(ASMJIT_DISABLE_TEXT)
+# define NAME_DATA_INDEX(X) 0
+#else
+# define NAME_DATA_INDEX(X) X
+#endif
+
+// Defines an X86/X64 instruction.
+#define INST(id, encoding, opcode0, opcode1, writeIndex, writeSize, nameDataIndex, commonDataIndex, operationDataIndex, seeToAvxDataIndex) { \
+  uint32_t(X86Inst::kEncoding##encoding),   \
+  uint32_t(NAME_DATA_INDEX(nameDataIndex)), \
+  uint32_t(commonDataIndex),                \
+  uint32_t(operationDataIndex),             \
+  uint32_t(seeToAvxDataIndex),              \
+  0,                                        \
+  opcode0                                   \
+}
+const X86Inst X86InstDB::instData[] = {
+  // <-----------------+--------------------+------------------+--------+------------------+--------+-------+-----+----+----+---+
+  //                   |                    |    Main OpCode   |#0 EVEX |Alternative OpCode|#1 EVEX | Write |     |    |    |Sse|
+  //    Instruction    |   Inst. Encoding   |                  +--------+                  +--------+---+---+NameX|ComX|OpnX|<->|
+  //                   |                    |#0:PP-MMM OP/O L|W|W|N|TT. |#1:PP-MMM OP/O L|W|W|N|TT. |Idx|Cnt|     |    |    |Avx|
+  // <-----------------+--------------------+------------------+--------+------------------+--------+---+---+-----+----+----+---+
+  // ${instData:Begin}
+  INST(None            , None               , 0                         , 0                         , 0 , 0 , 0   , 0  , 0  , 0 ),
+  INST(Aaa             , X86Op_xAX          , O(000000,37,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1   , 1  , 1  , 0 ),
+  INST(Aad             , X86I_xAX           , O(000000,D5,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5   , 2  , 1  , 0 ),
+  INST(Aam             , X86I_xAX           , O(000000,D4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9   , 2  , 1  , 0 ),
+  INST(Aas             , X86Op_xAX          , O(000000,3F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 13  , 1  , 1  , 0 ),
+  INST(Adc             , X86Arith           , O(000000,10,2,_,x,_,_,_  ), 0                         , 0 , 0 , 17  , 3  , 2  , 0 ),
+  INST(Adcx            , X86Rm              , O(660F38,F6,_,_,x,_,_,_  ), 0                         , 0 , 0 , 21  , 4  , 3  , 0 ),
+  INST(Add             , X86Arith           , O(000000,00,0,_,x,_,_,_  ), 0                         , 0 , 0 , 732 , 3  , 1  , 0 ),
+  INST(Addpd           , ExtRm              , O(660F00,58,_,_,_,_,_,_  ), 0                         , 0 , 0 , 4619, 5  , 4  , 1 ),
+  INST(Addps           , ExtRm              , O(000F00,58,_,_,_,_,_,_  ), 0                         , 0 , 0 , 4631, 5  , 5  , 1 ),
+  INST(Addsd           , ExtRm              , O(F20F00,58,_,_,_,_,_,_  ), 0                         , 0 , 0 , 4853, 6  , 4  , 1 ),
+  INST(Addss           , ExtRm              , O(F30F00,58,_,_,_,_,_,_  ), 0                         , 0 , 0 , 4863, 7  , 5  , 1 ),
+  INST(Addsubpd        , ExtRm              , O(660F00,D0,_,_,_,_,_,_  ), 0                         , 0 , 0 , 4358, 5  , 6  , 1 ),
+  INST(Addsubps        , ExtRm              , O(F20F00,D0,_,_,_,_,_,_  ), 0                         , 0 , 0 , 4370, 5  , 6  , 1 ),
+  INST(Adox            , X86Rm              , O(F30F38,F6,_,_,x,_,_,_  ), 0                         , 0 , 0 , 26  , 4  , 7  , 0 ),
+  INST(Aesdec          , ExtRm              , O(660F38,DE,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2854, 5  , 8  , 2 ),
+  INST(Aesdeclast      , ExtRm              , O(660F38,DF,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2862, 5  , 8  , 2 ),
+  INST(Aesenc          , ExtRm              , O(660F38,DC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2874, 5  , 8  , 2 ),
+  INST(Aesenclast      , ExtRm              , O(660F38,DD,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2882, 5  , 8  , 2 ),
+  INST(Aesimc          , ExtRm              , O(660F38,DB,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2894, 8  , 8  , 3 ),
+  INST(Aeskeygenassist , ExtRmi             , O(660F3A,DF,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2902, 9  , 8  , 3 ),
+  INST(And             , X86Arith           , O(000000,20,4,_,x,_,_,_  ), 0                         , 0 , 0 , 2317, 10 , 1  , 0 ),
+  INST(Andn            , VexRvm_Wx          , V(000F38,F2,_,0,x,_,_,_  ), 0                         , 0 , 0 , 6150, 11 , 9  , 0 ),
+  INST(Andnpd          , ExtRm              , O(660F00,55,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2935, 5  , 4  , 2 ),
+  INST(Andnps          , ExtRm              , O(000F00,55,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2943, 5  , 5  , 2 ),
+  INST(Andpd           , ExtRm              , O(660F00,54,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3872, 12 , 4  , 2 ),
+  INST(Andps           , ExtRm              , O(000F00,54,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3882, 12 , 5  , 2 ),
+  INST(Arpl            , X86Mr_NoSize       , O(000000,63,_,_,_,_,_,_  ), 0                         , 0 , 0 , 31  , 13 , 10 , 0 ),
+  INST(Bextr           , VexRmv_Wx          , V(000F38,F7,_,0,x,_,_,_  ), 0                         , 0 , 0 , 36  , 14 , 9  , 0 ),
+  INST(Blcfill         , VexVm_Wx           , V(XOP_M9,01,1,0,x,_,_,_  ), 0                         , 0 , 0 , 42  , 15 , 11 , 0 ),
+  INST(Blci            , VexVm_Wx           , V(XOP_M9,02,6,0,x,_,_,_  ), 0                         , 0 , 0 , 50  , 15 , 11 , 0 ),
+  INST(Blcic           , VexVm_Wx           , V(XOP_M9,01,5,0,x,_,_,_  ), 0                         , 0 , 0 , 55  , 15 , 11 , 0 ),
+  INST(Blcmsk          , VexVm_Wx           , V(XOP_M9,02,1,0,x,_,_,_  ), 0                         , 0 , 0 , 61  , 15 , 11 , 0 ),
+  INST(Blcs            , VexVm_Wx           , V(XOP_M9,01,3,0,x,_,_,_  ), 0                         , 0 , 0 , 68  , 15 , 11 , 0 ),
+  INST(Blendpd         , ExtRmi             , O(660F3A,0D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3021, 16 , 12 , 4 ),
+  INST(Blendps         , ExtRmi             , O(660F3A,0C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3030, 16 , 12 , 4 ),
+  INST(Blendvpd        , ExtRm_XMM0         , O(660F38,15,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3039, 17 , 12 , 5 ),
+  INST(Blendvps        , ExtRm_XMM0         , O(660F38,14,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3049, 17 , 12 , 5 ),
+  INST(Blsfill         , VexVm_Wx           , V(XOP_M9,01,2,0,x,_,_,_  ), 0                         , 0 , 0 , 73  , 15 , 11 , 0 ),
+  INST(Blsi            , VexVm_Wx           , V(000F38,F3,3,0,x,_,_,_  ), 0                         , 0 , 0 , 81  , 15 , 9  , 0 ),
+  INST(Blsic           , VexVm_Wx           , V(XOP_M9,01,6,0,x,_,_,_  ), 0                         , 0 , 0 , 86  , 15 , 11 , 0 ),
+  INST(Blsmsk          , VexVm_Wx           , V(000F38,F3,2,0,x,_,_,_  ), 0                         , 0 , 0 , 92  , 15 , 9  , 0 ),
+  INST(Blsr            , VexVm_Wx           , V(000F38,F3,1,0,x,_,_,_  ), 0                         , 0 , 0 , 99  , 15 , 9  , 0 ),
+  INST(Bndcl           , X86Rm              , O(F30F00,1A,_,_,_,_,_,_  ), 0                         , 0 , 0 , 104 , 18 , 13 , 0 ),
+  INST(Bndcn           , X86Rm              , O(F20F00,1B,_,_,_,_,_,_  ), 0                         , 0 , 0 , 110 , 18 , 13 , 0 ),
+  INST(Bndcu           , X86Rm              , O(F20F00,1A,_,_,_,_,_,_  ), 0                         , 0 , 0 , 116 , 18 , 13 , 0 ),
+  INST(Bndldx          , X86Rm              , O(000F00,1A,_,_,_,_,_,_  ), 0                         , 0 , 0 , 122 , 19 , 13 , 0 ),
+  INST(Bndmk           , X86Rm              , O(F30F00,1B,_,_,_,_,_,_  ), 0                         , 0 , 0 , 129 , 20 , 13 , 0 ),
+  INST(Bndmov          , X86Bndmov          , O(660F00,1A,_,_,_,_,_,_  ), O(660F00,1B,_,_,_,_,_,_  ), 0 , 0 , 135 , 21 , 13 , 0 ),
+  INST(Bndstx          , X86Mr              , O(000F00,1B,_,_,_,_,_,_  ), 0                         , 0 , 0 , 142 , 22 , 13 , 0 ),
+  INST(Bound           , X86Rm              , O(000000,62,_,_,_,_,_,_  ), 0                         , 0 , 0 , 149 , 23 , 0  , 0 ),
+  INST(Bsf             , X86Rm              , O(000F00,BC,_,_,x,_,_,_  ), 0                         , 0 , 0 , 155 , 24 , 1  , 0 ),
+  INST(Bsr             , X86Rm              , O(000F00,BD,_,_,x,_,_,_  ), 0                         , 0 , 0 , 159 , 24 , 1  , 0 ),
+  INST(Bswap           , X86Bswap           , O(000F00,C8,_,_,x,_,_,_  ), 0                         , 0 , 0 , 163 , 25 , 0  , 0 ),
+  INST(Bt              , X86Bt              , O(000F00,A3,_,_,x,_,_,_  ), O(000F00,BA,4,_,x,_,_,_  ), 0 , 0 , 169 , 26 , 14 , 0 ),
+  INST(Btc             , X86Bt              , O(000F00,BB,_,_,x,_,_,_  ), O(000F00,BA,7,_,x,_,_,_  ), 0 , 0 , 172 , 27 , 14 , 0 ),
+  INST(Btr             , X86Bt              , O(000F00,B3,_,_,x,_,_,_  ), O(000F00,BA,6,_,x,_,_,_  ), 0 , 0 , 176 , 28 , 14 , 0 ),
+  INST(Bts             , X86Bt              , O(000F00,AB,_,_,x,_,_,_  ), O(000F00,BA,5,_,x,_,_,_  ), 0 , 0 , 180 , 29 , 14 , 0 ),
+  INST(Bzhi            , VexRmv_Wx          , V(000F38,F5,_,0,x,_,_,_  ), 0                         , 0 , 0 , 184 , 14 , 15 , 0 ),
+  INST(Call            , X86Call            , O(000000,FF,2,_,_,_,_,_  ), 0                         , 0 , 0 , 2713, 30 , 16 , 0 ),
+  INST(Cbw             , X86Op_xAX          , O(660000,98,_,_,_,_,_,_  ), 0                         , 0 , 0 , 189 , 31 , 0  , 0 ),
+  INST(Cdq             , X86Op_xDX_xAX      , O(000000,99,_,_,_,_,_,_  ), 0                         , 0 , 0 , 193 , 32 , 0  , 0 ),
+  INST(Cdqe            , X86Op_xAX          , O(000000,98,_,_,1,_,_,_  ), 0                         , 0 , 0 , 197 , 33 , 0  , 0 ),
+  INST(Clac            , X86Op              , O(000F01,CA,_,_,_,_,_,_  ), 0                         , 0 , 0 , 202 , 34 , 17 , 0 ),
+  INST(Clc             , X86Op              , O(000000,F8,_,_,_,_,_,_  ), 0                         , 0 , 0 , 207 , 34 , 18 , 0 ),
+  INST(Cld             , X86Op              , O(000000,FC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 211 , 34 , 19 , 0 ),
+  INST(Clflush         , X86M_Only          , O(000F00,AE,7,_,_,_,_,_  ), 0                         , 0 , 0 , 215 , 35 , 20 , 0 ),
+  INST(Clflushopt      , X86M_Only          , O(660F00,AE,7,_,_,_,_,_  ), 0                         , 0 , 0 , 223 , 35 , 21 , 0 ),
+  INST(Cli             , X86Op              , O(000000,FA,_,_,_,_,_,_  ), 0                         , 0 , 0 , 234 , 34 , 22 , 0 ),
+  INST(Clts            , X86Op              , O(000F00,06,_,_,_,_,_,_  ), 0                         , 0 , 0 , 238 , 34 , 23 , 0 ),
+  INST(Clwb            , X86M_Only          , O(660F00,AE,6,_,_,_,_,_  ), 0                         , 0 , 0 , 243 , 35 , 24 , 0 ),
+  INST(Clzero          , X86Op_ZAX          , O(000F01,FC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 248 , 36 , 25 , 0 ),
+  INST(Cmc             , X86Op              , O(000000,F5,_,_,_,_,_,_  ), 0                         , 0 , 0 , 255 , 34 , 26 , 0 ),
+  INST(Cmova           , X86Rm              , O(000F00,47,_,_,x,_,_,_  ), 0                         , 0 , 0 , 259 , 24 , 27 , 0 ),
+  INST(Cmovae          , X86Rm              , O(000F00,43,_,_,x,_,_,_  ), 0                         , 0 , 0 , 265 , 24 , 28 , 0 ),
+  INST(Cmovb           , X86Rm              , O(000F00,42,_,_,x,_,_,_  ), 0                         , 0 , 0 , 589 , 24 , 28 , 0 ),
+  INST(Cmovbe          , X86Rm              , O(000F00,46,_,_,x,_,_,_  ), 0                         , 0 , 0 , 596 , 24 , 27 , 0 ),
+  INST(Cmovc           , X86Rm              , O(000F00,42,_,_,x,_,_,_  ), 0                         , 0 , 0 , 272 , 24 , 28 , 0 ),
+  INST(Cmove           , X86Rm              , O(000F00,44,_,_,x,_,_,_  ), 0                         , 0 , 0 , 604 , 24 , 29 , 0 ),
+  INST(Cmovg           , X86Rm              , O(000F00,4F,_,_,x,_,_,_  ), 0                         , 0 , 0 , 278 , 24 , 30 , 0 ),
+  INST(Cmovge          , X86Rm              , O(000F00,4D,_,_,x,_,_,_  ), 0                         , 0 , 0 , 284 , 24 , 31 , 0 ),
+  INST(Cmovl           , X86Rm              , O(000F00,4C,_,_,x,_,_,_  ), 0                         , 0 , 0 , 291 , 24 , 31 , 0 ),
+  INST(Cmovle          , X86Rm              , O(000F00,4E,_,_,x,_,_,_  ), 0                         , 0 , 0 , 297 , 24 , 30 , 0 ),
+  INST(Cmovna          , X86Rm              , O(000F00,46,_,_,x,_,_,_  ), 0                         , 0 , 0 , 304 , 24 , 27 , 0 ),
+  INST(Cmovnae         , X86Rm              , O(000F00,42,_,_,x,_,_,_  ), 0                         , 0 , 0 , 311 , 24 , 28 , 0 ),
+  INST(Cmovnb          , X86Rm              , O(000F00,43,_,_,x,_,_,_  ), 0                         , 0 , 0 , 611 , 24 , 28 , 0 ),
+  INST(Cmovnbe         , X86Rm              , O(000F00,47,_,_,x,_,_,_  ), 0                         , 0 , 0 , 619 , 24 , 27 , 0 ),
+  INST(Cmovnc          , X86Rm              , O(000F00,43,_,_,x,_,_,_  ), 0                         , 0 , 0 , 319 , 24 , 28 , 0 ),
+  INST(Cmovne          , X86Rm              , O(000F00,45,_,_,x,_,_,_  ), 0                         , 0 , 0 , 628 , 24 , 29 , 0 ),
+  INST(Cmovng          , X86Rm              , O(000F00,4E,_,_,x,_,_,_  ), 0                         , 0 , 0 , 326 , 24 , 30 , 0 ),
+  INST(Cmovnge         , X86Rm              , O(000F00,4C,_,_,x,_,_,_  ), 0                         , 0 , 0 , 333 , 24 , 31 , 0 ),
+  INST(Cmovnl          , X86Rm              , O(000F00,4D,_,_,x,_,_,_  ), 0                         , 0 , 0 , 341 , 24 , 31 , 0 ),
+  INST(Cmovnle         , X86Rm              , O(000F00,4F,_,_,x,_,_,_  ), 0                         , 0 , 0 , 348 , 24 , 30 , 0 ),
+  INST(Cmovno          , X86Rm              , O(000F00,41,_,_,x,_,_,_  ), 0                         , 0 , 0 , 356 , 24 , 32 , 0 ),
+  INST(Cmovnp          , X86Rm              , O(000F00,4B,_,_,x,_,_,_  ), 0                         , 0 , 0 , 363 , 24 , 33 , 0 ),
+  INST(Cmovns          , X86Rm              , O(000F00,49,_,_,x,_,_,_  ), 0                         , 0 , 0 , 370 , 24 , 34 , 0 ),
+  INST(Cmovnz          , X86Rm              , O(000F00,45,_,_,x,_,_,_  ), 0                         , 0 , 0 , 377 , 24 , 29 , 0 ),
+  INST(Cmovo           , X86Rm              , O(000F00,40,_,_,x,_,_,_  ), 0                         , 0 , 0 , 384 , 24 , 32 , 0 ),
+  INST(Cmovp           , X86Rm              , O(000F00,4A,_,_,x,_,_,_  ), 0                         , 0 , 0 , 390 , 24 , 33 , 0 ),
+  INST(Cmovpe          , X86Rm              , O(000F00,4A,_,_,x,_,_,_  ), 0                         , 0 , 0 , 396 , 24 , 33 , 0 ),
+  INST(Cmovpo          , X86Rm              , O(000F00,4B,_,_,x,_,_,_  ), 0                         , 0 , 0 , 403 , 24 , 33 , 0 ),
+  INST(Cmovs           , X86Rm              , O(000F00,48,_,_,x,_,_,_  ), 0                         , 0 , 0 , 410 , 24 , 34 , 0 ),
+  INST(Cmovz           , X86Rm              , O(000F00,44,_,_,x,_,_,_  ), 0                         , 0 , 0 , 416 , 24 , 29 , 0 ),
+  INST(Cmp             , X86Arith           , O(000000,38,7,_,x,_,_,_  ), 0                         , 0 , 0 , 422 , 37 , 1  , 0 ),
+  INST(Cmppd           , ExtRmi             , O(660F00,C2,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3275, 16 , 4  , 6 ),
+  INST(Cmpps           , ExtRmi             , O(000F00,C2,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3282, 16 , 5  , 6 ),
+  INST(Cmps            , X86StrMm           , O(000000,A6,_,_,_,_,_,_  ), 0                         , 0 , 0 , 426 , 38 , 35 , 0 ),
+  INST(Cmpsd           , ExtRmi             , O(F20F00,C2,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3289, 39 , 4  , 7 ),
+  INST(Cmpss           , ExtRmi             , O(F30F00,C2,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3296, 40 , 5  , 7 ),
+  INST(Cmpxchg         , X86Cmpxchg         , O(000F00,B0,_,_,x,_,_,_  ), 0                         , 0 , 0 , 431 , 41 , 36 , 0 ),
+  INST(Cmpxchg16b      , X86M_Only          , O(000F00,C7,1,_,1,_,_,_  ), 0                         , 0 , 0 , 439 , 42 , 37 , 0 ),
+  INST(Cmpxchg8b       , X86M_Only          , O(000F00,C7,1,_,_,_,_,_  ), 0                         , 0 , 0 , 450 , 43 , 38 , 0 ),
+  INST(Comisd          , ExtRm              , O(660F00,2F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9371, 44 , 39 , 8 ),
+  INST(Comiss          , ExtRm              , O(000F00,2F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9380, 45 , 40 , 8 ),
+  INST(Cpuid           , X86Op              , O(000F00,A2,_,_,_,_,_,_  ), 0                         , 0 , 0 , 460 , 46 , 41 , 0 ),
+  INST(Cqo             , X86Op_xDX_xAX      , O(000000,99,_,_,1,_,_,_  ), 0                         , 0 , 0 , 466 , 47 , 0  , 0 ),
+  INST(Crc32           , X86Crc             , O(F20F38,F0,_,_,x,_,_,_  ), 0                         , 0 , 0 , 470 , 48 , 42 , 0 ),
+  INST(Cvtdq2pd        , ExtRm              , O(F30F00,E6,_,_,_,_,_,_  ), 0                         , 0 , 16, 3343, 49 , 4  , 9 ),
+  INST(Cvtdq2ps        , ExtRm              , O(000F00,5B,_,_,_,_,_,_  ), 0                         , 0 , 16, 3353, 50 , 4  , 9 ),
+  INST(Cvtpd2dq        , ExtRm              , O(F20F00,E6,_,_,_,_,_,_  ), 0                         , 0 , 16, 3363, 50 , 4  , 9 ),
+  INST(Cvtpd2pi        , ExtRm              , O(660F00,2D,_,_,_,_,_,_  ), 0                         , 0 , 8 , 476 , 51 , 4  , 0 ),
+  INST(Cvtpd2ps        , ExtRm              , O(660F00,5A,_,_,_,_,_,_  ), 0                         , 0 , 16, 3373, 50 , 4  , 10),
+  INST(Cvtpi2pd        , ExtRm              , O(660F00,2A,_,_,_,_,_,_  ), 0                         , 0 , 16, 485 , 52 , 4  , 0 ),
+  INST(Cvtpi2ps        , ExtRm              , O(000F00,2A,_,_,_,_,_,_  ), 0                         , 0 , 8 , 494 , 53 , 5  , 0 ),
+  INST(Cvtps2dq        , ExtRm              , O(660F00,5B,_,_,_,_,_,_  ), 0                         , 0 , 16, 3425, 50 , 4  , 8 ),
+  INST(Cvtps2pd        , ExtRm              , O(000F00,5A,_,_,_,_,_,_  ), 0                         , 0 , 16, 3435, 49 , 4  , 8 ),
+  INST(Cvtps2pi        , ExtRm              , O(000F00,2D,_,_,_,_,_,_  ), 0                         , 0 , 8 , 503 , 54 , 5  , 0 ),
+  INST(Cvtsd2si        , ExtRm_Wx           , O(F20F00,2D,_,_,x,_,_,_  ), 0                         , 0 , 8 , 3507, 55 , 4  , 11),
+  INST(Cvtsd2ss        , ExtRm              , O(F20F00,5A,_,_,_,_,_,_  ), 0                         , 0 , 4 , 3517, 56 , 4  , 12),
+  INST(Cvtsi2sd        , ExtRm_Wx           , O(F20F00,2A,_,_,x,_,_,_  ), 0                         , 0 , 8 , 3538, 57 , 4  , 13),
+  INST(Cvtsi2ss        , ExtRm_Wx           , O(F30F00,2A,_,_,x,_,_,_  ), 0                         , 0 , 4 , 3548, 58 , 5  , 13),
+  INST(Cvtss2sd        , ExtRm              , O(F30F00,5A,_,_,_,_,_,_  ), 0                         , 0 , 8 , 3558, 59 , 4  , 13),
+  INST(Cvtss2si        , ExtRm_Wx           , O(F30F00,2D,_,_,x,_,_,_  ), 0                         , 0 , 8 , 3568, 60 , 5  , 14),
+  INST(Cvttpd2dq       , ExtRm              , O(660F00,E6,_,_,_,_,_,_  ), 0                         , 0 , 16, 3589, 50 , 4  , 15),
+  INST(Cvttpd2pi       , ExtRm              , O(660F00,2C,_,_,_,_,_,_  ), 0                         , 0 , 8 , 512 , 51 , 4  , 0 ),
+  INST(Cvttps2dq       , ExtRm              , O(F30F00,5B,_,_,_,_,_,_  ), 0                         , 0 , 16, 3635, 50 , 4  , 16),
+  INST(Cvttps2pi       , ExtRm              , O(000F00,2C,_,_,_,_,_,_  ), 0                         , 0 , 8 , 522 , 54 , 5  , 0 ),
+  INST(Cvttsd2si       , ExtRm_Wx           , O(F20F00,2C,_,_,x,_,_,_  ), 0                         , 0 , 8 , 3681, 55 , 4  , 17),
+  INST(Cvttss2si       , ExtRm_Wx           , O(F30F00,2C,_,_,x,_,_,_  ), 0                         , 0 , 8 , 3704, 60 , 5  , 18),
+  INST(Cwd             , X86Op_xDX_xAX      , O(660000,99,_,_,_,_,_,_  ), 0                         , 0 , 0 , 532 , 61 , 0  , 0 ),
+  INST(Cwde            , X86Op_xAX          , O(000000,98,_,_,_,_,_,_  ), 0                         , 0 , 0 , 536 , 62 , 0  , 0 ),
+  INST(Daa             , X86Op              , O(000000,27,_,_,_,_,_,_  ), 0                         , 0 , 0 , 541 , 1  , 1  , 0 ),
+  INST(Das             , X86Op              , O(000000,2F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 545 , 1  , 1  , 0 ),
+  INST(Dec             , X86IncDec          , O(000000,FE,1,_,x,_,_,_  ), O(000000,48,_,_,x,_,_,_  ), 0 , 0 , 2857, 63 , 43 , 0 ),
+  INST(Div             , X86M_GPB_MulDiv    , O(000000,F6,6,_,x,_,_,_  ), 0                         , 0 , 0 , 751 , 64 , 1  , 0 ),
+  INST(Divpd           , ExtRm              , O(660F00,5E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3803, 5  , 4  , 19),
+  INST(Divps           , ExtRm              , O(000F00,5E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3810, 5  , 5  , 19),
+  INST(Divsd           , ExtRm              , O(F20F00,5E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3817, 6  , 4  , 19),
+  INST(Divss           , ExtRm              , O(F30F00,5E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3824, 7  , 5  , 19),
+  INST(Dppd            , ExtRmi             , O(660F3A,41,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3831, 16 , 12 , 19),
+  INST(Dpps            , ExtRmi             , O(660F3A,40,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3837, 16 , 12 , 19),
+  INST(Emms            , X86Op              , O(000F00,77,_,_,_,_,_,_  ), 0                         , 0 , 0 , 719 , 65 , 44 , 0 ),
+  INST(Enter           , X86Enter           , O(000000,C8,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2721, 66 , 45 , 0 ),
+  INST(Extractps       , ExtExtract         , O(660F3A,17,_,_,_,_,_,_  ), 0                         , 0 , 8 , 4027, 67 , 12 , 20),
+  INST(Extrq           , ExtExtrq           , O(660F00,79,_,_,_,_,_,_  ), O(660F00,78,0,_,_,_,_,_  ), 0 , 0 , 6864, 68 , 46 , 0 ),
+  INST(F2xm1           , FpuOp              , O_FPU(00,D9F0,_)          , 0                         , 0 , 0 , 549 , 34 , 47 , 0 ),
+  INST(Fabs            , FpuOp              , O_FPU(00,D9E1,_)          , 0                         , 0 , 0 , 555 , 34 , 47 , 0 ),
+  INST(Fadd            , FpuArith           , O_FPU(00,C0C0,0)          , 0                         , 0 , 0 , 1957, 69 , 47 , 0 ),
+  INST(Faddp           , FpuRDef            , O_FPU(00,DEC0,_)          , 0                         , 0 , 0 , 560 , 70 , 47 , 0 ),
+  INST(Fbld            , X86M_Only          , O_FPU(00,00DF,4)          , 0                         , 0 , 0 , 566 , 71 , 47 , 0 ),
+  INST(Fbstp           , X86M_Only          , O_FPU(00,00DF,6)          , 0                         , 0 , 0 , 571 , 72 , 47 , 0 ),
+  INST(Fchs            , FpuOp              , O_FPU(00,D9E0,_)          , 0                         , 0 , 0 , 577 , 34 , 47 , 0 ),
+  INST(Fclex           , FpuOp              , O_FPU(9B,DBE2,_)          , 0                         , 0 , 0 , 582 , 34 , 47 , 0 ),
+  INST(Fcmovb          , FpuR               , O_FPU(00,DAC0,_)          , 0                         , 0 , 0 , 588 , 73 , 48 , 0 ),
+  INST(Fcmovbe         , FpuR               , O_FPU(00,DAD0,_)          , 0                         , 0 , 0 , 595 , 73 , 48 , 0 ),
+  INST(Fcmove          , FpuR               , O_FPU(00,DAC8,_)          , 0                         , 0 , 0 , 603 , 73 , 48 , 0 ),
+  INST(Fcmovnb         , FpuR               , O_FPU(00,DBC0,_)          , 0                         , 0 , 0 , 610 , 73 , 48 , 0 ),
+  INST(Fcmovnbe        , FpuR               , O_FPU(00,DBD0,_)          , 0                         , 0 , 0 , 618 , 73 , 48 , 0 ),
+  INST(Fcmovne         , FpuR               , O_FPU(00,DBC8,_)          , 0                         , 0 , 0 , 627 , 73 , 48 , 0 ),
+  INST(Fcmovnu         , FpuR               , O_FPU(00,DBD8,_)          , 0                         , 0 , 0 , 635 , 73 , 48 , 0 ),
+  INST(Fcmovu          , FpuR               , O_FPU(00,DAD8,_)          , 0                         , 0 , 0 , 643 , 73 , 48 , 0 ),
+  INST(Fcom            , FpuCom             , O_FPU(00,D0D0,2)          , 0                         , 0 , 0 , 650 , 74 , 47 , 0 ),
+  INST(Fcomi           , FpuR               , O_FPU(00,DBF0,_)          , 0                         , 0 , 0 , 655 , 75 , 49 , 0 ),
+  INST(Fcomip          , FpuR               , O_FPU(00,DFF0,_)          , 0                         , 0 , 0 , 661 , 75 , 49 , 0 ),
+  INST(Fcomp           , FpuCom             , O_FPU(00,D8D8,3)          , 0                         , 0 , 0 , 668 , 74 , 47 , 0 ),
+  INST(Fcompp          , FpuOp              , O_FPU(00,DED9,_)          , 0                         , 0 , 0 , 674 , 34 , 47 , 0 ),
+  INST(Fcos            , FpuOp              , O_FPU(00,D9FF,_)          , 0                         , 0 , 0 , 681 , 34 , 47 , 0 ),
+  INST(Fdecstp         , FpuOp              , O_FPU(00,D9F6,_)          , 0                         , 0 , 0 , 686 , 34 , 47 , 0 ),
+  INST(Fdiv            , FpuArith           , O_FPU(00,F0F8,6)          , 0                         , 0 , 0 , 694 , 69 , 47 , 0 ),
+  INST(Fdivp           , FpuRDef            , O_FPU(00,DEF8,_)          , 0                         , 0 , 0 , 699 , 70 , 47 , 0 ),
+  INST(Fdivr           , FpuArith           , O_FPU(00,F8F0,7)          , 0                         , 0 , 0 , 705 , 69 , 47 , 0 ),
+  INST(Fdivrp          , FpuRDef            , O_FPU(00,DEF0,_)          , 0                         , 0 , 0 , 711 , 70 , 47 , 0 ),
+  INST(Femms           , X86Op              , O(000F00,0E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 718 , 34 , 50 , 0 ),
+  INST(Ffree           , FpuR               , O_FPU(00,DDC0,_)          , 0                         , 0 , 0 , 724 , 73 , 47 , 0 ),
+  INST(Fiadd           , FpuM               , O_FPU(00,00DA,0)          , 0                         , 0 , 0 , 730 , 76 , 47 , 0 ),
+  INST(Ficom           , FpuM               , O_FPU(00,00DA,2)          , 0                         , 0 , 0 , 736 , 76 , 47 , 0 ),
+  INST(Ficomp          , FpuM               , O_FPU(00,00DA,3)          , 0                         , 0 , 0 , 742 , 76 , 47 , 0 ),
+  INST(Fidiv           , FpuM               , O_FPU(00,00DA,6)          , 0                         , 0 , 0 , 749 , 76 , 47 , 0 ),
+  INST(Fidivr          , FpuM               , O_FPU(00,00DA,7)          , 0                         , 0 , 0 , 755 , 76 , 47 , 0 ),
+  INST(Fild            , FpuM               , O_FPU(00,00DB,0)          , O_FPU(00,00DF,5)          , 0 , 0 , 762 , 77 , 47 , 0 ),
+  INST(Fimul           , FpuM               , O_FPU(00,00DA,1)          , 0                         , 0 , 0 , 767 , 76 , 47 , 0 ),
+  INST(Fincstp         , FpuOp              , O_FPU(00,D9F7,_)          , 0                         , 0 , 0 , 773 , 34 , 47 , 0 ),
+  INST(Finit           , FpuOp              , O_FPU(9B,DBE3,_)          , 0                         , 0 , 0 , 781 , 34 , 47 , 0 ),
+  INST(Fist            , FpuM               , O_FPU(00,00DB,2)          , 0                         , 0 , 0 , 787 , 78 , 47 , 0 ),
+  INST(Fistp           , FpuM               , O_FPU(00,00DB,3)          , O_FPU(00,00DF,7)          , 0 , 0 , 792 , 79 , 47 , 0 ),
+  INST(Fisttp          , FpuM               , O_FPU(00,00DB,1)          , O_FPU(00,00DD,1)          , 0 , 0 , 798 , 80 , 51 , 0 ),
+  INST(Fisub           , FpuM               , O_FPU(00,00DA,4)          , 0                         , 0 , 0 , 805 , 76 , 47 , 0 ),
+  INST(Fisubr          , FpuM               , O_FPU(00,00DA,5)          , 0                         , 0 , 0 , 811 , 76 , 47 , 0 ),
+  INST(Fld             , FpuFldFst          , O_FPU(00,00D9,0)          , O_FPU(00,00DB,5)          , 0 , 0 , 818 , 81 , 47 , 0 ),
+  INST(Fld1            , FpuOp              , O_FPU(00,D9E8,_)          , 0                         , 0 , 0 , 822 , 34 , 47 , 0 ),
+  INST(Fldcw           , X86M_Only          , O_FPU(00,00D9,5)          , 0                         , 0 , 0 , 827 , 82 , 47 , 0 ),
+  INST(Fldenv          , X86M_Only          , O_FPU(00,00D9,4)          , 0                         , 0 , 0 , 833 , 35 , 47 , 0 ),
+  INST(Fldl2e          , FpuOp              , O_FPU(00,D9EA,_)          , 0                         , 0 , 0 , 840 , 34 , 47 , 0 ),
+  INST(Fldl2t          , FpuOp              , O_FPU(00,D9E9,_)          , 0                         , 0 , 0 , 847 , 34 , 47 , 0 ),
+  INST(Fldlg2          , FpuOp              , O_FPU(00,D9EC,_)          , 0                         , 0 , 0 , 854 , 34 , 47 , 0 ),
+  INST(Fldln2          , FpuOp              , O_FPU(00,D9ED,_)          , 0                         , 0 , 0 , 861 , 34 , 47 , 0 ),
+  INST(Fldpi           , FpuOp              , O_FPU(00,D9EB,_)          , 0                         , 0 , 0 , 868 , 34 , 47 , 0 ),
+  INST(Fldz            , FpuOp              , O_FPU(00,D9EE,_)          , 0                         , 0 , 0 , 874 , 34 , 47 , 0 ),
+  INST(Fmul            , FpuArith           , O_FPU(00,C8C8,1)          , 0                         , 0 , 0 , 1999, 83 , 47 , 0 ),
+  INST(Fmulp           , FpuRDef            , O_FPU(00,DEC8,_)          , 0                         , 0 , 0 , 879 , 70 , 47 , 0 ),
+  INST(Fnclex          , FpuOp              , O_FPU(00,DBE2,_)          , 0                         , 0 , 0 , 885 , 34 , 47 , 0 ),
+  INST(Fninit          , FpuOp              , O_FPU(00,DBE3,_)          , 0                         , 0 , 0 , 892 , 34 , 47 , 0 ),
+  INST(Fnop            , FpuOp              , O_FPU(00,D9D0,_)          , 0                         , 0 , 0 , 899 , 34 , 47 , 0 ),
+  INST(Fnsave          , X86M_Only          , O_FPU(00,00DD,6)          , 0                         , 0 , 0 , 904 , 84 , 47 , 0 ),
+  INST(Fnstcw          , X86M_Only          , O_FPU(00,00D9,7)          , 0                         , 0 , 0 , 911 , 85 , 47 , 0 ),
+  INST(Fnstenv         , X86M_Only          , O_FPU(00,00D9,6)          , 0                         , 0 , 0 , 918 , 84 , 47 , 0 ),
+  INST(Fnstsw          , FpuStsw            , O_FPU(00,00DD,7)          , O_FPU(00,DFE0,_)          , 0 , 0 , 926 , 86 , 47 , 0 ),
+  INST(Fpatan          , FpuOp              , O_FPU(00,D9F3,_)          , 0                         , 0 , 0 , 933 , 34 , 47 , 0 ),
+  INST(Fprem           , FpuOp              , O_FPU(00,D9F8,_)          , 0                         , 0 , 0 , 940 , 34 , 47 , 0 ),
+  INST(Fprem1          , FpuOp              , O_FPU(00,D9F5,_)          , 0                         , 0 , 0 , 946 , 34 , 47 , 0 ),
+  INST(Fptan           , FpuOp              , O_FPU(00,D9F2,_)          , 0                         , 0 , 0 , 953 , 34 , 47 , 0 ),
+  INST(Frndint         , FpuOp              , O_FPU(00,D9FC,_)          , 0                         , 0 , 0 , 959 , 34 , 47 , 0 ),
+  INST(Frstor          , X86M_Only          , O_FPU(00,00DD,4)          , 0                         , 0 , 0 , 967 , 35 , 47 , 0 ),
+  INST(Fsave           , X86M_Only          , O_FPU(9B,00DD,6)          , 0                         , 0 , 0 , 974 , 84 , 47 , 0 ),
+  INST(Fscale          , FpuOp              , O_FPU(00,D9FD,_)          , 0                         , 0 , 0 , 980 , 34 , 47 , 0 ),
+  INST(Fsin            , FpuOp              , O_FPU(00,D9FE,_)          , 0                         , 0 , 0 , 987 , 34 , 47 , 0 ),
+  INST(Fsincos         , FpuOp              , O_FPU(00,D9FB,_)          , 0                         , 0 , 0 , 992 , 34 , 47 , 0 ),
+  INST(Fsqrt           , FpuOp              , O_FPU(00,D9FA,_)          , 0                         , 0 , 0 , 1000, 34 , 47 , 0 ),
+  INST(Fst             , FpuFldFst          , O_FPU(00,00D9,2)          , 0                         , 0 , 0 , 1006, 87 , 47 , 0 ),
+  INST(Fstcw           , X86M_Only          , O_FPU(9B,00D9,7)          , 0                         , 0 , 0 , 1010, 85 , 47 , 0 ),
+  INST(Fstenv          , X86M_Only          , O_FPU(9B,00D9,6)          , 0                         , 0 , 0 , 1016, 84 , 47 , 0 ),
+  INST(Fstp            , FpuFldFst          , O_FPU(00,00D9,3)          , O(000000,DB,7,_,_,_,_,_  ), 0 , 0 , 1023, 88 , 47 , 0 ),
+  INST(Fstsw           , FpuStsw            , O_FPU(9B,00DD,7)          , O_FPU(9B,DFE0,_)          , 0 , 0 , 1028, 89 , 47 , 0 ),
+  INST(Fsub            , FpuArith           , O_FPU(00,E0E8,4)          , 0                         , 0 , 0 , 2077, 69 , 47 , 0 ),
+  INST(Fsubp           , FpuRDef            , O_FPU(00,DEE8,_)          , 0                         , 0 , 0 , 1034, 70 , 47 , 0 ),
+  INST(Fsubr           , FpuArith           , O_FPU(00,E8E0,5)          , 0                         , 0 , 0 , 2083, 69 , 47 , 0 ),
+  INST(Fsubrp          , FpuRDef            , O_FPU(00,DEE0,_)          , 0                         , 0 , 0 , 1040, 70 , 47 , 0 ),
+  INST(Ftst            , FpuOp              , O_FPU(00,D9E4,_)          , 0                         , 0 , 0 , 1047, 34 , 47 , 0 ),
+  INST(Fucom           , FpuRDef            , O_FPU(00,DDE0,_)          , 0                         , 0 , 0 , 1052, 90 , 47 , 0 ),
+  INST(Fucomi          , FpuR               , O_FPU(00,DBE8,_)          , 0                         , 0 , 0 , 1058, 75 , 49 , 0 ),
+  INST(Fucomip         , FpuR               , O_FPU(00,DFE8,_)          , 0                         , 0 , 0 , 1065, 75 , 49 , 0 ),
+  INST(Fucomp          , FpuRDef            , O_FPU(00,DDE8,_)          , 0                         , 0 , 0 , 1073, 90 , 47 , 0 ),
+  INST(Fucompp         , FpuOp              , O_FPU(00,DAE9,_)          , 0                         , 0 , 0 , 1080, 34 , 47 , 0 ),
+  INST(Fwait           , X86Op              , O_FPU(00,00DB,_)          , 0                         , 0 , 0 , 1088, 34 , 47 , 0 ),
+  INST(Fxam            , FpuOp              , O_FPU(00,D9E5,_)          , 0                         , 0 , 0 , 1094, 34 , 47 , 0 ),
+  INST(Fxch            , FpuR               , O_FPU(00,D9C8,_)          , 0                         , 0 , 0 , 1099, 70 , 47 , 0 ),
+  INST(Fxrstor         , X86M_Only          , O(000F00,AE,1,_,_,_,_,_  ), 0                         , 0 , 0 , 1104, 35 , 52 , 0 ),
+  INST(Fxrstor64       , X86M_Only          , O(000F00,AE,1,_,1,_,_,_  ), 0                         , 0 , 0 , 1112, 91 , 52 , 0 ),
+  INST(Fxsave          , X86M_Only          , O(000F00,AE,0,_,_,_,_,_  ), 0                         , 0 , 0 , 1122, 84 , 53 , 0 ),
+  INST(Fxsave64        , X86M_Only          , O(000F00,AE,0,_,1,_,_,_  ), 0                         , 0 , 0 , 1129, 92 , 53 , 0 ),
+  INST(Fxtract         , FpuOp              , O_FPU(00,D9F4,_)          , 0                         , 0 , 0 , 1138, 34 , 47 , 0 ),
+  INST(Fyl2x           , FpuOp              , O_FPU(00,D9F1,_)          , 0                         , 0 , 0 , 1146, 34 , 47 , 0 ),
+  INST(Fyl2xp1         , FpuOp              , O_FPU(00,D9F9,_)          , 0                         , 0 , 0 , 1152, 34 , 47 , 0 ),
+  INST(Haddpd          , ExtRm              , O(660F00,7C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5382, 5  , 6  , 21),
+  INST(Haddps          , ExtRm              , O(F20F00,7C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5390, 5  , 6  , 21),
+  INST(Hlt             , X86Op              , O(000000,F4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1160, 34 , 23 , 0 ),
+  INST(Hsubpd          , ExtRm              , O(660F00,7D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5398, 5  , 6  , 22),
+  INST(Hsubps          , ExtRm              , O(F20F00,7D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5406, 5  , 6  , 22),
+  INST(Idiv            , X86M_GPB_MulDiv    , O(000000,F6,7,_,x,_,_,_  ), 0                         , 0 , 0 , 750 , 64 , 1  , 0 ),
+  INST(Imul            , X86Imul            , O(000000,F6,5,_,x,_,_,_  ), 0                         , 0 , 0 , 768 , 93 , 1  , 0 ),
+  INST(In              , X86In              , O(000000,EC,_,_,_,_,_,_  ), O(000000,E4,_,_,_,_,_,_  ), 0 , 0 , 9508, 94 , 45 , 0 ),
+  INST(Inc             , X86IncDec          , O(000000,FE,0,_,x,_,_,_  ), O(000000,40,_,_,x,_,_,_  ), 0 , 0 , 1164, 95 , 43 , 0 ),
+  INST(Ins             , X86Ins             , O(000000,6C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1168, 96 , 45 , 0 ),
+  INST(Insertps        , ExtRmi             , O(660F3A,21,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5542, 40 , 12 , 23),
+  INST(Insertq         , ExtInsertq         , O(F20F00,79,_,_,_,_,_,_  ), O(F20F00,78,_,_,_,_,_,_  ), 0 , 0 , 1172, 97 , 46 , 0 ),
+  INST(Int             , X86Int             , O(000000,CD,_,_,_,_,_,_  ), 0                         , 0 , 0 , 963 , 98 , 45 , 0 ),
+  INST(Int3            , X86Op              , O(000000,CC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1180, 34 , 45 , 0 ),
+  INST(Into            , X86Op              , O(000000,CE,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1185, 99 , 54 , 0 ),
+  INST(Invd            , X86Op              , O(000F00,08,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9463, 34 , 55 , 0 ),
+  INST(Invlpg          , X86M_Only          , O(000F00,01,7,_,_,_,_,_  ), 0                         , 0 , 0 , 1190, 35 , 55 , 0 ),
+  INST(Invpcid         , X86Rm_NoRexW       , O(660F38,82,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1197, 100, 55 , 0 ),
+  INST(Iret            , X86Op              , O(000000,CF,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1205, 34 , 16 , 0 ),
+  INST(Iretd           , X86Op              , O(000000,CF,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1210, 34 , 16 , 0 ),
+  INST(Iretq           , X86Op              , O(000000,CF,_,_,1,_,_,_  ), 0                         , 0 , 0 , 1216, 101, 16 , 0 ),
+  INST(Iretw           , X86Op              , O(660000,CF,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1222, 34 , 16 , 0 ),
+  INST(Ja              , X86Jcc             , O(000F00,87,_,_,_,_,_,_  ), O(000000,77,_,_,_,_,_,_  ), 0 , 0 , 1228, 102, 56 , 0 ),
+  INST(Jae             , X86Jcc             , O(000F00,83,_,_,_,_,_,_  ), O(000000,73,_,_,_,_,_,_  ), 0 , 0 , 1231, 103, 57 , 0 ),
+  INST(Jb              , X86Jcc             , O(000F00,82,_,_,_,_,_,_  ), O(000000,72,_,_,_,_,_,_  ), 0 , 0 , 1235, 104, 57 , 0 ),
+  INST(Jbe             , X86Jcc             , O(000F00,86,_,_,_,_,_,_  ), O(000000,76,_,_,_,_,_,_  ), 0 , 0 , 1238, 105, 56 , 0 ),
+  INST(Jc              , X86Jcc             , O(000F00,82,_,_,_,_,_,_  ), O(000000,72,_,_,_,_,_,_  ), 0 , 0 , 1242, 106, 57 , 0 ),
+  INST(Je              , X86Jcc             , O(000F00,84,_,_,_,_,_,_  ), O(000000,74,_,_,_,_,_,_  ), 0 , 0 , 1245, 107, 58 , 0 ),
+  INST(Jecxz           , X86JecxzLoop       , 0                         , O(000000,E3,_,_,_,_,_,_  ), 0 , 0 , 1248, 108, 45 , 0 ),
+  INST(Jg              , X86Jcc             , O(000F00,8F,_,_,_,_,_,_  ), O(000000,7F,_,_,_,_,_,_  ), 0 , 0 , 1254, 109, 59 , 0 ),
+  INST(Jge             , X86Jcc             , O(000F00,8D,_,_,_,_,_,_  ), O(000000,7D,_,_,_,_,_,_  ), 0 , 0 , 1257, 110, 60 , 0 ),
+  INST(Jl              , X86Jcc             , O(000F00,8C,_,_,_,_,_,_  ), O(000000,7C,_,_,_,_,_,_  ), 0 , 0 , 1261, 111, 60 , 0 ),
+  INST(Jle             , X86Jcc             , O(000F00,8E,_,_,_,_,_,_  ), O(000000,7E,_,_,_,_,_,_  ), 0 , 0 , 1264, 112, 59 , 0 ),
+  INST(Jmp             , X86Jmp             , O(000000,FF,4,_,_,_,_,_  ), O(000000,EB,_,_,_,_,_,_  ), 0 , 0 , 1268, 113, 45 , 0 ),
+  INST(Jna             , X86Jcc             , O(000F00,86,_,_,_,_,_,_  ), O(000000,76,_,_,_,_,_,_  ), 0 , 0 , 1272, 105, 56 , 0 ),
+  INST(Jnae            , X86Jcc             , O(000F00,82,_,_,_,_,_,_  ), O(000000,72,_,_,_,_,_,_  ), 0 , 0 , 1276, 104, 57 , 0 ),
+  INST(Jnb             , X86Jcc             , O(000F00,83,_,_,_,_,_,_  ), O(000000,73,_,_,_,_,_,_  ), 0 , 0 , 1281, 103, 57 , 0 ),
+  INST(Jnbe            , X86Jcc             , O(000F00,87,_,_,_,_,_,_  ), O(000000,77,_,_,_,_,_,_  ), 0 , 0 , 1285, 102, 56 , 0 ),
+  INST(Jnc             , X86Jcc             , O(000F00,83,_,_,_,_,_,_  ), O(000000,73,_,_,_,_,_,_  ), 0 , 0 , 1290, 114, 57 , 0 ),
+  INST(Jne             , X86Jcc             , O(000F00,85,_,_,_,_,_,_  ), O(000000,75,_,_,_,_,_,_  ), 0 , 0 , 1294, 115, 58 , 0 ),
+  INST(Jng             , X86Jcc             , O(000F00,8E,_,_,_,_,_,_  ), O(000000,7E,_,_,_,_,_,_  ), 0 , 0 , 1298, 112, 59 , 0 ),
+  INST(Jnge            , X86Jcc             , O(000F00,8C,_,_,_,_,_,_  ), O(000000,7C,_,_,_,_,_,_  ), 0 , 0 , 1302, 111, 60 , 0 ),
+  INST(Jnl             , X86Jcc             , O(000F00,8D,_,_,_,_,_,_  ), O(000000,7D,_,_,_,_,_,_  ), 0 , 0 , 1307, 110, 60 , 0 ),
+  INST(Jnle            , X86Jcc             , O(000F00,8F,_,_,_,_,_,_  ), O(000000,7F,_,_,_,_,_,_  ), 0 , 0 , 1311, 109, 59 , 0 ),
+  INST(Jno             , X86Jcc             , O(000F00,81,_,_,_,_,_,_  ), O(000000,71,_,_,_,_,_,_  ), 0 , 0 , 1316, 116, 54 , 0 ),
+  INST(Jnp             , X86Jcc             , O(000F00,8B,_,_,_,_,_,_  ), O(000000,7B,_,_,_,_,_,_  ), 0 , 0 , 1320, 117, 61 , 0 ),
+  INST(Jns             , X86Jcc             , O(000F00,89,_,_,_,_,_,_  ), O(000000,79,_,_,_,_,_,_  ), 0 , 0 , 1324, 118, 62 , 0 ),
+  INST(Jnz             , X86Jcc             , O(000F00,85,_,_,_,_,_,_  ), O(000000,75,_,_,_,_,_,_  ), 0 , 0 , 1328, 115, 58 , 0 ),
+  INST(Jo              , X86Jcc             , O(000F00,80,_,_,_,_,_,_  ), O(000000,70,_,_,_,_,_,_  ), 0 , 0 , 1332, 119, 54 , 0 ),
+  INST(Jp              , X86Jcc             , O(000F00,8A,_,_,_,_,_,_  ), O(000000,7A,_,_,_,_,_,_  ), 0 , 0 , 1335, 120, 61 , 0 ),
+  INST(Jpe             , X86Jcc             , O(000F00,8A,_,_,_,_,_,_  ), O(000000,7A,_,_,_,_,_,_  ), 0 , 0 , 1338, 120, 61 , 0 ),
+  INST(Jpo             , X86Jcc             , O(000F00,8B,_,_,_,_,_,_  ), O(000000,7B,_,_,_,_,_,_  ), 0 , 0 , 1342, 117, 61 , 0 ),
+  INST(Js              , X86Jcc             , O(000F00,88,_,_,_,_,_,_  ), O(000000,78,_,_,_,_,_,_  ), 0 , 0 , 1346, 121, 62 , 0 ),
+  INST(Jz              , X86Jcc             , O(000F00,84,_,_,_,_,_,_  ), O(000000,74,_,_,_,_,_,_  ), 0 , 0 , 1349, 107, 58 , 0 ),
+  INST(Kaddb           , VexRvm             , V(660F00,4A,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1352, 122, 63 , 0 ),
+  INST(Kaddd           , VexRvm             , V(660F00,4A,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1358, 122, 64 , 0 ),
+  INST(Kaddq           , VexRvm             , V(000F00,4A,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1364, 122, 64 , 0 ),
+  INST(Kaddw           , VexRvm             , V(000F00,4A,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1370, 122, 63 , 0 ),
+  INST(Kandb           , VexRvm             , V(660F00,41,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1376, 122, 63 , 0 ),
+  INST(Kandd           , VexRvm             , V(660F00,41,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1382, 122, 64 , 0 ),
+  INST(Kandnb          , VexRvm             , V(660F00,42,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1388, 122, 63 , 0 ),
+  INST(Kandnd          , VexRvm             , V(660F00,42,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1395, 122, 64 , 0 ),
+  INST(Kandnq          , VexRvm             , V(000F00,42,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1402, 122, 64 , 0 ),
+  INST(Kandnw          , VexRvm             , V(000F00,42,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1409, 122, 65 , 0 ),
+  INST(Kandq           , VexRvm             , V(000F00,41,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1416, 122, 64 , 0 ),
+  INST(Kandw           , VexRvm             , V(000F00,41,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1422, 122, 65 , 0 ),
+  INST(Kmovb           , VexKmov            , V(660F00,90,_,0,0,_,_,_  ), V(660F00,92,_,0,0,_,_,_  ), 0 , 0 , 1428, 123, 63 , 0 ),
+  INST(Kmovd           , VexKmov            , V(660F00,90,_,0,1,_,_,_  ), V(F20F00,92,_,0,0,_,_,_  ), 0 , 0 , 7344, 124, 64 , 0 ),
+  INST(Kmovq           , VexKmov            , V(000F00,90,_,0,1,_,_,_  ), V(F20F00,92,_,0,1,_,_,_  ), 0 , 0 , 7355, 125, 64 , 0 ),
+  INST(Kmovw           , VexKmov            , V(000F00,90,_,0,0,_,_,_  ), V(000F00,92,_,0,0,_,_,_  ), 0 , 0 , 1434, 126, 65 , 0 ),
+  INST(Knotb           , VexRm              , V(660F00,44,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1440, 127, 63 , 0 ),
+  INST(Knotd           , VexRm              , V(660F00,44,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1446, 127, 64 , 0 ),
+  INST(Knotq           , VexRm              , V(000F00,44,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1452, 127, 64 , 0 ),
+  INST(Knotw           , VexRm              , V(000F00,44,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1458, 127, 65 , 0 ),
+  INST(Korb            , VexRvm             , V(660F00,45,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1464, 122, 63 , 0 ),
+  INST(Kord            , VexRvm             , V(660F00,45,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1469, 122, 64 , 0 ),
+  INST(Korq            , VexRvm             , V(000F00,45,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1474, 122, 64 , 0 ),
+  INST(Kortestb        , VexRm              , V(660F00,98,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1479, 128, 66 , 0 ),
+  INST(Kortestd        , VexRm              , V(660F00,98,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1488, 128, 67 , 0 ),
+  INST(Kortestq        , VexRm              , V(000F00,98,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1497, 128, 67 , 0 ),
+  INST(Kortestw        , VexRm              , V(000F00,98,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1506, 128, 68 , 0 ),
+  INST(Korw            , VexRvm             , V(000F00,45,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1515, 122, 65 , 0 ),
+  INST(Kshiftlb        , VexRmi             , V(660F3A,32,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1520, 129, 63 , 0 ),
+  INST(Kshiftld        , VexRmi             , V(660F3A,33,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1529, 129, 64 , 0 ),
+  INST(Kshiftlq        , VexRmi             , V(660F3A,33,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1538, 129, 64 , 0 ),
+  INST(Kshiftlw        , VexRmi             , V(660F3A,32,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1547, 129, 65 , 0 ),
+  INST(Kshiftrb        , VexRmi             , V(660F3A,30,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1556, 129, 63 , 0 ),
+  INST(Kshiftrd        , VexRmi             , V(660F3A,31,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1565, 129, 64 , 0 ),
+  INST(Kshiftrq        , VexRmi             , V(660F3A,31,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1574, 129, 64 , 0 ),
+  INST(Kshiftrw        , VexRmi             , V(660F3A,30,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1583, 129, 65 , 0 ),
+  INST(Ktestb          , VexRm              , V(660F00,99,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1592, 128, 66 , 0 ),
+  INST(Ktestd          , VexRm              , V(660F00,99,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1599, 128, 67 , 0 ),
+  INST(Ktestq          , VexRm              , V(000F00,99,_,0,1,_,_,_  ), 0                         , 0 , 0 , 1606, 128, 67 , 0 ),
+  INST(Ktestw          , VexRm              , V(000F00,99,_,0,0,_,_,_  ), 0                         , 0 , 0 , 1613, 128, 66 , 0 ),
+  INST(Kunpckbw        , VexRvm             , V(660F00,4B,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1620, 122, 65 , 0 ),
+  INST(Kunpckdq        , VexRvm             , V(000F00,4B,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1629, 122, 64 , 0 ),
+  INST(Kunpckwd        , VexRvm             , V(000F00,4B,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1638, 122, 64 , 0 ),
+  INST(Kxnorb          , VexRvm             , V(660F00,46,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1647, 122, 63 , 0 ),
+  INST(Kxnord          , VexRvm             , V(660F00,46,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1654, 122, 64 , 0 ),
+  INST(Kxnorq          , VexRvm             , V(000F00,46,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1661, 122, 64 , 0 ),
+  INST(Kxnorw          , VexRvm             , V(000F00,46,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1668, 122, 65 , 0 ),
+  INST(Kxorb           , VexRvm             , V(660F00,47,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1675, 122, 63 , 0 ),
+  INST(Kxord           , VexRvm             , V(660F00,47,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1681, 122, 64 , 0 ),
+  INST(Kxorq           , VexRvm             , V(000F00,47,_,1,1,_,_,_  ), 0                         , 0 , 0 , 1687, 122, 64 , 0 ),
+  INST(Kxorw           , VexRvm             , V(000F00,47,_,1,0,_,_,_  ), 0                         , 0 , 0 , 1693, 122, 65 , 0 ),
+  INST(Lahf            , X86Op              , O(000000,9F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1699, 130, 69 , 0 ),
+  INST(Lar             , X86Rm              , O(000F00,02,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1704, 131, 70 , 0 ),
+  INST(Lddqu           , ExtRm              , O(F20F00,F0,_,_,_,_,_,_  ), 0                         , 0 , 16, 5552, 132, 6  , 24),
+  INST(Ldmxcsr         , X86M_Only          , O(000F00,AE,2,_,_,_,_,_  ), 0                         , 0 , 0 , 5559, 133, 5  , 0 ),
+  INST(Lds             , X86Rm              , O(000000,C5,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1708, 134, 45 , 0 ),
+  INST(Lea             , X86Lea             , O(000000,8D,_,_,x,_,_,_  ), 0                         , 0 , 0 , 1712, 135, 0  , 0 ),
+  INST(Leave           , X86Op              , O(000000,C9,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1716, 34 , 45 , 0 ),
+  INST(Les             , X86Rm              , O(000000,C4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1722, 134, 45 , 0 ),
+  INST(Lfence          , X86Fence           , O(000F00,AE,5,_,_,_,_,_  ), 0                         , 0 , 0 , 1726, 34 , 71 , 0 ),
+  INST(Lfs             , X86Rm              , O(000F00,B4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1733, 136, 45 , 0 ),
+  INST(Lgdt            , X86M_Only          , O(000F00,01,2,_,_,_,_,_  ), 0                         , 0 , 0 , 1737, 35 , 23 , 0 ),
+  INST(Lgs             , X86Rm              , O(000F00,B5,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1742, 136, 45 , 0 ),
+  INST(Lidt            , X86M_Only          , O(000F00,01,3,_,_,_,_,_  ), 0                         , 0 , 0 , 1746, 35 , 23 , 0 ),
+  INST(Lldt            , X86M               , O(000F00,00,2,_,_,_,_,_  ), 0                         , 0 , 0 , 1751, 137, 23 , 0 ),
+  INST(Lmsw            , X86M               , O(000F00,01,6,_,_,_,_,_  ), 0                         , 0 , 0 , 1756, 137, 23 , 0 ),
+  INST(Lods            , X86StrRm           , O(000000,AC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1761, 138, 72 , 0 ),
+  INST(Loop            , X86JecxzLoop       , 0                         , O(000000,E2,_,_,_,_,_,_  ), 0 , 0 , 1766, 139, 45 , 0 ),
+  INST(Loope           , X86JecxzLoop       , 0                         , O(000000,E1,_,_,_,_,_,_  ), 0 , 0 , 1771, 140, 58 , 0 ),
+  INST(Loopne          , X86JecxzLoop       , 0                         , O(000000,E0,_,_,_,_,_,_  ), 0 , 0 , 1777, 141, 58 , 0 ),
+  INST(Lsl             , X86Rm              , O(000F00,03,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1784, 142, 70 , 0 ),
+  INST(Lss             , X86Rm              , O(000F00,B2,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5959, 136, 45 , 0 ),
+  INST(Ltr             , X86M               , O(000F00,00,3,_,_,_,_,_  ), 0                         , 0 , 0 , 1788, 137, 23 , 0 ),
+  INST(Lzcnt           , X86Rm_Raw66H       , O(F30F00,BD,_,_,x,_,_,_  ), 0                         , 0 , 0 , 1792, 143, 73 , 0 ),
+  INST(Maskmovdqu      , ExtRm_ZDI          , O(660F00,57,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5568, 144, 4  , 25),
+  INST(Maskmovq        , ExtRm_ZDI          , O(000F00,F7,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7352, 145, 74 , 0 ),
+  INST(Maxpd           , ExtRm              , O(660F00,5F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5602, 5  , 4  , 26),
+  INST(Maxps           , ExtRm              , O(000F00,5F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5609, 5  , 5  , 26),
+  INST(Maxsd           , ExtRm              , O(F20F00,5F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7371, 6  , 4  , 26),
+  INST(Maxss           , ExtRm              , O(F30F00,5F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5623, 7  , 5  , 26),
+  INST(Mfence          , X86Fence           , O(000F00,AE,6,_,_,_,_,_  ), 0                         , 0 , 0 , 1798, 34 , 71 , 0 ),
+  INST(Minpd           , ExtRm              , O(660F00,5D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5630, 5  , 4  , 27),
+  INST(Minps           , ExtRm              , O(000F00,5D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5637, 5  , 5  , 27),
+  INST(Minsd           , ExtRm              , O(F20F00,5D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7435, 6  , 4  , 27),
+  INST(Minss           , ExtRm              , O(F30F00,5D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5651, 7  , 5  , 27),
+  INST(Monitor         , X86Op              , O(000F01,C8,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1805, 146, 75 , 0 ),
+  INST(Mov             , X86Mov             , 0                         , 0                         , 0 , 0 , 138 , 147, 76 , 0 ),
+  INST(Movapd          , ExtMov             , O(660F00,28,_,_,_,_,_,_  ), O(660F00,29,_,_,_,_,_,_  ), 0 , 16, 5658, 148, 4  , 28),
+  INST(Movaps          , ExtMov             , O(000F00,28,_,_,_,_,_,_  ), O(000F00,29,_,_,_,_,_,_  ), 0 , 16, 5666, 149, 5  , 28),
+  INST(Movbe           , ExtMovbe           , O(000F38,F0,_,_,x,_,_,_  ), O(000F38,F1,_,_,x,_,_,_  ), 0 , 0 , 597 , 150, 77 , 0 ),
+  INST(Movd            , ExtMovd            , O(000F00,6E,_,_,_,_,_,_  ), O(000F00,7E,_,_,_,_,_,_  ), 0 , 16, 7345, 151, 78 , 29),
+  INST(Movddup         , ExtMov             , O(F20F00,12,_,_,_,_,_,_  ), 0                         , 0 , 16, 5680, 49 , 6  , 29),
+  INST(Movdq2q         , ExtMov             , O(F20F00,D6,_,_,_,_,_,_  ), 0                         , 0 , 8 , 1813, 152, 4  , 0 ),
+  INST(Movdqa          , ExtMov             , O(660F00,6F,_,_,_,_,_,_  ), O(660F00,7F,_,_,_,_,_,_  ), 0 , 16, 5689, 153, 4  , 30),
+  INST(Movdqu          , ExtMov             , O(F30F00,6F,_,_,_,_,_,_  ), O(F30F00,7F,_,_,_,_,_,_  ), 0 , 16, 5572, 154, 4  , 28),
+  INST(Movhlps         , ExtMov             , O(000F00,12,_,_,_,_,_,_  ), 0                         , 0 , 8 , 5764, 155, 5  , 31),
+  INST(Movhpd          , ExtMov             , O(660F00,16,_,_,_,_,_,_  ), O(660F00,17,_,_,_,_,_,_  ), 8 , 8 , 5773, 156, 4  , 32),
+  INST(Movhps          , ExtMov             , O(000F00,16,_,_,_,_,_,_  ), O(000F00,17,_,_,_,_,_,_  ), 8 , 8 , 5781, 157, 5  , 32),
+  INST(Movlhps         , ExtMov             , O(000F00,16,_,_,_,_,_,_  ), 0                         , 8 , 8 , 5789, 158, 5  , 31),
+  INST(Movlpd          , ExtMov             , O(660F00,12,_,_,_,_,_,_  ), O(660F00,13,_,_,_,_,_,_  ), 0 , 8 , 5798, 159, 4  , 32),
+  INST(Movlps          , ExtMov             , O(000F00,12,_,_,_,_,_,_  ), O(000F00,13,_,_,_,_,_,_  ), 0 , 8 , 5806, 160, 5  , 32),
+  INST(Movmskpd        , ExtMov             , O(660F00,50,_,_,_,_,_,_  ), 0                         , 0 , 8 , 5814, 161, 4  , 33),
+  INST(Movmskps        , ExtMov             , O(000F00,50,_,_,_,_,_,_  ), 0                         , 0 , 8 , 5824, 161, 5  , 33),
+  INST(Movntdq         , ExtMov             , 0                         , O(660F00,E7,_,_,_,_,_,_  ), 0 , 16, 5834, 162, 4  , 33),
+  INST(Movntdqa        , ExtMov             , O(660F38,2A,_,_,_,_,_,_  ), 0                         , 0 , 16, 5843, 132, 12 , 33),
+  INST(Movnti          , ExtMovnti          , O(000F00,C3,_,_,x,_,_,_  ), 0                         , 0 , 8 , 1821, 163, 4  , 0 ),
+  INST(Movntpd         , ExtMov             , 0                         , O(660F00,2B,_,_,_,_,_,_  ), 0 , 16, 5853, 164, 4  , 34),
+  INST(Movntps         , ExtMov             , 0                         , O(000F00,2B,_,_,_,_,_,_  ), 0 , 16, 5862, 165, 5  , 34),
+  INST(Movntq          , ExtMov             , 0                         , O(000F00,E7,_,_,_,_,_,_  ), 0 , 8 , 1828, 166, 74 , 0 ),
+  INST(Movntsd         , ExtMov             , 0                         , O(F20F00,2B,_,_,_,_,_,_  ), 0 , 8 , 1835, 167, 46 , 0 ),
+  INST(Movntss         , ExtMov             , 0                         , O(F30F00,2B,_,_,_,_,_,_  ), 0 , 4 , 1843, 168, 46 , 0 ),
+  INST(Movq            , ExtMovq            , O(000F00,6E,_,_,x,_,_,_  ), O(000F00,7E,_,_,x,_,_,_  ), 0 , 16, 7356, 169, 78 , 28),
+  INST(Movq2dq         , ExtRm              , O(F30F00,D6,_,_,_,_,_,_  ), 0                         , 0 , 16, 1851, 170, 4  , 0 ),
+  INST(Movs            , X86StrMm           , O(000000,A4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 411 , 171, 72 , 0 ),
+  INST(Movsd           , ExtMov             , O(F20F00,10,_,_,_,_,_,_  ), O(F20F00,11,_,_,_,_,_,_  ), 0 , 8 , 5877, 172, 79 , 35),
+  INST(Movshdup        , ExtRm              , O(F30F00,16,_,_,_,_,_,_  ), 0                         , 0 , 16, 5884, 50 , 6  , 30),
+  INST(Movsldup        , ExtRm              , O(F30F00,12,_,_,_,_,_,_  ), 0                         , 0 , 16, 5894, 50 , 6  , 30),
+  INST(Movss           , ExtMov             , O(F30F00,10,_,_,_,_,_,_  ), O(F30F00,11,_,_,_,_,_,_  ), 0 , 4 , 5904, 173, 80 , 35),
+  INST(Movsx           , X86MovsxMovzx      , O(000F00,BE,_,_,x,_,_,_  ), 0                         , 0 , 0 , 1859, 174, 0  , 0 ),
+  INST(Movsxd          , X86Rm              , O(000000,63,_,_,1,_,_,_  ), 0                         , 0 , 0 , 1865, 175, 0  , 0 ),
+  INST(Movupd          , ExtMov             , O(660F00,10,_,_,_,_,_,_  ), O(660F00,11,_,_,_,_,_,_  ), 0 , 16, 5911, 176, 4  , 36),
+  INST(Movups          , ExtMov             , O(000F00,10,_,_,_,_,_,_  ), O(000F00,11,_,_,_,_,_,_  ), 0 , 16, 5919, 177, 5  , 36),
+  INST(Movzx           , X86MovsxMovzx      , O(000F00,B6,_,_,x,_,_,_  ), 0                         , 0 , 0 , 1872, 174, 0  , 0 ),
+  INST(Mpsadbw         , ExtRmi             , O(660F3A,42,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5927, 16 , 12 , 37),
+  INST(Mul             , X86M_GPB_MulDiv    , O(000000,F6,4,_,x,_,_,_  ), 0                         , 0 , 0 , 769 , 178, 1  , 0 ),
+  INST(Mulpd           , ExtRm              , O(660F00,59,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5936, 5  , 4  , 38),
+  INST(Mulps           , ExtRm              , O(000F00,59,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5943, 5  , 5  , 38),
+  INST(Mulsd           , ExtRm              , O(F20F00,59,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5950, 6  , 4  , 38),
+  INST(Mulss           , ExtRm              , O(F30F00,59,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5957, 7  , 5  , 38),
+  INST(Mulx            , VexRvm_ZDX_Wx      , V(F20F38,F6,_,0,x,_,_,_  ), 0                         , 0 , 0 , 1878, 179, 81 , 0 ),
+  INST(Mwait           , X86Op              , O(000F01,C9,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1883, 180, 75 , 0 ),
+  INST(Neg             , X86M_GPB           , O(000000,F6,3,_,x,_,_,_  ), 0                         , 0 , 0 , 1889, 181, 1  , 0 ),
+  INST(Nop             , X86Op              , O(000000,90,_,_,_,_,_,_  ), 0                         , 0 , 0 , 900 , 182, 0  , 0 ),
+  INST(Not             , X86M_GPB           , O(000000,F6,2,_,x,_,_,_  ), 0                         , 0 , 0 , 1893, 181, 0  , 0 ),
+  INST(Or              , X86Arith           , O(000000,08,1,_,x,_,_,_  ), 0                         , 0 , 0 , 1109, 183, 1  , 0 ),
+  INST(Orpd            , ExtRm              , O(660F00,56,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9429, 12 , 4  , 39),
+  INST(Orps            , ExtRm              , O(000F00,56,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9436, 12 , 5  , 39),
+  INST(Out             , X86Out             , O(000000,EE,_,_,_,_,_,_  ), O(000000,E6,_,_,_,_,_,_  ), 0 , 0 , 1897, 184, 45 , 0 ),
+  INST(Outs            , X86Outs            , O(000000,6E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1901, 185, 45 , 0 ),
+  INST(Pabsb           , ExtRm_P            , O(000F38,1C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5997, 186, 82 , 40),
+  INST(Pabsd           , ExtRm_P            , O(000F38,1E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6004, 186, 82 , 40),
+  INST(Pabsw           , ExtRm_P            , O(000F38,1D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6018, 186, 82 , 41),
+  INST(Packssdw        , ExtRm_P            , O(000F00,6B,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6025, 187, 78 , 42),
+  INST(Packsswb        , ExtRm_P            , O(000F00,63,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6035, 187, 78 , 42),
+  INST(Packusdw        , ExtRm              , O(660F38,2B,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6045, 5  , 12 , 42),
+  INST(Packuswb        , ExtRm_P            , O(000F00,67,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6055, 187, 78 , 42),
+  INST(Paddb           , ExtRm_P            , O(000F00,FC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6065, 187, 78 , 42),
+  INST(Paddd           , ExtRm_P            , O(000F00,FE,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6072, 187, 78 , 42),
+  INST(Paddq           , ExtRm_P            , O(000F00,D4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6079, 187, 4  , 42),
+  INST(Paddsb          , ExtRm_P            , O(000F00,EC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6086, 187, 78 , 42),
+  INST(Paddsw          , ExtRm_P            , O(000F00,ED,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6094, 187, 78 , 42),
+  INST(Paddusb         , ExtRm_P            , O(000F00,DC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6102, 187, 78 , 42),
+  INST(Paddusw         , ExtRm_P            , O(000F00,DD,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6111, 187, 78 , 42),
+  INST(Paddw           , ExtRm_P            , O(000F00,FD,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6120, 187, 78 , 42),
+  INST(Palignr         , ExtRmi_P           , O(000F3A,0F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6127, 188, 6  , 42),
+  INST(Pand            , ExtRm_P            , O(000F00,DB,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6136, 189, 78 , 42),
+  INST(Pandn           , ExtRm_P            , O(000F00,DF,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6149, 190, 78 , 43),
+  INST(Pause           , X86Op              , O(F30000,90,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1906, 34 , 45 , 0 ),
+  INST(Pavgb           , ExtRm_P            , O(000F00,E0,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6179, 187, 83 , 44),
+  INST(Pavgusb         , Ext3dNow           , O(000F0F,BF,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1912, 191, 84 , 0 ),
+  INST(Pavgw           , ExtRm_P            , O(000F00,E3,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6186, 187, 83 , 45),
+  INST(Pblendvb        , ExtRm_XMM0         , O(660F38,10,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6202, 17 , 12 , 46),
+  INST(Pblendw         , ExtRmi             , O(660F3A,0E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6212, 16 , 12 , 44),
+  INST(Pclmulqdq       , ExtRmi             , O(660F3A,44,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6305, 16 , 85 , 47),
+  INST(Pcmpeqb         , ExtRm_P            , O(000F00,74,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6337, 190, 78 , 48),
+  INST(Pcmpeqd         , ExtRm_P            , O(000F00,76,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6346, 190, 78 , 48),
+  INST(Pcmpeqq         , ExtRm              , O(660F38,29,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6355, 192, 12 , 48),
+  INST(Pcmpeqw         , ExtRm_P            , O(000F00,75,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6364, 190, 78 , 48),
+  INST(Pcmpestri       , ExtRmi             , O(660F3A,61,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6373, 193, 86 , 49),
+  INST(Pcmpestrm       , ExtRmi             , O(660F3A,60,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6384, 194, 86 , 49),
+  INST(Pcmpgtb         , ExtRm_P            , O(000F00,64,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6395, 190, 78 , 48),
+  INST(Pcmpgtd         , ExtRm_P            , O(000F00,66,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6404, 190, 78 , 48),
+  INST(Pcmpgtq         , ExtRm              , O(660F38,37,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6413, 192, 42 , 48),
+  INST(Pcmpgtw         , ExtRm_P            , O(000F00,65,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6422, 190, 78 , 48),
+  INST(Pcmpistri       , ExtRmi             , O(660F3A,63,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6431, 195, 86 , 49),
+  INST(Pcmpistrm       , ExtRmi             , O(660F3A,62,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6442, 196, 86 , 49),
+  INST(Pcommit         , X86Op_O            , O(660F00,AE,7,_,_,_,_,_  ), 0                         , 0 , 0 , 1920, 34 , 87 , 0 ),
+  INST(Pdep            , VexRvm_Wx          , V(F20F38,F5,_,0,x,_,_,_  ), 0                         , 0 , 0 , 1928, 11 , 81 , 0 ),
+  INST(Pext            , VexRvm_Wx          , V(F30F38,F5,_,0,x,_,_,_  ), 0                         , 0 , 0 , 1933, 11 , 81 , 0 ),
+  INST(Pextrb          , ExtExtract         , O(000F3A,14,_,_,_,_,_,_  ), 0                         , 0 , 8 , 6847, 197, 12 , 50),
+  INST(Pextrd          , ExtExtract         , O(000F3A,16,_,_,_,_,_,_  ), 0                         , 0 , 8 , 6855, 67 , 12 , 50),
+  INST(Pextrq          , ExtExtract         , O(000F3A,16,_,_,1,_,_,_  ), 0                         , 0 , 8 , 6863, 198, 12 , 50),
+  INST(Pextrw          , ExtPextrw          , O(000F00,C5,_,_,_,_,_,_  ), O(000F3A,15,_,_,_,_,_,_  ), 0 , 8 , 6871, 199, 88 , 50),
+  INST(Pf2id           , Ext3dNow           , O(000F0F,1D,_,_,_,_,_,_  ), 0                         , 0 , 8 , 1938, 200, 84 , 0 ),
+  INST(Pf2iw           , Ext3dNow           , O(000F0F,1C,_,_,_,_,_,_  ), 0                         , 0 , 8 , 1944, 200, 89 , 0 ),
+  INST(Pfacc           , Ext3dNow           , O(000F0F,AE,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1950, 191, 84 , 0 ),
+  INST(Pfadd           , Ext3dNow           , O(000F0F,9E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1956, 191, 84 , 0 ),
+  INST(Pfcmpeq         , Ext3dNow           , O(000F0F,B0,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1962, 191, 84 , 0 ),
+  INST(Pfcmpge         , Ext3dNow           , O(000F0F,90,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1970, 191, 84 , 0 ),
+  INST(Pfcmpgt         , Ext3dNow           , O(000F0F,A0,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1978, 191, 84 , 0 ),
+  INST(Pfmax           , Ext3dNow           , O(000F0F,A4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1986, 191, 84 , 0 ),
+  INST(Pfmin           , Ext3dNow           , O(000F0F,94,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1992, 191, 84 , 0 ),
+  INST(Pfmul           , Ext3dNow           , O(000F0F,B4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 1998, 191, 84 , 0 ),
+  INST(Pfnacc          , Ext3dNow           , O(000F0F,8A,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2004, 191, 89 , 0 ),
+  INST(Pfpnacc         , Ext3dNow           , O(000F0F,8E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2011, 191, 89 , 0 ),
+  INST(Pfrcp           , Ext3dNow           , O(000F0F,96,_,_,_,_,_,_  ), 0                         , 0 , 8 , 2019, 200, 84 , 0 ),
+  INST(Pfrcpit1        , Ext3dNow           , O(000F0F,A6,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2025, 191, 84 , 0 ),
+  INST(Pfrcpit2        , Ext3dNow           , O(000F0F,B6,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2034, 191, 84 , 0 ),
+  INST(Pfrcpv          , Ext3dNow           , O(000F0F,86,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2043, 191, 90 , 0 ),
+  INST(Pfrsqit1        , Ext3dNow           , O(000F0F,A7,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2050, 201, 84 , 0 ),
+  INST(Pfrsqrt         , Ext3dNow           , O(000F0F,97,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2059, 201, 84 , 0 ),
+  INST(Pfrsqrtv        , Ext3dNow           , O(000F0F,87,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2067, 191, 90 , 0 ),
+  INST(Pfsub           , Ext3dNow           , O(000F0F,9A,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2076, 191, 84 , 0 ),
+  INST(Pfsubr          , Ext3dNow           , O(000F0F,AA,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2082, 191, 84 , 0 ),
+  INST(Phaddd          , ExtRm_P            , O(000F38,02,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6950, 187, 82 , 51),
+  INST(Phaddsw         , ExtRm_P            , O(000F38,03,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6967, 187, 82 , 52),
+  INST(Phaddw          , ExtRm_P            , O(000F38,01,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7036, 187, 82 , 53),
+  INST(Phminposuw      , ExtRm              , O(660F38,41,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7062, 5  , 12 , 54),
+  INST(Phsubd          , ExtRm_P            , O(000F38,06,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7083, 187, 82 , 55),
+  INST(Phsubsw         , ExtRm_P            , O(000F38,07,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7100, 187, 82 , 56),
+  INST(Phsubw          , ExtRm_P            , O(000F38,05,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7109, 187, 82 , 56),
+  INST(Pi2fd           , Ext3dNow           , O(000F0F,0D,_,_,_,_,_,_  ), 0                         , 0 , 8 , 2089, 200, 84 , 0 ),
+  INST(Pi2fw           , Ext3dNow           , O(000F0F,0C,_,_,_,_,_,_  ), 0                         , 0 , 8 , 2095, 200, 89 , 0 ),
+  INST(Pinsrb          , ExtRmi             , O(660F3A,20,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7126, 202, 12 , 57),
+  INST(Pinsrd          , ExtRmi             , O(660F3A,22,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7134, 203, 12 , 57),
+  INST(Pinsrq          , ExtRmi             , O(660F3A,22,_,_,1,_,_,_  ), 0                         , 0 , 0 , 7142, 204, 12 , 57),
+  INST(Pinsrw          , ExtRmi_P           , O(000F00,C4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7150, 205, 83 , 55),
+  INST(Pmaddubsw       , ExtRm_P            , O(000F38,04,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7320, 187, 82 , 58),
+  INST(Pmaddwd         , ExtRm_P            , O(000F00,F5,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7331, 187, 78 , 58),
+  INST(Pmaxsb          , ExtRm              , O(660F38,3C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7362, 12 , 12 , 59),
+  INST(Pmaxsd          , ExtRm              , O(660F38,3D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7370, 12 , 12 , 59),
+  INST(Pmaxsw          , ExtRm_P            , O(000F00,EE,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7386, 189, 83 , 60),
+  INST(Pmaxub          , ExtRm_P            , O(000F00,DE,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7394, 189, 83 , 60),
+  INST(Pmaxud          , ExtRm              , O(660F38,3F,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7402, 12 , 12 , 60),
+  INST(Pmaxuw          , ExtRm              , O(660F38,3E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7418, 12 , 12 , 61),
+  INST(Pminsb          , ExtRm              , O(660F38,38,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7426, 12 , 12 , 61),
+  INST(Pminsd          , ExtRm              , O(660F38,39,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7434, 12 , 12 , 61),
+  INST(Pminsw          , ExtRm_P            , O(000F00,EA,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7450, 189, 83 , 62),
+  INST(Pminub          , ExtRm_P            , O(000F00,DA,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7458, 189, 83 , 62),
+  INST(Pminud          , ExtRm              , O(660F38,3B,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7466, 12 , 12 , 62),
+  INST(Pminuw          , ExtRm              , O(660F38,3A,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7482, 12 , 12 , 63),
+  INST(Pmovmskb        , ExtRm_P            , O(000F00,D7,_,_,_,_,_,_  ), 0                         , 0 , 8 , 7560, 206, 83 , 64),
+  INST(Pmovsxbd        , ExtRm              , O(660F38,21,_,_,_,_,_,_  ), 0                         , 0 , 16, 7657, 207, 12 , 14),
+  INST(Pmovsxbq        , ExtRm              , O(660F38,22,_,_,_,_,_,_  ), 0                         , 0 , 16, 7667, 208, 12 , 14),
+  INST(Pmovsxbw        , ExtRm              , O(660F38,20,_,_,_,_,_,_  ), 0                         , 0 , 16, 7677, 49 , 12 , 14),
+  INST(Pmovsxdq        , ExtRm              , O(660F38,25,_,_,_,_,_,_  ), 0                         , 0 , 16, 7687, 49 , 12 , 14),
+  INST(Pmovsxwd        , ExtRm              , O(660F38,23,_,_,_,_,_,_  ), 0                         , 0 , 16, 7697, 49 , 12 , 14),
+  INST(Pmovsxwq        , ExtRm              , O(660F38,24,_,_,_,_,_,_  ), 0                         , 0 , 16, 7707, 207, 12 , 14),
+  INST(Pmovzxbd        , ExtRm              , O(660F38,31,_,_,_,_,_,_  ), 0                         , 0 , 16, 7794, 207, 12 , 65),
+  INST(Pmovzxbq        , ExtRm              , O(660F38,32,_,_,_,_,_,_  ), 0                         , 0 , 16, 7804, 208, 12 , 65),
+  INST(Pmovzxbw        , ExtRm              , O(660F38,30,_,_,_,_,_,_  ), 0                         , 0 , 16, 7814, 49 , 12 , 65),
+  INST(Pmovzxdq        , ExtRm              , O(660F38,35,_,_,_,_,_,_  ), 0                         , 0 , 16, 7824, 49 , 12 , 65),
+  INST(Pmovzxwd        , ExtRm              , O(660F38,33,_,_,_,_,_,_  ), 0                         , 0 , 16, 7834, 49 , 12 , 65),
+  INST(Pmovzxwq        , ExtRm              , O(660F38,34,_,_,_,_,_,_  ), 0                         , 0 , 16, 7844, 207, 12 , 65),
+  INST(Pmuldq          , ExtRm              , O(660F38,28,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7854, 5  , 12 , 19),
+  INST(Pmulhrsw        , ExtRm_P            , O(000F38,0B,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7862, 187, 82 , 19),
+  INST(Pmulhrw         , Ext3dNow           , O(000F0F,B7,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2101, 191, 84 , 0 ),
+  INST(Pmulhuw         , ExtRm_P            , O(000F00,E4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7872, 187, 83 , 66),
+  INST(Pmulhw          , ExtRm_P            , O(000F00,E5,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7881, 187, 78 , 66),
+  INST(Pmulld          , ExtRm              , O(660F38,40,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7889, 5  , 12 , 66),
+  INST(Pmullw          , ExtRm_P            , O(000F00,D5,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7905, 187, 78 , 19),
+  INST(Pmuludq         , ExtRm_P            , O(000F00,F4,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7928, 187, 4  , 67),
+  INST(Pop             , X86Pop             , O(000000,8F,0,_,_,_,_,_  ), O(000000,58,_,_,_,_,_,_  ), 0 , 0 , 2109, 209, 45 , 0 ),
+  INST(Popa            , X86Op              , O(660000,61,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2113, 99 , 45 , 0 ),
+  INST(Popad           , X86Op              , O(000000,61,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2118, 99 , 45 , 0 ),
+  INST(Popcnt          , X86Rm_Raw66H       , O(F30F00,B8,_,_,x,_,_,_  ), 0                         , 0 , 0 , 2124, 143, 91 , 0 ),
+  INST(Popf            , X86Op              , O(660000,9D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2131, 34 , 16 , 0 ),
+  INST(Popfd           , X86Op              , O(000000,9D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2136, 99 , 16 , 0 ),
+  INST(Popfq           , X86Op              , O(000000,9D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2142, 101, 16 , 0 ),
+  INST(Por             , ExtRm_P            , O(000F00,EB,_,_,_,_,_,_  ), 0                         , 0 , 0 , 7955, 189, 78 , 68),
+  INST(Prefetch        , X86M_Only          , O(000F00,0D,0,_,_,_,_,_  ), 0                         , 0 , 0 , 2148, 35 , 92 , 0 ),
+  INST(Prefetchnta     , X86M_Only          , O(000F00,18,0,_,_,_,_,_  ), 0                         , 0 , 0 , 2157, 35 , 93 , 0 ),
+  INST(Prefetcht0      , X86M_Only          , O(000F00,18,1,_,_,_,_,_  ), 0                         , 0 , 0 , 2169, 35 , 93 , 0 ),
+  INST(Prefetcht1      , X86M_Only          , O(000F00,18,2,_,_,_,_,_  ), 0                         , 0 , 0 , 2180, 35 , 93 , 0 ),
+  INST(Prefetcht2      , X86M_Only          , O(000F00,18,3,_,_,_,_,_  ), 0                         , 0 , 0 , 2191, 35 , 93 , 0 ),
+  INST(Prefetchw       , X86M_Only          , O(000F00,0D,1,_,_,_,_,_  ), 0                         , 0 , 0 , 2202, 35 , 94 , 0 ),
+  INST(Prefetchwt1     , X86M_Only          , O(000F00,0D,2,_,_,_,_,_  ), 0                         , 0 , 0 , 2212, 35 , 95 , 0 ),
+  INST(Psadbw          , ExtRm_P            , O(000F00,F6,_,_,_,_,_,_  ), 0                         , 0 , 0 , 3795, 187, 83 , 69),
+  INST(Pshufb          , ExtRm_P            , O(000F38,00,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8179, 187, 82 , 70),
+  INST(Pshufd          , ExtRmi             , O(660F00,70,_,_,_,_,_,_  ), 0                         , 0 , 16, 8187, 210, 4  , 71),
+  INST(Pshufhw         , ExtRmi             , O(F30F00,70,_,_,_,_,_,_  ), 0                         , 0 , 16, 8195, 210, 4  , 71),
+  INST(Pshuflw         , ExtRmi             , O(F20F00,70,_,_,_,_,_,_  ), 0                         , 0 , 16, 8204, 210, 4  , 71),
+  INST(Pshufw          , ExtRmi_P           , O(000F00,70,_,_,_,_,_,_  ), 0                         , 0 , 8 , 2224, 211, 74 , 0 ),
+  INST(Psignb          , ExtRm_P            , O(000F38,08,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8213, 187, 82 , 72),
+  INST(Psignd          , ExtRm_P            , O(000F38,0A,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8221, 187, 82 , 72),
+  INST(Psignw          , ExtRm_P            , O(000F38,09,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8229, 187, 82 , 72),
+  INST(Pslld           , ExtRmRi_P          , O(000F00,F2,_,_,_,_,_,_  ), O(000F00,72,6,_,_,_,_,_  ), 0 , 0 , 8237, 212, 78 , 72),
+  INST(Pslldq          , ExtRmRi            , 0                         , O(660F00,73,7,_,_,_,_,_  ), 0 , 0 , 8244, 213, 4  , 72),
+  INST(Psllq           , ExtRmRi_P          , O(000F00,F3,_,_,_,_,_,_  ), O(000F00,73,6,_,_,_,_,_  ), 0 , 0 , 8252, 214, 78 , 72),
+  INST(Psllw           , ExtRmRi_P          , O(000F00,F1,_,_,_,_,_,_  ), O(000F00,71,6,_,_,_,_,_  ), 0 , 0 , 8283, 215, 78 , 73),
+  INST(Psrad           , ExtRmRi_P          , O(000F00,E2,_,_,_,_,_,_  ), O(000F00,72,4,_,_,_,_,_  ), 0 , 0 , 8290, 216, 78 , 73),
+  INST(Psraw           , ExtRmRi_P          , O(000F00,E1,_,_,_,_,_,_  ), O(000F00,71,4,_,_,_,_,_  ), 0 , 0 , 8328, 217, 78 , 74),
+  INST(Psrld           , ExtRmRi_P          , O(000F00,D2,_,_,_,_,_,_  ), O(000F00,72,2,_,_,_,_,_  ), 0 , 0 , 8335, 218, 78 , 74),
+  INST(Psrldq          , ExtRmRi            , 0                         , O(660F00,73,3,_,_,_,_,_  ), 0 , 0 , 8342, 219, 4  , 74),
+  INST(Psrlq           , ExtRmRi_P          , O(000F00,D3,_,_,_,_,_,_  ), O(000F00,73,2,_,_,_,_,_  ), 0 , 0 , 8350, 220, 78 , 74),
+  INST(Psrlw           , ExtRmRi_P          , O(000F00,D1,_,_,_,_,_,_  ), O(000F00,71,2,_,_,_,_,_  ), 0 , 0 , 8381, 221, 78 , 75),
+  INST(Psubb           , ExtRm_P            , O(000F00,F8,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8388, 190, 78 , 75),
+  INST(Psubd           , ExtRm_P            , O(000F00,FA,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8395, 190, 78 , 75),
+  INST(Psubq           , ExtRm_P            , O(000F00,FB,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8402, 190, 4  , 75),
+  INST(Psubsb          , ExtRm_P            , O(000F00,E8,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8409, 190, 78 , 75),
+  INST(Psubsw          , ExtRm_P            , O(000F00,E9,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8417, 190, 78 , 75),
+  INST(Psubusb         , ExtRm_P            , O(000F00,D8,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8425, 190, 78 , 75),
+  INST(Psubusw         , ExtRm_P            , O(000F00,D9,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8434, 190, 78 , 75),
+  INST(Psubw           , ExtRm_P            , O(000F00,F9,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8443, 190, 78 , 75),
+  INST(Pswapd          , Ext3dNow           , O(000F0F,BB,_,_,_,_,_,_  ), 0                         , 0 , 8 , 2231, 200, 89 , 0 ),
+  INST(Ptest           , ExtRm              , O(660F38,17,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8472, 222, 96 , 76),
+  INST(Punpckhbw       , ExtRm_P            , O(000F00,68,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8555, 187, 78 , 77),
+  INST(Punpckhdq       , ExtRm_P            , O(000F00,6A,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8566, 187, 78 , 77),
+  INST(Punpckhqdq      , ExtRm              , O(660F00,6D,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8577, 5  , 4  , 77),
+  INST(Punpckhwd       , ExtRm_P            , O(000F00,69,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8589, 187, 78 , 77),
+  INST(Punpcklbw       , ExtRm_P            , O(000F00,60,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8600, 187, 78 , 77),
+  INST(Punpckldq       , ExtRm_P            , O(000F00,62,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8611, 187, 78 , 77),
+  INST(Punpcklqdq      , ExtRm              , O(660F00,6C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8622, 5  , 4  , 77),
+  INST(Punpcklwd       , ExtRm_P            , O(000F00,61,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8634, 187, 78 , 77),
+  INST(Push            , X86Push            , O(000000,FF,6,_,_,_,_,_  ), O(000000,50,_,_,_,_,_,_  ), 0 , 0 , 2238, 223, 45 , 0 ),
+  INST(Pusha           , X86Op              , O(660000,60,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2243, 99 , 45 , 0 ),
+  INST(Pushad          , X86Op              , O(000000,60,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2249, 99 , 45 , 0 ),
+  INST(Pushf           , X86Op              , O(660000,9C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2256, 34 , 45 , 0 ),
+  INST(Pushfd          , X86Op              , O(000000,9C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2262, 99 , 45 , 0 ),
+  INST(Pushfq          , X86Op              , O(000000,9C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2269, 101, 45 , 0 ),
+  INST(Pxor            , ExtRm_P            , O(000F00,EF,_,_,_,_,_,_  ), 0                         , 0 , 0 , 8645, 190, 78 , 78),
+  INST(Rcl             , X86Rot             , O(000000,D0,2,_,x,_,_,_  ), 0                         , 0 , 0 , 2276, 224, 97 , 0 ),
+  INST(Rcpps           , ExtRm              , O(000F00,53,_,_,_,_,_,_  ), 0                         , 0 , 16, 8773, 50 , 5  , 79),
+  INST(Rcpss           , ExtRm              , O(F30F00,53,_,_,_,_,_,_  ), 0                         , 0 , 4 , 8780, 225, 5  , 80),
+  INST(Rcr             , X86Rot             , O(000000,D0,3,_,x,_,_,_  ), 0                         , 0 , 0 , 2280, 224, 97 , 0 ),
+  INST(Rdfsbase        , X86M               , O(F30F00,AE,0,_,x,_,_,_  ), 0                         , 0 , 8 , 2284, 226, 98 , 0 ),
+  INST(Rdgsbase        , X86M               , O(F30F00,AE,1,_,x,_,_,_  ), 0                         , 0 , 8 , 2293, 226, 98 , 0 ),
+  INST(Rdmsr           , X86Op              , O(000F00,32,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2302, 227, 99 , 0 ),
+  INST(Rdpmc           , X86Op              , O(000F00,33,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2308, 227, 23 , 0 ),
+  INST(Rdrand          , X86M               , O(000F00,C7,6,_,x,_,_,_  ), 0                         , 0 , 8 , 2314, 228, 100, 0 ),
+  INST(Rdseed          , X86M               , O(000F00,C7,7,_,x,_,_,_  ), 0                         , 0 , 8 , 2321, 228, 101, 0 ),
+  INST(Rdtsc           , X86Op              , O(000F00,31,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2328, 229, 102, 0 ),
+  INST(Rdtscp          , X86Op              , O(000F01,F9,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2334, 230, 103, 0 ),
+  INST(Ret             , X86Ret             , O(000000,C2,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2748, 231, 45 , 0 ),
+  INST(Rol             , X86Rot             , O(000000,D0,0,_,x,_,_,_  ), 0                         , 0 , 0 , 2341, 224, 97 , 0 ),
+  INST(Ror             , X86Rot             , O(000000,D0,1,_,x,_,_,_  ), 0                         , 0 , 0 , 2345, 224, 97 , 0 ),
+  INST(Rorx            , VexRmi_Wx          , V(F20F3A,F0,_,0,x,_,_,_  ), 0                         , 0 , 0 , 2349, 232, 81 , 0 ),
+  INST(Roundpd         , ExtRmi             , O(660F3A,09,_,_,_,_,_,_  ), 0                         , 0 , 16, 8875, 210, 12 , 81),
+  INST(Roundps         , ExtRmi             , O(660F3A,08,_,_,_,_,_,_  ), 0                         , 0 , 16, 8884, 210, 12 , 81),
+  INST(Roundsd         , ExtRmi             , O(660F3A,0B,_,_,_,_,_,_  ), 0                         , 0 , 8 , 8893, 233, 12 , 82),
+  INST(Roundss         , ExtRmi             , O(660F3A,0A,_,_,_,_,_,_  ), 0                         , 0 , 4 , 8902, 234, 12 , 82),
+  INST(Rsm             , X86Op              , O(000F00,AA,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2354, 99 , 16 , 0 ),
+  INST(Rsqrtps         , ExtRm              , O(000F00,52,_,_,_,_,_,_  ), 0                         , 0 , 16, 8999, 50 , 5  , 3 ),
+  INST(Rsqrtss         , ExtRm              , O(F30F00,52,_,_,_,_,_,_  ), 0                         , 0 , 4 , 9008, 225, 5  , 2 ),
+  INST(Sahf            , X86Op              , O(000000,9E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2358, 235, 104, 0 ),
+  INST(Sal             , X86Rot             , O(000000,D0,4,_,x,_,_,_  ), 0                         , 0 , 0 , 2363, 224, 1  , 0 ),
+  INST(Sar             , X86Rot             , O(000000,D0,7,_,x,_,_,_  ), 0                         , 0 , 0 , 2367, 224, 1  , 0 ),
+  INST(Sarx            , VexRmv_Wx          , V(F30F38,F7,_,0,x,_,_,_  ), 0                         , 0 , 0 , 2371, 14 , 81 , 0 ),
+  INST(Sbb             , X86Arith           , O(000000,18,3,_,x,_,_,_  ), 0                         , 0 , 0 , 2376, 3  , 2  , 0 ),
+  INST(Scas            , X86StrRm           , O(000000,AE,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2380, 236, 35 , 0 ),
+  INST(Seta            , X86Set             , O(000F00,97,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2385, 237, 105, 0 ),
+  INST(Setae           , X86Set             , O(000F00,93,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2390, 237, 106, 0 ),
+  INST(Setb            , X86Set             , O(000F00,92,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2396, 237, 106, 0 ),
+  INST(Setbe           , X86Set             , O(000F00,96,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2401, 237, 105, 0 ),
+  INST(Setc            , X86Set             , O(000F00,92,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2407, 237, 106, 0 ),
+  INST(Sete            , X86Set             , O(000F00,94,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2412, 237, 107, 0 ),
+  INST(Setg            , X86Set             , O(000F00,9F,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2417, 237, 108, 0 ),
+  INST(Setge           , X86Set             , O(000F00,9D,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2422, 237, 109, 0 ),
+  INST(Setl            , X86Set             , O(000F00,9C,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2428, 237, 109, 0 ),
+  INST(Setle           , X86Set             , O(000F00,9E,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2433, 237, 108, 0 ),
+  INST(Setna           , X86Set             , O(000F00,96,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2439, 237, 105, 0 ),
+  INST(Setnae          , X86Set             , O(000F00,92,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2445, 237, 106, 0 ),
+  INST(Setnb           , X86Set             , O(000F00,93,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2452, 237, 106, 0 ),
+  INST(Setnbe          , X86Set             , O(000F00,97,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2458, 237, 105, 0 ),
+  INST(Setnc           , X86Set             , O(000F00,93,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2465, 237, 106, 0 ),
+  INST(Setne           , X86Set             , O(000F00,95,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2471, 237, 107, 0 ),
+  INST(Setng           , X86Set             , O(000F00,9E,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2477, 237, 108, 0 ),
+  INST(Setnge          , X86Set             , O(000F00,9C,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2483, 237, 109, 0 ),
+  INST(Setnl           , X86Set             , O(000F00,9D,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2490, 237, 109, 0 ),
+  INST(Setnle          , X86Set             , O(000F00,9F,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2496, 237, 108, 0 ),
+  INST(Setno           , X86Set             , O(000F00,91,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2503, 237, 110, 0 ),
+  INST(Setnp           , X86Set             , O(000F00,9B,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2509, 237, 111, 0 ),
+  INST(Setns           , X86Set             , O(000F00,99,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2515, 237, 112, 0 ),
+  INST(Setnz           , X86Set             , O(000F00,95,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2521, 237, 107, 0 ),
+  INST(Seto            , X86Set             , O(000F00,90,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2527, 237, 110, 0 ),
+  INST(Setp            , X86Set             , O(000F00,9A,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2532, 237, 111, 0 ),
+  INST(Setpe           , X86Set             , O(000F00,9A,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2537, 237, 111, 0 ),
+  INST(Setpo           , X86Set             , O(000F00,9B,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2543, 237, 111, 0 ),
+  INST(Sets            , X86Set             , O(000F00,98,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2549, 237, 112, 0 ),
+  INST(Setz            , X86Set             , O(000F00,94,_,_,_,_,_,_  ), 0                         , 0 , 1 , 2554, 237, 107, 0 ),
+  INST(Sfence          , X86Fence           , O(000F00,AE,7,_,_,_,_,_  ), 0                         , 0 , 0 , 2559, 34 , 113, 0 ),
+  INST(Sgdt            , X86M_Only          , O(000F00,01,0,_,_,_,_,_  ), 0                         , 0 , 0 , 2566, 84 , 45 , 0 ),
+  INST(Sha1msg1        , ExtRm              , O(000F38,C9,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2571, 5  , 114, 0 ),
+  INST(Sha1msg2        , ExtRm              , O(000F38,CA,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2580, 5  , 114, 0 ),
+  INST(Sha1nexte       , ExtRm              , O(000F38,C8,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2589, 5  , 114, 0 ),
+  INST(Sha1rnds4       , ExtRmi             , O(000F3A,CC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2599, 16 , 114, 0 ),
+  INST(Sha256msg1      , ExtRm              , O(000F38,CC,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2609, 5  , 114, 0 ),
+  INST(Sha256msg2      , ExtRm              , O(000F38,CD,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2620, 5  , 114, 0 ),
+  INST(Sha256rnds2     , ExtRm_XMM0         , O(000F38,CB,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2631, 17 , 114, 0 ),
+  INST(Shl             , X86Rot             , O(000000,D0,4,_,x,_,_,_  ), 0                         , 0 , 0 , 2643, 224, 1  , 0 ),
+  INST(Shld            , X86ShldShrd        , O(000F00,A4,_,_,x,_,_,_  ), 0                         , 0 , 0 , 8159, 238, 1  , 0 ),
+  INST(Shlx            , VexRmv_Wx          , V(660F38,F7,_,0,x,_,_,_  ), 0                         , 0 , 0 , 2647, 14 , 81 , 0 ),
+  INST(Shr             , X86Rot             , O(000000,D0,5,_,x,_,_,_  ), 0                         , 0 , 0 , 2652, 224, 1  , 0 ),
+  INST(Shrd            , X86ShldShrd        , O(000F00,AC,_,_,x,_,_,_  ), 0                         , 0 , 0 , 2656, 238, 1  , 0 ),
+  INST(Shrx            , VexRmv_Wx          , V(F20F38,F7,_,0,x,_,_,_  ), 0                         , 0 , 0 , 2661, 14 , 81 , 0 ),
+  INST(Shufpd          , ExtRmi             , O(660F00,C6,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9269, 16 , 4  , 83),
+  INST(Shufps          , ExtRmi             , O(000F00,C6,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9277, 16 , 5  , 83),
+  INST(Sidt            , X86M_Only          , O(000F00,01,1,_,_,_,_,_  ), 0                         , 0 , 0 , 2666, 84 , 45 , 0 ),
+  INST(Sldt            , X86M               , O(000F00,00,0,_,_,_,_,_  ), 0                         , 0 , 0 , 2671, 239, 45 , 0 ),
+  INST(Smsw            , X86M               , O(000F00,01,4,_,_,_,_,_  ), 0                         , 0 , 0 , 2676, 239, 45 , 0 ),
+  INST(Sqrtpd          , ExtRm              , O(660F00,51,_,_,_,_,_,_  ), 0                         , 0 , 16, 9285, 50 , 4  , 84),
+  INST(Sqrtps          , ExtRm              , O(000F00,51,_,_,_,_,_,_  ), 0                         , 0 , 16, 9000, 50 , 5  , 84),
+  INST(Sqrtsd          , ExtRm              , O(F20F00,51,_,_,_,_,_,_  ), 0                         , 0 , 8 , 9301, 240, 4  , 85),
+  INST(Sqrtss          , ExtRm              , O(F30F00,51,_,_,_,_,_,_  ), 0                         , 0 , 4 , 9009, 225, 5  , 85),
+  INST(Stac            , X86Op              , O(000F01,CB,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2681, 34 , 17 , 0 ),
+  INST(Stc             , X86Op              , O(000000,F9,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2686, 34 , 18 , 0 ),
+  INST(Std             , X86Op              , O(000000,FD,_,_,_,_,_,_  ), 0                         , 0 , 0 , 6242, 34 , 19 , 0 ),
+  INST(Sti             , X86Op              , O(000000,FB,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2690, 34 , 22 , 0 ),
+  INST(Stmxcsr         , X86M_Only          , O(000F00,AE,3,_,_,_,_,_  ), 0                         , 0 , 0 , 9317, 241, 5  , 0 ),
+  INST(Stos            , X86StrMr           , O(000000,AA,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2694, 242, 72 , 0 ),
+  INST(Str             , X86M               , O(000F00,00,1,_,_,_,_,_  ), 0                         , 0 , 0 , 2699, 239, 45 , 0 ),
+  INST(Sub             , X86Arith           , O(000000,28,5,_,x,_,_,_  ), 0                         , 0 , 0 , 807 , 243, 1  , 0 ),
+  INST(Subpd           , ExtRm              , O(660F00,5C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 4361, 5  , 4  , 86),
+  INST(Subps           , ExtRm              , O(000F00,5C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 4373, 5  , 5  , 86),
+  INST(Subsd           , ExtRm              , O(F20F00,5C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5049, 6  , 4  , 86),
+  INST(Subss           , ExtRm              , O(F30F00,5C,_,_,_,_,_,_  ), 0                         , 0 , 0 , 5059, 7  , 5  , 86),
+  INST(Swapgs          , X86Op              , O(000F01,F8,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2703, 101, 23 , 0 ),
+  INST(Syscall         , X86Op              , O(000F00,05,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2710, 101, 45 , 0 ),
+  INST(Sysenter        , X86Op              , O(000F00,34,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2718, 34 , 45 , 0 ),
+  INST(Sysexit         , X86Op              , O(000F00,35,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2727, 34 , 23 , 0 ),
+  INST(Sysexit64       , X86Op              , O(000F00,35,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2735, 34 , 23 , 0 ),
+  INST(Sysret          , X86Op              , O(000F00,07,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2745, 101, 23 , 0 ),
+  INST(Sysret64        , X86Op              , O(000F00,07,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2752, 101, 23 , 0 ),
+  INST(T1mskc          , VexVm_Wx           , V(XOP_M9,01,7,0,x,_,_,_  ), 0                         , 0 , 0 , 2761, 15 , 11 , 0 ),
+  INST(Test            , X86Test            , O(000000,84,_,_,x,_,_,_  ), O(000000,F6,_,_,x,_,_,_  ), 0 , 0 , 8473, 244, 1  , 0 ),
+  INST(Tzcnt           , X86Rm_Raw66H       , O(F30F00,BC,_,_,x,_,_,_  ), 0                         , 0 , 0 , 2768, 143, 9  , 0 ),
+  INST(Tzmsk           , VexVm_Wx           , V(XOP_M9,01,4,0,x,_,_,_  ), 0                         , 0 , 0 , 2774, 15 , 11 , 0 ),
+  INST(Ucomisd         , ExtRm              , O(660F00,2E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9370, 44 , 39 , 15),
+  INST(Ucomiss         , ExtRm              , O(000F00,2E,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9379, 45 , 40 , 15),
+  INST(Ud2             , X86Op              , O(000F00,0B,_,_,_,_,_,_  ), 0                         , 0 , 0 , 2780, 34 , 0  , 0 ),
+  INST(Unpckhpd        , ExtRm              , O(660F00,15,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9388, 5  , 4  , 13),
+  INST(Unpckhps        , ExtRm              , O(000F00,15,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9398, 5  , 5  , 13),
+  INST(Unpcklpd        , ExtRm              , O(660F00,14,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9408, 5  , 4  , 13),
+  INST(Unpcklps        , ExtRm              , O(000F00,14,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9418, 5  , 5  , 13),
+  INST(V4fmaddps       , VexRm_T1_4X        , V(F20F38,9A,_,2,_,0,2,T4X), 0                         , 0 , 0 , 2784, 245, 115, 0 ),
+  INST(V4fnmaddps      , VexRm_T1_4X        , V(F20F38,AA,_,2,_,0,2,T4X), 0                         , 0 , 0 , 2794, 245, 115, 0 ),
+  INST(Vaddpd          , VexRvm_Lx          , V(660F00,58,_,x,I,1,4,FV ), 0                         , 0 , 0 , 2805, 246, 116, 1 ),
+  INST(Vaddps          , VexRvm_Lx          , V(000F00,58,_,x,I,0,4,FV ), 0                         , 0 , 0 , 2812, 247, 116, 1 ),
+  INST(Vaddsd          , VexRvm             , V(F20F00,58,_,I,I,1,3,T1S), 0                         , 0 , 0 , 2819, 248, 117, 1 ),
+  INST(Vaddss          , VexRvm             , V(F30F00,58,_,I,I,0,2,T1S), 0                         , 0 , 0 , 2826, 249, 117, 1 ),
+  INST(Vaddsubpd       , VexRvm_Lx          , V(660F00,D0,_,x,I,_,_,_  ), 0                         , 0 , 0 , 2833, 250, 118, 1 ),
+  INST(Vaddsubps       , VexRvm_Lx          , V(F20F00,D0,_,x,I,_,_,_  ), 0                         , 0 , 0 , 2843, 250, 118, 1 ),
+  INST(Vaesdec         , VexRvm             , V(660F38,DE,_,0,I,_,_,_  ), 0                         , 0 , 0 , 2853, 251, 119, 2 ),
+  INST(Vaesdeclast     , VexRvm             , V(660F38,DF,_,0,I,_,_,_  ), 0                         , 0 , 0 , 2861, 251, 119, 2 ),
+  INST(Vaesenc         , VexRvm             , V(660F38,DC,_,0,I,_,_,_  ), 0                         , 0 , 0 , 2873, 251, 119, 2 ),
+  INST(Vaesenclast     , VexRvm             , V(660F38,DD,_,0,I,_,_,_  ), 0                         , 0 , 0 , 2881, 251, 119, 2 ),
+  INST(Vaesimc         , VexRm              , V(660F38,DB,_,0,I,_,_,_  ), 0                         , 0 , 0 , 2893, 252, 119, 3 ),
+  INST(Vaeskeygenassist, VexRmi             , V(660F3A,DF,_,0,I,_,_,_  ), 0                         , 0 , 0 , 2901, 253, 119, 3 ),
+  INST(Valignd         , VexRvmi_Lx         , V(660F3A,03,_,x,_,0,4,FV ), 0                         , 0 , 0 , 2918, 254, 120, 0 ),
+  INST(Valignq         , VexRvmi_Lx         , V(660F3A,03,_,x,_,1,4,FV ), 0                         , 0 , 0 , 2926, 255, 120, 0 ),
+  INST(Vandnpd         , VexRvm_Lx          , V(660F00,55,_,x,I,1,4,FV ), 0                         , 0 , 0 , 2934, 256, 121, 2 ),
+  INST(Vandnps         , VexRvm_Lx          , V(000F00,55,_,x,I,0,4,FV ), 0                         , 0 , 0 , 2942, 257, 121, 2 ),
+  INST(Vandpd          , VexRvm_Lx          , V(660F00,54,_,x,I,1,4,FV ), 0                         , 0 , 0 , 2950, 258, 121, 2 ),
+  INST(Vandps          , VexRvm_Lx          , V(000F00,54,_,x,I,0,4,FV ), 0                         , 0 , 0 , 2957, 259, 121, 2 ),
+  INST(Vblendmb        , VexRvm_Lx          , V(660F38,66,_,x,_,0,4,FVM), 0                         , 0 , 0 , 2964, 260, 122, 0 ),
+  INST(Vblendmd        , VexRvm_Lx          , V(660F38,64,_,x,_,0,4,FV ), 0                         , 0 , 0 , 2973, 261, 120, 0 ),
+  INST(Vblendmpd       , VexRvm_Lx          , V(660F38,65,_,x,_,1,4,FV ), 0                         , 0 , 0 , 2982, 262, 120, 0 ),
+  INST(Vblendmps       , VexRvm_Lx          , V(660F38,65,_,x,_,0,4,FV ), 0                         , 0 , 0 , 2992, 261, 120, 0 ),
+  INST(Vblendmq        , VexRvm_Lx          , V(660F38,64,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3002, 262, 120, 0 ),
+  INST(Vblendmw        , VexRvm_Lx          , V(660F38,66,_,x,_,1,4,FVM), 0                         , 0 , 0 , 3011, 260, 122, 0 ),
+  INST(Vblendpd        , VexRvmi_Lx         , V(660F3A,0D,_,x,I,_,_,_  ), 0                         , 0 , 0 , 3020, 263, 118, 4 ),
+  INST(Vblendps        , VexRvmi_Lx         , V(660F3A,0C,_,x,I,_,_,_  ), 0                         , 0 , 0 , 3029, 263, 118, 4 ),
+  INST(Vblendvpd       , VexRvmr_Lx         , V(660F3A,4B,_,x,0,_,_,_  ), 0                         , 0 , 0 , 3038, 264, 118, 5 ),
+  INST(Vblendvps       , VexRvmr_Lx         , V(660F3A,4A,_,x,0,_,_,_  ), 0                         , 0 , 0 , 3048, 264, 118, 5 ),
+  INST(Vbroadcastf128  , VexRm              , V(660F38,1A,_,1,0,_,_,_  ), 0                         , 0 , 0 , 3058, 265, 118, 0 ),
+  INST(Vbroadcastf32x2 , VexRm_Lx           , V(660F38,19,_,x,_,0,3,T2 ), 0                         , 0 , 0 , 3073, 266, 123, 0 ),
+  INST(Vbroadcastf32x4 , VexRm_Lx           , V(660F38,1A,_,x,_,0,4,T4 ), 0                         , 0 , 0 , 3089, 267, 65 , 0 ),
+  INST(Vbroadcastf32x8 , VexRm              , V(660F38,1B,_,2,_,0,5,T8 ), 0                         , 0 , 0 , 3105, 268, 63 , 0 ),
+  INST(Vbroadcastf64x2 , VexRm_Lx           , V(660F38,1A,_,x,_,1,4,T2 ), 0                         , 0 , 0 , 3121, 267, 123, 0 ),
+  INST(Vbroadcastf64x4 , VexRm              , V(660F38,1B,_,2,_,1,5,T4 ), 0                         , 0 , 0 , 3137, 268, 65 , 0 ),
+  INST(Vbroadcasti128  , VexRm              , V(660F38,5A,_,1,0,_,_,_  ), 0                         , 0 , 0 , 3153, 265, 124, 0 ),
+  INST(Vbroadcasti32x2 , VexRm_Lx           , V(660F38,59,_,x,_,0,3,T2 ), 0                         , 0 , 0 , 3168, 269, 123, 0 ),
+  INST(Vbroadcasti32x4 , VexRm_Lx           , V(660F38,5A,_,x,_,0,4,T4 ), 0                         , 0 , 0 , 3184, 266, 120, 0 ),
+  INST(Vbroadcasti32x8 , VexRm              , V(660F38,5B,_,2,_,0,5,T8 ), 0                         , 0 , 0 , 3200, 270, 63 , 0 ),
+  INST(Vbroadcasti64x2 , VexRm_Lx           , V(660F38,5A,_,x,_,1,4,T2 ), 0                         , 0 , 0 , 3216, 266, 123, 0 ),
+  INST(Vbroadcasti64x4 , VexRm              , V(660F38,5B,_,2,_,1,5,T4 ), 0                         , 0 , 0 , 3232, 270, 65 , 0 ),
+  INST(Vbroadcastsd    , VexRm_Lx           , V(660F38,19,_,x,0,1,3,T1S), 0                         , 0 , 0 , 3248, 271, 125, 0 ),
+  INST(Vbroadcastss    , VexRm_Lx           , V(660F38,18,_,x,0,0,2,T1S), 0                         , 0 , 0 , 3261, 272, 125, 0 ),
+  INST(Vcmppd          , VexRvmi_Lx         , V(660F00,C2,_,x,I,1,4,FV ), 0                         , 0 , 0 , 3274, 273, 116, 6 ),
+  INST(Vcmpps          , VexRvmi_Lx         , V(000F00,C2,_,x,I,0,4,FV ), 0                         , 0 , 0 , 3281, 274, 116, 6 ),
+  INST(Vcmpsd          , VexRvmi            , V(F20F00,C2,_,I,I,1,3,T1S), 0                         , 0 , 0 , 3288, 275, 117, 7 ),
+  INST(Vcmpss          , VexRvmi            , V(F30F00,C2,_,I,I,0,2,T1S), 0                         , 0 , 0 , 3295, 276, 117, 7 ),
+  INST(Vcomisd         , VexRm              , V(660F00,2F,_,I,I,1,3,T1S), 0                         , 0 , 0 , 3302, 277, 126, 8 ),
+  INST(Vcomiss         , VexRm              , V(000F00,2F,_,I,I,0,2,T1S), 0                         , 0 , 0 , 3310, 278, 126, 8 ),
+  INST(Vcompresspd     , VexMr_Lx           , V(660F38,8A,_,x,_,1,3,T1S), 0                         , 0 , 0 , 3318, 279, 120, 0 ),
+  INST(Vcompressps     , VexMr_Lx           , V(660F38,8A,_,x,_,0,2,T1S), 0                         , 0 , 0 , 3330, 279, 120, 0 ),
+  INST(Vcvtdq2pd       , VexRm_Lx           , V(F30F00,E6,_,x,I,0,3,HV ), 0                         , 0 , 0 , 3342, 280, 116, 9 ),
+  INST(Vcvtdq2ps       , VexRm_Lx           , V(000F00,5B,_,x,I,0,4,FV ), 0                         , 0 , 0 , 3352, 281, 116, 9 ),
+  INST(Vcvtpd2dq       , VexRm_Lx           , V(F20F00,E6,_,x,I,1,4,FV ), 0                         , 0 , 0 , 3362, 282, 116, 9 ),
+  INST(Vcvtpd2ps       , VexRm_Lx           , V(660F00,5A,_,x,I,1,4,FV ), 0                         , 0 , 0 , 3372, 283, 116, 10),
+  INST(Vcvtpd2qq       , VexRm_Lx           , V(660F00,7B,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3382, 284, 123, 0 ),
+  INST(Vcvtpd2udq      , VexRm_Lx           , V(000F00,79,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3392, 285, 120, 0 ),
+  INST(Vcvtpd2uqq      , VexRm_Lx           , V(660F00,79,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3403, 284, 123, 0 ),
+  INST(Vcvtph2ps       , VexRm_Lx           , V(660F38,13,_,x,0,0,3,HVM), 0                         , 0 , 0 , 3414, 286, 127, 0 ),
+  INST(Vcvtps2dq       , VexRm_Lx           , V(660F00,5B,_,x,I,0,4,FV ), 0                         , 0 , 0 , 3424, 281, 116, 8 ),
+  INST(Vcvtps2pd       , VexRm_Lx           , V(000F00,5A,_,x,I,0,4,HV ), 0                         , 0 , 0 , 3434, 287, 116, 8 ),
+  INST(Vcvtps2ph       , VexMri_Lx          , V(660F3A,1D,_,x,0,0,3,HVM), 0                         , 0 , 0 , 3444, 288, 127, 0 ),
+  INST(Vcvtps2qq       , VexRm_Lx           , V(660F00,7B,_,x,_,0,3,HV ), 0                         , 0 , 0 , 3454, 289, 123, 0 ),
+  INST(Vcvtps2udq      , VexRm_Lx           , V(000F00,79,_,x,_,0,4,FV ), 0                         , 0 , 0 , 3464, 290, 120, 0 ),
+  INST(Vcvtps2uqq      , VexRm_Lx           , V(660F00,79,_,x,_,0,3,HV ), 0                         , 0 , 0 , 3475, 289, 123, 0 ),
+  INST(Vcvtqq2pd       , VexRm_Lx           , V(F30F00,E6,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3486, 284, 123, 0 ),
+  INST(Vcvtqq2ps       , VexRm_Lx           , V(000F00,5B,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3496, 285, 123, 0 ),
+  INST(Vcvtsd2si       , VexRm_Wx           , V(F20F00,2D,_,I,x,x,3,T1F), 0                         , 0 , 0 , 3506, 291, 117, 11),
+  INST(Vcvtsd2ss       , VexRvm             , V(F20F00,5A,_,I,I,1,3,T1S), 0                         , 0 , 0 , 3516, 248, 117, 12),
+  INST(Vcvtsd2usi      , VexRm_Wx           , V(F20F00,79,_,I,_,x,3,T1F), 0                         , 0 , 0 , 3526, 292, 65 , 0 ),
+  INST(Vcvtsi2sd       , VexRvm_Wx          , V(F20F00,2A,_,I,x,x,2,T1W), 0                         , 0 , 0 , 3537, 293, 117, 13),
+  INST(Vcvtsi2ss       , VexRvm_Wx          , V(F30F00,2A,_,I,x,x,2,T1W), 0                         , 0 , 0 , 3547, 293, 117, 13),
+  INST(Vcvtss2sd       , VexRvm             , V(F30F00,5A,_,I,I,0,2,T1S), 0                         , 0 , 0 , 3557, 294, 117, 13),
+  INST(Vcvtss2si       , VexRm_Wx           , V(F30F00,2D,_,I,x,x,2,T1F), 0                         , 0 , 0 , 3567, 295, 117, 14),
+  INST(Vcvtss2usi      , VexRm_Wx           , V(F30F00,79,_,I,_,x,2,T1F), 0                         , 0 , 0 , 3577, 296, 65 , 0 ),
+  INST(Vcvttpd2dq      , VexRm_Lx           , V(660F00,E6,_,x,I,1,4,FV ), 0                         , 0 , 0 , 3588, 297, 116, 15),
+  INST(Vcvttpd2qq      , VexRm_Lx           , V(660F00,7A,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3599, 298, 120, 0 ),
+  INST(Vcvttpd2udq     , VexRm_Lx           , V(000F00,78,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3610, 299, 120, 0 ),
+  INST(Vcvttpd2uqq     , VexRm_Lx           , V(660F00,78,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3622, 298, 123, 0 ),
+  INST(Vcvttps2dq      , VexRm_Lx           , V(F30F00,5B,_,x,I,0,4,FV ), 0                         , 0 , 0 , 3634, 300, 116, 16),
+  INST(Vcvttps2qq      , VexRm_Lx           , V(660F00,7A,_,x,_,0,3,HV ), 0                         , 0 , 0 , 3645, 301, 123, 0 ),
+  INST(Vcvttps2udq     , VexRm_Lx           , V(000F00,78,_,x,_,0,4,FV ), 0                         , 0 , 0 , 3656, 302, 120, 0 ),
+  INST(Vcvttps2uqq     , VexRm_Lx           , V(660F00,78,_,x,_,0,3,HV ), 0                         , 0 , 0 , 3668, 301, 123, 0 ),
+  INST(Vcvttsd2si      , VexRm_Wx           , V(F20F00,2C,_,I,x,x,3,T1F), 0                         , 0 , 0 , 3680, 303, 117, 17),
+  INST(Vcvttsd2usi     , VexRm_Wx           , V(F20F00,78,_,I,_,x,3,T1F), 0                         , 0 , 0 , 3691, 304, 65 , 0 ),
+  INST(Vcvttss2si      , VexRm_Wx           , V(F30F00,2C,_,I,x,x,2,T1F), 0                         , 0 , 0 , 3703, 305, 117, 18),
+  INST(Vcvttss2usi     , VexRm_Wx           , V(F30F00,78,_,I,_,x,2,T1F), 0                         , 0 , 0 , 3714, 306, 65 , 0 ),
+  INST(Vcvtudq2pd      , VexRm_Lx           , V(F30F00,7A,_,x,_,0,3,HV ), 0                         , 0 , 0 , 3726, 307, 120, 0 ),
+  INST(Vcvtudq2ps      , VexRm_Lx           , V(F20F00,7A,_,x,_,0,4,FV ), 0                         , 0 , 0 , 3737, 290, 120, 0 ),
+  INST(Vcvtuqq2pd      , VexRm_Lx           , V(F30F00,7A,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3748, 284, 123, 0 ),
+  INST(Vcvtuqq2ps      , VexRm_Lx           , V(F20F00,7A,_,x,_,1,4,FV ), 0                         , 0 , 0 , 3759, 285, 123, 0 ),
+  INST(Vcvtusi2sd      , VexRvm_Wx          , V(F20F00,7B,_,I,_,x,2,T1W), 0                         , 0 , 0 , 3770, 308, 65 , 0 ),
+  INST(Vcvtusi2ss      , VexRvm_Wx          , V(F30F00,7B,_,I,_,x,2,T1W), 0                         , 0 , 0 , 3781, 308, 65 , 0 ),
+  INST(Vdbpsadbw       , VexRvmi_Lx         , V(660F3A,42,_,x,_,0,4,FVM), 0                         , 0 , 0 , 3792, 309, 122, 0 ),
+  INST(Vdivpd          , VexRvm_Lx          , V(660F00,5E,_,x,I,1,4,FV ), 0                         , 0 , 0 , 3802, 246, 116, 19),
+  INST(Vdivps          , VexRvm_Lx          , V(000F00,5E,_,x,I,0,4,FV ), 0                         , 0 , 0 , 3809, 247, 116, 19),
+  INST(Vdivsd          , VexRvm             , V(F20F00,5E,_,I,I,1,3,T1S), 0                         , 0 , 0 , 3816, 248, 117, 19),
+  INST(Vdivss          , VexRvm             , V(F30F00,5E,_,I,I,0,2,T1S), 0                         , 0 , 0 , 3823, 249, 117, 19),
+  INST(Vdppd           , VexRvmi_Lx         , V(660F3A,41,_,x,I,_,_,_  ), 0                         , 0 , 0 , 3830, 310, 118, 19),
+  INST(Vdpps           , VexRvmi_Lx         , V(660F3A,40,_,x,I,_,_,_  ), 0                         , 0 , 0 , 3836, 263, 118, 19),
+  INST(Verr            , X86M               , O(000F00,00,4,_,_,_,_,_  ), 0                         , 0 , 0 , 3842, 137, 70 , 0 ),
+  INST(Verw            , X86M               , O(000F00,00,5,_,_,_,_,_  ), 0                         , 0 , 0 , 3847, 137, 70 , 0 ),
+  INST(Vexp2pd         , VexRm              , V(660F38,C8,_,2,_,1,4,FV ), 0                         , 0 , 0 , 3852, 311, 128, 0 ),
+  INST(Vexp2ps         , VexRm              , V(660F38,C8,_,2,_,0,4,FV ), 0                         , 0 , 0 , 3860, 312, 128, 0 ),
+  INST(Vexpandpd       , VexRm_Lx           , V(660F38,88,_,x,_,1,3,T1S), 0                         , 0 , 0 , 3868, 313, 120, 0 ),
+  INST(Vexpandps       , VexRm_Lx           , V(660F38,88,_,x,_,0,2,T1S), 0                         , 0 , 0 , 3878, 313, 120, 0 ),
+  INST(Vextractf128    , VexMri             , V(660F3A,19,_,1,0,_,_,_  ), 0                         , 0 , 0 , 3888, 314, 118, 0 ),
+  INST(Vextractf32x4   , VexMri_Lx          , V(660F3A,19,_,x,_,0,4,T4 ), 0                         , 0 , 0 , 3901, 315, 120, 0 ),
+  INST(Vextractf32x8   , VexMri             , V(660F3A,1B,_,2,_,0,5,T8 ), 0                         , 0 , 0 , 3915, 316, 63 , 0 ),
+  INST(Vextractf64x2   , VexMri_Lx          , V(660F3A,19,_,x,_,1,4,T2 ), 0                         , 0 , 0 , 3929, 315, 123, 0 ),
+  INST(Vextractf64x4   , VexMri             , V(660F3A,1B,_,2,_,1,5,T4 ), 0                         , 0 , 0 , 3943, 316, 65 , 0 ),
+  INST(Vextracti128    , VexMri             , V(660F3A,39,_,1,0,_,_,_  ), 0                         , 0 , 0 , 3957, 314, 124, 0 ),
+  INST(Vextracti32x4   , VexMri_Lx          , V(660F3A,39,_,x,_,0,4,T4 ), 0                         , 0 , 0 , 3970, 315, 120, 0 ),
+  INST(Vextracti32x8   , VexMri             , V(660F3A,3B,_,2,_,0,5,T8 ), 0                         , 0 , 0 , 3984, 316, 63 , 0 ),
+  INST(Vextracti64x2   , VexMri_Lx          , V(660F3A,39,_,x,_,1,4,T2 ), 0                         , 0 , 0 , 3998, 315, 123, 0 ),
+  INST(Vextracti64x4   , VexMri             , V(660F3A,3B,_,2,_,1,5,T4 ), 0                         , 0 , 0 , 4012, 316, 65 , 0 ),
+  INST(Vextractps      , VexMri             , V(660F3A,17,_,0,I,I,2,T1S), 0                         , 0 , 0 , 4026, 317, 117, 20),
+  INST(Vfixupimmpd     , VexRvmi_Lx         , V(660F3A,54,_,x,_,1,4,FV ), 0                         , 0 , 0 , 4037, 318, 120, 0 ),
+  INST(Vfixupimmps     , VexRvmi_Lx         , V(660F3A,54,_,x,_,0,4,FV ), 0                         , 0 , 0 , 4049, 319, 120, 0 ),
+  INST(Vfixupimmsd     , VexRvmi            , V(660F3A,55,_,I,_,1,3,T1S), 0                         , 0 , 0 , 4061, 320, 65 , 0 ),
+  INST(Vfixupimmss     , VexRvmi            , V(660F3A,55,_,I,_,0,2,T1S), 0                         , 0 , 0 , 4073, 321, 65 , 0 ),
+  INST(Vfmadd132pd     , VexRvm_Lx          , V(660F38,98,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4085, 322, 129, 0 ),
+  INST(Vfmadd132ps     , VexRvm_Lx          , V(660F38,98,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4097, 323, 129, 0 ),
+  INST(Vfmadd132sd     , VexRvm             , V(660F38,99,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4109, 324, 130, 0 ),
+  INST(Vfmadd132ss     , VexRvm             , V(660F38,99,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4121, 325, 130, 0 ),
+  INST(Vfmadd213pd     , VexRvm_Lx          , V(660F38,A8,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4133, 322, 129, 0 ),
+  INST(Vfmadd213ps     , VexRvm_Lx          , V(660F38,A8,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4145, 323, 129, 0 ),
+  INST(Vfmadd213sd     , VexRvm             , V(660F38,A9,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4157, 324, 130, 0 ),
+  INST(Vfmadd213ss     , VexRvm             , V(660F38,A9,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4169, 325, 130, 0 ),
+  INST(Vfmadd231pd     , VexRvm_Lx          , V(660F38,B8,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4181, 322, 129, 0 ),
+  INST(Vfmadd231ps     , VexRvm_Lx          , V(660F38,B8,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4193, 323, 129, 0 ),
+  INST(Vfmadd231sd     , VexRvm             , V(660F38,B9,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4205, 324, 130, 0 ),
+  INST(Vfmadd231ss     , VexRvm             , V(660F38,B9,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4217, 325, 130, 0 ),
+  INST(Vfmaddpd        , Fma4_Lx            , V(660F3A,69,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4229, 326, 131, 0 ),
+  INST(Vfmaddps        , Fma4_Lx            , V(660F3A,68,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4238, 326, 131, 0 ),
+  INST(Vfmaddsd        , Fma4               , V(660F3A,6B,_,0,x,_,_,_  ), 0                         , 0 , 0 , 4247, 327, 131, 0 ),
+  INST(Vfmaddss        , Fma4               , V(660F3A,6A,_,0,x,_,_,_  ), 0                         , 0 , 0 , 4256, 328, 131, 0 ),
+  INST(Vfmaddsub132pd  , VexRvm_Lx          , V(660F38,96,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4265, 322, 129, 0 ),
+  INST(Vfmaddsub132ps  , VexRvm_Lx          , V(660F38,96,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4280, 323, 129, 0 ),
+  INST(Vfmaddsub213pd  , VexRvm_Lx          , V(660F38,A6,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4295, 322, 129, 0 ),
+  INST(Vfmaddsub213ps  , VexRvm_Lx          , V(660F38,A6,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4310, 323, 129, 0 ),
+  INST(Vfmaddsub231pd  , VexRvm_Lx          , V(660F38,B6,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4325, 322, 129, 0 ),
+  INST(Vfmaddsub231ps  , VexRvm_Lx          , V(660F38,B6,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4340, 323, 129, 0 ),
+  INST(Vfmaddsubpd     , Fma4_Lx            , V(660F3A,5D,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4355, 326, 131, 0 ),
+  INST(Vfmaddsubps     , Fma4_Lx            , V(660F3A,5C,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4367, 326, 131, 0 ),
+  INST(Vfmsub132pd     , VexRvm_Lx          , V(660F38,9A,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4379, 322, 129, 0 ),
+  INST(Vfmsub132ps     , VexRvm_Lx          , V(660F38,9A,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4391, 323, 129, 0 ),
+  INST(Vfmsub132sd     , VexRvm             , V(660F38,9B,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4403, 324, 130, 0 ),
+  INST(Vfmsub132ss     , VexRvm             , V(660F38,9B,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4415, 325, 130, 0 ),
+  INST(Vfmsub213pd     , VexRvm_Lx          , V(660F38,AA,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4427, 322, 129, 0 ),
+  INST(Vfmsub213ps     , VexRvm_Lx          , V(660F38,AA,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4439, 323, 129, 0 ),
+  INST(Vfmsub213sd     , VexRvm             , V(660F38,AB,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4451, 324, 130, 0 ),
+  INST(Vfmsub213ss     , VexRvm             , V(660F38,AB,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4463, 325, 130, 0 ),
+  INST(Vfmsub231pd     , VexRvm_Lx          , V(660F38,BA,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4475, 322, 129, 0 ),
+  INST(Vfmsub231ps     , VexRvm_Lx          , V(660F38,BA,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4487, 323, 129, 0 ),
+  INST(Vfmsub231sd     , VexRvm             , V(660F38,BB,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4499, 324, 130, 0 ),
+  INST(Vfmsub231ss     , VexRvm             , V(660F38,BB,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4511, 325, 130, 0 ),
+  INST(Vfmsubadd132pd  , VexRvm_Lx          , V(660F38,97,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4523, 322, 129, 0 ),
+  INST(Vfmsubadd132ps  , VexRvm_Lx          , V(660F38,97,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4538, 323, 129, 0 ),
+  INST(Vfmsubadd213pd  , VexRvm_Lx          , V(660F38,A7,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4553, 322, 129, 0 ),
+  INST(Vfmsubadd213ps  , VexRvm_Lx          , V(660F38,A7,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4568, 323, 129, 0 ),
+  INST(Vfmsubadd231pd  , VexRvm_Lx          , V(660F38,B7,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4583, 322, 129, 0 ),
+  INST(Vfmsubadd231ps  , VexRvm_Lx          , V(660F38,B7,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4598, 323, 129, 0 ),
+  INST(Vfmsubaddpd     , Fma4_Lx            , V(660F3A,5F,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4613, 326, 131, 0 ),
+  INST(Vfmsubaddps     , Fma4_Lx            , V(660F3A,5E,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4625, 326, 131, 0 ),
+  INST(Vfmsubpd        , Fma4_Lx            , V(660F3A,6D,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4637, 326, 131, 0 ),
+  INST(Vfmsubps        , Fma4_Lx            , V(660F3A,6C,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4646, 326, 131, 0 ),
+  INST(Vfmsubsd        , Fma4               , V(660F3A,6F,_,0,x,_,_,_  ), 0                         , 0 , 0 , 4655, 327, 131, 0 ),
+  INST(Vfmsubss        , Fma4               , V(660F3A,6E,_,0,x,_,_,_  ), 0                         , 0 , 0 , 4664, 328, 131, 0 ),
+  INST(Vfnmadd132pd    , VexRvm_Lx          , V(660F38,9C,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4673, 322, 129, 0 ),
+  INST(Vfnmadd132ps    , VexRvm_Lx          , V(660F38,9C,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4686, 323, 129, 0 ),
+  INST(Vfnmadd132sd    , VexRvm             , V(660F38,9D,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4699, 324, 130, 0 ),
+  INST(Vfnmadd132ss    , VexRvm             , V(660F38,9D,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4712, 325, 130, 0 ),
+  INST(Vfnmadd213pd    , VexRvm_Lx          , V(660F38,AC,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4725, 322, 129, 0 ),
+  INST(Vfnmadd213ps    , VexRvm_Lx          , V(660F38,AC,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4738, 323, 129, 0 ),
+  INST(Vfnmadd213sd    , VexRvm             , V(660F38,AD,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4751, 324, 130, 0 ),
+  INST(Vfnmadd213ss    , VexRvm             , V(660F38,AD,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4764, 325, 130, 0 ),
+  INST(Vfnmadd231pd    , VexRvm_Lx          , V(660F38,BC,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4777, 322, 129, 0 ),
+  INST(Vfnmadd231ps    , VexRvm_Lx          , V(660F38,BC,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4790, 323, 129, 0 ),
+  INST(Vfnmadd231sd    , VexRvm             , V(660F38,BC,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4803, 324, 130, 0 ),
+  INST(Vfnmadd231ss    , VexRvm             , V(660F38,BC,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4816, 325, 130, 0 ),
+  INST(Vfnmaddpd       , Fma4_Lx            , V(660F3A,79,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4829, 326, 131, 0 ),
+  INST(Vfnmaddps       , Fma4_Lx            , V(660F3A,78,_,x,x,_,_,_  ), 0                         , 0 , 0 , 4839, 326, 131, 0 ),
+  INST(Vfnmaddsd       , Fma4               , V(660F3A,7B,_,0,x,_,_,_  ), 0                         , 0 , 0 , 4849, 327, 131, 0 ),
+  INST(Vfnmaddss       , Fma4               , V(660F3A,7A,_,0,x,_,_,_  ), 0                         , 0 , 0 , 4859, 328, 131, 0 ),
+  INST(Vfnmsub132pd    , VexRvm_Lx          , V(660F38,9E,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4869, 322, 129, 0 ),
+  INST(Vfnmsub132ps    , VexRvm_Lx          , V(660F38,9E,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4882, 323, 129, 0 ),
+  INST(Vfnmsub132sd    , VexRvm             , V(660F38,9F,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4895, 324, 130, 0 ),
+  INST(Vfnmsub132ss    , VexRvm             , V(660F38,9F,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4908, 325, 130, 0 ),
+  INST(Vfnmsub213pd    , VexRvm_Lx          , V(660F38,AE,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4921, 322, 129, 0 ),
+  INST(Vfnmsub213ps    , VexRvm_Lx          , V(660F38,AE,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4934, 323, 129, 0 ),
+  INST(Vfnmsub213sd    , VexRvm             , V(660F38,AF,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4947, 324, 130, 0 ),
+  INST(Vfnmsub213ss    , VexRvm             , V(660F38,AF,_,I,0,0,2,T1S), 0                         , 0 , 0 , 4960, 325, 130, 0 ),
+  INST(Vfnmsub231pd    , VexRvm_Lx          , V(660F38,BE,_,x,1,1,4,FV ), 0                         , 0 , 0 , 4973, 322, 129, 0 ),
+  INST(Vfnmsub231ps    , VexRvm_Lx          , V(660F38,BE,_,x,0,0,4,FV ), 0                         , 0 , 0 , 4986, 323, 129, 0 ),
+  INST(Vfnmsub231sd    , VexRvm             , V(660F38,BF,_,I,1,1,3,T1S), 0                         , 0 , 0 , 4999, 324, 130, 0 ),
+  INST(Vfnmsub231ss    , VexRvm             , V(660F38,BF,_,I,0,0,2,T1S), 0                         , 0 , 0 , 5012, 325, 130, 0 ),
+  INST(Vfnmsubpd       , Fma4_Lx            , V(660F3A,7D,_,x,x,_,_,_  ), 0                         , 0 , 0 , 5025, 326, 131, 0 ),
+  INST(Vfnmsubps       , Fma4_Lx            , V(660F3A,7C,_,x,x,_,_,_  ), 0                         , 0 , 0 , 5035, 326, 131, 0 ),
+  INST(Vfnmsubsd       , Fma4               , V(660F3A,7F,_,0,x,_,_,_  ), 0                         , 0 , 0 , 5045, 327, 131, 0 ),
+  INST(Vfnmsubss       , Fma4               , V(660F3A,7E,_,0,x,_,_,_  ), 0                         , 0 , 0 , 5055, 328, 131, 0 ),
+  INST(Vfpclasspd      , VexRmi_Lx          , V(660F3A,66,_,x,_,1,4,FV ), 0                         , 0 , 0 , 5065, 329, 123, 0 ),
+  INST(Vfpclassps      , VexRmi_Lx          , V(660F3A,66,_,x,_,0,4,FV ), 0                         , 0 , 0 , 5076, 330, 123, 0 ),
+  INST(Vfpclasssd      , VexRmi_Lx          , V(660F3A,67,_,I,_,1,3,T1S), 0                         , 0 , 0 , 5087, 331, 63 , 0 ),
+  INST(Vfpclassss      , VexRmi_Lx          , V(660F3A,67,_,I,_,0,2,T1S), 0                         , 0 , 0 , 5098, 332, 63 , 0 ),
+  INST(Vfrczpd         , VexRm_Lx           , V(XOP_M9,81,_,x,0,_,_,_  ), 0                         , 0 , 0 , 5109, 333, 132, 0 ),
+  INST(Vfrczps         , VexRm_Lx           , V(XOP_M9,80,_,x,0,_,_,_  ), 0                         , 0 , 0 , 5117, 333, 132, 0 ),
+  INST(Vfrczsd         , VexRm              , V(XOP_M9,83,_,0,0,_,_,_  ), 0                         , 0 , 0 , 5125, 334, 132, 0 ),
+  INST(Vfrczss         , VexRm              , V(XOP_M9,82,_,0,0,_,_,_  ), 0                         , 0 , 0 , 5133, 335, 132, 0 ),
+  INST(Vgatherdpd      , VexRmvRm_VM        , V(660F38,92,_,x,1,_,_,_  ), V(660F38,92,_,x,_,1,3,T1S), 0 , 0 , 5141, 336, 133, 0 ),
+  INST(Vgatherdps      , VexRmvRm_VM        , V(660F38,92,_,x,0,_,_,_  ), V(660F38,92,_,x,_,0,2,T1S), 0 , 0 , 5152, 337, 133, 0 ),
+  INST(Vgatherpf0dpd   , VexM_VM            , V(660F38,C6,1,2,_,1,3,T1S), 0                         , 0 , 0 , 5163, 338, 134, 0 ),
+  INST(Vgatherpf0dps   , VexM_VM            , V(660F38,C6,1,2,_,0,2,T1S), 0                         , 0 , 0 , 5177, 339, 134, 0 ),
+  INST(Vgatherpf0qpd   , VexM_VM            , V(660F38,C7,1,2,_,1,3,T1S), 0                         , 0 , 0 , 5191, 340, 134, 0 ),
+  INST(Vgatherpf0qps   , VexM_VM            , V(660F38,C7,1,2,_,0,2,T1S), 0                         , 0 , 0 , 5205, 340, 134, 0 ),
+  INST(Vgatherpf1dpd   , VexM_VM            , V(660F38,C6,2,2,_,1,3,T1S), 0                         , 0 , 0 , 5219, 338, 134, 0 ),
+  INST(Vgatherpf1dps   , VexM_VM            , V(660F38,C6,2,2,_,0,2,T1S), 0                         , 0 , 0 , 5233, 339, 134, 0 ),
+  INST(Vgatherpf1qpd   , VexM_VM            , V(660F38,C7,2,2,_,1,3,T1S), 0                         , 0 , 0 , 5247, 340, 134, 0 ),
+  INST(Vgatherpf1qps   , VexM_VM            , V(660F38,C7,2,2,_,0,2,T1S), 0                         , 0 , 0 , 5261, 340, 134, 0 ),
+  INST(Vgatherqpd      , VexRmvRm_VM        , V(660F38,93,_,x,1,_,_,_  ), V(660F38,93,_,x,_,1,3,T1S), 0 , 0 , 5275, 341, 133, 0 ),
+  INST(Vgatherqps      , VexRmvRm_VM        , V(660F38,93,_,x,0,_,_,_  ), V(660F38,93,_,x,_,0,2,T1S), 0 , 0 , 5286, 342, 133, 0 ),
+  INST(Vgetexppd       , VexRm_Lx           , V(660F38,42,_,x,_,1,4,FV ), 0                         , 0 , 0 , 5297, 298, 120, 0 ),
+  INST(Vgetexpps       , VexRm_Lx           , V(660F38,42,_,x,_,0,4,FV ), 0                         , 0 , 0 , 5307, 302, 120, 0 ),
+  INST(Vgetexpsd       , VexRm              , V(660F38,43,_,I,_,1,3,T1S), 0                         , 0 , 0 , 5317, 343, 65 , 0 ),
+  INST(Vgetexpss       , VexRm              , V(660F38,43,_,I,_,0,2,T1S), 0                         , 0 , 0 , 5327, 344, 65 , 0 ),
+  INST(Vgetmantpd      , VexRmi_Lx          , V(660F3A,26,_,x,_,1,4,FV ), 0                         , 0 , 0 , 5337, 345, 120, 0 ),
+  INST(Vgetmantps      , VexRmi_Lx          , V(660F3A,26,_,x,_,0,4,FV ), 0                         , 0 , 0 , 5348, 346, 120, 0 ),
+  INST(Vgetmantsd      , VexRmi             , V(660F3A,27,_,I,_,1,3,T1S), 0                         , 0 , 0 , 5359, 347, 65 , 0 ),
+  INST(Vgetmantss      , VexRmi             , V(660F3A,27,_,I,_,0,2,T1S), 0                         , 0 , 0 , 5370, 348, 65 , 0 ),
+  INST(Vhaddpd         , VexRvm_Lx          , V(660F00,7C,_,x,I,_,_,_  ), 0                         , 0 , 0 , 5381, 250, 118, 21),
+  INST(Vhaddps         , VexRvm_Lx          , V(F20F00,7C,_,x,I,_,_,_  ), 0                         , 0 , 0 , 5389, 250, 118, 21),
+  INST(Vhsubpd         , VexRvm_Lx          , V(660F00,7D,_,x,I,_,_,_  ), 0                         , 0 , 0 , 5397, 250, 118, 22),
+  INST(Vhsubps         , VexRvm_Lx          , V(F20F00,7D,_,x,I,_,_,_  ), 0                         , 0 , 0 , 5405, 250, 118, 22),
+  INST(Vinsertf128     , VexRvmi            , V(660F3A,18,_,1,0,_,_,_  ), 0                         , 0 , 0 , 5413, 349, 118, 0 ),
+  INST(Vinsertf32x4    , VexRvmi_Lx         , V(660F3A,18,_,x,_,0,4,T4 ), 0                         , 0 , 0 , 5425, 350, 120, 0 ),
+  INST(Vinsertf32x8    , VexRvmi            , V(660F3A,1A,_,2,_,0,5,T8 ), 0                         , 0 , 0 , 5438, 351, 63 , 0 ),
+  INST(Vinsertf64x2    , VexRvmi_Lx         , V(660F3A,18,_,x,_,1,4,T2 ), 0                         , 0 , 0 , 5451, 350, 123, 0 ),
+  INST(Vinsertf64x4    , VexRvmi            , V(660F3A,1A,_,2,_,1,5,T4 ), 0                         , 0 , 0 , 5464, 351, 65 , 0 ),
+  INST(Vinserti128     , VexRvmi            , V(660F3A,38,_,1,0,_,_,_  ), 0                         , 0 , 0 , 5477, 349, 124, 0 ),
+  INST(Vinserti32x4    , VexRvmi_Lx         , V(660F3A,38,_,x,_,0,4,T4 ), 0                         , 0 , 0 , 5489, 350, 120, 0 ),
+  INST(Vinserti32x8    , VexRvmi            , V(660F3A,3A,_,2,_,0,5,T8 ), 0                         , 0 , 0 , 5502, 351, 63 , 0 ),
+  INST(Vinserti64x2    , VexRvmi_Lx         , V(660F3A,38,_,x,_,1,4,T2 ), 0                         , 0 , 0 , 5515, 350, 123, 0 ),
+  INST(Vinserti64x4    , VexRvmi            , V(660F3A,3A,_,2,_,1,5,T4 ), 0                         , 0 , 0 , 5528, 351, 65 , 0 ),
+  INST(Vinsertps       , VexRvmi            , V(660F3A,21,_,0,I,0,2,T1S), 0                         , 0 , 0 , 5541, 352, 117, 23),
+  INST(Vlddqu          , VexRm_Lx           , V(F20F00,F0,_,x,I,_,_,_  ), 0                         , 0 , 0 , 5551, 353, 118, 24),
+  INST(Vldmxcsr        , VexM               , V(000F00,AE,2,0,I,_,_,_  ), 0                         , 0 , 0 , 5558, 354, 118, 0 ),
+  INST(Vmaskmovdqu     , VexRm_ZDI          , V(660F00,F7,_,0,I,_,_,_  ), 0                         , 0 , 0 , 5567, 355, 118, 25),
+  INST(Vmaskmovpd      , VexRvmMvr_Lx       , V(660F38,2D,_,x,0,_,_,_  ), V(660F38,2F,_,x,0,_,_,_  ), 0 , 0 , 5579, 356, 118, 0 ),
+  INST(Vmaskmovps      , VexRvmMvr_Lx       , V(660F38,2C,_,x,0,_,_,_  ), V(660F38,2E,_,x,0,_,_,_  ), 0 , 0 , 5590, 357, 118, 0 ),
+  INST(Vmaxpd          , VexRvm_Lx          , V(660F00,5F,_,x,I,1,4,FV ), 0                         , 0 , 0 , 5601, 358, 116, 26),
+  INST(Vmaxps          , VexRvm_Lx          , V(000F00,5F,_,x,I,0,4,FV ), 0                         , 0 , 0 , 5608, 359, 116, 26),
+  INST(Vmaxsd          , VexRvm             , V(F20F00,5F,_,I,I,1,3,T1S), 0                         , 0 , 0 , 5615, 360, 116, 26),
+  INST(Vmaxss          , VexRvm             , V(F30F00,5F,_,I,I,0,2,T1S), 0                         , 0 , 0 , 5622, 294, 116, 26),
+  INST(Vminpd          , VexRvm_Lx          , V(660F00,5D,_,x,I,1,4,FV ), 0                         , 0 , 0 , 5629, 358, 116, 27),
+  INST(Vminps          , VexRvm_Lx          , V(000F00,5D,_,x,I,0,4,FV ), 0                         , 0 , 0 , 5636, 359, 116, 27),
+  INST(Vminsd          , VexRvm             , V(F20F00,5D,_,I,I,1,3,T1S), 0                         , 0 , 0 , 5643, 360, 116, 27),
+  INST(Vminss          , VexRvm             , V(F30F00,5D,_,I,I,0,2,T1S), 0                         , 0 , 0 , 5650, 294, 116, 27),
+  INST(Vmovapd         , VexRmMr_Lx         , V(660F00,28,_,x,I,1,4,FVM), V(660F00,29,_,x,I,1,4,FVM), 0 , 0 , 5657, 361, 116, 28),
+  INST(Vmovaps         , VexRmMr_Lx         , V(000F00,28,_,x,I,0,4,FVM), V(000F00,29,_,x,I,0,4,FVM), 0 , 0 , 5665, 362, 116, 28),
+  INST(Vmovd           , VexMovdMovq        , V(660F00,6E,_,0,0,0,2,T1S), V(660F00,7E,_,0,0,0,2,T1S), 0 , 0 , 5673, 363, 117, 29),
+  INST(Vmovddup        , VexRm_Lx           , V(F20F00,12,_,x,I,1,3,DUP), 0                         , 0 , 0 , 5679, 364, 116, 29),
+  INST(Vmovdqa         , VexRmMr_Lx         , V(660F00,6F,_,x,I,_,_,_  ), V(660F00,7F,_,x,I,_,_,_  ), 0 , 0 , 5688, 365, 118, 30),
+  INST(Vmovdqa32       , VexRmMr_Lx         , V(660F00,6F,_,x,_,0,4,FVM), V(660F00,7F,_,x,_,0,4,FVM), 0 , 0 , 5696, 366, 120, 0 ),
+  INST(Vmovdqa64       , VexRmMr_Lx         , V(660F00,6F,_,x,_,1,4,FVM), V(660F00,7F,_,x,_,1,4,FVM), 0 , 0 , 5706, 367, 120, 0 ),
+  INST(Vmovdqu         , VexRmMr_Lx         , V(F30F00,6F,_,x,I,_,_,_  ), V(F30F00,7F,_,x,I,_,_,_  ), 0 , 0 , 5716, 368, 118, 28),
+  INST(Vmovdqu16       , VexRmMr_Lx         , V(F20F00,6F,_,x,_,1,4,FVM), V(F20F00,7F,_,x,_,1,4,FVM), 0 , 0 , 5724, 369, 122, 0 ),
+  INST(Vmovdqu32       , VexRmMr_Lx         , V(F30F00,6F,_,x,_,0,4,FVM), V(F30F00,7F,_,x,_,0,4,FVM), 0 , 0 , 5734, 370, 120, 0 ),
+  INST(Vmovdqu64       , VexRmMr_Lx         , V(F30F00,6F,_,x,_,1,4,FVM), V(F30F00,7F,_,x,_,1,4,FVM), 0 , 0 , 5744, 371, 120, 0 ),
+  INST(Vmovdqu8        , VexRmMr_Lx         , V(F20F00,6F,_,x,_,0,4,FVM), V(F20F00,7F,_,x,_,0,4,FVM), 0 , 0 , 5754, 372, 122, 0 ),
+  INST(Vmovhlps        , VexRvm             , V(000F00,12,_,0,I,0,_,_  ), 0                         , 0 , 0 , 5763, 373, 117, 31),
+  INST(Vmovhpd         , VexRvmMr           , V(660F00,16,_,0,I,1,3,T1S), V(660F00,17,_,0,I,1,3,T1S), 0 , 0 , 5772, 374, 117, 32),
+  INST(Vmovhps         , VexRvmMr           , V(000F00,16,_,0,I,0,3,T2 ), V(000F00,17,_,0,I,0,3,T2 ), 0 , 0 , 5780, 375, 117, 32),
+  INST(Vmovlhps        , VexRvm             , V(000F00,16,_,0,I,0,_,_  ), 0                         , 0 , 0 , 5788, 373, 117, 31),
+  INST(Vmovlpd         , VexRvmMr           , V(660F00,12,_,0,I,1,3,T1S), V(660F00,13,_,0,I,1,3,T1S), 0 , 0 , 5797, 376, 117, 32),
+  INST(Vmovlps         , VexRvmMr           , V(000F00,12,_,0,I,0,3,T2 ), V(000F00,13,_,0,I,0,3,T2 ), 0 , 0 , 5805, 377, 117, 32),
+  INST(Vmovmskpd       , VexRm_Lx           , V(660F00,50,_,x,I,_,_,_  ), 0                         , 0 , 0 , 5813, 378, 118, 33),
+  INST(Vmovmskps       , VexRm_Lx           , V(000F00,50,_,x,I,_,_,_  ), 0                         , 0 , 0 , 5823, 378, 118, 33),
+  INST(Vmovntdq        , VexMr_Lx           , V(660F00,E7,_,x,I,0,4,FVM), 0                         , 0 , 0 , 5833, 379, 116, 33),
+  INST(Vmovntdqa       , VexRm_Lx           , V(660F38,2A,_,x,I,0,4,FVM), 0                         , 0 , 0 , 5842, 380, 125, 33),
+  INST(Vmovntpd        , VexMr_Lx           , V(660F00,2B,_,x,I,1,4,FVM), 0                         , 0 , 0 , 5852, 379, 116, 34),
+  INST(Vmovntps        , VexMr_Lx           , V(000F00,2B,_,x,I,0,4,FVM), 0                         , 0 , 0 , 5861, 379, 116, 34),
+  INST(Vmovq           , VexMovdMovq        , V(660F00,6E,_,0,I,1,3,T1S), V(660F00,7E,_,0,I,1,3,T1S), 0 , 0 , 5870, 381, 117, 28),
+  INST(Vmovsd          , VexMovssMovsd      , V(F20F00,10,_,I,I,1,3,T1S), V(F20F00,11,_,I,I,1,3,T1S), 0 , 0 , 5876, 382, 117, 35),
+  INST(Vmovshdup       , VexRm_Lx           , V(F30F00,16,_,x,I,0,4,FVM), 0                         , 0 , 0 , 5883, 383, 116, 30),
+  INST(Vmovsldup       , VexRm_Lx           , V(F30F00,12,_,x,I,0,4,FVM), 0                         , 0 , 0 , 5893, 383, 116, 30),
+  INST(Vmovss          , VexMovssMovsd      , V(F30F00,10,_,I,I,0,2,T1S), V(F30F00,11,_,I,I,0,2,T1S), 0 , 0 , 5903, 384, 117, 35),
+  INST(Vmovupd         , VexRmMr_Lx         , V(660F00,10,_,x,I,1,4,FVM), V(660F00,11,_,x,I,1,4,FVM), 0 , 0 , 5910, 385, 116, 36),
+  INST(Vmovups         , VexRmMr_Lx         , V(000F00,10,_,x,I,0,4,FVM), V(000F00,11,_,x,I,0,4,FVM), 0 , 0 , 5918, 386, 116, 36),
+  INST(Vmpsadbw        , VexRvmi_Lx         , V(660F3A,42,_,x,I,_,_,_  ), 0                         , 0 , 0 , 5926, 263, 135, 37),
+  INST(Vmulpd          , VexRvm_Lx          , V(660F00,59,_,x,I,1,4,FV ), 0                         , 0 , 0 , 5935, 246, 116, 38),
+  INST(Vmulps          , VexRvm_Lx          , V(000F00,59,_,x,I,0,4,FV ), 0                         , 0 , 0 , 5942, 247, 116, 38),
+  INST(Vmulsd          , VexRvm_Lx          , V(F20F00,59,_,I,I,1,3,T1S), 0                         , 0 , 0 , 5949, 248, 117, 38),
+  INST(Vmulss          , VexRvm_Lx          , V(F30F00,59,_,I,I,0,2,T1S), 0                         , 0 , 0 , 5956, 249, 117, 38),
+  INST(Vorpd           , VexRvm_Lx          , V(660F00,56,_,x,I,1,4,FV ), 0                         , 0 , 0 , 5963, 258, 121, 39),
+  INST(Vorps           , VexRvm_Lx          , V(000F00,56,_,x,I,0,4,FV ), 0                         , 0 , 0 , 5969, 259, 116, 39),
+  INST(Vp4dpwssd       , VexRm_T1_4X        , V(F20F38,52,_,2,_,0,2,T4X), 0                         , 0 , 0 , 5975, 387, 136, 0 ),
+  INST(Vp4dpwssds      , VexRm_T1_4X        , V(F20F38,53,_,2,_,0,2,T4X), 0                         , 0 , 0 , 5985, 387, 136, 0 ),
+  INST(Vpabsb          , VexRm_Lx           , V(660F38,1C,_,x,I,_,4,FVM), 0                         , 0 , 0 , 5996, 383, 137, 40),
+  INST(Vpabsd          , VexRm_Lx           , V(660F38,1E,_,x,I,0,4,FV ), 0                         , 0 , 0 , 6003, 383, 125, 40),
+  INST(Vpabsq          , VexRm_Lx           , V(660F38,1F,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6010, 313, 120, 0 ),
+  INST(Vpabsw          , VexRm_Lx           , V(660F38,1D,_,x,I,_,4,FVM), 0                         , 0 , 0 , 6017, 383, 137, 41),
+  INST(Vpackssdw       , VexRvm_Lx          , V(660F00,6B,_,x,I,0,4,FV ), 0                         , 0 , 0 , 6024, 257, 137, 42),
+  INST(Vpacksswb       , VexRvm_Lx          , V(660F00,63,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6034, 388, 137, 42),
+  INST(Vpackusdw       , VexRvm_Lx          , V(660F38,2B,_,x,I,0,4,FV ), 0                         , 0 , 0 , 6044, 257, 137, 42),
+  INST(Vpackuswb       , VexRvm_Lx          , V(660F00,67,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6054, 388, 137, 42),
+  INST(Vpaddb          , VexRvm_Lx          , V(660F00,FC,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6064, 388, 137, 42),
+  INST(Vpaddd          , VexRvm_Lx          , V(660F00,FE,_,x,I,0,4,FV ), 0                         , 0 , 0 , 6071, 257, 125, 42),
+  INST(Vpaddq          , VexRvm_Lx          , V(660F00,D4,_,x,I,1,4,FV ), 0                         , 0 , 0 , 6078, 256, 125, 42),
+  INST(Vpaddsb         , VexRvm_Lx          , V(660F00,EC,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6085, 388, 137, 42),
+  INST(Vpaddsw         , VexRvm_Lx          , V(660F00,ED,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6093, 388, 137, 42),
+  INST(Vpaddusb        , VexRvm_Lx          , V(660F00,DC,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6101, 388, 137, 42),
+  INST(Vpaddusw        , VexRvm_Lx          , V(660F00,DD,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6110, 388, 137, 42),
+  INST(Vpaddw          , VexRvm_Lx          , V(660F00,FD,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6119, 388, 137, 42),
+  INST(Vpalignr        , VexRvmi_Lx         , V(660F3A,0F,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6126, 389, 137, 42),
+  INST(Vpand           , VexRvm_Lx          , V(660F00,DB,_,x,I,_,_,_  ), 0                         , 0 , 0 , 6135, 390, 135, 42),
+  INST(Vpandd          , VexRvm_Lx          , V(660F00,DB,_,x,_,0,4,FV ), 0                         , 0 , 0 , 6141, 391, 120, 0 ),
+  INST(Vpandn          , VexRvm_Lx          , V(660F00,DF,_,x,I,_,_,_  ), 0                         , 0 , 0 , 6148, 392, 135, 43),
+  INST(Vpandnd         , VexRvm_Lx          , V(660F00,DF,_,x,_,0,4,FV ), 0                         , 0 , 0 , 6155, 393, 120, 0 ),
+  INST(Vpandnq         , VexRvm_Lx          , V(660F00,DF,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6163, 394, 120, 0 ),
+  INST(Vpandq          , VexRvm_Lx          , V(660F00,DB,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6171, 395, 120, 0 ),
+  INST(Vpavgb          , VexRvm_Lx          , V(660F00,E0,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6178, 388, 137, 44),
+  INST(Vpavgw          , VexRvm_Lx          , V(660F00,E3,_,x,I,I,4,FVM), 0                         , 0 , 0 , 6185, 388, 137, 45),
+  INST(Vpblendd        , VexRvmi_Lx         , V(660F3A,02,_,x,0,_,_,_  ), 0                         , 0 , 0 , 6192, 263, 124, 0 ),
+  INST(Vpblendvb       , VexRvmr            , V(660F3A,4C,_,x,0,_,_,_  ), 0                         , 0 , 0 , 6201, 264, 135, 46),
+  INST(Vpblendw        , VexRvmi_Lx         , V(660F3A,0E,_,x,I,_,_,_  ), 0                         , 0 , 0 , 6211, 263, 135, 44),
+  INST(Vpbroadcastb    , VexRm_Lx           , V(660F38,78,_,x,0,0,0,T1S), 0                         , 0 , 0 , 6220, 396, 138, 0 ),
+  INST(Vpbroadcastd    , VexRm_Lx           , V(660F38,58,_,x,0,0,2,T1S), 0                         , 0 , 0 , 6233, 397, 133, 0 ),
+  INST(Vpbroadcastmb2d , VexRm_Lx           , V(F30F38,3A,_,x,_,0,_,_  ), 0                         , 0 , 0 , 6246, 398, 139, 0 ),
+  INST(Vpbroadcastmb2q , VexRm_Lx           , V(F30F38,2A,_,x,_,1,_,_  ), 0                         , 0 , 0 , 6262, 398, 139, 0 ),
+  INST(Vpbroadcastq    , VexRm_Lx           , V(660F38,59,_,x,0,1,3,T1S), 0                         , 0 , 0 , 6278, 399, 133, 0 ),
+  INST(Vpbroadcastw    , VexRm_Lx           , V(660F38,79,_,x,0,0,1,T1S), 0                         , 0 , 0 , 6291, 400, 138, 0 ),
+  INST(Vpclmulqdq      , VexRvmi            , V(660F3A,44,_,0,I,_,_,_  ), 0                         , 0 , 0 , 6304, 310, 140, 47),
+  INST(Vpcmov          , VexRvrmRvmr_Lx     , V(XOP_M8,A2,_,x,x,_,_,_  ), 0                         , 0 , 0 , 6315, 326, 132, 0 ),
+  INST(Vpcmpb          , VexRvmi_Lx         , V(660F3A,3F,_,x,_,0,4,FVM), 0                         , 0 , 0 , 6322, 401, 122, 0 ),
+  INST(Vpcmpd          , VexRvmi_Lx         , V(660F3A,1F,_,x,_,0,4,FV ), 0                         , 0 , 0 , 6329, 402, 120, 0 ),
+  INST(Vpcmpeqb        , VexRvm_Lx          , V(660F00,74,_,x,I,I,4,FV ), 0                         , 0 , 0 , 6336, 403, 137, 48),
+  INST(Vpcmpeqd        , VexRvm_Lx          , V(660F00,76,_,x,I,0,4,FVM), 0                         , 0 , 0 , 6345, 404, 125, 48),
+  INST(Vpcmpeqq        , VexRvm_Lx          , V(660F38,29,_,x,I,1,4,FVM), 0                         , 0 , 0 , 6354, 405, 125, 48),
+  INST(Vpcmpeqw        , VexRvm_Lx          , V(660F00,75,_,x,I,I,4,FV ), 0                         , 0 , 0 , 6363, 403, 137, 48),
+  INST(Vpcmpestri      , VexRmi             , V(660F3A,61,_,0,I,_,_,_  ), 0                         , 0 , 0 , 6372, 406, 141, 49),
+  INST(Vpcmpestrm      , VexRmi             , V(660F3A,60,_,0,I,_,_,_  ), 0                         , 0 , 0 , 6383, 407, 141, 49),
+  INST(Vpcmpgtb        , VexRvm_Lx          , V(660F00,64,_,x,I,I,4,FV ), 0                         , 0 , 0 , 6394, 403, 137, 48),
+  INST(Vpcmpgtd        , VexRvm_Lx          , V(660F00,66,_,x,I,0,4,FVM), 0                         , 0 , 0 , 6403, 404, 125, 48),
+  INST(Vpcmpgtq        , VexRvm_Lx          , V(660F38,37,_,x,I,1,4,FVM), 0                         , 0 , 0 , 6412, 405, 125, 48),
+  INST(Vpcmpgtw        , VexRvm_Lx          , V(660F00,65,_,x,I,I,4,FV ), 0                         , 0 , 0 , 6421, 403, 137, 48),
+  INST(Vpcmpistri      , VexRmi             , V(660F3A,63,_,0,I,_,_,_  ), 0                         , 0 , 0 , 6430, 408, 141, 49),
+  INST(Vpcmpistrm      , VexRmi             , V(660F3A,62,_,0,I,_,_,_  ), 0                         , 0 , 0 , 6441, 409, 141, 49),
+  INST(Vpcmpq          , VexRvmi_Lx         , V(660F3A,1F,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6452, 410, 120, 0 ),
+  INST(Vpcmpub         , VexRvmi_Lx         , V(660F3A,3E,_,x,_,0,4,FVM), 0                         , 0 , 0 , 6459, 401, 122, 0 ),
+  INST(Vpcmpud         , VexRvmi_Lx         , V(660F3A,1E,_,x,_,0,4,FV ), 0                         , 0 , 0 , 6467, 402, 120, 0 ),
+  INST(Vpcmpuq         , VexRvmi_Lx         , V(660F3A,1E,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6475, 410, 120, 0 ),
+  INST(Vpcmpuw         , VexRvmi_Lx         , V(660F3A,3E,_,x,_,1,4,FVM), 0                         , 0 , 0 , 6483, 410, 122, 0 ),
+  INST(Vpcmpw          , VexRvmi_Lx         , V(660F3A,3F,_,x,_,1,4,FVM), 0                         , 0 , 0 , 6491, 410, 122, 0 ),
+  INST(Vpcomb          , VexRvmi            , V(XOP_M8,CC,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6498, 310, 132, 0 ),
+  INST(Vpcomd          , VexRvmi            , V(XOP_M8,CE,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6505, 310, 132, 0 ),
+  INST(Vpcompressd     , VexMr_Lx           , V(660F38,8B,_,x,_,0,2,T1S), 0                         , 0 , 0 , 6512, 279, 120, 0 ),
+  INST(Vpcompressq     , VexMr_Lx           , V(660F38,8B,_,x,_,1,3,T1S), 0                         , 0 , 0 , 6524, 279, 120, 0 ),
+  INST(Vpcomq          , VexRvmi            , V(XOP_M8,CF,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6536, 310, 132, 0 ),
+  INST(Vpcomub         , VexRvmi            , V(XOP_M8,EC,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6543, 310, 132, 0 ),
+  INST(Vpcomud         , VexRvmi            , V(XOP_M8,EE,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6551, 310, 132, 0 ),
+  INST(Vpcomuq         , VexRvmi            , V(XOP_M8,EF,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6559, 310, 132, 0 ),
+  INST(Vpcomuw         , VexRvmi            , V(XOP_M8,ED,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6567, 310, 132, 0 ),
+  INST(Vpcomw          , VexRvmi            , V(XOP_M8,CD,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6575, 310, 132, 0 ),
+  INST(Vpconflictd     , VexRm_Lx           , V(660F38,C4,_,x,_,0,4,FV ), 0                         , 0 , 0 , 6582, 411, 139, 0 ),
+  INST(Vpconflictq     , VexRm_Lx           , V(660F38,C4,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6594, 411, 139, 0 ),
+  INST(Vperm2f128      , VexRvmi            , V(660F3A,06,_,1,0,_,_,_  ), 0                         , 0 , 0 , 6606, 412, 118, 0 ),
+  INST(Vperm2i128      , VexRvmi            , V(660F3A,46,_,1,0,_,_,_  ), 0                         , 0 , 0 , 6617, 412, 124, 0 ),
+  INST(Vpermb          , VexRvm_Lx          , V(660F38,8D,_,x,_,0,4,FVM), 0                         , 0 , 0 , 6628, 260, 142, 0 ),
+  INST(Vpermd          , VexRvm_Lx          , V(660F38,36,_,x,0,0,4,FV ), 0                         , 0 , 0 , 6635, 413, 133, 0 ),
+  INST(Vpermi2b        , VexRvm_Lx          , V(660F38,75,_,x,_,0,4,FVM), 0                         , 0 , 0 , 6642, 260, 142, 0 ),
+  INST(Vpermi2d        , VexRvm_Lx          , V(660F38,76,_,x,_,0,4,FV ), 0                         , 0 , 0 , 6651, 414, 120, 0 ),
+  INST(Vpermi2pd       , VexRvm_Lx          , V(660F38,77,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6660, 262, 120, 0 ),
+  INST(Vpermi2ps       , VexRvm_Lx          , V(660F38,77,_,x,_,0,4,FV ), 0                         , 0 , 0 , 6670, 261, 120, 0 ),
+  INST(Vpermi2q        , VexRvm_Lx          , V(660F38,76,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6680, 415, 120, 0 ),
+  INST(Vpermi2w        , VexRvm_Lx          , V(660F38,75,_,x,_,1,4,FVM), 0                         , 0 , 0 , 6689, 416, 122, 0 ),
+  INST(Vpermil2pd      , VexRvrmiRvmri_Lx   , V(660F3A,49,_,x,x,_,_,_  ), 0                         , 0 , 0 , 6698, 417, 132, 0 ),
+  INST(Vpermil2ps      , VexRvrmiRvmri_Lx   , V(660F3A,48,_,x,x,_,_,_  ), 0                         , 0 , 0 , 6709, 417, 132, 0 ),
+  INST(Vpermilpd       , VexRvmRmi_Lx       , V(660F38,0D,_,x,0,1,4,FV ), V(660F3A,05,_,x,0,1,4,FV ), 0 , 0 , 6720, 418, 116, 0 ),
+  INST(Vpermilps       , VexRvmRmi_Lx       , V(660F38,0C,_,x,0,0,4,FV ), V(660F3A,04,_,x,0,0,4,FV ), 0 , 0 , 6730, 419, 116, 0 ),
+  INST(Vpermpd         , VexRmi             , V(660F3A,01,_,1,1,_,_,_  ), 0                         , 0 , 0 , 6740, 420, 124, 0 ),
+  INST(Vpermps         , VexRvm             , V(660F38,16,_,1,0,_,_,_  ), 0                         , 0 , 0 , 6748, 421, 124, 0 ),
+  INST(Vpermq          , VexRvmRmi_Lx       , V(660F38,36,_,x,_,1,4,FV ), V(660F3A,00,_,x,1,1,4,FV ), 0 , 0 , 6756, 422, 133, 0 ),
+  INST(Vpermt2b        , VexRvm_Lx          , V(660F38,7D,_,x,_,0,4,FVM), 0                         , 0 , 0 , 6763, 260, 142, 0 ),
+  INST(Vpermt2d        , VexRvm_Lx          , V(660F38,7E,_,x,_,0,4,FV ), 0                         , 0 , 0 , 6772, 414, 120, 0 ),
+  INST(Vpermt2pd       , VexRvm_Lx          , V(660F38,7F,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6781, 415, 120, 0 ),
+  INST(Vpermt2ps       , VexRvm_Lx          , V(660F38,7F,_,x,_,0,4,FV ), 0                         , 0 , 0 , 6791, 414, 120, 0 ),
+  INST(Vpermt2q        , VexRvm_Lx          , V(660F38,7E,_,x,_,1,4,FV ), 0                         , 0 , 0 , 6801, 415, 120, 0 ),
+  INST(Vpermt2w        , VexRvm_Lx          , V(660F38,7D,_,x,_,1,4,FVM), 0                         , 0 , 0 , 6810, 416, 122, 0 ),
+  INST(Vpermw          , VexRvm_Lx          , V(660F38,8D,_,x,_,1,4,FVM), 0                         , 0 , 0 , 6819, 260, 122, 0 ),
+  INST(Vpexpandd       , VexRm_Lx           , V(660F38,89,_,x,_,0,2,T1S), 0                         , 0 , 0 , 6826, 313, 120, 0 ),
+  INST(Vpexpandq       , VexRm_Lx           , V(660F38,89,_,x,_,1,3,T1S), 0                         , 0 , 0 , 6836, 313, 120, 0 ),
+  INST(Vpextrb         , VexMri             , V(660F3A,14,_,0,0,I,0,T1S), 0                         , 0 , 0 , 6846, 423, 143, 50),
+  INST(Vpextrd         , VexMri             , V(660F3A,16,_,0,0,0,2,T1S), 0                         , 0 , 0 , 6854, 317, 144, 50),
+  INST(Vpextrq         , VexMri             , V(660F3A,16,_,0,1,1,3,T1S), 0                         , 0 , 0 , 6862, 424, 144, 50),
+  INST(Vpextrw         , VexMri             , V(660F3A,15,_,0,0,I,1,T1S), 0                         , 0 , 0 , 6870, 425, 143, 50),
+  INST(Vpgatherdd      , VexRmvRm_VM        , V(660F38,90,_,x,0,_,_,_  ), V(660F38,90,_,x,_,0,2,T1S), 0 , 0 , 6878, 426, 133, 0 ),
+  INST(Vpgatherdq      , VexRmvRm_VM        , V(660F38,90,_,x,1,_,_,_  ), V(660F38,90,_,x,_,1,3,T1S), 0 , 0 , 6889, 427, 133, 0 ),
+  INST(Vpgatherqd      , VexRmvRm_VM        , V(660F38,91,_,x,0,_,_,_  ), V(660F38,91,_,x,_,0,2,T1S), 0 , 0 , 6900, 428, 133, 0 ),
+  INST(Vpgatherqq      , VexRmvRm_VM        , V(660F38,91,_,x,1,_,_,_  ), V(660F38,91,_,x,_,1,3,T1S), 0 , 0 , 6911, 429, 133, 0 ),
+  INST(Vphaddbd        , VexRm              , V(XOP_M9,C2,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6922, 252, 132, 0 ),
+  INST(Vphaddbq        , VexRm              , V(XOP_M9,C3,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6931, 252, 132, 0 ),
+  INST(Vphaddbw        , VexRm              , V(XOP_M9,C1,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6940, 252, 132, 0 ),
+  INST(Vphaddd         , VexRvm_Lx          , V(660F38,02,_,x,I,_,_,_  ), 0                         , 0 , 0 , 6949, 250, 135, 51),
+  INST(Vphadddq        , VexRm              , V(XOP_M9,CB,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6957, 252, 132, 0 ),
+  INST(Vphaddsw        , VexRvm_Lx          , V(660F38,03,_,x,I,_,_,_  ), 0                         , 0 , 0 , 6966, 250, 135, 52),
+  INST(Vphaddubd       , VexRm              , V(XOP_M9,D2,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6975, 252, 132, 0 ),
+  INST(Vphaddubq       , VexRm              , V(XOP_M9,D3,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6985, 252, 132, 0 ),
+  INST(Vphaddubw       , VexRm              , V(XOP_M9,D1,_,0,0,_,_,_  ), 0                         , 0 , 0 , 6995, 252, 132, 0 ),
+  INST(Vphaddudq       , VexRm              , V(XOP_M9,DB,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7005, 252, 132, 0 ),
+  INST(Vphadduwd       , VexRm              , V(XOP_M9,D6,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7015, 252, 132, 0 ),
+  INST(Vphadduwq       , VexRm              , V(XOP_M9,D7,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7025, 252, 132, 0 ),
+  INST(Vphaddw         , VexRvm_Lx          , V(660F38,01,_,x,I,_,_,_  ), 0                         , 0 , 0 , 7035, 250, 135, 53),
+  INST(Vphaddwd        , VexRm              , V(XOP_M9,C6,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7043, 252, 132, 0 ),
+  INST(Vphaddwq        , VexRm              , V(XOP_M9,C7,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7052, 252, 132, 0 ),
+  INST(Vphminposuw     , VexRm              , V(660F38,41,_,0,I,_,_,_  ), 0                         , 0 , 0 , 7061, 252, 118, 54),
+  INST(Vphsubbw        , VexRm              , V(XOP_M9,E1,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7073, 252, 132, 0 ),
+  INST(Vphsubd         , VexRvm_Lx          , V(660F38,06,_,x,I,_,_,_  ), 0                         , 0 , 0 , 7082, 250, 135, 55),
+  INST(Vphsubdq        , VexRm              , V(XOP_M9,E3,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7090, 252, 132, 0 ),
+  INST(Vphsubsw        , VexRvm_Lx          , V(660F38,07,_,x,I,_,_,_  ), 0                         , 0 , 0 , 7099, 250, 135, 56),
+  INST(Vphsubw         , VexRvm_Lx          , V(660F38,05,_,x,I,_,_,_  ), 0                         , 0 , 0 , 7108, 250, 135, 56),
+  INST(Vphsubwd        , VexRm              , V(XOP_M9,E2,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7116, 252, 132, 0 ),
+  INST(Vpinsrb         , VexRvmi            , V(660F3A,20,_,0,0,I,0,T1S), 0                         , 0 , 0 , 7125, 430, 143, 57),
+  INST(Vpinsrd         , VexRvmi            , V(660F3A,22,_,0,0,0,2,T1S), 0                         , 0 , 0 , 7133, 431, 144, 57),
+  INST(Vpinsrq         , VexRvmi            , V(660F3A,22,_,0,1,1,3,T1S), 0                         , 0 , 0 , 7141, 432, 144, 57),
+  INST(Vpinsrw         , VexRvmi            , V(660F00,C4,_,0,0,I,1,T1S), 0                         , 0 , 0 , 7149, 433, 143, 55),
+  INST(Vplzcntd        , VexRm_Lx           , V(660F38,44,_,x,_,0,4,FV ), 0                         , 0 , 0 , 7157, 411, 139, 0 ),
+  INST(Vplzcntq        , VexRm_Lx           , V(660F38,44,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7166, 434, 139, 0 ),
+  INST(Vpmacsdd        , VexRvmr            , V(XOP_M8,9E,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7175, 435, 132, 0 ),
+  INST(Vpmacsdqh       , VexRvmr            , V(XOP_M8,9F,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7184, 435, 132, 0 ),
+  INST(Vpmacsdql       , VexRvmr            , V(XOP_M8,97,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7194, 435, 132, 0 ),
+  INST(Vpmacssdd       , VexRvmr            , V(XOP_M8,8E,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7204, 435, 132, 0 ),
+  INST(Vpmacssdqh      , VexRvmr            , V(XOP_M8,8F,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7214, 435, 132, 0 ),
+  INST(Vpmacssdql      , VexRvmr            , V(XOP_M8,87,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7225, 435, 132, 0 ),
+  INST(Vpmacsswd       , VexRvmr            , V(XOP_M8,86,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7236, 435, 132, 0 ),
+  INST(Vpmacssww       , VexRvmr            , V(XOP_M8,85,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7246, 435, 132, 0 ),
+  INST(Vpmacswd        , VexRvmr            , V(XOP_M8,96,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7256, 435, 132, 0 ),
+  INST(Vpmacsww        , VexRvmr            , V(XOP_M8,95,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7265, 435, 132, 0 ),
+  INST(Vpmadcsswd      , VexRvmr            , V(XOP_M8,A6,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7274, 435, 132, 0 ),
+  INST(Vpmadcswd       , VexRvmr            , V(XOP_M8,B6,_,0,0,_,_,_  ), 0                         , 0 , 0 , 7285, 435, 132, 0 ),
+  INST(Vpmadd52huq     , VexRvm_Lx          , V(660F38,B5,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7295, 262, 145, 0 ),
+  INST(Vpmadd52luq     , VexRvm_Lx          , V(660F38,B4,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7307, 262, 145, 0 ),
+  INST(Vpmaddubsw      , VexRvm_Lx          , V(660F38,04,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7319, 388, 137, 58),
+  INST(Vpmaddwd        , VexRvm_Lx          , V(660F00,F5,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7330, 388, 137, 58),
+  INST(Vpmaskmovd      , VexRvmMvr_Lx       , V(660F38,8C,_,x,0,_,_,_  ), V(660F38,8E,_,x,0,_,_,_  ), 0 , 0 , 7339, 436, 124, 0 ),
+  INST(Vpmaskmovq      , VexRvmMvr_Lx       , V(660F38,8C,_,x,1,_,_,_  ), V(660F38,8E,_,x,1,_,_,_  ), 0 , 0 , 7350, 437, 124, 0 ),
+  INST(Vpmaxsb         , VexRvm_Lx          , V(660F38,3C,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7361, 438, 137, 59),
+  INST(Vpmaxsd         , VexRvm_Lx          , V(660F38,3D,_,x,I,0,4,FV ), 0                         , 0 , 0 , 7369, 259, 125, 59),
+  INST(Vpmaxsq         , VexRvm_Lx          , V(660F38,3D,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7377, 262, 120, 0 ),
+  INST(Vpmaxsw         , VexRvm_Lx          , V(660F00,EE,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7385, 438, 137, 60),
+  INST(Vpmaxub         , VexRvm_Lx          , V(660F00,DE,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7393, 438, 137, 60),
+  INST(Vpmaxud         , VexRvm_Lx          , V(660F38,3F,_,x,I,0,4,FV ), 0                         , 0 , 0 , 7401, 259, 125, 60),
+  INST(Vpmaxuq         , VexRvm_Lx          , V(660F38,3F,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7409, 262, 120, 0 ),
+  INST(Vpmaxuw         , VexRvm_Lx          , V(660F38,3E,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7417, 438, 137, 61),
+  INST(Vpminsb         , VexRvm_Lx          , V(660F38,38,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7425, 438, 137, 61),
+  INST(Vpminsd         , VexRvm_Lx          , V(660F38,39,_,x,I,0,4,FV ), 0                         , 0 , 0 , 7433, 259, 125, 61),
+  INST(Vpminsq         , VexRvm_Lx          , V(660F38,39,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7441, 262, 120, 0 ),
+  INST(Vpminsw         , VexRvm_Lx          , V(660F00,EA,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7449, 438, 137, 62),
+  INST(Vpminub         , VexRvm_Lx          , V(660F00,DA,_,x,I,_,4,FVM), 0                         , 0 , 0 , 7457, 438, 137, 62),
+  INST(Vpminud         , VexRvm_Lx          , V(660F38,3B,_,x,I,0,4,FV ), 0                         , 0 , 0 , 7465, 259, 125, 62),
+  INST(Vpminuq         , VexRvm_Lx          , V(660F38,3B,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7473, 262, 120, 0 ),
+  INST(Vpminuw         , VexRvm_Lx          , V(660F38,3A,_,x,I,_,4,FVM), 0                         , 0 , 0 , 7481, 438, 137, 63),
+  INST(Vpmovb2m        , VexRm_Lx           , V(F30F38,29,_,x,_,0,_,_  ), 0                         , 0 , 0 , 7489, 439, 122, 0 ),
+  INST(Vpmovd2m        , VexRm_Lx           , V(F30F38,39,_,x,_,0,_,_  ), 0                         , 0 , 0 , 7498, 439, 123, 0 ),
+  INST(Vpmovdb         , VexMr_Lx           , V(F30F38,31,_,x,_,0,2,QVM), 0                         , 0 , 0 , 7507, 440, 120, 0 ),
+  INST(Vpmovdw         , VexMr_Lx           , V(F30F38,33,_,x,_,0,3,HVM), 0                         , 0 , 0 , 7515, 441, 120, 0 ),
+  INST(Vpmovm2b        , VexRm_Lx           , V(F30F38,28,_,x,_,0,_,_  ), 0                         , 0 , 0 , 7523, 398, 122, 0 ),
+  INST(Vpmovm2d        , VexRm_Lx           , V(F30F38,38,_,x,_,0,_,_  ), 0                         , 0 , 0 , 7532, 398, 123, 0 ),
+  INST(Vpmovm2q        , VexRm_Lx           , V(F30F38,38,_,x,_,1,_,_  ), 0                         , 0 , 0 , 7541, 398, 123, 0 ),
+  INST(Vpmovm2w        , VexRm_Lx           , V(F30F38,28,_,x,_,1,_,_  ), 0                         , 0 , 0 , 7550, 398, 122, 0 ),
+  INST(Vpmovmskb       , VexRm_Lx           , V(660F00,D7,_,x,I,_,_,_  ), 0                         , 0 , 0 , 7559, 378, 135, 64),
+  INST(Vpmovq2m        , VexRm_Lx           , V(F30F38,39,_,x,_,1,_,_  ), 0                         , 0 , 0 , 7569, 439, 123, 0 ),
+  INST(Vpmovqb         , VexMr_Lx           , V(F30F38,32,_,x,_,0,1,OVM), 0                         , 0 , 0 , 7578, 442, 120, 0 ),
+  INST(Vpmovqd         , VexMr_Lx           , V(F30F38,35,_,x,_,0,3,HVM), 0                         , 0 , 0 , 7586, 441, 120, 0 ),
+  INST(Vpmovqw         , VexMr_Lx           , V(F30F38,34,_,x,_,0,2,QVM), 0                         , 0 , 0 , 7594, 440, 120, 0 ),
+  INST(Vpmovsdb        , VexMr_Lx           , V(F30F38,21,_,x,_,0,2,QVM), 0                         , 0 , 0 , 7602, 440, 120, 0 ),
+  INST(Vpmovsdw        , VexMr_Lx           , V(F30F38,23,_,x,_,0,3,HVM), 0                         , 0 , 0 , 7611, 441, 120, 0 ),
+  INST(Vpmovsqb        , VexMr_Lx           , V(F30F38,22,_,x,_,0,1,OVM), 0                         , 0 , 0 , 7620, 442, 120, 0 ),
+  INST(Vpmovsqd        , VexMr_Lx           , V(F30F38,25,_,x,_,0,3,HVM), 0                         , 0 , 0 , 7629, 441, 120, 0 ),
+  INST(Vpmovsqw        , VexMr_Lx           , V(F30F38,24,_,x,_,0,2,QVM), 0                         , 0 , 0 , 7638, 440, 120, 0 ),
+  INST(Vpmovswb        , VexMr_Lx           , V(F30F38,20,_,x,_,0,3,HVM), 0                         , 0 , 0 , 7647, 441, 122, 0 ),
+  INST(Vpmovsxbd       , VexRm_Lx           , V(660F38,21,_,x,I,I,2,QVM), 0                         , 0 , 0 , 7656, 443, 125, 14),
+  INST(Vpmovsxbq       , VexRm_Lx           , V(660F38,22,_,x,I,I,1,OVM), 0                         , 0 , 0 , 7666, 444, 125, 14),
+  INST(Vpmovsxbw       , VexRm_Lx           , V(660F38,20,_,x,I,I,3,HVM), 0                         , 0 , 0 , 7676, 445, 137, 14),
+  INST(Vpmovsxdq       , VexRm_Lx           , V(660F38,25,_,x,I,0,3,HVM), 0                         , 0 , 0 , 7686, 446, 125, 14),
+  INST(Vpmovsxwd       , VexRm_Lx           , V(660F38,23,_,x,I,I,3,HVM), 0                         , 0 , 0 , 7696, 445, 125, 14),
+  INST(Vpmovsxwq       , VexRm_Lx           , V(660F38,24,_,x,I,I,2,QVM), 0                         , 0 , 0 , 7706, 443, 125, 14),
+  INST(Vpmovusdb       , VexMr_Lx           , V(F30F38,11,_,x,_,0,2,QVM), 0                         , 0 , 0 , 7716, 440, 120, 0 ),
+  INST(Vpmovusdw       , VexMr_Lx           , V(F30F38,13,_,x,_,0,3,HVM), 0                         , 0 , 0 , 7726, 441, 120, 0 ),
+  INST(Vpmovusqb       , VexMr_Lx           , V(F30F38,12,_,x,_,0,1,OVM), 0                         , 0 , 0 , 7736, 442, 120, 0 ),
+  INST(Vpmovusqd       , VexMr_Lx           , V(F30F38,15,_,x,_,0,3,HVM), 0                         , 0 , 0 , 7746, 441, 120, 0 ),
+  INST(Vpmovusqw       , VexMr_Lx           , V(F30F38,14,_,x,_,0,2,QVM), 0                         , 0 , 0 , 7756, 440, 120, 0 ),
+  INST(Vpmovuswb       , VexMr_Lx           , V(F30F38,10,_,x,_,0,3,HVM), 0                         , 0 , 0 , 7766, 441, 122, 0 ),
+  INST(Vpmovw2m        , VexRm_Lx           , V(F30F38,29,_,x,_,1,_,_  ), 0                         , 0 , 0 , 7776, 439, 122, 0 ),
+  INST(Vpmovwb         , VexMr_Lx           , V(F30F38,30,_,x,_,0,3,HVM), 0                         , 0 , 0 , 7785, 441, 122, 0 ),
+  INST(Vpmovzxbd       , VexRm_Lx           , V(660F38,31,_,x,I,I,2,QVM), 0                         , 0 , 0 , 7793, 443, 125, 65),
+  INST(Vpmovzxbq       , VexRm_Lx           , V(660F38,32,_,x,I,I,1,OVM), 0                         , 0 , 0 , 7803, 444, 125, 65),
+  INST(Vpmovzxbw       , VexRm_Lx           , V(660F38,30,_,x,I,I,3,HVM), 0                         , 0 , 0 , 7813, 445, 137, 65),
+  INST(Vpmovzxdq       , VexRm_Lx           , V(660F38,35,_,x,I,0,3,HVM), 0                         , 0 , 0 , 7823, 446, 125, 65),
+  INST(Vpmovzxwd       , VexRm_Lx           , V(660F38,33,_,x,I,I,3,HVM), 0                         , 0 , 0 , 7833, 445, 125, 65),
+  INST(Vpmovzxwq       , VexRm_Lx           , V(660F38,34,_,x,I,I,2,QVM), 0                         , 0 , 0 , 7843, 443, 125, 65),
+  INST(Vpmuldq         , VexRvm_Lx          , V(660F38,28,_,x,I,1,4,FV ), 0                         , 0 , 0 , 7853, 256, 125, 19),
+  INST(Vpmulhrsw       , VexRvm_Lx          , V(660F38,0B,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7861, 388, 137, 19),
+  INST(Vpmulhuw        , VexRvm_Lx          , V(660F00,E4,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7871, 388, 137, 66),
+  INST(Vpmulhw         , VexRvm_Lx          , V(660F00,E5,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7880, 388, 137, 66),
+  INST(Vpmulld         , VexRvm_Lx          , V(660F38,40,_,x,I,0,4,FV ), 0                         , 0 , 0 , 7888, 257, 125, 66),
+  INST(Vpmullq         , VexRvm_Lx          , V(660F38,40,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7896, 262, 123, 0 ),
+  INST(Vpmullw         , VexRvm_Lx          , V(660F00,D5,_,x,I,I,4,FVM), 0                         , 0 , 0 , 7904, 388, 137, 19),
+  INST(Vpmultishiftqb  , VexRvm_Lx          , V(660F38,83,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7912, 262, 142, 0 ),
+  INST(Vpmuludq        , VexRvm_Lx          , V(660F00,F4,_,x,I,1,4,FV ), 0                         , 0 , 0 , 7927, 256, 125, 67),
+  INST(Vpopcntd        , VexRm              , V(660F38,55,_,2,_,0,4,FVM), 0                         , 0 , 0 , 7936, 447, 146, 0 ),
+  INST(Vpopcntq        , VexRm              , V(660F38,55,_,2,_,1,4,FVM), 0                         , 0 , 0 , 7945, 448, 146, 0 ),
+  INST(Vpor            , VexRvm_Lx          , V(660F00,EB,_,x,I,_,_,_  ), 0                         , 0 , 0 , 7954, 390, 135, 68),
+  INST(Vpord           , VexRvm_Lx          , V(660F00,EB,_,x,_,0,4,FV ), 0                         , 0 , 0 , 7959, 391, 120, 0 ),
+  INST(Vporq           , VexRvm_Lx          , V(660F00,EB,_,x,_,1,4,FV ), 0                         , 0 , 0 , 7965, 395, 120, 0 ),
+  INST(Vpperm          , VexRvrmRvmr        , V(XOP_M8,A3,_,0,x,_,_,_  ), 0                         , 0 , 0 , 7971, 449, 132, 0 ),
+  INST(Vprold          , VexVmi_Lx          , V(660F00,72,1,x,_,0,4,FV ), 0                         , 0 , 0 , 7978, 450, 120, 0 ),
+  INST(Vprolq          , VexVmi_Lx          , V(660F00,72,1,x,_,1,4,FV ), 0                         , 0 , 0 , 7985, 451, 120, 0 ),
+  INST(Vprolvd         , VexRvm_Lx          , V(660F38,15,_,x,_,0,4,FV ), 0                         , 0 , 0 , 7992, 261, 120, 0 ),
+  INST(Vprolvq         , VexRvm_Lx          , V(660F38,15,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8000, 262, 120, 0 ),
+  INST(Vprord          , VexVmi_Lx          , V(660F00,72,0,x,_,0,4,FV ), 0                         , 0 , 0 , 8008, 450, 120, 0 ),
+  INST(Vprorq          , VexVmi_Lx          , V(660F00,72,0,x,_,1,4,FV ), 0                         , 0 , 0 , 8015, 451, 120, 0 ),
+  INST(Vprorvd         , VexRvm_Lx          , V(660F38,14,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8022, 261, 120, 0 ),
+  INST(Vprorvq         , VexRvm_Lx          , V(660F38,14,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8030, 262, 120, 0 ),
+  INST(Vprotb          , VexRvmRmvRmi       , V(XOP_M9,90,_,0,x,_,_,_  ), V(XOP_M8,C0,_,0,x,_,_,_  ), 0 , 0 , 8038, 452, 132, 0 ),
+  INST(Vprotd          , VexRvmRmvRmi       , V(XOP_M9,92,_,0,x,_,_,_  ), V(XOP_M8,C2,_,0,x,_,_,_  ), 0 , 0 , 8045, 453, 132, 0 ),
+  INST(Vprotq          , VexRvmRmvRmi       , V(XOP_M9,93,_,0,x,_,_,_  ), V(XOP_M8,C3,_,0,x,_,_,_  ), 0 , 0 , 8052, 454, 132, 0 ),
+  INST(Vprotw          , VexRvmRmvRmi       , V(XOP_M9,91,_,0,x,_,_,_  ), V(XOP_M8,C1,_,0,x,_,_,_  ), 0 , 0 , 8059, 455, 132, 0 ),
+  INST(Vpsadbw         , VexRvm_Lx          , V(660F00,F6,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8066, 456, 137, 69),
+  INST(Vpscatterdd     , VexMr_VM           , V(660F38,A0,_,x,_,0,2,T1S), 0                         , 0 , 0 , 8074, 457, 120, 0 ),
+  INST(Vpscatterdq     , VexMr_VM           , V(660F38,A0,_,x,_,1,3,T1S), 0                         , 0 , 0 , 8086, 457, 120, 0 ),
+  INST(Vpscatterqd     , VexMr_VM           , V(660F38,A1,_,x,_,0,2,T1S), 0                         , 0 , 0 , 8098, 458, 120, 0 ),
+  INST(Vpscatterqq     , VexMr_VM           , V(660F38,A1,_,x,_,1,3,T1S), 0                         , 0 , 0 , 8110, 459, 120, 0 ),
+  INST(Vpshab          , VexRvmRmv          , V(XOP_M9,98,_,0,x,_,_,_  ), 0                         , 0 , 0 , 8122, 460, 132, 0 ),
+  INST(Vpshad          , VexRvmRmv          , V(XOP_M9,9A,_,0,x,_,_,_  ), 0                         , 0 , 0 , 8129, 460, 132, 0 ),
+  INST(Vpshaq          , VexRvmRmv          , V(XOP_M9,9B,_,0,x,_,_,_  ), 0                         , 0 , 0 , 8136, 460, 132, 0 ),
+  INST(Vpshaw          , VexRvmRmv          , V(XOP_M9,99,_,0,x,_,_,_  ), 0                         , 0 , 0 , 8143, 460, 132, 0 ),
+  INST(Vpshlb          , VexRvmRmv          , V(XOP_M9,94,_,0,x,_,_,_  ), 0                         , 0 , 0 , 8150, 460, 132, 0 ),
+  INST(Vpshld          , VexRvmRmv          , V(XOP_M9,96,_,0,x,_,_,_  ), 0                         , 0 , 0 , 8157, 460, 132, 0 ),
+  INST(Vpshlq          , VexRvmRmv          , V(XOP_M9,97,_,0,x,_,_,_  ), 0                         , 0 , 0 , 8164, 460, 132, 0 ),
+  INST(Vpshlw          , VexRvmRmv          , V(XOP_M9,95,_,0,x,_,_,_  ), 0                         , 0 , 0 , 8171, 460, 132, 0 ),
+  INST(Vpshufb         , VexRvm_Lx          , V(660F38,00,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8178, 388, 137, 70),
+  INST(Vpshufd         , VexRmi_Lx          , V(660F00,70,_,x,I,0,4,FV ), 0                         , 0 , 0 , 8186, 461, 125, 71),
+  INST(Vpshufhw        , VexRmi_Lx          , V(F30F00,70,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8194, 462, 137, 71),
+  INST(Vpshuflw        , VexRmi_Lx          , V(F20F00,70,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8203, 462, 137, 71),
+  INST(Vpsignb         , VexRvm_Lx          , V(660F38,08,_,x,I,_,_,_  ), 0                         , 0 , 0 , 8212, 250, 135, 72),
+  INST(Vpsignd         , VexRvm_Lx          , V(660F38,0A,_,x,I,_,_,_  ), 0                         , 0 , 0 , 8220, 250, 135, 72),
+  INST(Vpsignw         , VexRvm_Lx          , V(660F38,09,_,x,I,_,_,_  ), 0                         , 0 , 0 , 8228, 250, 135, 72),
+  INST(Vpslld          , VexRvmVmi_Lx       , V(660F00,F2,_,x,I,0,4,128), V(660F00,72,6,x,I,0,4,FV ), 0 , 0 , 8236, 463, 125, 72),
+  INST(Vpslldq         , VexEvexVmi_Lx      , V(660F00,73,7,x,I,I,4,FVM), 0                         , 0 , 0 , 8243, 464, 137, 72),
+  INST(Vpsllq          , VexRvmVmi_Lx       , V(660F00,F3,_,x,I,1,4,128), V(660F00,73,6,x,I,1,4,FV ), 0 , 0 , 8251, 465, 125, 72),
+  INST(Vpsllvd         , VexRvm_Lx          , V(660F38,47,_,x,0,0,4,FV ), 0                         , 0 , 0 , 8258, 257, 133, 0 ),
+  INST(Vpsllvq         , VexRvm_Lx          , V(660F38,47,_,x,1,1,4,FV ), 0                         , 0 , 0 , 8266, 256, 133, 0 ),
+  INST(Vpsllvw         , VexRvm_Lx          , V(660F38,12,_,x,_,1,4,FVM), 0                         , 0 , 0 , 8274, 260, 122, 0 ),
+  INST(Vpsllw          , VexRvmVmi_Lx       , V(660F00,F1,_,x,I,I,4,FVM), V(660F00,71,6,x,I,I,4,FVM), 0 , 0 , 8282, 466, 137, 73),
+  INST(Vpsrad          , VexRvmVmi_Lx       , V(660F00,E2,_,x,I,0,4,128), V(660F00,72,4,x,I,0,4,FV ), 0 , 0 , 8289, 467, 125, 73),
+  INST(Vpsraq          , VexRvmVmi_Lx       , V(660F00,E2,_,x,_,1,4,128), V(660F00,72,4,x,_,1,4,FV ), 0 , 0 , 8296, 468, 120, 0 ),
+  INST(Vpsravd         , VexRvm_Lx          , V(660F38,46,_,x,0,0,4,FV ), 0                         , 0 , 0 , 8303, 257, 133, 0 ),
+  INST(Vpsravq         , VexRvm_Lx          , V(660F38,46,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8311, 262, 120, 0 ),
+  INST(Vpsravw         , VexRvm_Lx          , V(660F38,11,_,x,_,1,4,FVM), 0                         , 0 , 0 , 8319, 260, 122, 0 ),
+  INST(Vpsraw          , VexRvmVmi_Lx       , V(660F00,E1,_,x,I,I,4,128), V(660F00,71,4,x,I,I,4,FVM), 0 , 0 , 8327, 469, 137, 74),
+  INST(Vpsrld          , VexRvmVmi_Lx       , V(660F00,D2,_,x,I,0,4,128), V(660F00,72,2,x,I,0,4,FV ), 0 , 0 , 8334, 470, 125, 74),
+  INST(Vpsrldq         , VexEvexVmi_Lx      , V(660F00,73,3,x,I,I,4,FVM), 0                         , 0 , 0 , 8341, 464, 137, 74),
+  INST(Vpsrlq          , VexRvmVmi_Lx       , V(660F00,D3,_,x,I,1,4,128), V(660F00,73,2,x,I,1,4,FV ), 0 , 0 , 8349, 471, 125, 74),
+  INST(Vpsrlvd         , VexRvm_Lx          , V(660F38,45,_,x,0,0,4,FV ), 0                         , 0 , 0 , 8356, 257, 133, 0 ),
+  INST(Vpsrlvq         , VexRvm_Lx          , V(660F38,45,_,x,1,1,4,FV ), 0                         , 0 , 0 , 8364, 256, 133, 0 ),
+  INST(Vpsrlvw         , VexRvm_Lx          , V(660F38,10,_,x,_,1,4,FVM), 0                         , 0 , 0 , 8372, 260, 122, 0 ),
+  INST(Vpsrlw          , VexRvmVmi_Lx       , V(660F00,D1,_,x,I,I,4,128), V(660F00,71,2,x,I,I,4,FVM), 0 , 0 , 8380, 472, 137, 75),
+  INST(Vpsubb          , VexRvm_Lx          , V(660F00,F8,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8387, 473, 137, 75),
+  INST(Vpsubd          , VexRvm_Lx          , V(660F00,FA,_,x,I,0,4,FV ), 0                         , 0 , 0 , 8394, 474, 125, 75),
+  INST(Vpsubq          , VexRvm_Lx          , V(660F00,FB,_,x,I,1,4,FV ), 0                         , 0 , 0 , 8401, 475, 125, 75),
+  INST(Vpsubsb         , VexRvm_Lx          , V(660F00,E8,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8408, 473, 137, 75),
+  INST(Vpsubsw         , VexRvm_Lx          , V(660F00,E9,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8416, 473, 137, 75),
+  INST(Vpsubusb        , VexRvm_Lx          , V(660F00,D8,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8424, 473, 137, 75),
+  INST(Vpsubusw        , VexRvm_Lx          , V(660F00,D9,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8433, 473, 137, 75),
+  INST(Vpsubw          , VexRvm_Lx          , V(660F00,F9,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8442, 473, 137, 75),
+  INST(Vpternlogd      , VexRvmi_Lx         , V(660F3A,25,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8449, 476, 120, 0 ),
+  INST(Vpternlogq      , VexRvmi_Lx         , V(660F3A,25,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8460, 477, 120, 0 ),
+  INST(Vptest          , VexRm_Lx           , V(660F38,17,_,x,I,_,_,_  ), 0                         , 0 , 0 , 8471, 478, 141, 76),
+  INST(Vptestmb        , VexRvm_Lx          , V(660F38,26,_,x,_,0,4,FVM), 0                         , 0 , 0 , 8478, 479, 122, 0 ),
+  INST(Vptestmd        , VexRvm_Lx          , V(660F38,27,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8487, 480, 120, 0 ),
+  INST(Vptestmq        , VexRvm_Lx          , V(660F38,27,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8496, 481, 120, 0 ),
+  INST(Vptestmw        , VexRvm_Lx          , V(660F38,26,_,x,_,1,4,FVM), 0                         , 0 , 0 , 8505, 479, 122, 0 ),
+  INST(Vptestnmb       , VexRvm_Lx          , V(F30F38,26,_,x,_,0,4,FVM), 0                         , 0 , 0 , 8514, 479, 122, 0 ),
+  INST(Vptestnmd       , VexRvm_Lx          , V(F30F38,27,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8524, 480, 120, 0 ),
+  INST(Vptestnmq       , VexRvm_Lx          , V(F30F38,27,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8534, 481, 120, 0 ),
+  INST(Vptestnmw       , VexRvm_Lx          , V(F30F38,26,_,x,_,1,4,FVM), 0                         , 0 , 0 , 8544, 479, 122, 0 ),
+  INST(Vpunpckhbw      , VexRvm_Lx          , V(660F00,68,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8554, 388, 137, 77),
+  INST(Vpunpckhdq      , VexRvm_Lx          , V(660F00,6A,_,x,I,0,4,FV ), 0                         , 0 , 0 , 8565, 257, 125, 77),
+  INST(Vpunpckhqdq     , VexRvm_Lx          , V(660F00,6D,_,x,I,1,4,FV ), 0                         , 0 , 0 , 8576, 256, 125, 77),
+  INST(Vpunpckhwd      , VexRvm_Lx          , V(660F00,69,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8588, 388, 137, 77),
+  INST(Vpunpcklbw      , VexRvm_Lx          , V(660F00,60,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8599, 388, 137, 77),
+  INST(Vpunpckldq      , VexRvm_Lx          , V(660F00,62,_,x,I,0,4,FV ), 0                         , 0 , 0 , 8610, 257, 125, 77),
+  INST(Vpunpcklqdq     , VexRvm_Lx          , V(660F00,6C,_,x,I,1,4,FV ), 0                         , 0 , 0 , 8621, 256, 125, 77),
+  INST(Vpunpcklwd      , VexRvm_Lx          , V(660F00,61,_,x,I,I,4,FVM), 0                         , 0 , 0 , 8633, 388, 137, 77),
+  INST(Vpxor           , VexRvm_Lx          , V(660F00,EF,_,x,I,_,_,_  ), 0                         , 0 , 0 , 8644, 392, 135, 78),
+  INST(Vpxord          , VexRvm_Lx          , V(660F00,EF,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8650, 393, 120, 0 ),
+  INST(Vpxorq          , VexRvm_Lx          , V(660F00,EF,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8657, 394, 120, 0 ),
+  INST(Vrangepd        , VexRvmi_Lx         , V(660F3A,50,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8664, 482, 123, 0 ),
+  INST(Vrangeps        , VexRvmi_Lx         , V(660F3A,50,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8673, 483, 123, 0 ),
+  INST(Vrangesd        , VexRvmi            , V(660F3A,51,_,I,_,1,3,T1S), 0                         , 0 , 0 , 8682, 484, 63 , 0 ),
+  INST(Vrangess        , VexRvmi            , V(660F3A,51,_,I,_,0,2,T1S), 0                         , 0 , 0 , 8691, 485, 63 , 0 ),
+  INST(Vrcp14pd        , VexRm_Lx           , V(660F38,4C,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8700, 434, 120, 0 ),
+  INST(Vrcp14ps        , VexRm_Lx           , V(660F38,4C,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8709, 411, 120, 0 ),
+  INST(Vrcp14sd        , VexRvm             , V(660F38,4D,_,I,_,1,3,T1S), 0                         , 0 , 0 , 8718, 486, 65 , 0 ),
+  INST(Vrcp14ss        , VexRvm             , V(660F38,4D,_,I,_,0,2,T1S), 0                         , 0 , 0 , 8727, 487, 65 , 0 ),
+  INST(Vrcp28pd        , VexRm              , V(660F38,CA,_,2,_,1,4,FV ), 0                         , 0 , 0 , 8736, 311, 128, 0 ),
+  INST(Vrcp28ps        , VexRm              , V(660F38,CA,_,2,_,0,4,FV ), 0                         , 0 , 0 , 8745, 312, 128, 0 ),
+  INST(Vrcp28sd        , VexRvm             , V(660F38,CB,_,I,_,1,3,T1S), 0                         , 0 , 0 , 8754, 488, 128, 0 ),
+  INST(Vrcp28ss        , VexRvm             , V(660F38,CB,_,I,_,0,2,T1S), 0                         , 0 , 0 , 8763, 489, 128, 0 ),
+  INST(Vrcpps          , VexRm_Lx           , V(000F00,53,_,x,I,_,_,_  ), 0                         , 0 , 0 , 8772, 333, 118, 79),
+  INST(Vrcpss          , VexRvm             , V(F30F00,53,_,I,I,_,_,_  ), 0                         , 0 , 0 , 8779, 490, 118, 80),
+  INST(Vreducepd       , VexRmi_Lx          , V(660F3A,56,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8786, 451, 123, 0 ),
+  INST(Vreduceps       , VexRmi_Lx          , V(660F3A,56,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8796, 450, 123, 0 ),
+  INST(Vreducesd       , VexRvmi            , V(660F3A,57,_,I,_,1,3,T1S), 0                         , 0 , 0 , 8806, 491, 63 , 0 ),
+  INST(Vreducess       , VexRvmi            , V(660F3A,57,_,I,_,0,2,T1S), 0                         , 0 , 0 , 8816, 492, 63 , 0 ),
+  INST(Vrndscalepd     , VexRmi_Lx          , V(660F3A,09,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8826, 345, 120, 0 ),
+  INST(Vrndscaleps     , VexRmi_Lx          , V(660F3A,08,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8838, 346, 120, 0 ),
+  INST(Vrndscalesd     , VexRvmi            , V(660F3A,0B,_,I,_,1,3,T1S), 0                         , 0 , 0 , 8850, 484, 65 , 0 ),
+  INST(Vrndscaless     , VexRvmi            , V(660F3A,0A,_,I,_,0,2,T1S), 0                         , 0 , 0 , 8862, 485, 65 , 0 ),
+  INST(Vroundpd        , VexRmi_Lx          , V(660F3A,09,_,x,I,_,_,_  ), 0                         , 0 , 0 , 8874, 493, 118, 81),
+  INST(Vroundps        , VexRmi_Lx          , V(660F3A,08,_,x,I,_,_,_  ), 0                         , 0 , 0 , 8883, 493, 118, 81),
+  INST(Vroundsd        , VexRvmi            , V(660F3A,0B,_,I,I,_,_,_  ), 0                         , 0 , 0 , 8892, 494, 118, 82),
+  INST(Vroundss        , VexRvmi            , V(660F3A,0A,_,I,I,_,_,_  ), 0                         , 0 , 0 , 8901, 495, 118, 82),
+  INST(Vrsqrt14pd      , VexRm_Lx           , V(660F38,4E,_,x,_,1,4,FV ), 0                         , 0 , 0 , 8910, 434, 120, 0 ),
+  INST(Vrsqrt14ps      , VexRm_Lx           , V(660F38,4E,_,x,_,0,4,FV ), 0                         , 0 , 0 , 8921, 411, 120, 0 ),
+  INST(Vrsqrt14sd      , VexRvm             , V(660F38,4F,_,I,_,1,3,T1S), 0                         , 0 , 0 , 8932, 486, 65 , 0 ),
+  INST(Vrsqrt14ss      , VexRvm             , V(660F38,4F,_,I,_,0,2,T1S), 0                         , 0 , 0 , 8943, 487, 65 , 0 ),
+  INST(Vrsqrt28pd      , VexRm              , V(660F38,CC,_,2,_,1,4,FV ), 0                         , 0 , 0 , 8954, 311, 128, 0 ),
+  INST(Vrsqrt28ps      , VexRm              , V(660F38,CC,_,2,_,0,4,FV ), 0                         , 0 , 0 , 8965, 312, 128, 0 ),
+  INST(Vrsqrt28sd      , VexRvm             , V(660F38,CD,_,I,_,1,3,T1S), 0                         , 0 , 0 , 8976, 488, 128, 0 ),
+  INST(Vrsqrt28ss      , VexRvm             , V(660F38,CD,_,I,_,0,2,T1S), 0                         , 0 , 0 , 8987, 489, 128, 0 ),
+  INST(Vrsqrtps        , VexRm_Lx           , V(000F00,52,_,x,I,_,_,_  ), 0                         , 0 , 0 , 8998, 333, 118, 3 ),
+  INST(Vrsqrtss        , VexRvm             , V(F30F00,52,_,I,I,_,_,_  ), 0                         , 0 , 0 , 9007, 490, 118, 2 ),
+  INST(Vscalefpd       , VexRvm_Lx          , V(660F38,2C,_,x,_,1,4,FV ), 0                         , 0 , 0 , 9016, 496, 120, 0 ),
+  INST(Vscalefps       , VexRvm_Lx          , V(660F38,2C,_,x,_,0,4,FV ), 0                         , 0 , 0 , 9026, 497, 120, 0 ),
+  INST(Vscalefsd       , VexRvm             , V(660F38,2D,_,I,_,1,3,T1S), 0                         , 0 , 0 , 9036, 498, 65 , 0 ),
+  INST(Vscalefss       , VexRvm             , V(660F38,2D,_,I,_,0,2,T1S), 0                         , 0 , 0 , 9046, 499, 65 , 0 ),
+  INST(Vscatterdpd     , VexMr_Lx           , V(660F38,A2,_,x,_,1,3,T1S), 0                         , 0 , 0 , 9056, 500, 120, 0 ),
+  INST(Vscatterdps     , VexMr_Lx           , V(660F38,A2,_,x,_,0,2,T1S), 0                         , 0 , 0 , 9068, 457, 120, 0 ),
+  INST(Vscatterpf0dpd  , VexM_VM            , V(660F38,C6,5,2,_,1,3,T1S), 0                         , 0 , 0 , 9080, 338, 134, 0 ),
+  INST(Vscatterpf0dps  , VexM_VM            , V(660F38,C6,5,2,_,0,2,T1S), 0                         , 0 , 0 , 9095, 339, 134, 0 ),
+  INST(Vscatterpf0qpd  , VexM_VM            , V(660F38,C7,5,2,_,1,3,T1S), 0                         , 0 , 0 , 9110, 340, 134, 0 ),
+  INST(Vscatterpf0qps  , VexM_VM            , V(660F38,C7,5,2,_,0,2,T1S), 0                         , 0 , 0 , 9125, 340, 134, 0 ),
+  INST(Vscatterpf1dpd  , VexM_VM            , V(660F38,C6,6,2,_,1,3,T1S), 0                         , 0 , 0 , 9140, 338, 134, 0 ),
+  INST(Vscatterpf1dps  , VexM_VM            , V(660F38,C6,6,2,_,0,2,T1S), 0                         , 0 , 0 , 9155, 339, 134, 0 ),
+  INST(Vscatterpf1qpd  , VexM_VM            , V(660F38,C7,6,2,_,1,3,T1S), 0                         , 0 , 0 , 9170, 340, 134, 0 ),
+  INST(Vscatterpf1qps  , VexM_VM            , V(660F38,C7,6,2,_,0,2,T1S), 0                         , 0 , 0 , 9185, 340, 134, 0 ),
+  INST(Vscatterqpd     , VexMr_Lx           , V(660F38,A3,_,x,_,1,3,T1S), 0                         , 0 , 0 , 9200, 459, 120, 0 ),
+  INST(Vscatterqps     , VexMr_Lx           , V(660F38,A3,_,x,_,0,2,T1S), 0                         , 0 , 0 , 9212, 458, 120, 0 ),
+  INST(Vshuff32x4      , VexRvmi_Lx         , V(660F3A,23,_,x,_,0,4,FV ), 0                         , 0 , 0 , 9224, 501, 120, 0 ),
+  INST(Vshuff64x2      , VexRvmi_Lx         , V(660F3A,23,_,x,_,1,4,FV ), 0                         , 0 , 0 , 9235, 502, 120, 0 ),
+  INST(Vshufi32x4      , VexRvmi_Lx         , V(660F3A,43,_,x,_,0,4,FV ), 0                         , 0 , 0 , 9246, 501, 120, 0 ),
+  INST(Vshufi64x2      , VexRvmi_Lx         , V(660F3A,43,_,x,_,1,4,FV ), 0                         , 0 , 0 , 9257, 502, 120, 0 ),
+  INST(Vshufpd         , VexRvmi_Lx         , V(660F00,C6,_,x,I,1,4,FV ), 0                         , 0 , 0 , 9268, 503, 116, 83),
+  INST(Vshufps         , VexRvmi_Lx         , V(000F00,C6,_,x,I,0,4,FV ), 0                         , 0 , 0 , 9276, 504, 116, 83),
+  INST(Vsqrtpd         , VexRm_Lx           , V(660F00,51,_,x,I,1,4,FV ), 0                         , 0 , 0 , 9284, 505, 116, 84),
+  INST(Vsqrtps         , VexRm_Lx           , V(000F00,51,_,x,I,0,4,FV ), 0                         , 0 , 0 , 9292, 281, 116, 84),
+  INST(Vsqrtsd         , VexRvm             , V(F20F00,51,_,I,I,1,3,T1S), 0                         , 0 , 0 , 9300, 248, 117, 85),
+  INST(Vsqrtss         , VexRvm             , V(F30F00,51,_,I,I,0,2,T1S), 0                         , 0 , 0 , 9308, 249, 117, 85),
+  INST(Vstmxcsr        , VexM               , V(000F00,AE,3,0,I,_,_,_  ), 0                         , 0 , 0 , 9316, 506, 118, 0 ),
+  INST(Vsubpd          , VexRvm_Lx          , V(660F00,5C,_,x,I,1,4,FV ), 0                         , 0 , 0 , 9325, 246, 116, 86),
+  INST(Vsubps          , VexRvm_Lx          , V(000F00,5C,_,x,I,0,4,FV ), 0                         , 0 , 0 , 9332, 247, 116, 86),
+  INST(Vsubsd          , VexRvm             , V(F20F00,5C,_,I,I,1,3,T1S), 0                         , 0 , 0 , 9339, 248, 117, 86),
+  INST(Vsubss          , VexRvm             , V(F30F00,5C,_,I,I,0,2,T1S), 0                         , 0 , 0 , 9346, 249, 117, 86),
+  INST(Vtestpd         , VexRm_Lx           , V(660F38,0F,_,x,0,_,_,_  ), 0                         , 0 , 0 , 9353, 478, 141, 0 ),
+  INST(Vtestps         , VexRm_Lx           , V(660F38,0E,_,x,0,_,_,_  ), 0                         , 0 , 0 , 9361, 478, 141, 0 ),
+  INST(Vucomisd        , VexRm              , V(660F00,2E,_,I,I,1,3,T1S), 0                         , 0 , 0 , 9369, 277, 126, 15),
+  INST(Vucomiss        , VexRm              , V(000F00,2E,_,I,I,0,2,T1S), 0                         , 0 , 0 , 9378, 278, 126, 15),
+  INST(Vunpckhpd       , VexRvm_Lx          , V(660F00,15,_,x,I,1,4,FV ), 0                         , 0 , 0 , 9387, 256, 116, 13),
+  INST(Vunpckhps       , VexRvm_Lx          , V(000F00,15,_,x,I,0,4,FV ), 0                         , 0 , 0 , 9397, 257, 116, 13),
+  INST(Vunpcklpd       , VexRvm_Lx          , V(660F00,14,_,x,I,1,4,FV ), 0                         , 0 , 0 , 9407, 256, 116, 13),
+  INST(Vunpcklps       , VexRvm_Lx          , V(000F00,14,_,x,I,0,4,FV ), 0                         , 0 , 0 , 9417, 257, 116, 13),
+  INST(Vxorpd          , VexRvm_Lx          , V(660F00,57,_,x,I,1,4,FV ), 0                         , 0 , 0 , 9427, 475, 121, 87),
+  INST(Vxorps          , VexRvm_Lx          , V(000F00,57,_,x,I,0,4,FV ), 0                         , 0 , 0 , 9434, 474, 121, 87),
+  INST(Vzeroall        , VexOp              , V(000F00,77,_,1,I,_,_,_  ), 0                         , 0 , 0 , 9441, 507, 118, 0 ),
+  INST(Vzeroupper      , VexOp              , V(000F00,77,_,0,I,_,_,_  ), 0                         , 0 , 0 , 9450, 507, 118, 0 ),
+  INST(Wbinvd          , X86Op              , O(000F00,09,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9461, 34 , 23 , 0 ),
+  INST(Wrfsbase        , X86M               , O(F30F00,AE,2,_,x,_,_,_  ), 0                         , 0 , 0 , 9468, 508, 98 , 0 ),
+  INST(Wrgsbase        , X86M               , O(F30F00,AE,3,_,x,_,_,_  ), 0                         , 0 , 0 , 9477, 508, 98 , 0 ),
+  INST(Wrmsr           , X86Op              , O(000F00,30,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9486, 509, 147, 0 ),
+  INST(Xabort          , X86Op_O_I8         , O(000000,C6,7,_,_,_,_,_  ), 0                         , 0 , 0 , 9492, 98 , 148, 0 ),
+  INST(Xadd            , X86Xadd            , O(000F00,C0,_,_,x,_,_,_  ), 0                         , 0 , 0 , 9499, 510, 36 , 0 ),
+  INST(Xbegin          , X86JmpRel          , O(000000,C7,7,_,_,_,_,_  ), 0                         , 0 , 0 , 9504, 511, 148, 0 ),
+  INST(Xchg            , X86Xchg            , O(000000,86,_,_,x,_,_,_  ), 0                         , 0 , 0 , 434 , 512, 0  , 0 ),
+  INST(Xend            , X86Op              , O(000F01,D5,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9511, 34 , 148, 0 ),
+  INST(Xgetbv          , X86Op              , O(000F01,D0,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9516, 227, 149, 0 ),
+  INST(Xlatb           , X86Op              , O(000000,D7,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9523, 34 , 45 , 0 ),
+  INST(Xor             , X86Arith           , O(000000,30,6,_,x,_,_,_  ), 0                         , 0 , 0 , 8646, 243, 1  , 0 ),
+  INST(Xorpd           , ExtRm              , O(660F00,57,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9428, 192, 4  , 87),
+  INST(Xorps           , ExtRm              , O(000F00,57,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9435, 192, 5  , 87),
+  INST(Xrstor          , X86M_Only          , O(000F00,AE,5,_,_,_,_,_  ), 0                         , 0 , 0 , 1105, 513, 149, 0 ),
+  INST(Xrstor64        , X86M_Only          , O(000F00,AE,5,_,1,_,_,_  ), 0                         , 0 , 0 , 1113, 514, 149, 0 ),
+  INST(Xrstors         , X86M_Only          , O(000F00,C7,3,_,_,_,_,_  ), 0                         , 0 , 0 , 9529, 513, 150, 0 ),
+  INST(Xrstors64       , X86M_Only          , O(000F00,C7,3,_,1,_,_,_  ), 0                         , 0 , 0 , 9537, 514, 150, 0 ),
+  INST(Xsave           , X86M_Only          , O(000F00,AE,4,_,_,_,_,_  ), 0                         , 0 , 0 , 1123, 515, 149, 0 ),
+  INST(Xsave64         , X86M_Only          , O(000F00,AE,4,_,1,_,_,_  ), 0                         , 0 , 0 , 1130, 516, 149, 0 ),
+  INST(Xsavec          , X86M_Only          , O(000F00,C7,4,_,_,_,_,_  ), 0                         , 0 , 0 , 9547, 515, 151, 0 ),
+  INST(Xsavec64        , X86M_Only          , O(000F00,C7,4,_,1,_,_,_  ), 0                         , 0 , 0 , 9554, 516, 151, 0 ),
+  INST(Xsaveopt        , X86M_Only          , O(000F00,AE,6,_,_,_,_,_  ), 0                         , 0 , 0 , 9563, 515, 152, 0 ),
+  INST(Xsaveopt64      , X86M_Only          , O(000F00,AE,6,_,1,_,_,_  ), 0                         , 0 , 0 , 9572, 516, 152, 0 ),
+  INST(Xsaves          , X86M_Only          , O(000F00,C7,5,_,_,_,_,_  ), 0                         , 0 , 0 , 9583, 515, 150, 0 ),
+  INST(Xsaves64        , X86M_Only          , O(000F00,C7,5,_,1,_,_,_  ), 0                         , 0 , 0 , 9590, 516, 150, 0 ),
+  INST(Xsetbv          , X86Op              , O(000F01,D1,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9599, 509, 153, 0 ),
+  INST(Xtest           , X86Op              , O(000F01,D6,_,_,_,_,_,_  ), 0                         , 0 , 0 , 9606, 34 , 154, 0 )
+  // ${instData:End}
 };
-
-// Automatically generated, do not edit.
-static const uint16_t _x86InstAlphaIndex[26] = {
-  kX86InstIdAdc,
-  kX86InstIdBextr,
-  kX86InstIdCall,
-  kX86InstIdDaa,
-  kX86InstIdEmms,
-  kX86InstIdF2xm1,
-  0xFFFF,
-  kX86InstIdHaddpd,
-  kX86InstIdIdiv,
-  kX86InstIdJa,
-  0xFFFF,
-  kX86InstIdLahf,
-  kX86InstIdMaskmovdqu,
-  kX86InstIdNeg,
-  kX86InstIdOr,
-  kX86InstIdPabsb,
-  0xFFFF,
-  kX86InstIdRcl,
-  kX86InstIdSahf,
-  kX86InstIdTest,
-  kX86InstIdUcomisd,
-  kX86InstIdVaddpd,
-  kX86InstIdWrfsbase,
-  kX86InstIdXadd,
-  0xFFFF,
-  0xFFFF
-};
-
-// Automatically generated, do not edit.
-enum kX86InstData_NameIndex {
-  kInstIdNone_NameIndex = 0,
-  kX86InstIdAdc_NameIndex = 1,
-  kX86InstIdAdd_NameIndex = 5,
-  kX86InstIdAddpd_NameIndex = 9,
-  kX86InstIdAddps_NameIndex = 15,
-  kX86InstIdAddsd_NameIndex = 21,
-  kX86InstIdAddss_NameIndex = 27,
-  kX86InstIdAddsubpd_NameIndex = 33,
-  kX86InstIdAddsubps_NameIndex = 42,
-  kX86InstIdAesdec_NameIndex = 51,
-  kX86InstIdAesdeclast_NameIndex = 58,
-  kX86InstIdAesenc_NameIndex = 69,
-  kX86InstIdAesenclast_NameIndex = 76,
-  kX86InstIdAesimc_NameIndex = 87,
-  kX86InstIdAeskeygenassist_NameIndex = 94,
-  kX86InstIdAnd_NameIndex = 110,
-  kX86InstIdAndn_NameIndex = 114,
-  kX86InstIdAndnpd_NameIndex = 119,
-  kX86InstIdAndnps_NameIndex = 126,
-  kX86InstIdAndpd_NameIndex = 133,
-  kX86InstIdAndps_NameIndex = 139,
-  kX86InstIdBextr_NameIndex = 145,
-  kX86InstIdBlendpd_NameIndex = 151,
-  kX86InstIdBlendps_NameIndex = 159,
-  kX86InstIdBlendvpd_NameIndex = 167,
-  kX86InstIdBlendvps_NameIndex = 176,
-  kX86InstIdBlsi_NameIndex = 185,
-  kX86InstIdBlsmsk_NameIndex = 190,
-  kX86InstIdBlsr_NameIndex = 197,
-  kX86InstIdBsf_NameIndex = 202,
-  kX86InstIdBsr_NameIndex = 206,
-  kX86InstIdBswap_NameIndex = 210,
-  kX86InstIdBt_NameIndex = 216,
-  kX86InstIdBtc_NameIndex = 219,
-  kX86InstIdBtr_NameIndex = 223,
-  kX86InstIdBts_NameIndex = 227,
-  kX86InstIdBzhi_NameIndex = 231,
-  kX86InstIdCall_NameIndex = 236,
-  kX86InstIdCbw_NameIndex = 241,
-  kX86InstIdCdq_NameIndex = 245,
-  kX86InstIdCdqe_NameIndex = 249,
-  kX86InstIdClc_NameIndex = 254,
-  kX86InstIdCld_NameIndex = 258,
-  kX86InstIdClflush_NameIndex = 262,
-  kX86InstIdCmc_NameIndex = 270,
-  kX86InstIdCmova_NameIndex = 274,
-  kX86InstIdCmovae_NameIndex = 280,
-  kX86InstIdCmovb_NameIndex = 287,
-  kX86InstIdCmovbe_NameIndex = 293,
-  kX86InstIdCmovc_NameIndex = 300,
-  kX86InstIdCmove_NameIndex = 306,
-  kX86InstIdCmovg_NameIndex = 312,
-  kX86InstIdCmovge_NameIndex = 318,
-  kX86InstIdCmovl_NameIndex = 325,
-  kX86InstIdCmovle_NameIndex = 331,
-  kX86InstIdCmovna_NameIndex = 338,
-  kX86InstIdCmovnae_NameIndex = 345,
-  kX86InstIdCmovnb_NameIndex = 353,
-  kX86InstIdCmovnbe_NameIndex = 360,
-  kX86InstIdCmovnc_NameIndex = 368,
-  kX86InstIdCmovne_NameIndex = 375,
-  kX86InstIdCmovng_NameIndex = 382,
-  kX86InstIdCmovnge_NameIndex = 389,
-  kX86InstIdCmovnl_NameIndex = 397,
-  kX86InstIdCmovnle_NameIndex = 404,
-  kX86InstIdCmovno_NameIndex = 412,
-  kX86InstIdCmovnp_NameIndex = 419,
-  kX86InstIdCmovns_NameIndex = 426,
-  kX86InstIdCmovnz_NameIndex = 433,
-  kX86InstIdCmovo_NameIndex = 440,
-  kX86InstIdCmovp_NameIndex = 446,
-  kX86InstIdCmovpe_NameIndex = 452,
-  kX86InstIdCmovpo_NameIndex = 459,
-  kX86InstIdCmovs_NameIndex = 466,
-  kX86InstIdCmovz_NameIndex = 472,
-  kX86InstIdCmp_NameIndex = 478,
-  kX86InstIdCmppd_NameIndex = 482,
-  kX86InstIdCmpps_NameIndex = 488,
-  kX86InstIdCmpsB_NameIndex = 494,
-  kX86InstIdCmpsD_NameIndex = 501,
-  kX86InstIdCmpsQ_NameIndex = 508,
-  kX86InstIdCmpsW_NameIndex = 515,
-  kX86InstIdCmpsd_NameIndex = 522,
-  kX86InstIdCmpss_NameIndex = 528,
-  kX86InstIdCmpxchg_NameIndex = 534,
-  kX86InstIdCmpxchg16b_NameIndex = 542,
-  kX86InstIdCmpxchg8b_NameIndex = 553,
-  kX86InstIdComisd_NameIndex = 563,
-  kX86InstIdComiss_NameIndex = 570,
-  kX86InstIdCpuid_NameIndex = 577,
-  kX86InstIdCqo_NameIndex = 583,
-  kX86InstIdCrc32_NameIndex = 587,
-  kX86InstIdCvtdq2pd_NameIndex = 593,
-  kX86InstIdCvtdq2ps_NameIndex = 602,
-  kX86InstIdCvtpd2dq_NameIndex = 611,
-  kX86InstIdCvtpd2pi_NameIndex = 620,
-  kX86InstIdCvtpd2ps_NameIndex = 629,
-  kX86InstIdCvtpi2pd_NameIndex = 638,
-  kX86InstIdCvtpi2ps_NameIndex = 647,
-  kX86InstIdCvtps2dq_NameIndex = 656,
-  kX86InstIdCvtps2pd_NameIndex = 665,
-  kX86InstIdCvtps2pi_NameIndex = 674,
-  kX86InstIdCvtsd2si_NameIndex = 683,
-  kX86InstIdCvtsd2ss_NameIndex = 692,
-  kX86InstIdCvtsi2sd_NameIndex = 701,
-  kX86InstIdCvtsi2ss_NameIndex = 710,
-  kX86InstIdCvtss2sd_NameIndex = 719,
-  kX86InstIdCvtss2si_NameIndex = 728,
-  kX86InstIdCvttpd2dq_NameIndex = 737,
-  kX86InstIdCvttpd2pi_NameIndex = 747,
-  kX86InstIdCvttps2dq_NameIndex = 757,
-  kX86InstIdCvttps2pi_NameIndex = 767,
-  kX86InstIdCvttsd2si_NameIndex = 777,
-  kX86InstIdCvttss2si_NameIndex = 787,
-  kX86InstIdCwd_NameIndex = 797,
-  kX86InstIdCwde_NameIndex = 801,
-  kX86InstIdDaa_NameIndex = 806,
-  kX86InstIdDas_NameIndex = 810,
-  kX86InstIdDec_NameIndex = 814,
-  kX86InstIdDiv_NameIndex = 818,
-  kX86InstIdDivpd_NameIndex = 822,
-  kX86InstIdDivps_NameIndex = 828,
-  kX86InstIdDivsd_NameIndex = 834,
-  kX86InstIdDivss_NameIndex = 840,
-  kX86InstIdDppd_NameIndex = 846,
-  kX86InstIdDpps_NameIndex = 851,
-  kX86InstIdEmms_NameIndex = 856,
-  kX86InstIdEnter_NameIndex = 861,
-  kX86InstIdExtractps_NameIndex = 867,
-  kX86InstIdExtrq_NameIndex = 877,
-  kX86InstIdF2xm1_NameIndex = 883,
-  kX86InstIdFabs_NameIndex = 889,
-  kX86InstIdFadd_NameIndex = 894,
-  kX86InstIdFaddp_NameIndex = 899,
-  kX86InstIdFbld_NameIndex = 905,
-  kX86InstIdFbstp_NameIndex = 910,
-  kX86InstIdFchs_NameIndex = 916,
-  kX86InstIdFclex_NameIndex = 921,
-  kX86InstIdFcmovb_NameIndex = 927,
-  kX86InstIdFcmovbe_NameIndex = 934,
-  kX86InstIdFcmove_NameIndex = 942,
-  kX86InstIdFcmovnb_NameIndex = 949,
-  kX86InstIdFcmovnbe_NameIndex = 957,
-  kX86InstIdFcmovne_NameIndex = 966,
-  kX86InstIdFcmovnu_NameIndex = 974,
-  kX86InstIdFcmovu_NameIndex = 982,
-  kX86InstIdFcom_NameIndex = 989,
-  kX86InstIdFcomi_NameIndex = 994,
-  kX86InstIdFcomip_NameIndex = 1000,
-  kX86InstIdFcomp_NameIndex = 1007,
-  kX86InstIdFcompp_NameIndex = 1013,
-  kX86InstIdFcos_NameIndex = 1020,
-  kX86InstIdFdecstp_NameIndex = 1025,
-  kX86InstIdFdiv_NameIndex = 1033,
-  kX86InstIdFdivp_NameIndex = 1038,
-  kX86InstIdFdivr_NameIndex = 1044,
-  kX86InstIdFdivrp_NameIndex = 1050,
-  kX86InstIdFemms_NameIndex = 1057,
-  kX86InstIdFfree_NameIndex = 1063,
-  kX86InstIdFiadd_NameIndex = 1069,
-  kX86InstIdFicom_NameIndex = 1075,
-  kX86InstIdFicomp_NameIndex = 1081,
-  kX86InstIdFidiv_NameIndex = 1088,
-  kX86InstIdFidivr_NameIndex = 1094,
-  kX86InstIdFild_NameIndex = 1101,
-  kX86InstIdFimul_NameIndex = 1106,
-  kX86InstIdFincstp_NameIndex = 1112,
-  kX86InstIdFinit_NameIndex = 1120,
-  kX86InstIdFist_NameIndex = 1126,
-  kX86InstIdFistp_NameIndex = 1131,
-  kX86InstIdFisttp_NameIndex = 1137,
-  kX86InstIdFisub_NameIndex = 1144,
-  kX86InstIdFisubr_NameIndex = 1150,
-  kX86InstIdFld_NameIndex = 1157,
-  kX86InstIdFld1_NameIndex = 1161,
-  kX86InstIdFldcw_NameIndex = 1166,
-  kX86InstIdFldenv_NameIndex = 1172,
-  kX86InstIdFldl2e_NameIndex = 1179,
-  kX86InstIdFldl2t_NameIndex = 1186,
-  kX86InstIdFldlg2_NameIndex = 1193,
-  kX86InstIdFldln2_NameIndex = 1200,
-  kX86InstIdFldpi_NameIndex = 1207,
-  kX86InstIdFldz_NameIndex = 1213,
-  kX86InstIdFmul_NameIndex = 1218,
-  kX86InstIdFmulp_NameIndex = 1223,
-  kX86InstIdFnclex_NameIndex = 1229,
-  kX86InstIdFninit_NameIndex = 1236,
-  kX86InstIdFnop_NameIndex = 1243,
-  kX86InstIdFnsave_NameIndex = 1248,
-  kX86InstIdFnstcw_NameIndex = 1255,
-  kX86InstIdFnstenv_NameIndex = 1262,
-  kX86InstIdFnstsw_NameIndex = 1270,
-  kX86InstIdFpatan_NameIndex = 1277,
-  kX86InstIdFprem_NameIndex = 1284,
-  kX86InstIdFprem1_NameIndex = 1290,
-  kX86InstIdFptan_NameIndex = 1297,
-  kX86InstIdFrndint_NameIndex = 1303,
-  kX86InstIdFrstor_NameIndex = 1311,
-  kX86InstIdFsave_NameIndex = 1318,
-  kX86InstIdFscale_NameIndex = 1324,
-  kX86InstIdFsin_NameIndex = 1331,
-  kX86InstIdFsincos_NameIndex = 1336,
-  kX86InstIdFsqrt_NameIndex = 1344,
-  kX86InstIdFst_NameIndex = 1350,
-  kX86InstIdFstcw_NameIndex = 1354,
-  kX86InstIdFstenv_NameIndex = 1360,
-  kX86InstIdFstp_NameIndex = 1367,
-  kX86InstIdFstsw_NameIndex = 1372,
-  kX86InstIdFsub_NameIndex = 1378,
-  kX86InstIdFsubp_NameIndex = 1383,
-  kX86InstIdFsubr_NameIndex = 1389,
-  kX86InstIdFsubrp_NameIndex = 1395,
-  kX86InstIdFtst_NameIndex = 1402,
-  kX86InstIdFucom_NameIndex = 1407,
-  kX86InstIdFucomi_NameIndex = 1413,
-  kX86InstIdFucomip_NameIndex = 1420,
-  kX86InstIdFucomp_NameIndex = 1428,
-  kX86InstIdFucompp_NameIndex = 1435,
-  kX86InstIdFwait_NameIndex = 1443,
-  kX86InstIdFxam_NameIndex = 1449,
-  kX86InstIdFxch_NameIndex = 1454,
-  kX86InstIdFxrstor_NameIndex = 1459,
-  kX86InstIdFxsave_NameIndex = 1467,
-  kX86InstIdFxtract_NameIndex = 1474,
-  kX86InstIdFyl2x_NameIndex = 1482,
-  kX86InstIdFyl2xp1_NameIndex = 1488,
-  kX86InstIdHaddpd_NameIndex = 1496,
-  kX86InstIdHaddps_NameIndex = 1503,
-  kX86InstIdHsubpd_NameIndex = 1510,
-  kX86InstIdHsubps_NameIndex = 1517,
-  kX86InstIdIdiv_NameIndex = 1524,
-  kX86InstIdImul_NameIndex = 1529,
-  kX86InstIdInc_NameIndex = 1534,
-  kX86InstIdInsertps_NameIndex = 1538,
-  kX86InstIdInsertq_NameIndex = 1547,
-  kX86InstIdInt_NameIndex = 1555,
-  kX86InstIdJa_NameIndex = 1559,
-  kX86InstIdJae_NameIndex = 1562,
-  kX86InstIdJb_NameIndex = 1566,
-  kX86InstIdJbe_NameIndex = 1569,
-  kX86InstIdJc_NameIndex = 1573,
-  kX86InstIdJe_NameIndex = 1576,
-  kX86InstIdJg_NameIndex = 1579,
-  kX86InstIdJge_NameIndex = 1582,
-  kX86InstIdJl_NameIndex = 1586,
-  kX86InstIdJle_NameIndex = 1589,
-  kX86InstIdJna_NameIndex = 1593,
-  kX86InstIdJnae_NameIndex = 1597,
-  kX86InstIdJnb_NameIndex = 1602,
-  kX86InstIdJnbe_NameIndex = 1606,
-  kX86InstIdJnc_NameIndex = 1611,
-  kX86InstIdJne_NameIndex = 1615,
-  kX86InstIdJng_NameIndex = 1619,
-  kX86InstIdJnge_NameIndex = 1623,
-  kX86InstIdJnl_NameIndex = 1628,
-  kX86InstIdJnle_NameIndex = 1632,
-  kX86InstIdJno_NameIndex = 1637,
-  kX86InstIdJnp_NameIndex = 1641,
-  kX86InstIdJns_NameIndex = 1645,
-  kX86InstIdJnz_NameIndex = 1649,
-  kX86InstIdJo_NameIndex = 1653,
-  kX86InstIdJp_NameIndex = 1656,
-  kX86InstIdJpe_NameIndex = 1659,
-  kX86InstIdJpo_NameIndex = 1663,
-  kX86InstIdJs_NameIndex = 1667,
-  kX86InstIdJz_NameIndex = 1670,
-  kX86InstIdJecxz_NameIndex = 1673,
-  kX86InstIdJmp_NameIndex = 1679,
-  kX86InstIdLahf_NameIndex = 1683,
-  kX86InstIdLddqu_NameIndex = 1688,
-  kX86InstIdLdmxcsr_NameIndex = 1694,
-  kX86InstIdLea_NameIndex = 1702,
-  kX86InstIdLeave_NameIndex = 1706,
-  kX86InstIdLfence_NameIndex = 1712,
-  kX86InstIdLodsB_NameIndex = 1719,
-  kX86InstIdLodsD_NameIndex = 1726,
-  kX86InstIdLodsQ_NameIndex = 1733,
-  kX86InstIdLodsW_NameIndex = 1740,
-  kX86InstIdLzcnt_NameIndex = 1747,
-  kX86InstIdMaskmovdqu_NameIndex = 1753,
-  kX86InstIdMaskmovq_NameIndex = 1764,
-  kX86InstIdMaxpd_NameIndex = 1773,
-  kX86InstIdMaxps_NameIndex = 1779,
-  kX86InstIdMaxsd_NameIndex = 1785,
-  kX86InstIdMaxss_NameIndex = 1791,
-  kX86InstIdMfence_NameIndex = 1797,
-  kX86InstIdMinpd_NameIndex = 1804,
-  kX86InstIdMinps_NameIndex = 1810,
-  kX86InstIdMinsd_NameIndex = 1816,
-  kX86InstIdMinss_NameIndex = 1822,
-  kX86InstIdMonitor_NameIndex = 1828,
-  kX86InstIdMov_NameIndex = 1836,
-  kX86InstIdMovPtr_NameIndex = 1840,
-  kX86InstIdMovapd_NameIndex = 1848,
-  kX86InstIdMovaps_NameIndex = 1855,
-  kX86InstIdMovbe_NameIndex = 1862,
-  kX86InstIdMovd_NameIndex = 1868,
-  kX86InstIdMovddup_NameIndex = 1873,
-  kX86InstIdMovdq2q_NameIndex = 1881,
-  kX86InstIdMovdqa_NameIndex = 1889,
-  kX86InstIdMovdqu_NameIndex = 1896,
-  kX86InstIdMovhlps_NameIndex = 1903,
-  kX86InstIdMovhpd_NameIndex = 1911,
-  kX86InstIdMovhps_NameIndex = 1918,
-  kX86InstIdMovlhps_NameIndex = 1925,
-  kX86InstIdMovlpd_NameIndex = 1933,
-  kX86InstIdMovlps_NameIndex = 1940,
-  kX86InstIdMovmskpd_NameIndex = 1947,
-  kX86InstIdMovmskps_NameIndex = 1956,
-  kX86InstIdMovntdq_NameIndex = 1965,
-  kX86InstIdMovntdqa_NameIndex = 1973,
-  kX86InstIdMovnti_NameIndex = 1982,
-  kX86InstIdMovntpd_NameIndex = 1989,
-  kX86InstIdMovntps_NameIndex = 1997,
-  kX86InstIdMovntq_NameIndex = 2005,
-  kX86InstIdMovntsd_NameIndex = 2012,
-  kX86InstIdMovntss_NameIndex = 2020,
-  kX86InstIdMovq_NameIndex = 2028,
-  kX86InstIdMovq2dq_NameIndex = 2033,
-  kX86InstIdMovsB_NameIndex = 2041,
-  kX86InstIdMovsD_NameIndex = 2048,
-  kX86InstIdMovsQ_NameIndex = 2055,
-  kX86InstIdMovsW_NameIndex = 2062,
-  kX86InstIdMovsd_NameIndex = 2069,
-  kX86InstIdMovshdup_NameIndex = 2075,
-  kX86InstIdMovsldup_NameIndex = 2084,
-  kX86InstIdMovss_NameIndex = 2093,
-  kX86InstIdMovsx_NameIndex = 2099,
-  kX86InstIdMovsxd_NameIndex = 2105,
-  kX86InstIdMovupd_NameIndex = 2112,
-  kX86InstIdMovups_NameIndex = 2119,
-  kX86InstIdMovzx_NameIndex = 2126,
-  kX86InstIdMpsadbw_NameIndex = 2132,
-  kX86InstIdMul_NameIndex = 2140,
-  kX86InstIdMulpd_NameIndex = 2144,
-  kX86InstIdMulps_NameIndex = 2150,
-  kX86InstIdMulsd_NameIndex = 2156,
-  kX86InstIdMulss_NameIndex = 2162,
-  kX86InstIdMulx_NameIndex = 2168,
-  kX86InstIdMwait_NameIndex = 2173,
-  kX86InstIdNeg_NameIndex = 2179,
-  kX86InstIdNop_NameIndex = 2183,
-  kX86InstIdNot_NameIndex = 2187,
-  kX86InstIdOr_NameIndex = 2191,
-  kX86InstIdOrpd_NameIndex = 2194,
-  kX86InstIdOrps_NameIndex = 2199,
-  kX86InstIdPabsb_NameIndex = 2204,
-  kX86InstIdPabsd_NameIndex = 2210,
-  kX86InstIdPabsw_NameIndex = 2216,
-  kX86InstIdPackssdw_NameIndex = 2222,
-  kX86InstIdPacksswb_NameIndex = 2231,
-  kX86InstIdPackusdw_NameIndex = 2240,
-  kX86InstIdPackuswb_NameIndex = 2249,
-  kX86InstIdPaddb_NameIndex = 2258,
-  kX86InstIdPaddd_NameIndex = 2264,
-  kX86InstIdPaddq_NameIndex = 2270,
-  kX86InstIdPaddsb_NameIndex = 2276,
-  kX86InstIdPaddsw_NameIndex = 2283,
-  kX86InstIdPaddusb_NameIndex = 2290,
-  kX86InstIdPaddusw_NameIndex = 2298,
-  kX86InstIdPaddw_NameIndex = 2306,
-  kX86InstIdPalignr_NameIndex = 2312,
-  kX86InstIdPand_NameIndex = 2320,
-  kX86InstIdPandn_NameIndex = 2325,
-  kX86InstIdPause_NameIndex = 2331,
-  kX86InstIdPavgb_NameIndex = 2337,
-  kX86InstIdPavgw_NameIndex = 2343,
-  kX86InstIdPblendvb_NameIndex = 2349,
-  kX86InstIdPblendw_NameIndex = 2358,
-  kX86InstIdPclmulqdq_NameIndex = 2366,
-  kX86InstIdPcmpeqb_NameIndex = 2376,
-  kX86InstIdPcmpeqd_NameIndex = 2384,
-  kX86InstIdPcmpeqq_NameIndex = 2392,
-  kX86InstIdPcmpeqw_NameIndex = 2400,
-  kX86InstIdPcmpestri_NameIndex = 2408,
-  kX86InstIdPcmpestrm_NameIndex = 2418,
-  kX86InstIdPcmpgtb_NameIndex = 2428,
-  kX86InstIdPcmpgtd_NameIndex = 2436,
-  kX86InstIdPcmpgtq_NameIndex = 2444,
-  kX86InstIdPcmpgtw_NameIndex = 2452,
-  kX86InstIdPcmpistri_NameIndex = 2460,
-  kX86InstIdPcmpistrm_NameIndex = 2470,
-  kX86InstIdPdep_NameIndex = 2480,
-  kX86InstIdPext_NameIndex = 2485,
-  kX86InstIdPextrb_NameIndex = 2490,
-  kX86InstIdPextrd_NameIndex = 2497,
-  kX86InstIdPextrq_NameIndex = 2504,
-  kX86InstIdPextrw_NameIndex = 2511,
-  kX86InstIdPf2id_NameIndex = 2518,
-  kX86InstIdPf2iw_NameIndex = 2524,
-  kX86InstIdPfacc_NameIndex = 2530,
-  kX86InstIdPfadd_NameIndex = 2536,
-  kX86InstIdPfcmpeq_NameIndex = 2542,
-  kX86InstIdPfcmpge_NameIndex = 2550,
-  kX86InstIdPfcmpgt_NameIndex = 2558,
-  kX86InstIdPfmax_NameIndex = 2566,
-  kX86InstIdPfmin_NameIndex = 2572,
-  kX86InstIdPfmul_NameIndex = 2578,
-  kX86InstIdPfnacc_NameIndex = 2584,
-  kX86InstIdPfpnacc_NameIndex = 2591,
-  kX86InstIdPfrcp_NameIndex = 2599,
-  kX86InstIdPfrcpit1_NameIndex = 2605,
-  kX86InstIdPfrcpit2_NameIndex = 2614,
-  kX86InstIdPfrsqit1_NameIndex = 2623,
-  kX86InstIdPfrsqrt_NameIndex = 2632,
-  kX86InstIdPfsub_NameIndex = 2640,
-  kX86InstIdPfsubr_NameIndex = 2646,
-  kX86InstIdPhaddd_NameIndex = 2653,
-  kX86InstIdPhaddsw_NameIndex = 2660,
-  kX86InstIdPhaddw_NameIndex = 2668,
-  kX86InstIdPhminposuw_NameIndex = 2675,
-  kX86InstIdPhsubd_NameIndex = 2686,
-  kX86InstIdPhsubsw_NameIndex = 2693,
-  kX86InstIdPhsubw_NameIndex = 2701,
-  kX86InstIdPi2fd_NameIndex = 2708,
-  kX86InstIdPi2fw_NameIndex = 2714,
-  kX86InstIdPinsrb_NameIndex = 2720,
-  kX86InstIdPinsrd_NameIndex = 2727,
-  kX86InstIdPinsrq_NameIndex = 2734,
-  kX86InstIdPinsrw_NameIndex = 2741,
-  kX86InstIdPmaddubsw_NameIndex = 2748,
-  kX86InstIdPmaddwd_NameIndex = 2758,
-  kX86InstIdPmaxsb_NameIndex = 2766,
-  kX86InstIdPmaxsd_NameIndex = 2773,
-  kX86InstIdPmaxsw_NameIndex = 2780,
-  kX86InstIdPmaxub_NameIndex = 2787,
-  kX86InstIdPmaxud_NameIndex = 2794,
-  kX86InstIdPmaxuw_NameIndex = 2801,
-  kX86InstIdPminsb_NameIndex = 2808,
-  kX86InstIdPminsd_NameIndex = 2815,
-  kX86InstIdPminsw_NameIndex = 2822,
-  kX86InstIdPminub_NameIndex = 2829,
-  kX86InstIdPminud_NameIndex = 2836,
-  kX86InstIdPminuw_NameIndex = 2843,
-  kX86InstIdPmovmskb_NameIndex = 2850,
-  kX86InstIdPmovsxbd_NameIndex = 2859,
-  kX86InstIdPmovsxbq_NameIndex = 2868,
-  kX86InstIdPmovsxbw_NameIndex = 2877,
-  kX86InstIdPmovsxdq_NameIndex = 2886,
-  kX86InstIdPmovsxwd_NameIndex = 2895,
-  kX86InstIdPmovsxwq_NameIndex = 2904,
-  kX86InstIdPmovzxbd_NameIndex = 2913,
-  kX86InstIdPmovzxbq_NameIndex = 2922,
-  kX86InstIdPmovzxbw_NameIndex = 2931,
-  kX86InstIdPmovzxdq_NameIndex = 2940,
-  kX86InstIdPmovzxwd_NameIndex = 2949,
-  kX86InstIdPmovzxwq_NameIndex = 2958,
-  kX86InstIdPmuldq_NameIndex = 2967,
-  kX86InstIdPmulhrsw_NameIndex = 2974,
-  kX86InstIdPmulhuw_NameIndex = 2983,
-  kX86InstIdPmulhw_NameIndex = 2991,
-  kX86InstIdPmulld_NameIndex = 2998,
-  kX86InstIdPmullw_NameIndex = 3005,
-  kX86InstIdPmuludq_NameIndex = 3012,
-  kX86InstIdPop_NameIndex = 3020,
-  kX86InstIdPopa_NameIndex = 3024,
-  kX86InstIdPopcnt_NameIndex = 3029,
-  kX86InstIdPopf_NameIndex = 3036,
-  kX86InstIdPor_NameIndex = 3041,
-  kX86InstIdPrefetch_NameIndex = 3045,
-  kX86InstIdPrefetch3dNow_NameIndex = 3054,
-  kX86InstIdPrefetchw3dNow_NameIndex = 3069,
-  kX86InstIdPsadbw_NameIndex = 3085,
-  kX86InstIdPshufb_NameIndex = 3092,
-  kX86InstIdPshufd_NameIndex = 3099,
-  kX86InstIdPshufhw_NameIndex = 3106,
-  kX86InstIdPshuflw_NameIndex = 3114,
-  kX86InstIdPshufw_NameIndex = 3122,
-  kX86InstIdPsignb_NameIndex = 3129,
-  kX86InstIdPsignd_NameIndex = 3136,
-  kX86InstIdPsignw_NameIndex = 3143,
-  kX86InstIdPslld_NameIndex = 3150,
-  kX86InstIdPslldq_NameIndex = 3156,
-  kX86InstIdPsllq_NameIndex = 3163,
-  kX86InstIdPsllw_NameIndex = 3169,
-  kX86InstIdPsrad_NameIndex = 3175,
-  kX86InstIdPsraw_NameIndex = 3181,
-  kX86InstIdPsrld_NameIndex = 3187,
-  kX86InstIdPsrldq_NameIndex = 3193,
-  kX86InstIdPsrlq_NameIndex = 3200,
-  kX86InstIdPsrlw_NameIndex = 3206,
-  kX86InstIdPsubb_NameIndex = 3212,
-  kX86InstIdPsubd_NameIndex = 3218,
-  kX86InstIdPsubq_NameIndex = 3224,
-  kX86InstIdPsubsb_NameIndex = 3230,
-  kX86InstIdPsubsw_NameIndex = 3237,
-  kX86InstIdPsubusb_NameIndex = 3244,
-  kX86InstIdPsubusw_NameIndex = 3252,
-  kX86InstIdPsubw_NameIndex = 3260,
-  kX86InstIdPswapd_NameIndex = 3266,
-  kX86InstIdPtest_NameIndex = 3273,
-  kX86InstIdPunpckhbw_NameIndex = 3279,
-  kX86InstIdPunpckhdq_NameIndex = 3289,
-  kX86InstIdPunpckhqdq_NameIndex = 3299,
-  kX86InstIdPunpckhwd_NameIndex = 3310,
-  kX86InstIdPunpcklbw_NameIndex = 3320,
-  kX86InstIdPunpckldq_NameIndex = 3330,
-  kX86InstIdPunpcklqdq_NameIndex = 3340,
-  kX86InstIdPunpcklwd_NameIndex = 3351,
-  kX86InstIdPush_NameIndex = 3361,
-  kX86InstIdPusha_NameIndex = 3366,
-  kX86InstIdPushf_NameIndex = 3372,
-  kX86InstIdPxor_NameIndex = 3378,
-  kX86InstIdRcl_NameIndex = 3383,
-  kX86InstIdRcpps_NameIndex = 3387,
-  kX86InstIdRcpss_NameIndex = 3393,
-  kX86InstIdRcr_NameIndex = 3399,
-  kX86InstIdRdfsbase_NameIndex = 3403,
-  kX86InstIdRdgsbase_NameIndex = 3412,
-  kX86InstIdRdrand_NameIndex = 3421,
-  kX86InstIdRdtsc_NameIndex = 3428,
-  kX86InstIdRdtscp_NameIndex = 3434,
-  kX86InstIdRepLodsB_NameIndex = 3441,
-  kX86InstIdRepLodsD_NameIndex = 3452,
-  kX86InstIdRepLodsQ_NameIndex = 3463,
-  kX86InstIdRepLodsW_NameIndex = 3474,
-  kX86InstIdRepMovsB_NameIndex = 3485,
-  kX86InstIdRepMovsD_NameIndex = 3496,
-  kX86InstIdRepMovsQ_NameIndex = 3507,
-  kX86InstIdRepMovsW_NameIndex = 3518,
-  kX86InstIdRepStosB_NameIndex = 3529,
-  kX86InstIdRepStosD_NameIndex = 3540,
-  kX86InstIdRepStosQ_NameIndex = 3551,
-  kX86InstIdRepStosW_NameIndex = 3562,
-  kX86InstIdRepeCmpsB_NameIndex = 3573,
-  kX86InstIdRepeCmpsD_NameIndex = 3585,
-  kX86InstIdRepeCmpsQ_NameIndex = 3597,
-  kX86InstIdRepeCmpsW_NameIndex = 3609,
-  kX86InstIdRepeScasB_NameIndex = 3621,
-  kX86InstIdRepeScasD_NameIndex = 3633,
-  kX86InstIdRepeScasQ_NameIndex = 3645,
-  kX86InstIdRepeScasW_NameIndex = 3657,
-  kX86InstIdRepneCmpsB_NameIndex = 3669,
-  kX86InstIdRepneCmpsD_NameIndex = 3682,
-  kX86InstIdRepneCmpsQ_NameIndex = 3695,
-  kX86InstIdRepneCmpsW_NameIndex = 3708,
-  kX86InstIdRepneScasB_NameIndex = 3721,
-  kX86InstIdRepneScasD_NameIndex = 3734,
-  kX86InstIdRepneScasQ_NameIndex = 3747,
-  kX86InstIdRepneScasW_NameIndex = 3760,
-  kX86InstIdRet_NameIndex = 3773,
-  kX86InstIdRol_NameIndex = 3777,
-  kX86InstIdRor_NameIndex = 3781,
-  kX86InstIdRorx_NameIndex = 3785,
-  kX86InstIdRoundpd_NameIndex = 3790,
-  kX86InstIdRoundps_NameIndex = 3798,
-  kX86InstIdRoundsd_NameIndex = 3806,
-  kX86InstIdRoundss_NameIndex = 3814,
-  kX86InstIdRsqrtps_NameIndex = 3822,
-  kX86InstIdRsqrtss_NameIndex = 3830,
-  kX86InstIdSahf_NameIndex = 3838,
-  kX86InstIdSal_NameIndex = 3843,
-  kX86InstIdSar_NameIndex = 3847,
-  kX86InstIdSarx_NameIndex = 3851,
-  kX86InstIdSbb_NameIndex = 3856,
-  kX86InstIdScasB_NameIndex = 3860,
-  kX86InstIdScasD_NameIndex = 3867,
-  kX86InstIdScasQ_NameIndex = 3874,
-  kX86InstIdScasW_NameIndex = 3881,
-  kX86InstIdSeta_NameIndex = 3888,
-  kX86InstIdSetae_NameIndex = 3893,
-  kX86InstIdSetb_NameIndex = 3899,
-  kX86InstIdSetbe_NameIndex = 3904,
-  kX86InstIdSetc_NameIndex = 3910,
-  kX86InstIdSete_NameIndex = 3915,
-  kX86InstIdSetg_NameIndex = 3920,
-  kX86InstIdSetge_NameIndex = 3925,
-  kX86InstIdSetl_NameIndex = 3931,
-  kX86InstIdSetle_NameIndex = 3936,
-  kX86InstIdSetna_NameIndex = 3942,
-  kX86InstIdSetnae_NameIndex = 3948,
-  kX86InstIdSetnb_NameIndex = 3955,
-  kX86InstIdSetnbe_NameIndex = 3961,
-  kX86InstIdSetnc_NameIndex = 3968,
-  kX86InstIdSetne_NameIndex = 3974,
-  kX86InstIdSetng_NameIndex = 3980,
-  kX86InstIdSetnge_NameIndex = 3986,
-  kX86InstIdSetnl_NameIndex = 3993,
-  kX86InstIdSetnle_NameIndex = 3999,
-  kX86InstIdSetno_NameIndex = 4006,
-  kX86InstIdSetnp_NameIndex = 4012,
-  kX86InstIdSetns_NameIndex = 4018,
-  kX86InstIdSetnz_NameIndex = 4024,
-  kX86InstIdSeto_NameIndex = 4030,
-  kX86InstIdSetp_NameIndex = 4035,
-  kX86InstIdSetpe_NameIndex = 4040,
-  kX86InstIdSetpo_NameIndex = 4046,
-  kX86InstIdSets_NameIndex = 4052,
-  kX86InstIdSetz_NameIndex = 4057,
-  kX86InstIdSfence_NameIndex = 4062,
-  kX86InstIdShl_NameIndex = 4069,
-  kX86InstIdShld_NameIndex = 4073,
-  kX86InstIdShlx_NameIndex = 4078,
-  kX86InstIdShr_NameIndex = 4083,
-  kX86InstIdShrd_NameIndex = 4087,
-  kX86InstIdShrx_NameIndex = 4092,
-  kX86InstIdShufpd_NameIndex = 4097,
-  kX86InstIdShufps_NameIndex = 4104,
-  kX86InstIdSqrtpd_NameIndex = 4111,
-  kX86InstIdSqrtps_NameIndex = 4118,
-  kX86InstIdSqrtsd_NameIndex = 4125,
-  kX86InstIdSqrtss_NameIndex = 4132,
-  kX86InstIdStc_NameIndex = 4139,
-  kX86InstIdStd_NameIndex = 4143,
-  kX86InstIdStmxcsr_NameIndex = 4147,
-  kX86InstIdStosB_NameIndex = 4155,
-  kX86InstIdStosD_NameIndex = 4162,
-  kX86InstIdStosQ_NameIndex = 4169,
-  kX86InstIdStosW_NameIndex = 4176,
-  kX86InstIdSub_NameIndex = 4183,
-  kX86InstIdSubpd_NameIndex = 4187,
-  kX86InstIdSubps_NameIndex = 4193,
-  kX86InstIdSubsd_NameIndex = 4199,
-  kX86InstIdSubss_NameIndex = 4205,
-  kX86InstIdTest_NameIndex = 4211,
-  kX86InstIdTzcnt_NameIndex = 4216,
-  kX86InstIdUcomisd_NameIndex = 4222,
-  kX86InstIdUcomiss_NameIndex = 4230,
-  kX86InstIdUd2_NameIndex = 4238,
-  kX86InstIdUnpckhpd_NameIndex = 4242,
-  kX86InstIdUnpckhps_NameIndex = 4251,
-  kX86InstIdUnpcklpd_NameIndex = 4260,
-  kX86InstIdUnpcklps_NameIndex = 4269,
-  kX86InstIdVaddpd_NameIndex = 4278,
-  kX86InstIdVaddps_NameIndex = 4285,
-  kX86InstIdVaddsd_NameIndex = 4292,
-  kX86InstIdVaddss_NameIndex = 4299,
-  kX86InstIdVaddsubpd_NameIndex = 4306,
-  kX86InstIdVaddsubps_NameIndex = 4316,
-  kX86InstIdVaesdec_NameIndex = 4326,
-  kX86InstIdVaesdeclast_NameIndex = 4334,
-  kX86InstIdVaesenc_NameIndex = 4346,
-  kX86InstIdVaesenclast_NameIndex = 4354,
-  kX86InstIdVaesimc_NameIndex = 4366,
-  kX86InstIdVaeskeygenassist_NameIndex = 4374,
-  kX86InstIdVandnpd_NameIndex = 4391,
-  kX86InstIdVandnps_NameIndex = 4399,
-  kX86InstIdVandpd_NameIndex = 4407,
-  kX86InstIdVandps_NameIndex = 4414,
-  kX86InstIdVblendpd_NameIndex = 4421,
-  kX86InstIdVblendps_NameIndex = 4430,
-  kX86InstIdVblendvpd_NameIndex = 4439,
-  kX86InstIdVblendvps_NameIndex = 4449,
-  kX86InstIdVbroadcastf128_NameIndex = 4459,
-  kX86InstIdVbroadcasti128_NameIndex = 4474,
-  kX86InstIdVbroadcastsd_NameIndex = 4489,
-  kX86InstIdVbroadcastss_NameIndex = 4502,
-  kX86InstIdVcmppd_NameIndex = 4515,
-  kX86InstIdVcmpps_NameIndex = 4522,
-  kX86InstIdVcmpsd_NameIndex = 4529,
-  kX86InstIdVcmpss_NameIndex = 4536,
-  kX86InstIdVcomisd_NameIndex = 4543,
-  kX86InstIdVcomiss_NameIndex = 4551,
-  kX86InstIdVcvtdq2pd_NameIndex = 4559,
-  kX86InstIdVcvtdq2ps_NameIndex = 4569,
-  kX86InstIdVcvtpd2dq_NameIndex = 4579,
-  kX86InstIdVcvtpd2ps_NameIndex = 4589,
-  kX86InstIdVcvtph2ps_NameIndex = 4599,
-  kX86InstIdVcvtps2dq_NameIndex = 4609,
-  kX86InstIdVcvtps2pd_NameIndex = 4619,
-  kX86InstIdVcvtps2ph_NameIndex = 4629,
-  kX86InstIdVcvtsd2si_NameIndex = 4639,
-  kX86InstIdVcvtsd2ss_NameIndex = 4649,
-  kX86InstIdVcvtsi2sd_NameIndex = 4659,
-  kX86InstIdVcvtsi2ss_NameIndex = 4669,
-  kX86InstIdVcvtss2sd_NameIndex = 4679,
-  kX86InstIdVcvtss2si_NameIndex = 4689,
-  kX86InstIdVcvttpd2dq_NameIndex = 4699,
-  kX86InstIdVcvttps2dq_NameIndex = 4710,
-  kX86InstIdVcvttsd2si_NameIndex = 4721,
-  kX86InstIdVcvttss2si_NameIndex = 4732,
-  kX86InstIdVdivpd_NameIndex = 4743,
-  kX86InstIdVdivps_NameIndex = 4750,
-  kX86InstIdVdivsd_NameIndex = 4757,
-  kX86InstIdVdivss_NameIndex = 4764,
-  kX86InstIdVdppd_NameIndex = 4771,
-  kX86InstIdVdpps_NameIndex = 4777,
-  kX86InstIdVextractf128_NameIndex = 4783,
-  kX86InstIdVextracti128_NameIndex = 4796,
-  kX86InstIdVextractps_NameIndex = 4809,
-  kX86InstIdVfmadd132pd_NameIndex = 4820,
-  kX86InstIdVfmadd132ps_NameIndex = 4832,
-  kX86InstIdVfmadd132sd_NameIndex = 4844,
-  kX86InstIdVfmadd132ss_NameIndex = 4856,
-  kX86InstIdVfmadd213pd_NameIndex = 4868,
-  kX86InstIdVfmadd213ps_NameIndex = 4880,
-  kX86InstIdVfmadd213sd_NameIndex = 4892,
-  kX86InstIdVfmadd213ss_NameIndex = 4904,
-  kX86InstIdVfmadd231pd_NameIndex = 4916,
-  kX86InstIdVfmadd231ps_NameIndex = 4928,
-  kX86InstIdVfmadd231sd_NameIndex = 4940,
-  kX86InstIdVfmadd231ss_NameIndex = 4952,
-  kX86InstIdVfmaddpd_NameIndex = 4964,
-  kX86InstIdVfmaddps_NameIndex = 4973,
-  kX86InstIdVfmaddsd_NameIndex = 4982,
-  kX86InstIdVfmaddss_NameIndex = 4991,
-  kX86InstIdVfmaddsub132pd_NameIndex = 5000,
-  kX86InstIdVfmaddsub132ps_NameIndex = 5015,
-  kX86InstIdVfmaddsub213pd_NameIndex = 5030,
-  kX86InstIdVfmaddsub213ps_NameIndex = 5045,
-  kX86InstIdVfmaddsub231pd_NameIndex = 5060,
-  kX86InstIdVfmaddsub231ps_NameIndex = 5075,
-  kX86InstIdVfmaddsubpd_NameIndex = 5090,
-  kX86InstIdVfmaddsubps_NameIndex = 5102,
-  kX86InstIdVfmsub132pd_NameIndex = 5114,
-  kX86InstIdVfmsub132ps_NameIndex = 5126,
-  kX86InstIdVfmsub132sd_NameIndex = 5138,
-  kX86InstIdVfmsub132ss_NameIndex = 5150,
-  kX86InstIdVfmsub213pd_NameIndex = 5162,
-  kX86InstIdVfmsub213ps_NameIndex = 5174,
-  kX86InstIdVfmsub213sd_NameIndex = 5186,
-  kX86InstIdVfmsub213ss_NameIndex = 5198,
-  kX86InstIdVfmsub231pd_NameIndex = 5210,
-  kX86InstIdVfmsub231ps_NameIndex = 5222,
-  kX86InstIdVfmsub231sd_NameIndex = 5234,
-  kX86InstIdVfmsub231ss_NameIndex = 5246,
-  kX86InstIdVfmsubadd132pd_NameIndex = 5258,
-  kX86InstIdVfmsubadd132ps_NameIndex = 5273,
-  kX86InstIdVfmsubadd213pd_NameIndex = 5288,
-  kX86InstIdVfmsubadd213ps_NameIndex = 5303,
-  kX86InstIdVfmsubadd231pd_NameIndex = 5318,
-  kX86InstIdVfmsubadd231ps_NameIndex = 5333,
-  kX86InstIdVfmsubaddpd_NameIndex = 5348,
-  kX86InstIdVfmsubaddps_NameIndex = 5360,
-  kX86InstIdVfmsubpd_NameIndex = 5372,
-  kX86InstIdVfmsubps_NameIndex = 5381,
-  kX86InstIdVfmsubsd_NameIndex = 5390,
-  kX86InstIdVfmsubss_NameIndex = 5399,
-  kX86InstIdVfnmadd132pd_NameIndex = 5408,
-  kX86InstIdVfnmadd132ps_NameIndex = 5421,
-  kX86InstIdVfnmadd132sd_NameIndex = 5434,
-  kX86InstIdVfnmadd132ss_NameIndex = 5447,
-  kX86InstIdVfnmadd213pd_NameIndex = 5460,
-  kX86InstIdVfnmadd213ps_NameIndex = 5473,
-  kX86InstIdVfnmadd213sd_NameIndex = 5486,
-  kX86InstIdVfnmadd213ss_NameIndex = 5499,
-  kX86InstIdVfnmadd231pd_NameIndex = 5512,
-  kX86InstIdVfnmadd231ps_NameIndex = 5525,
-  kX86InstIdVfnmadd231sd_NameIndex = 5538,
-  kX86InstIdVfnmadd231ss_NameIndex = 5551,
-  kX86InstIdVfnmaddpd_NameIndex = 5564,
-  kX86InstIdVfnmaddps_NameIndex = 5574,
-  kX86InstIdVfnmaddsd_NameIndex = 5584,
-  kX86InstIdVfnmaddss_NameIndex = 5594,
-  kX86InstIdVfnmsub132pd_NameIndex = 5604,
-  kX86InstIdVfnmsub132ps_NameIndex = 5617,
-  kX86InstIdVfnmsub132sd_NameIndex = 5630,
-  kX86InstIdVfnmsub132ss_NameIndex = 5643,
-  kX86InstIdVfnmsub213pd_NameIndex = 5656,
-  kX86InstIdVfnmsub213ps_NameIndex = 5669,
-  kX86InstIdVfnmsub213sd_NameIndex = 5682,
-  kX86InstIdVfnmsub213ss_NameIndex = 5695,
-  kX86InstIdVfnmsub231pd_NameIndex = 5708,
-  kX86InstIdVfnmsub231ps_NameIndex = 5721,
-  kX86InstIdVfnmsub231sd_NameIndex = 5734,
-  kX86InstIdVfnmsub231ss_NameIndex = 5747,
-  kX86InstIdVfnmsubpd_NameIndex = 5760,
-  kX86InstIdVfnmsubps_NameIndex = 5770,
-  kX86InstIdVfnmsubsd_NameIndex = 5780,
-  kX86InstIdVfnmsubss_NameIndex = 5790,
-  kX86InstIdVfrczpd_NameIndex = 5800,
-  kX86InstIdVfrczps_NameIndex = 5808,
-  kX86InstIdVfrczsd_NameIndex = 5816,
-  kX86InstIdVfrczss_NameIndex = 5824,
-  kX86InstIdVgatherdpd_NameIndex = 5832,
-  kX86InstIdVgatherdps_NameIndex = 5843,
-  kX86InstIdVgatherqpd_NameIndex = 5854,
-  kX86InstIdVgatherqps_NameIndex = 5865,
-  kX86InstIdVhaddpd_NameIndex = 5876,
-  kX86InstIdVhaddps_NameIndex = 5884,
-  kX86InstIdVhsubpd_NameIndex = 5892,
-  kX86InstIdVhsubps_NameIndex = 5900,
-  kX86InstIdVinsertf128_NameIndex = 5908,
-  kX86InstIdVinserti128_NameIndex = 5920,
-  kX86InstIdVinsertps_NameIndex = 5932,
-  kX86InstIdVlddqu_NameIndex = 5942,
-  kX86InstIdVldmxcsr_NameIndex = 5949,
-  kX86InstIdVmaskmovdqu_NameIndex = 5958,
-  kX86InstIdVmaskmovpd_NameIndex = 5970,
-  kX86InstIdVmaskmovps_NameIndex = 5981,
-  kX86InstIdVmaxpd_NameIndex = 5992,
-  kX86InstIdVmaxps_NameIndex = 5999,
-  kX86InstIdVmaxsd_NameIndex = 6006,
-  kX86InstIdVmaxss_NameIndex = 6013,
-  kX86InstIdVminpd_NameIndex = 6020,
-  kX86InstIdVminps_NameIndex = 6027,
-  kX86InstIdVminsd_NameIndex = 6034,
-  kX86InstIdVminss_NameIndex = 6041,
-  kX86InstIdVmovapd_NameIndex = 6048,
-  kX86InstIdVmovaps_NameIndex = 6056,
-  kX86InstIdVmovd_NameIndex = 6064,
-  kX86InstIdVmovddup_NameIndex = 6070,
-  kX86InstIdVmovdqa_NameIndex = 6079,
-  kX86InstIdVmovdqu_NameIndex = 6087,
-  kX86InstIdVmovhlps_NameIndex = 6095,
-  kX86InstIdVmovhpd_NameIndex = 6104,
-  kX86InstIdVmovhps_NameIndex = 6112,
-  kX86InstIdVmovlhps_NameIndex = 6120,
-  kX86InstIdVmovlpd_NameIndex = 6129,
-  kX86InstIdVmovlps_NameIndex = 6137,
-  kX86InstIdVmovmskpd_NameIndex = 6145,
-  kX86InstIdVmovmskps_NameIndex = 6155,
-  kX86InstIdVmovntdq_NameIndex = 6165,
-  kX86InstIdVmovntdqa_NameIndex = 6174,
-  kX86InstIdVmovntpd_NameIndex = 6184,
-  kX86InstIdVmovntps_NameIndex = 6193,
-  kX86InstIdVmovq_NameIndex = 6202,
-  kX86InstIdVmovsd_NameIndex = 6208,
-  kX86InstIdVmovshdup_NameIndex = 6215,
-  kX86InstIdVmovsldup_NameIndex = 6225,
-  kX86InstIdVmovss_NameIndex = 6235,
-  kX86InstIdVmovupd_NameIndex = 6242,
-  kX86InstIdVmovups_NameIndex = 6250,
-  kX86InstIdVmpsadbw_NameIndex = 6258,
-  kX86InstIdVmulpd_NameIndex = 6267,
-  kX86InstIdVmulps_NameIndex = 6274,
-  kX86InstIdVmulsd_NameIndex = 6281,
-  kX86InstIdVmulss_NameIndex = 6288,
-  kX86InstIdVorpd_NameIndex = 6295,
-  kX86InstIdVorps_NameIndex = 6301,
-  kX86InstIdVpabsb_NameIndex = 6307,
-  kX86InstIdVpabsd_NameIndex = 6314,
-  kX86InstIdVpabsw_NameIndex = 6321,
-  kX86InstIdVpackssdw_NameIndex = 6328,
-  kX86InstIdVpacksswb_NameIndex = 6338,
-  kX86InstIdVpackusdw_NameIndex = 6348,
-  kX86InstIdVpackuswb_NameIndex = 6358,
-  kX86InstIdVpaddb_NameIndex = 6368,
-  kX86InstIdVpaddd_NameIndex = 6375,
-  kX86InstIdVpaddq_NameIndex = 6382,
-  kX86InstIdVpaddsb_NameIndex = 6389,
-  kX86InstIdVpaddsw_NameIndex = 6397,
-  kX86InstIdVpaddusb_NameIndex = 6405,
-  kX86InstIdVpaddusw_NameIndex = 6414,
-  kX86InstIdVpaddw_NameIndex = 6423,
-  kX86InstIdVpalignr_NameIndex = 6430,
-  kX86InstIdVpand_NameIndex = 6439,
-  kX86InstIdVpandn_NameIndex = 6445,
-  kX86InstIdVpavgb_NameIndex = 6452,
-  kX86InstIdVpavgw_NameIndex = 6459,
-  kX86InstIdVpblendd_NameIndex = 6466,
-  kX86InstIdVpblendvb_NameIndex = 6475,
-  kX86InstIdVpblendw_NameIndex = 6485,
-  kX86InstIdVpbroadcastb_NameIndex = 6494,
-  kX86InstIdVpbroadcastd_NameIndex = 6507,
-  kX86InstIdVpbroadcastq_NameIndex = 6520,
-  kX86InstIdVpbroadcastw_NameIndex = 6533,
-  kX86InstIdVpclmulqdq_NameIndex = 6546,
-  kX86InstIdVpcmov_NameIndex = 6557,
-  kX86InstIdVpcmpeqb_NameIndex = 6564,
-  kX86InstIdVpcmpeqd_NameIndex = 6573,
-  kX86InstIdVpcmpeqq_NameIndex = 6582,
-  kX86InstIdVpcmpeqw_NameIndex = 6591,
-  kX86InstIdVpcmpestri_NameIndex = 6600,
-  kX86InstIdVpcmpestrm_NameIndex = 6611,
-  kX86InstIdVpcmpgtb_NameIndex = 6622,
-  kX86InstIdVpcmpgtd_NameIndex = 6631,
-  kX86InstIdVpcmpgtq_NameIndex = 6640,
-  kX86InstIdVpcmpgtw_NameIndex = 6649,
-  kX86InstIdVpcmpistri_NameIndex = 6658,
-  kX86InstIdVpcmpistrm_NameIndex = 6669,
-  kX86InstIdVpcomb_NameIndex = 6680,
-  kX86InstIdVpcomd_NameIndex = 6687,
-  kX86InstIdVpcomq_NameIndex = 6694,
-  kX86InstIdVpcomub_NameIndex = 6701,
-  kX86InstIdVpcomud_NameIndex = 6709,
-  kX86InstIdVpcomuq_NameIndex = 6717,
-  kX86InstIdVpcomuw_NameIndex = 6725,
-  kX86InstIdVpcomw_NameIndex = 6733,
-  kX86InstIdVperm2f128_NameIndex = 6740,
-  kX86InstIdVperm2i128_NameIndex = 6751,
-  kX86InstIdVpermd_NameIndex = 6762,
-  kX86InstIdVpermil2pd_NameIndex = 6769,
-  kX86InstIdVpermil2ps_NameIndex = 6780,
-  kX86InstIdVpermilpd_NameIndex = 6791,
-  kX86InstIdVpermilps_NameIndex = 6801,
-  kX86InstIdVpermpd_NameIndex = 6811,
-  kX86InstIdVpermps_NameIndex = 6819,
-  kX86InstIdVpermq_NameIndex = 6827,
-  kX86InstIdVpextrb_NameIndex = 6834,
-  kX86InstIdVpextrd_NameIndex = 6842,
-  kX86InstIdVpextrq_NameIndex = 6850,
-  kX86InstIdVpextrw_NameIndex = 6858,
-  kX86InstIdVpgatherdd_NameIndex = 6866,
-  kX86InstIdVpgatherdq_NameIndex = 6877,
-  kX86InstIdVpgatherqd_NameIndex = 6888,
-  kX86InstIdVpgatherqq_NameIndex = 6899,
-  kX86InstIdVphaddbd_NameIndex = 6910,
-  kX86InstIdVphaddbq_NameIndex = 6919,
-  kX86InstIdVphaddbw_NameIndex = 6928,
-  kX86InstIdVphaddd_NameIndex = 6937,
-  kX86InstIdVphadddq_NameIndex = 6945,
-  kX86InstIdVphaddsw_NameIndex = 6954,
-  kX86InstIdVphaddubd_NameIndex = 6963,
-  kX86InstIdVphaddubq_NameIndex = 6973,
-  kX86InstIdVphaddubw_NameIndex = 6983,
-  kX86InstIdVphaddudq_NameIndex = 6993,
-  kX86InstIdVphadduwd_NameIndex = 7003,
-  kX86InstIdVphadduwq_NameIndex = 7013,
-  kX86InstIdVphaddw_NameIndex = 7023,
-  kX86InstIdVphaddwd_NameIndex = 7031,
-  kX86InstIdVphaddwq_NameIndex = 7040,
-  kX86InstIdVphminposuw_NameIndex = 7049,
-  kX86InstIdVphsubbw_NameIndex = 7061,
-  kX86InstIdVphsubd_NameIndex = 7070,
-  kX86InstIdVphsubdq_NameIndex = 7078,
-  kX86InstIdVphsubsw_NameIndex = 7087,
-  kX86InstIdVphsubw_NameIndex = 7096,
-  kX86InstIdVphsubwd_NameIndex = 7104,
-  kX86InstIdVpinsrb_NameIndex = 7113,
-  kX86InstIdVpinsrd_NameIndex = 7121,
-  kX86InstIdVpinsrq_NameIndex = 7129,
-  kX86InstIdVpinsrw_NameIndex = 7137,
-  kX86InstIdVpmacsdd_NameIndex = 7145,
-  kX86InstIdVpmacsdqh_NameIndex = 7154,
-  kX86InstIdVpmacsdql_NameIndex = 7164,
-  kX86InstIdVpmacssdd_NameIndex = 7174,
-  kX86InstIdVpmacssdqh_NameIndex = 7184,
-  kX86InstIdVpmacssdql_NameIndex = 7195,
-  kX86InstIdVpmacsswd_NameIndex = 7206,
-  kX86InstIdVpmacssww_NameIndex = 7216,
-  kX86InstIdVpmacswd_NameIndex = 7226,
-  kX86InstIdVpmacsww_NameIndex = 7235,
-  kX86InstIdVpmadcsswd_NameIndex = 7244,
-  kX86InstIdVpmadcswd_NameIndex = 7255,
-  kX86InstIdVpmaddubsw_NameIndex = 7265,
-  kX86InstIdVpmaddwd_NameIndex = 7276,
-  kX86InstIdVpmaskmovd_NameIndex = 7285,
-  kX86InstIdVpmaskmovq_NameIndex = 7296,
-  kX86InstIdVpmaxsb_NameIndex = 7307,
-  kX86InstIdVpmaxsd_NameIndex = 7315,
-  kX86InstIdVpmaxsw_NameIndex = 7323,
-  kX86InstIdVpmaxub_NameIndex = 7331,
-  kX86InstIdVpmaxud_NameIndex = 7339,
-  kX86InstIdVpmaxuw_NameIndex = 7347,
-  kX86InstIdVpminsb_NameIndex = 7355,
-  kX86InstIdVpminsd_NameIndex = 7363,
-  kX86InstIdVpminsw_NameIndex = 7371,
-  kX86InstIdVpminub_NameIndex = 7379,
-  kX86InstIdVpminud_NameIndex = 7387,
-  kX86InstIdVpminuw_NameIndex = 7395,
-  kX86InstIdVpmovmskb_NameIndex = 7403,
-  kX86InstIdVpmovsxbd_NameIndex = 7413,
-  kX86InstIdVpmovsxbq_NameIndex = 7423,
-  kX86InstIdVpmovsxbw_NameIndex = 7433,
-  kX86InstIdVpmovsxdq_NameIndex = 7443,
-  kX86InstIdVpmovsxwd_NameIndex = 7453,
-  kX86InstIdVpmovsxwq_NameIndex = 7463,
-  kX86InstIdVpmovzxbd_NameIndex = 7473,
-  kX86InstIdVpmovzxbq_NameIndex = 7483,
-  kX86InstIdVpmovzxbw_NameIndex = 7493,
-  kX86InstIdVpmovzxdq_NameIndex = 7503,
-  kX86InstIdVpmovzxwd_NameIndex = 7513,
-  kX86InstIdVpmovzxwq_NameIndex = 7523,
-  kX86InstIdVpmuldq_NameIndex = 7533,
-  kX86InstIdVpmulhrsw_NameIndex = 7541,
-  kX86InstIdVpmulhuw_NameIndex = 7551,
-  kX86InstIdVpmulhw_NameIndex = 7560,
-  kX86InstIdVpmulld_NameIndex = 7568,
-  kX86InstIdVpmullw_NameIndex = 7576,
-  kX86InstIdVpmuludq_NameIndex = 7584,
-  kX86InstIdVpor_NameIndex = 7593,
-  kX86InstIdVpperm_NameIndex = 7598,
-  kX86InstIdVprotb_NameIndex = 7605,
-  kX86InstIdVprotd_NameIndex = 7612,
-  kX86InstIdVprotq_NameIndex = 7619,
-  kX86InstIdVprotw_NameIndex = 7626,
-  kX86InstIdVpsadbw_NameIndex = 7633,
-  kX86InstIdVpshab_NameIndex = 7641,
-  kX86InstIdVpshad_NameIndex = 7648,
-  kX86InstIdVpshaq_NameIndex = 7655,
-  kX86InstIdVpshaw_NameIndex = 7662,
-  kX86InstIdVpshlb_NameIndex = 7669,
-  kX86InstIdVpshld_NameIndex = 7676,
-  kX86InstIdVpshlq_NameIndex = 7683,
-  kX86InstIdVpshlw_NameIndex = 7690,
-  kX86InstIdVpshufb_NameIndex = 7697,
-  kX86InstIdVpshufd_NameIndex = 7705,
-  kX86InstIdVpshufhw_NameIndex = 7713,
-  kX86InstIdVpshuflw_NameIndex = 7722,
-  kX86InstIdVpsignb_NameIndex = 7731,
-  kX86InstIdVpsignd_NameIndex = 7739,
-  kX86InstIdVpsignw_NameIndex = 7747,
-  kX86InstIdVpslld_NameIndex = 7755,
-  kX86InstIdVpslldq_NameIndex = 7762,
-  kX86InstIdVpsllq_NameIndex = 7770,
-  kX86InstIdVpsllvd_NameIndex = 7777,
-  kX86InstIdVpsllvq_NameIndex = 7785,
-  kX86InstIdVpsllw_NameIndex = 7793,
-  kX86InstIdVpsrad_NameIndex = 7800,
-  kX86InstIdVpsravd_NameIndex = 7807,
-  kX86InstIdVpsraw_NameIndex = 7815,
-  kX86InstIdVpsrld_NameIndex = 7822,
-  kX86InstIdVpsrldq_NameIndex = 7829,
-  kX86InstIdVpsrlq_NameIndex = 7837,
-  kX86InstIdVpsrlvd_NameIndex = 7844,
-  kX86InstIdVpsrlvq_NameIndex = 7852,
-  kX86InstIdVpsrlw_NameIndex = 7860,
-  kX86InstIdVpsubb_NameIndex = 7867,
-  kX86InstIdVpsubd_NameIndex = 7874,
-  kX86InstIdVpsubq_NameIndex = 7881,
-  kX86InstIdVpsubsb_NameIndex = 7888,
-  kX86InstIdVpsubsw_NameIndex = 7896,
-  kX86InstIdVpsubusb_NameIndex = 7904,
-  kX86InstIdVpsubusw_NameIndex = 7913,
-  kX86InstIdVpsubw_NameIndex = 7922,
-  kX86InstIdVptest_NameIndex = 7929,
-  kX86InstIdVpunpckhbw_NameIndex = 7936,
-  kX86InstIdVpunpckhdq_NameIndex = 7947,
-  kX86InstIdVpunpckhqdq_NameIndex = 7958,
-  kX86InstIdVpunpckhwd_NameIndex = 7970,
-  kX86InstIdVpunpcklbw_NameIndex = 7981,
-  kX86InstIdVpunpckldq_NameIndex = 7992,
-  kX86InstIdVpunpcklqdq_NameIndex = 8003,
-  kX86InstIdVpunpcklwd_NameIndex = 8015,
-  kX86InstIdVpxor_NameIndex = 8026,
-  kX86InstIdVrcpps_NameIndex = 8032,
-  kX86InstIdVrcpss_NameIndex = 8039,
-  kX86InstIdVroundpd_NameIndex = 8046,
-  kX86InstIdVroundps_NameIndex = 8055,
-  kX86InstIdVroundsd_NameIndex = 8064,
-  kX86InstIdVroundss_NameIndex = 8073,
-  kX86InstIdVrsqrtps_NameIndex = 8082,
-  kX86InstIdVrsqrtss_NameIndex = 8091,
-  kX86InstIdVshufpd_NameIndex = 8100,
-  kX86InstIdVshufps_NameIndex = 8108,
-  kX86InstIdVsqrtpd_NameIndex = 8116,
-  kX86InstIdVsqrtps_NameIndex = 8124,
-  kX86InstIdVsqrtsd_NameIndex = 8132,
-  kX86InstIdVsqrtss_NameIndex = 8140,
-  kX86InstIdVstmxcsr_NameIndex = 8148,
-  kX86InstIdVsubpd_NameIndex = 8157,
-  kX86InstIdVsubps_NameIndex = 8164,
-  kX86InstIdVsubsd_NameIndex = 8171,
-  kX86InstIdVsubss_NameIndex = 8178,
-  kX86InstIdVtestpd_NameIndex = 8185,
-  kX86InstIdVtestps_NameIndex = 8193,
-  kX86InstIdVucomisd_NameIndex = 8201,
-  kX86InstIdVucomiss_NameIndex = 8210,
-  kX86InstIdVunpckhpd_NameIndex = 8219,
-  kX86InstIdVunpckhps_NameIndex = 8229,
-  kX86InstIdVunpcklpd_NameIndex = 8239,
-  kX86InstIdVunpcklps_NameIndex = 8249,
-  kX86InstIdVxorpd_NameIndex = 8259,
-  kX86InstIdVxorps_NameIndex = 8266,
-  kX86InstIdVzeroall_NameIndex = 8273,
-  kX86InstIdVzeroupper_NameIndex = 8282,
-  kX86InstIdWrfsbase_NameIndex = 8293,
-  kX86InstIdWrgsbase_NameIndex = 8302,
-  kX86InstIdXadd_NameIndex = 8311,
-  kX86InstIdXchg_NameIndex = 8316,
-  kX86InstIdXgetbv_NameIndex = 8321,
-  kX86InstIdXor_NameIndex = 8328,
-  kX86InstIdXorpd_NameIndex = 8332,
-  kX86InstIdXorps_NameIndex = 8338,
-  kX86InstIdXrstor_NameIndex = 8344,
-  kX86InstIdXrstor64_NameIndex = 8351,
-  kX86InstIdXsave_NameIndex = 8360,
-  kX86InstIdXsave64_NameIndex = 8366,
-  kX86InstIdXsaveopt_NameIndex = 8374,
-  kX86InstIdXsaveopt64_NameIndex = 8383,
-  kX86InstIdXsetbv_NameIndex = 8394
-};
-#endif // !ASMJIT_DISABLE_NAMES
-
-// Automatically generated, do not edit.
-const X86InstExtendedInfo _x86InstExtendedInfo[] = {
-  { Enc(None)         , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Arith)     , 0 , 0 , 0x20, 0x3F, 0, { O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                  }, F(Lock)                            , U                    },
-  { Enc(X86Arith)     , 0 , 0 , 0x00, 0x3F, 0, { O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                  }, F(Lock)                            , U                    },
-  { Enc(ExtRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRmi)       , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                  }, F(None)                            , U                    },
-  { Enc(AvxRvm)       , 0 , 0 , 0x00, 0x3F, 0, { O(Gqd)            , O(Gqd)            , O(GqdMem)         , U                 , U                  }, F(None)                            , U                    },
-  { Enc(AvxRmv)       , 0 , 0 , 0x00, 0x3F, 0, { O(Gqd)            , O(GqdMem)         , O(Gqd)            , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(AvxVm)        , 0 , 0 , 0x00, 0x3F, 0, { O(Gqd)            , O(GqdMem)         , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86RegRm)     , 0 , 0 , 0x00, 0x3F, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86BSwap)     , 0 , 0 , 0x00, 0x00, 0, { O(Gqd)            , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86BTest)     , 0 , 0 , 0x00, 0x3B, 0, { O(GqdwMem)        , O(Gqdw)|O(Imm)    , U                 , U                 , U                  }, F(Test)                            , O_000F00(BA,4,_,_,_) },
-  { Enc(X86BTest)     , 0 , 0 , 0x00, 0x3B, 0, { O(GqdwMem)        , O(Gqdw)|O(Imm)    , U                 , U                 , U                  }, F(Lock)                            , O_000F00(BA,7,_,_,_) },
-  { Enc(X86BTest)     , 0 , 0 , 0x00, 0x3B, 0, { O(GqdwMem)        , O(Gqdw)|O(Imm)    , U                 , U                 , U                  }, F(Lock)                            , O_000F00(BA,6,_,_,_) },
-  { Enc(X86BTest)     , 0 , 0 , 0x00, 0x3B, 0, { O(GqdwMem)        , O(Gqdw)|O(Imm)    , U                 , U                 , U                  }, F(Lock)                            , O_000F00(BA,5,_,_,_) },
-  { Enc(X86Call)      , 0 , 0 , 0x00, 0x00, 0, { O(GqdMem)|O(LbImm), U                 , U                 , U                 , U                  }, F(Flow)                            , O_000000(E8,U,_,_,_) },
-  { Enc(X86Op)        , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x00, 0x20, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x00, 0x40, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86M)         , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x20, 0x20, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86RegRm)     , 0 , 0 , 0x24, 0x00, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86RegRm)     , 0 , 0 , 0x20, 0x00, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86RegRm)     , 0 , 0 , 0x04, 0x00, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86RegRm)     , 0 , 0 , 0x07, 0x00, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86RegRm)     , 0 , 0 , 0x03, 0x00, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86RegRm)     , 0 , 0 , 0x01, 0x00, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86RegRm)     , 0 , 0 , 0x10, 0x00, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86RegRm)     , 0 , 0 , 0x02, 0x00, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Arith)     , 0 , 0 , 0x00, 0x3F, 0, { O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                  }, F(Test)                            , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x40, 0x3F, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Op_66H)    , 0 , 0 , 0x40, 0x3F, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86RmReg)     , 0 , 0 , 0x00, 0x3F, 0, { U                 , U                 , U                 , U                 , U                  }, F(Lock)|F(Special)                 , U                    },
-  { Enc(X86M)         , 0 , 0 , 0x00, 0x04, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(ExtRm)        , 0 , 0 , 0x00, 0x3F, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(Test)                            , U                    },
-  { Enc(ExtCrc)       , 0 , 0 , 0x00, 0x00, 0, { O(Gqd)            , O(GqdwbMem)       , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRm)        , 0 , 16, 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRm)        , 0 , 8 , 0x00, 0x00, 0, { O(Mm)             , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRm)        , 0 , 16, 0x00, 0x00, 0, { O(Xmm)            , O(MmMem)          , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRm)        , 0 , 8 , 0x00, 0x00, 0, { O(Xmm)            , O(MmMem)          , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRm_Q)      , 0 , 8 , 0x00, 0x00, 0, { O(Gqd)            , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRm)        , 0 , 4 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRm_Q)      , 0 , 8 , 0x00, 0x00, 0, { O(Xmm)            , O(GqdMem)         , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRm_Q)      , 0 , 4 , 0x00, 0x00, 0, { O(Xmm)            , O(GqdMem)         , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRm)        , 0 , 8 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x28, 0x3F, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86IncDec)    , 0 , 0 , 0x00, 0x1F, 0, { O(GqdwbMem)       , U                 , U                 , U                 , U                  }, F(Lock)                            , O_000000(48,U,_,_,_) },
-  { Enc(X86Rm_B)      , 0 , 0 , 0x00, 0x3F, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Enter)     , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(ExtExtract)   , 0 , 8 , 0x00, 0x00, 0, { O(GqdMem)         , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , O_660F3A(17,U,_,_,_) },
-  { Enc(ExtExtrq)     , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)|O(Imm)     , O(None)|O(Imm)    , U                 , U                  }, F(None)                            , O_660F00(78,0,_,_,_) },
-  { Enc(FpuOp)        , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(FpuArith)     , 0 , 0 , 0x00, 0x00, 0, { O(FpMem)          , O(Fp)             , U                 , U                 , U                  }, F(Fp)|F(Mem4_8)                    , U                    },
-  { Enc(FpuRDef)      , 0 , 0 , 0x00, 0x00, 0, { O(Fp)             , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(X86M)         , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(FpuR)         , 0 , 0 , 0x20, 0x00, 0, { O(Fp)             , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(FpuR)         , 0 , 0 , 0x24, 0x00, 0, { O(Fp)             , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(FpuR)         , 0 , 0 , 0x04, 0x00, 0, { O(Fp)             , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(FpuR)         , 0 , 0 , 0x10, 0x00, 0, { O(Fp)             , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(FpuCom)       , 0 , 0 , 0x00, 0x00, 0, { O(Fp)|O(Mem)      , O(Fp)             , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(FpuR)         , 0 , 0 , 0x00, 0x3F, 0, { O(Fp)             , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(FpuR)         , 0 , 0 , 0x00, 0x00, 0, { O(Fp)             , U                 , U                 , U                 , U                  }, F(Fp)                              , U                    },
-  { Enc(FpuM)         , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)|F(Mem2_4)                    , U                    },
-  { Enc(FpuM)         , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)|F(Mem2_4_8)                  , O_000000(DF,5,_,_,_) },
-  { Enc(FpuM)         , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)|F(Mem2_4_8)                  , O_000000(DF,7,_,_,_) },
-  { Enc(FpuM)         , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)|F(Mem2_4_8)                  , O_000000(DD,1,_,_,_) },
-  { Enc(FpuFldFst)    , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)|F(Mem4_8_10)                 , O_000000(DB,5,_,_,_) },
-  { Enc(FpuStsw)      , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)                              , O_00_X(DFE0,U)       },
-  { Enc(FpuFldFst)    , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)|F(Mem4_8)                    , U                    },
-  { Enc(FpuFldFst)    , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)|F(Mem4_8_10)                 , O_000000(DB,7,_,_,_) },
-  { Enc(FpuStsw)      , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Fp)                              , O_9B_X(DFE0,U)       },
-  { Enc(X86Rm_B)      , 0 , 0 , 0x00, 0x3F, 0, { 0                 , 0                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Imul)      , 0 , 0 , 0x00, 0x3F, 0, { 0                 , 0                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86IncDec)    , 0 , 0 , 0x00, 0x1F, 0, { O(GqdwbMem)       , U                 , U                 , U                 , U                  }, F(Lock)                            , O_000000(40,U,_,_,_) },
-  { Enc(ExtInsertq)   , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(None)|O(Imm)    , O(None)|O(Imm)    , U                  }, F(None)                            , O_F20F00(78,U,_,_,_) },
-  { Enc(X86Int)       , 0 , 0 , 0x00, 0x80, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Jcc)       , 0 , 0 , 0x24, 0x00, 0, { O(Label)          , U                 , U                 , U                 , U                  }, F(Flow)                            , U                    },
-  { Enc(X86Jcc)       , 0 , 0 , 0x20, 0x00, 0, { O(Label)          , U                 , U                 , U                 , U                  }, F(Flow)                            , U                    },
-  { Enc(X86Jcc)       , 0 , 0 , 0x04, 0x00, 0, { O(Label)          , U                 , U                 , U                 , U                  }, F(Flow)                            , U                    },
-  { Enc(X86Jcc)       , 0 , 0 , 0x07, 0x00, 0, { O(Label)          , U                 , U                 , U                 , U                  }, F(Flow)                            , U                    },
-  { Enc(X86Jcc)       , 0 , 0 , 0x03, 0x00, 0, { O(Label)          , U                 , U                 , U                 , U                  }, F(Flow)                            , U                    },
-  { Enc(X86Jcc)       , 0 , 0 , 0x01, 0x00, 0, { O(Label)          , U                 , U                 , U                 , U                  }, F(Flow)                            , U                    },
-  { Enc(X86Jcc)       , 0 , 0 , 0x10, 0x00, 0, { O(Label)          , U                 , U                 , U                 , U                  }, F(Flow)                            , U                    },
-  { Enc(X86Jcc)       , 0 , 0 , 0x02, 0x00, 0, { O(Label)          , U                 , U                 , U                 , U                  }, F(Flow)                            , U                    },
-  { Enc(X86Jecxz)     , 0 , 0 , 0x00, 0x00, 0, { O(Gqdw)           , O(Label)          , U                 , U                 , U                  }, F(Flow)|F(Special)                 , U                    },
-  { Enc(X86Jmp)       , 0 , 0 , 0x00, 0x00, 0, { O(Label)|O(Imm)   , U                 , U                 , U                 , U                  }, F(Flow)                            , O_000000(E9,U,_,_,_) },
-  { Enc(X86Op)        , 0 , 0 , 0x3E, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(ExtRm)        , 0 , 16, 0x00, 0x00, 0, { O(Xmm)            , O(Mem)            , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Lea)       , 0 , 0 , 0x00, 0x00, 0, { O(Gqd)            , O(Mem)            , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtFence)     , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Op)        , 0 , 1 , 0x40, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(Move)|F(Special)                 , U                    },
-  { Enc(X86Op)        , 0 , 4 , 0x40, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(Move)|F(Special)                 , U                    },
-  { Enc(X86Op)        , 0 , 8 , 0x40, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(Move)|F(Special)                 , U                    },
-  { Enc(X86Op_66H)    , 0 , 2 , 0x40, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(Move)|F(Special)                 , U                    },
-  { Enc(ExtRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(ExtRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Mm)             , O(Mm)             , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Mov)       , 0 , 0 , 0x00, 0x00, 0, { O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86MovPtr)    , 0 , 0 , 0x00, 0x00, 0, { O(Gqdwb)          , O(Imm)            , U                 , U                 , U                  }, F(Move)|F(Special)                 , O_000000(A2,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , O_660F00(29,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , O_000F00(29,U,_,_,_) },
-  { Enc(ExtMovBe)     , 0 , 0 , 0x00, 0x00, 0, { O(GqdwMem)        , O(GqdwMem)        , U                 , U                 , U                  }, F(Move)                            , O_000F38(F1,U,_,_,_) },
-  { Enc(ExtMovD)      , 0 , 16, 0x00, 0x00, 0, { O(Gd)|O(MmXmmMem) , O(Gd)|O(MmXmmMem) , U                 , U                 , U                  }, F(Move)                            , O_000F00(7E,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtMov)       , 0 , 8 , 0x00, 0x00, 0, { O(Mm)             , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , O_660F00(7F,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , O_F30F00(7F,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 8 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtMov)       , 8 , 8 , 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(None)                            , O_660F00(17,U,_,_,_) },
-  { Enc(ExtMov)       , 8 , 8 , 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(None)                            , O_000F00(17,U,_,_,_) },
-  { Enc(ExtMov)       , 8 , 8 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtMov)       , 0 , 8 , 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , O_660F00(13,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 8 , 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , O_000F00(13,U,_,_,_) },
-  { Enc(ExtMovNoRexW) , 0 , 8 , 0x00, 0x00, 0, { O(Gqd)            , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(Mem)            , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , O_660F00(E7,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(Xmm)            , O(Mem)            , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtMov)       , 0 , 8 , 0x00, 0x00, 0, { O(Mem)            , O(Gqd)            , U                 , U                 , U                  }, F(Move)                            , O_000F00(C3,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(Mem)            , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , O_660F00(2B,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(Mem)            , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , O_000F00(2B,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 8 , 0x00, 0x00, 0, { O(Mem)            , O(Mm)             , U                 , U                 , U                  }, F(Move)                            , O_000F00(E7,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 8 , 0x00, 0x00, 0, { O(Mem)            , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , O_F20F00(2B,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 4 , 0x00, 0x00, 0, { O(Mem)            , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , O_F30F00(2B,U,_,_,_) },
-  { Enc(ExtMovQ)      , 0 , 16, 0x00, 0x00, 0, { O(Gq)|O(MmXmmMem) , O(Gq)|O(MmXmmMem) , U                 , U                 , U                  }, F(Move)                            , O_000F00(7E,U,_,W,_) },
-  { Enc(ExtRm)        , 0 , 16, 0x00, 0x00, 0, { O(Xmm)            , O(Mm)             , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(Move)|F(Special)                 , U                    },
-  { Enc(X86Op_66H)    , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(ExtMov)       , 0 , 8 , 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)           |F(Z)            , O_F20F00(11,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 4 , 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)           |F(Z)            , O_F30F00(11,U,_,_,_) },
-  { Enc(X86MovSxZx)   , 0 , 0 , 0x00, 0x00, 0, { O(Gqdw)           , O(GwbMem)         , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86MovSxd)    , 0 , 0 , 0x00, 0x00, 0, { O(Gq)             , O(GdMem)          , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , O_660F00(11,U,_,_,_) },
-  { Enc(ExtMov)       , 0 , 16, 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Move)                            , O_000F00(11,U,_,_,_) },
-  { Enc(AvxRvm)       , 0 , 0 , 0x00, 0x00, 0, { O(Gqd)            , O(Gqd)            , O(GqdMem)         , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Rm_B)      , 0 , 0 , 0x00, 0x3F, 0, { O(GqdwbMem)       , U                 , U                 , U                 , U                  }, F(Lock)                            , U                    },
-  { Enc(X86Rm_B)      , 0 , 0 , 0x00, 0x00, 0, { O(GqdwbMem)       , U                 , U                 , U                 , U                  }, F(Lock)                            , U                    },
-  { Enc(ExtRm_P)      , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRmi_P)     , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)       , O(Imm)            , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtExtract)   , 0 , 8 , 0x00, 0x00, 0, { O(Gd)|O(Gb)|O(Mem), O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , O_000F3A(14,U,_,_,_) },
-  { Enc(ExtExtract)   , 0 , 8 , 0x00, 0x00, 0, { O(GdMem)          , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , O_000F3A(16,U,_,_,_) },
-  { Enc(ExtExtract)   , 0 , 8 , 0x00, 0x00, 0, { O(GqdMem)         , O(Xmm)            , U                 , U                 , U                  }, F(Move)                            , O_000F3A(16,U,_,W,_) },
-  { Enc(ExtExtract)   , 0 , 8 , 0x00, 0x00, 0, { O(GdMem)          , O(MmXmm)          , U                 , U                 , U                  }, F(Move)                            , O_000F3A(15,U,_,_,_) },
-  { Enc(3dNow)        , 0 , 0 , 0x00, 0x00, 0, { O(Mm)             , O(MmMem)          , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRmi)       , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(GdMem)          , O(Imm)            , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRmi)       , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(GqMem)          , O(Imm)            , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRmi_P)     , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(GdMem)          , O(Imm)            , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRm_PQ)     , 0 , 8 , 0x00, 0x00, 0, { O(Gqd)            , O(MmXmm)          , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Pop)       , 0 , 0 , 0x00, 0x00, 0, { 0                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , O_000000(58,U,_,_,_) },
-  { Enc(X86Op)        , 0 , 0 , 0x00, 0xFF, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(ExtPrefetch)  , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , O(Imm)            , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRmi)       , 0 , 16, 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRmi_P)     , 0 , 8 , 0x00, 0x00, 0, { O(Mm)             , O(MmMem)          , O(Imm)            , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRmRi_P)    , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                  }, F(None)                            , O_000F00(72,6,_,_,_) },
-  { Enc(ExtRmRi)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Imm)            , U                 , U                 , U                  }, F(None)                            , O_660F00(73,7,_,_,_) },
-  { Enc(ExtRmRi_P)    , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                  }, F(None)                            , O_000F00(73,6,_,_,_) },
-  { Enc(ExtRmRi_P)    , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                  }, F(None)                            , O_000F00(71,6,_,_,_) },
-  { Enc(ExtRmRi_P)    , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                  }, F(None)                            , O_000F00(72,4,_,_,_) },
-  { Enc(ExtRmRi_P)    , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                  }, F(None)                            , O_000F00(71,4,_,_,_) },
-  { Enc(ExtRmRi_P)    , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                  }, F(None)                            , O_000F00(72,2,_,_,_) },
-  { Enc(ExtRmRi)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Imm)            , U                 , U                 , U                  }, F(None)                            , O_660F00(73,3,_,_,_) },
-  { Enc(ExtRmRi_P)    , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                  }, F(None)                            , O_000F00(73,2,_,_,_) },
-  { Enc(ExtRmRi_P)    , 0 , 0 , 0x00, 0x00, 0, { O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                  }, F(None)                            , O_000F00(71,2,_,_,_) },
-  { Enc(X86Push)      , 0 , 0 , 0x00, 0x00, 0, { 0                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , O_000000(50,U,_,_,_) },
-  { Enc(X86Op)        , 0 , 0 , 0xFF, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Rot)       , 0 , 0 , 0x20, 0x21, 0, { O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Rm)        , 0 , 8 , 0x00, 0x00, 0, { O(Gqd)            , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Rm)        , 0 , 8 , 0x00, 0x3F, 0, { O(Gqdw)           , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Rep)       , 0 , 0 , 0x40, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Rep)       , 0 , 0 , 0x40, 0x00, 0, { O(Mem)            , O(Mem)            , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Rep)       , 0 , 0 , 0x40, 0x3F, 0, { O(Mem)            , O(Mem)            , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Ret)       , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Rot)       , 0 , 0 , 0x00, 0x21, 0, { O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(AvxRmi)       , 0 , 0 , 0x00, 0x00, 0, { O(Gqd)            , O(GqdMem)         , O(Imm)            , U                 , U                  }, F(None)                            , U                    },
-  { Enc(ExtRmi)       , 0 , 8 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(ExtRmi)       , 0 , 4 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x00, 0x3E, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Rot)       , 0 , 0 , 0x00, 0x3F, 0, { O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(AvxRmv)       , 0 , 0 , 0x00, 0x00, 0, { O(Gqd)            , O(GqdMem)         , O(Gqd)            , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Set)       , 0 , 1 , 0x24, 0x00, 0, { O(GbMem)          , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Set)       , 0 , 1 , 0x20, 0x00, 0, { O(GbMem)          , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Set)       , 0 , 1 , 0x04, 0x00, 0, { O(GbMem)          , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Set)       , 0 , 1 , 0x07, 0x00, 0, { O(GbMem)          , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Set)       , 0 , 1 , 0x03, 0x00, 0, { O(GbMem)          , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Set)       , 0 , 1 , 0x01, 0x00, 0, { O(GbMem)          , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Set)       , 0 , 1 , 0x10, 0x00, 0, { O(GbMem)          , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Set)       , 0 , 1 , 0x02, 0x00, 0, { O(GbMem)          , U                 , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(X86Shlrd)     , 0 , 0 , 0x00, 0x3F, 0, { O(GqdwbMem)       , O(Gb)             , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Shlrd)     , 0 , 0 , 0x00, 0x3F, 0, { O(GqdwbMem)       , O(Gqdwb)          , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Op)        , 0 , 0 , 0x40, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Op_66H)    , 0 , 0 , 0x40, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    },
-  { Enc(X86Test)      , 0 , 0 , 0x00, 0x3F, 0, { O(GqdwbMem)       , O(Gqdwb)|O(Imm)   , U                 , U                 , U                  }, F(Test)                            , O_000000(F6,U,_,_,_) },
-  { Enc(X86RegRm)     , 0 , 0 , 0x00, 0x3F, 0, { O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                  }, F(Move)                            , U                    },
-  { Enc(AvxRvm_P)     , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvm)       , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRmi)       , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmi_P)    , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmr_P)    , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(Xy)             , O(XyMem)          , O(Xy)             , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Ymm)            , O(Mem)            , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Ymm)            , O(XmmMem)         , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XmmMem)         , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmi)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm_P)      , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XmmMem)         , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm_P)      , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxMri_P)     , 0 , 0 , 0x00, 0x00, 0, { O(XmmMem)         , O(Xy)             , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Gqd)            , O(XmmMem)         , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvm)       , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(GqdMem)         , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm_P)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxMri)       , 0 , 0 , 0x00, 0x00, 0, { O(XmmMem)         , O(Ymm)            , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxMri)       , 0 , 0 , 0x00, 0x00, 0, { O(GqdMem)         , O(Xmm)            , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(Fma4_P)       , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                  }, F(Avx)                             , U                    },
-  { Enc(Fma4)         , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                  }, F(Avx)                             , U                    },
-  { Enc(XopRm_P)      , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(XopRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxGather)    , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(Mem)            , O(Xy)             , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxGatherEx)  , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Mem)            , O(Xmm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmi)      , 0 , 0 , 0x00, 0x00, 0, { O(Ymm)            , O(Ymm)            , O(XmmMem)         , O(Imm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm_P)      , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(Mem)            , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxM)         , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm)        , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmMvr_P)  , 0 , 0 , 0x00, 0x00, 0, { O(XyMem)          , O(Xy)             , O(XyMem)          , U                 , U                  }, F(Avx)                             , O_660F38(2F,U,_,_,_) },
-  { Enc(AvxRvmMvr_P)  , 0 , 0 , 0x00, 0x00, 0, { O(XyMem)          , O(Xy)             , O(XyMem)          , U                 , U                  }, F(Avx)                             , O_660F38(2E,U,_,_,_) },
-  { Enc(AvxRmMr_P)    , 0 , 0 , 0x00, 0x00, 0, { O(XyMem)          , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , O_660F00(29,U,_,_,_) },
-  { Enc(AvxRmMr_P)    , 0 , 0 , 0x00, 0x00, 0, { O(XyMem)          , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , O_000F00(29,U,_,_,_) },
-  { Enc(AvxRmMr)      , 0 , 0 , 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                  }, F(Avx)                             , O_660F00(7E,U,_,_,_) },
-  { Enc(AvxRmMr_P)    , 0 , 0 , 0x00, 0x00, 0, { O(XyMem)          , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , O_660F00(7F,U,_,_,_) },
-  { Enc(AvxRmMr_P)    , 0 , 0 , 0x00, 0x00, 0, { O(XyMem)          , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , O_F30F00(7F,U,_,_,_) },
-  { Enc(AvxRvm)       , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(Xmm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmMr)     , 0 , 0 , 0x00, 0x00, 0, { O(XmmMem)         , O(Xmm)            , O(Mem)            , U                 , U                  }, F(Avx)                             , O_660F00(17,U,_,_,_) },
-  { Enc(AvxRvmMr)     , 0 , 0 , 0x00, 0x00, 0, { O(XmmMem)         , O(Xmm)            , O(Mem)            , U                 , U                  }, F(Avx)                             , O_000F00(17,U,_,_,_) },
-  { Enc(AvxRvmMr)     , 0 , 0 , 0x00, 0x00, 0, { O(XmmMem)         , O(Xmm)            , O(Mem)            , U                 , U                  }, F(Avx)                             , O_660F00(13,U,_,_,_) },
-  { Enc(AvxRvmMr)     , 0 , 0 , 0x00, 0x00, 0, { O(XmmMem)         , O(Xmm)            , O(Mem)            , U                 , U                  }, F(Avx)                             , O_000F00(13,U,_,_,_) },
-  { Enc(AvxRm_P)      , 0 , 0 , 0x00, 0x00, 0, { O(Gqd)            , O(Xy)             , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxMr)        , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , O(Xy)             , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxMr_P)      , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , O(Xy)             , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxMovSsSd)   , 0 , 0 , 0x00, 0x00, 0, { O(XmmMem)         , O(XmmMem)         , O(Xmm)            , U                 , U                  }, F(Avx)                             , O_F20F00(11,U,_,_,_) },
-  { Enc(AvxMovSsSd)   , 0 , 0 , 0x00, 0x00, 0, { O(XmmMem)         , O(Xmm)            , O(Xmm)            , U                 , U                  }, F(Avx)                             , O_F30F00(11,U,_,_,_) },
-  { Enc(AvxRmMr_P)    , 0 , 0 , 0x00, 0x00, 0, { O(XyMem)          , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , O_660F00(11,U,_,_,_) },
-  { Enc(AvxRmMr_P)    , 0 , 0 , 0x00, 0x00, 0, { O(XyMem)          , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , O_000F00(11,U,_,_,_) },
-  { Enc(AvxRvmr)      , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(Xy)             , O(XyMem)          , O(Xy)             , U                  }, F(Avx)                             , U                    },
-  { Enc(XopRvrmRvmr_P), 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                  }, F(Avx)                             , U                    },
-  { Enc(XopRvmi)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmi)      , 0 , 0 , 0x00, 0x00, 0, { O(Ymm)            , O(Ymm)            , O(YmmMem)         , O(Imm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvm)       , 0 , 0 , 0x00, 0x00, 0, { O(Ymm)            , O(Ymm)            , O(YmmMem)         , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvrmRvmr_P), 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmRmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F3A(05,U,_,_,_) },
-  { Enc(AvxRvmRmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F3A(04,U,_,_,_) },
-  { Enc(AvxRmi)       , 0 , 0 , 0x00, 0x00, 0, { O(Ymm)            , O(YmmMem)         , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxMri)       , 0 , 0 , 0x00, 0x00, 0, { O(GqdwbMem)       , O(Xmm)            , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxMri)       , 0 , 0 , 0x00, 0x00, 0, { O(GqMem)          , O(Xmm)            , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxMri)       , 0 , 0 , 0x00, 0x00, 0, { O(GqdwMem)        , O(Xmm)            , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmi)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(GqdwbMem)       , O(Imm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmi)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(GqdMem)         , O(Imm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmi)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(GqMem)          , O(Imm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmi)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(GqdwMem)        , O(Imm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(XopRvmr)      , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmMvr_P)  , 0 , 0 , 0x00, 0x00, 0, { O(XyMem)          , O(Xy)             , O(XyMem)          , U                 , U                  }, F(Avx)                             , O_660F38(8E,U,_,_,_) },
-  { Enc(XopRvrmRvmr)  , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                  }, F(Avx)                             , U                    },
-  { Enc(XopRvmRmi)    , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(XmmMem)|O(Imm)  , U                 , U                  }, F(Avx)                             , O_00_M08(C0,U,_,_,_) },
-  { Enc(XopRvmRmi)    , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(XmmMem)|O(Imm)  , U                 , U                  }, F(Avx)                             , O_00_M08(C2,U,_,_,_) },
-  { Enc(XopRvmRmi)    , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(XmmMem)|O(Imm)  , U                 , U                  }, F(Avx)                             , O_00_M08(C3,U,_,_,_) },
-  { Enc(XopRvmRmi)    , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(XmmMem)|O(Imm)  , U                 , U                  }, F(Avx)                             , O_00_M08(C1,U,_,_,_) },
-  { Enc(XopRvmRmv)    , 0 , 0 , 0x00, 0x00, 0, { O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRmi_P)     , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmVmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F00(72,6,_,_,_) },
-  { Enc(AvxVmi_P)     , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(Imm)            , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRvmVmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F00(73,6,_,_,_) },
-  { Enc(AvxRvmVmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F00(71,6,_,_,_) },
-  { Enc(AvxRvmVmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F00(72,4,_,_,_) },
-  { Enc(AvxRvmVmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F00(71,4,_,_,_) },
-  { Enc(AvxRvmVmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F00(72,2,_,_,_) },
-  { Enc(AvxRvmVmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F00(73,2,_,_,_) },
-  { Enc(AvxRvmVmi_P)  , 0 , 0 , 0x00, 0x00, 0, { O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                  }, F(Avx)                             , O_660F00(71,2,_,_,_) },
-  { Enc(AvxRm_P)      , 0 , 0 , 0x00, 0x3F, 0, { O(Xy)             , O(XyMem)          , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxRm_P)      , 0 , 0 , 0x00, 0x3F, 0, { O(Xy)             , O(XyMem)          , U                 , U                 , U                  }, F(Test)                            , U                    },
-  { Enc(AvxRm)        , 0 , 0 , 0x00, 0x3F, 0, { O(Xmm)            , O(XmmMem)         , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(AvxOp)        , 0 , 0 , 0x00, 0x00, 0, { U                 , U                 , U                 , U                 , U                  }, F(Avx)                             , U                    },
-  { Enc(X86Rm)        , 0 , 0 , 0x00, 0x00, 0, { O(Gqd)            , U                 , U                 , U                 , U                  }, F(None)                            , U                    },
-  { Enc(X86Xadd)      , 0 , 0 , 0x00, 0x3F, 0, { O(GqdwbMem)       , O(Gqdwb)          , U                 , U                 , U                  }, F(Xchg)|F(Lock)                    , U                    },
-  { Enc(X86Xchg)      , 0 , 0 , 0x00, 0x00, 0, { O(GqdwbMem)       , O(Gqdwb)          , U                 , U                 , U                  }, F(Xchg)|F(Lock)                    , U                    },
-  { Enc(X86M)         , 0 , 0 , 0x00, 0x00, 0, { O(Mem)            , U                 , U                 , U                 , U                  }, F(None)|F(Special)                 , U                    }
-};
-
-// Automatically generated, do not edit.
-enum kX86InstData_ExtendedIndex {
-  kInstIdNone_ExtendedIndex = 0,
-  kX86InstIdAdc_ExtendedIndex = 1,
-  kX86InstIdAdd_ExtendedIndex = 2,
-  kX86InstIdAddpd_ExtendedIndex = 3,
-  kX86InstIdAddps_ExtendedIndex = 3,
-  kX86InstIdAddsd_ExtendedIndex = 3,
-  kX86InstIdAddss_ExtendedIndex = 3,
-  kX86InstIdAddsubpd_ExtendedIndex = 3,
-  kX86InstIdAddsubps_ExtendedIndex = 3,
-  kX86InstIdAesdec_ExtendedIndex = 3,
-  kX86InstIdAesdeclast_ExtendedIndex = 3,
-  kX86InstIdAesenc_ExtendedIndex = 3,
-  kX86InstIdAesenclast_ExtendedIndex = 3,
-  kX86InstIdAesimc_ExtendedIndex = 3,
-  kX86InstIdAeskeygenassist_ExtendedIndex = 4,
-  kX86InstIdAnd_ExtendedIndex = 2,
-  kX86InstIdAndn_ExtendedIndex = 5,
-  kX86InstIdAndnpd_ExtendedIndex = 3,
-  kX86InstIdAndnps_ExtendedIndex = 3,
-  kX86InstIdAndpd_ExtendedIndex = 3,
-  kX86InstIdAndps_ExtendedIndex = 3,
-  kX86InstIdBextr_ExtendedIndex = 6,
-  kX86InstIdBlendpd_ExtendedIndex = 4,
-  kX86InstIdBlendps_ExtendedIndex = 4,
-  kX86InstIdBlendvpd_ExtendedIndex = 7,
-  kX86InstIdBlendvps_ExtendedIndex = 7,
-  kX86InstIdBlsi_ExtendedIndex = 8,
-  kX86InstIdBlsmsk_ExtendedIndex = 8,
-  kX86InstIdBlsr_ExtendedIndex = 8,
-  kX86InstIdBsf_ExtendedIndex = 9,
-  kX86InstIdBsr_ExtendedIndex = 9,
-  kX86InstIdBswap_ExtendedIndex = 10,
-  kX86InstIdBt_ExtendedIndex = 11,
-  kX86InstIdBtc_ExtendedIndex = 12,
-  kX86InstIdBtr_ExtendedIndex = 13,
-  kX86InstIdBts_ExtendedIndex = 14,
-  kX86InstIdBzhi_ExtendedIndex = 6,
-  kX86InstIdCall_ExtendedIndex = 15,
-  kX86InstIdCbw_ExtendedIndex = 16,
-  kX86InstIdCdq_ExtendedIndex = 16,
-  kX86InstIdCdqe_ExtendedIndex = 16,
-  kX86InstIdClc_ExtendedIndex = 17,
-  kX86InstIdCld_ExtendedIndex = 18,
-  kX86InstIdClflush_ExtendedIndex = 19,
-  kX86InstIdCmc_ExtendedIndex = 20,
-  kX86InstIdCmova_ExtendedIndex = 21,
-  kX86InstIdCmovae_ExtendedIndex = 22,
-  kX86InstIdCmovb_ExtendedIndex = 22,
-  kX86InstIdCmovbe_ExtendedIndex = 21,
-  kX86InstIdCmovc_ExtendedIndex = 22,
-  kX86InstIdCmove_ExtendedIndex = 23,
-  kX86InstIdCmovg_ExtendedIndex = 24,
-  kX86InstIdCmovge_ExtendedIndex = 25,
-  kX86InstIdCmovl_ExtendedIndex = 25,
-  kX86InstIdCmovle_ExtendedIndex = 24,
-  kX86InstIdCmovna_ExtendedIndex = 21,
-  kX86InstIdCmovnae_ExtendedIndex = 22,
-  kX86InstIdCmovnb_ExtendedIndex = 22,
-  kX86InstIdCmovnbe_ExtendedIndex = 21,
-  kX86InstIdCmovnc_ExtendedIndex = 22,
-  kX86InstIdCmovne_ExtendedIndex = 23,
-  kX86InstIdCmovng_ExtendedIndex = 24,
-  kX86InstIdCmovnge_ExtendedIndex = 25,
-  kX86InstIdCmovnl_ExtendedIndex = 25,
-  kX86InstIdCmovnle_ExtendedIndex = 24,
-  kX86InstIdCmovno_ExtendedIndex = 26,
-  kX86InstIdCmovnp_ExtendedIndex = 27,
-  kX86InstIdCmovns_ExtendedIndex = 28,
-  kX86InstIdCmovnz_ExtendedIndex = 23,
-  kX86InstIdCmovo_ExtendedIndex = 26,
-  kX86InstIdCmovp_ExtendedIndex = 27,
-  kX86InstIdCmovpe_ExtendedIndex = 27,
-  kX86InstIdCmovpo_ExtendedIndex = 27,
-  kX86InstIdCmovs_ExtendedIndex = 28,
-  kX86InstIdCmovz_ExtendedIndex = 23,
-  kX86InstIdCmp_ExtendedIndex = 29,
-  kX86InstIdCmppd_ExtendedIndex = 4,
-  kX86InstIdCmpps_ExtendedIndex = 4,
-  kX86InstIdCmpsB_ExtendedIndex = 30,
-  kX86InstIdCmpsD_ExtendedIndex = 30,
-  kX86InstIdCmpsQ_ExtendedIndex = 30,
-  kX86InstIdCmpsW_ExtendedIndex = 31,
-  kX86InstIdCmpsd_ExtendedIndex = 4,
-  kX86InstIdCmpss_ExtendedIndex = 4,
-  kX86InstIdCmpxchg_ExtendedIndex = 32,
-  kX86InstIdCmpxchg16b_ExtendedIndex = 33,
-  kX86InstIdCmpxchg8b_ExtendedIndex = 33,
-  kX86InstIdComisd_ExtendedIndex = 34,
-  kX86InstIdComiss_ExtendedIndex = 34,
-  kX86InstIdCpuid_ExtendedIndex = 16,
-  kX86InstIdCqo_ExtendedIndex = 16,
-  kX86InstIdCrc32_ExtendedIndex = 35,
-  kX86InstIdCvtdq2pd_ExtendedIndex = 36,
-  kX86InstIdCvtdq2ps_ExtendedIndex = 36,
-  kX86InstIdCvtpd2dq_ExtendedIndex = 36,
-  kX86InstIdCvtpd2pi_ExtendedIndex = 37,
-  kX86InstIdCvtpd2ps_ExtendedIndex = 36,
-  kX86InstIdCvtpi2pd_ExtendedIndex = 38,
-  kX86InstIdCvtpi2ps_ExtendedIndex = 39,
-  kX86InstIdCvtps2dq_ExtendedIndex = 36,
-  kX86InstIdCvtps2pd_ExtendedIndex = 36,
-  kX86InstIdCvtps2pi_ExtendedIndex = 37,
-  kX86InstIdCvtsd2si_ExtendedIndex = 40,
-  kX86InstIdCvtsd2ss_ExtendedIndex = 41,
-  kX86InstIdCvtsi2sd_ExtendedIndex = 42,
-  kX86InstIdCvtsi2ss_ExtendedIndex = 43,
-  kX86InstIdCvtss2sd_ExtendedIndex = 44,
-  kX86InstIdCvtss2si_ExtendedIndex = 40,
-  kX86InstIdCvttpd2dq_ExtendedIndex = 36,
-  kX86InstIdCvttpd2pi_ExtendedIndex = 37,
-  kX86InstIdCvttps2dq_ExtendedIndex = 36,
-  kX86InstIdCvttps2pi_ExtendedIndex = 37,
-  kX86InstIdCvttsd2si_ExtendedIndex = 40,
-  kX86InstIdCvttss2si_ExtendedIndex = 40,
-  kX86InstIdCwd_ExtendedIndex = 16,
-  kX86InstIdCwde_ExtendedIndex = 16,
-  kX86InstIdDaa_ExtendedIndex = 45,
-  kX86InstIdDas_ExtendedIndex = 45,
-  kX86InstIdDec_ExtendedIndex = 46,
-  kX86InstIdDiv_ExtendedIndex = 47,
-  kX86InstIdDivpd_ExtendedIndex = 3,
-  kX86InstIdDivps_ExtendedIndex = 3,
-  kX86InstIdDivsd_ExtendedIndex = 3,
-  kX86InstIdDivss_ExtendedIndex = 3,
-  kX86InstIdDppd_ExtendedIndex = 4,
-  kX86InstIdDpps_ExtendedIndex = 4,
-  kX86InstIdEmms_ExtendedIndex = 48,
-  kX86InstIdEnter_ExtendedIndex = 49,
-  kX86InstIdExtractps_ExtendedIndex = 50,
-  kX86InstIdExtrq_ExtendedIndex = 51,
-  kX86InstIdF2xm1_ExtendedIndex = 52,
-  kX86InstIdFabs_ExtendedIndex = 52,
-  kX86InstIdFadd_ExtendedIndex = 53,
-  kX86InstIdFaddp_ExtendedIndex = 54,
-  kX86InstIdFbld_ExtendedIndex = 55,
-  kX86InstIdFbstp_ExtendedIndex = 55,
-  kX86InstIdFchs_ExtendedIndex = 52,
-  kX86InstIdFclex_ExtendedIndex = 52,
-  kX86InstIdFcmovb_ExtendedIndex = 56,
-  kX86InstIdFcmovbe_ExtendedIndex = 57,
-  kX86InstIdFcmove_ExtendedIndex = 58,
-  kX86InstIdFcmovnb_ExtendedIndex = 56,
-  kX86InstIdFcmovnbe_ExtendedIndex = 57,
-  kX86InstIdFcmovne_ExtendedIndex = 58,
-  kX86InstIdFcmovnu_ExtendedIndex = 59,
-  kX86InstIdFcmovu_ExtendedIndex = 59,
-  kX86InstIdFcom_ExtendedIndex = 60,
-  kX86InstIdFcomi_ExtendedIndex = 61,
-  kX86InstIdFcomip_ExtendedIndex = 61,
-  kX86InstIdFcomp_ExtendedIndex = 60,
-  kX86InstIdFcompp_ExtendedIndex = 52,
-  kX86InstIdFcos_ExtendedIndex = 52,
-  kX86InstIdFdecstp_ExtendedIndex = 52,
-  kX86InstIdFdiv_ExtendedIndex = 53,
-  kX86InstIdFdivp_ExtendedIndex = 54,
-  kX86InstIdFdivr_ExtendedIndex = 53,
-  kX86InstIdFdivrp_ExtendedIndex = 54,
-  kX86InstIdFemms_ExtendedIndex = 62,
-  kX86InstIdFfree_ExtendedIndex = 63,
-  kX86InstIdFiadd_ExtendedIndex = 64,
-  kX86InstIdFicom_ExtendedIndex = 64,
-  kX86InstIdFicomp_ExtendedIndex = 64,
-  kX86InstIdFidiv_ExtendedIndex = 64,
-  kX86InstIdFidivr_ExtendedIndex = 64,
-  kX86InstIdFild_ExtendedIndex = 65,
-  kX86InstIdFimul_ExtendedIndex = 64,
-  kX86InstIdFincstp_ExtendedIndex = 52,
-  kX86InstIdFinit_ExtendedIndex = 52,
-  kX86InstIdFist_ExtendedIndex = 64,
-  kX86InstIdFistp_ExtendedIndex = 66,
-  kX86InstIdFisttp_ExtendedIndex = 67,
-  kX86InstIdFisub_ExtendedIndex = 64,
-  kX86InstIdFisubr_ExtendedIndex = 64,
-  kX86InstIdFld_ExtendedIndex = 68,
-  kX86InstIdFld1_ExtendedIndex = 52,
-  kX86InstIdFldcw_ExtendedIndex = 55,
-  kX86InstIdFldenv_ExtendedIndex = 55,
-  kX86InstIdFldl2e_ExtendedIndex = 52,
-  kX86InstIdFldl2t_ExtendedIndex = 52,
-  kX86InstIdFldlg2_ExtendedIndex = 52,
-  kX86InstIdFldln2_ExtendedIndex = 52,
-  kX86InstIdFldpi_ExtendedIndex = 52,
-  kX86InstIdFldz_ExtendedIndex = 52,
-  kX86InstIdFmul_ExtendedIndex = 53,
-  kX86InstIdFmulp_ExtendedIndex = 54,
-  kX86InstIdFnclex_ExtendedIndex = 52,
-  kX86InstIdFninit_ExtendedIndex = 52,
-  kX86InstIdFnop_ExtendedIndex = 52,
-  kX86InstIdFnsave_ExtendedIndex = 55,
-  kX86InstIdFnstcw_ExtendedIndex = 55,
-  kX86InstIdFnstenv_ExtendedIndex = 55,
-  kX86InstIdFnstsw_ExtendedIndex = 69,
-  kX86InstIdFpatan_ExtendedIndex = 52,
-  kX86InstIdFprem_ExtendedIndex = 52,
-  kX86InstIdFprem1_ExtendedIndex = 52,
-  kX86InstIdFptan_ExtendedIndex = 52,
-  kX86InstIdFrndint_ExtendedIndex = 52,
-  kX86InstIdFrstor_ExtendedIndex = 55,
-  kX86InstIdFsave_ExtendedIndex = 55,
-  kX86InstIdFscale_ExtendedIndex = 52,
-  kX86InstIdFsin_ExtendedIndex = 52,
-  kX86InstIdFsincos_ExtendedIndex = 52,
-  kX86InstIdFsqrt_ExtendedIndex = 52,
-  kX86InstIdFst_ExtendedIndex = 70,
-  kX86InstIdFstcw_ExtendedIndex = 55,
-  kX86InstIdFstenv_ExtendedIndex = 55,
-  kX86InstIdFstp_ExtendedIndex = 71,
-  kX86InstIdFstsw_ExtendedIndex = 72,
-  kX86InstIdFsub_ExtendedIndex = 53,
-  kX86InstIdFsubp_ExtendedIndex = 54,
-  kX86InstIdFsubr_ExtendedIndex = 53,
-  kX86InstIdFsubrp_ExtendedIndex = 54,
-  kX86InstIdFtst_ExtendedIndex = 52,
-  kX86InstIdFucom_ExtendedIndex = 54,
-  kX86InstIdFucomi_ExtendedIndex = 61,
-  kX86InstIdFucomip_ExtendedIndex = 61,
-  kX86InstIdFucomp_ExtendedIndex = 54,
-  kX86InstIdFucompp_ExtendedIndex = 52,
-  kX86InstIdFwait_ExtendedIndex = 62,
-  kX86InstIdFxam_ExtendedIndex = 52,
-  kX86InstIdFxch_ExtendedIndex = 63,
-  kX86InstIdFxrstor_ExtendedIndex = 55,
-  kX86InstIdFxsave_ExtendedIndex = 55,
-  kX86InstIdFxtract_ExtendedIndex = 52,
-  kX86InstIdFyl2x_ExtendedIndex = 52,
-  kX86InstIdFyl2xp1_ExtendedIndex = 52,
-  kX86InstIdHaddpd_ExtendedIndex = 3,
-  kX86InstIdHaddps_ExtendedIndex = 3,
-  kX86InstIdHsubpd_ExtendedIndex = 3,
-  kX86InstIdHsubps_ExtendedIndex = 3,
-  kX86InstIdIdiv_ExtendedIndex = 73,
-  kX86InstIdImul_ExtendedIndex = 74,
-  kX86InstIdInc_ExtendedIndex = 75,
-  kX86InstIdInsertps_ExtendedIndex = 4,
-  kX86InstIdInsertq_ExtendedIndex = 76,
-  kX86InstIdInt_ExtendedIndex = 77,
-  kX86InstIdJa_ExtendedIndex = 78,
-  kX86InstIdJae_ExtendedIndex = 79,
-  kX86InstIdJb_ExtendedIndex = 79,
-  kX86InstIdJbe_ExtendedIndex = 78,
-  kX86InstIdJc_ExtendedIndex = 79,
-  kX86InstIdJe_ExtendedIndex = 80,
-  kX86InstIdJg_ExtendedIndex = 81,
-  kX86InstIdJge_ExtendedIndex = 82,
-  kX86InstIdJl_ExtendedIndex = 82,
-  kX86InstIdJle_ExtendedIndex = 81,
-  kX86InstIdJna_ExtendedIndex = 78,
-  kX86InstIdJnae_ExtendedIndex = 79,
-  kX86InstIdJnb_ExtendedIndex = 79,
-  kX86InstIdJnbe_ExtendedIndex = 78,
-  kX86InstIdJnc_ExtendedIndex = 79,
-  kX86InstIdJne_ExtendedIndex = 80,
-  kX86InstIdJng_ExtendedIndex = 81,
-  kX86InstIdJnge_ExtendedIndex = 82,
-  kX86InstIdJnl_ExtendedIndex = 82,
-  kX86InstIdJnle_ExtendedIndex = 81,
-  kX86InstIdJno_ExtendedIndex = 83,
-  kX86InstIdJnp_ExtendedIndex = 84,
-  kX86InstIdJns_ExtendedIndex = 85,
-  kX86InstIdJnz_ExtendedIndex = 80,
-  kX86InstIdJo_ExtendedIndex = 83,
-  kX86InstIdJp_ExtendedIndex = 84,
-  kX86InstIdJpe_ExtendedIndex = 84,
-  kX86InstIdJpo_ExtendedIndex = 84,
-  kX86InstIdJs_ExtendedIndex = 85,
-  kX86InstIdJz_ExtendedIndex = 80,
-  kX86InstIdJecxz_ExtendedIndex = 86,
-  kX86InstIdJmp_ExtendedIndex = 87,
-  kX86InstIdLahf_ExtendedIndex = 88,
-  kX86InstIdLddqu_ExtendedIndex = 89,
-  kX86InstIdLdmxcsr_ExtendedIndex = 19,
-  kX86InstIdLea_ExtendedIndex = 90,
-  kX86InstIdLeave_ExtendedIndex = 16,
-  kX86InstIdLfence_ExtendedIndex = 91,
-  kX86InstIdLodsB_ExtendedIndex = 92,
-  kX86InstIdLodsD_ExtendedIndex = 93,
-  kX86InstIdLodsQ_ExtendedIndex = 94,
-  kX86InstIdLodsW_ExtendedIndex = 95,
-  kX86InstIdLzcnt_ExtendedIndex = 9,
-  kX86InstIdMaskmovdqu_ExtendedIndex = 96,
-  kX86InstIdMaskmovq_ExtendedIndex = 97,
-  kX86InstIdMaxpd_ExtendedIndex = 3,
-  kX86InstIdMaxps_ExtendedIndex = 3,
-  kX86InstIdMaxsd_ExtendedIndex = 3,
-  kX86InstIdMaxss_ExtendedIndex = 3,
-  kX86InstIdMfence_ExtendedIndex = 91,
-  kX86InstIdMinpd_ExtendedIndex = 3,
-  kX86InstIdMinps_ExtendedIndex = 3,
-  kX86InstIdMinsd_ExtendedIndex = 3,
-  kX86InstIdMinss_ExtendedIndex = 3,
-  kX86InstIdMonitor_ExtendedIndex = 16,
-  kX86InstIdMov_ExtendedIndex = 98,
-  kX86InstIdMovPtr_ExtendedIndex = 99,
-  kX86InstIdMovapd_ExtendedIndex = 100,
-  kX86InstIdMovaps_ExtendedIndex = 101,
-  kX86InstIdMovbe_ExtendedIndex = 102,
-  kX86InstIdMovd_ExtendedIndex = 103,
-  kX86InstIdMovddup_ExtendedIndex = 104,
-  kX86InstIdMovdq2q_ExtendedIndex = 105,
-  kX86InstIdMovdqa_ExtendedIndex = 106,
-  kX86InstIdMovdqu_ExtendedIndex = 107,
-  kX86InstIdMovhlps_ExtendedIndex = 108,
-  kX86InstIdMovhpd_ExtendedIndex = 109,
-  kX86InstIdMovhps_ExtendedIndex = 110,
-  kX86InstIdMovlhps_ExtendedIndex = 111,
-  kX86InstIdMovlpd_ExtendedIndex = 112,
-  kX86InstIdMovlps_ExtendedIndex = 113,
-  kX86InstIdMovmskpd_ExtendedIndex = 114,
-  kX86InstIdMovmskps_ExtendedIndex = 114,
-  kX86InstIdMovntdq_ExtendedIndex = 115,
-  kX86InstIdMovntdqa_ExtendedIndex = 116,
-  kX86InstIdMovnti_ExtendedIndex = 117,
-  kX86InstIdMovntpd_ExtendedIndex = 118,
-  kX86InstIdMovntps_ExtendedIndex = 119,
-  kX86InstIdMovntq_ExtendedIndex = 120,
-  kX86InstIdMovntsd_ExtendedIndex = 121,
-  kX86InstIdMovntss_ExtendedIndex = 122,
-  kX86InstIdMovq_ExtendedIndex = 123,
-  kX86InstIdMovq2dq_ExtendedIndex = 124,
-  kX86InstIdMovsB_ExtendedIndex = 16,
-  kX86InstIdMovsD_ExtendedIndex = 125,
-  kX86InstIdMovsQ_ExtendedIndex = 16,
-  kX86InstIdMovsW_ExtendedIndex = 126,
-  kX86InstIdMovsd_ExtendedIndex = 127,
-  kX86InstIdMovshdup_ExtendedIndex = 36,
-  kX86InstIdMovsldup_ExtendedIndex = 36,
-  kX86InstIdMovss_ExtendedIndex = 128,
-  kX86InstIdMovsx_ExtendedIndex = 129,
-  kX86InstIdMovsxd_ExtendedIndex = 130,
-  kX86InstIdMovupd_ExtendedIndex = 131,
-  kX86InstIdMovups_ExtendedIndex = 132,
-  kX86InstIdMovzx_ExtendedIndex = 129,
-  kX86InstIdMpsadbw_ExtendedIndex = 4,
-  kX86InstIdMul_ExtendedIndex = 73,
-  kX86InstIdMulpd_ExtendedIndex = 3,
-  kX86InstIdMulps_ExtendedIndex = 3,
-  kX86InstIdMulsd_ExtendedIndex = 3,
-  kX86InstIdMulss_ExtendedIndex = 3,
-  kX86InstIdMulx_ExtendedIndex = 133,
-  kX86InstIdMwait_ExtendedIndex = 16,
-  kX86InstIdNeg_ExtendedIndex = 134,
-  kX86InstIdNop_ExtendedIndex = 48,
-  kX86InstIdNot_ExtendedIndex = 135,
-  kX86InstIdOr_ExtendedIndex = 2,
-  kX86InstIdOrpd_ExtendedIndex = 3,
-  kX86InstIdOrps_ExtendedIndex = 3,
-  kX86InstIdPabsb_ExtendedIndex = 136,
-  kX86InstIdPabsd_ExtendedIndex = 136,
-  kX86InstIdPabsw_ExtendedIndex = 136,
-  kX86InstIdPackssdw_ExtendedIndex = 136,
-  kX86InstIdPacksswb_ExtendedIndex = 136,
-  kX86InstIdPackusdw_ExtendedIndex = 3,
-  kX86InstIdPackuswb_ExtendedIndex = 136,
-  kX86InstIdPaddb_ExtendedIndex = 136,
-  kX86InstIdPaddd_ExtendedIndex = 136,
-  kX86InstIdPaddq_ExtendedIndex = 136,
-  kX86InstIdPaddsb_ExtendedIndex = 136,
-  kX86InstIdPaddsw_ExtendedIndex = 136,
-  kX86InstIdPaddusb_ExtendedIndex = 136,
-  kX86InstIdPaddusw_ExtendedIndex = 136,
-  kX86InstIdPaddw_ExtendedIndex = 136,
-  kX86InstIdPalignr_ExtendedIndex = 137,
-  kX86InstIdPand_ExtendedIndex = 136,
-  kX86InstIdPandn_ExtendedIndex = 136,
-  kX86InstIdPause_ExtendedIndex = 48,
-  kX86InstIdPavgb_ExtendedIndex = 136,
-  kX86InstIdPavgw_ExtendedIndex = 136,
-  kX86InstIdPblendvb_ExtendedIndex = 7,
-  kX86InstIdPblendw_ExtendedIndex = 4,
-  kX86InstIdPclmulqdq_ExtendedIndex = 4,
-  kX86InstIdPcmpeqb_ExtendedIndex = 136,
-  kX86InstIdPcmpeqd_ExtendedIndex = 136,
-  kX86InstIdPcmpeqq_ExtendedIndex = 3,
-  kX86InstIdPcmpeqw_ExtendedIndex = 136,
-  kX86InstIdPcmpestri_ExtendedIndex = 4,
-  kX86InstIdPcmpestrm_ExtendedIndex = 4,
-  kX86InstIdPcmpgtb_ExtendedIndex = 136,
-  kX86InstIdPcmpgtd_ExtendedIndex = 136,
-  kX86InstIdPcmpgtq_ExtendedIndex = 3,
-  kX86InstIdPcmpgtw_ExtendedIndex = 136,
-  kX86InstIdPcmpistri_ExtendedIndex = 4,
-  kX86InstIdPcmpistrm_ExtendedIndex = 4,
-  kX86InstIdPdep_ExtendedIndex = 133,
-  kX86InstIdPext_ExtendedIndex = 133,
-  kX86InstIdPextrb_ExtendedIndex = 138,
-  kX86InstIdPextrd_ExtendedIndex = 139,
-  kX86InstIdPextrq_ExtendedIndex = 140,
-  kX86InstIdPextrw_ExtendedIndex = 141,
-  kX86InstIdPf2id_ExtendedIndex = 142,
-  kX86InstIdPf2iw_ExtendedIndex = 142,
-  kX86InstIdPfacc_ExtendedIndex = 142,
-  kX86InstIdPfadd_ExtendedIndex = 142,
-  kX86InstIdPfcmpeq_ExtendedIndex = 142,
-  kX86InstIdPfcmpge_ExtendedIndex = 142,
-  kX86InstIdPfcmpgt_ExtendedIndex = 142,
-  kX86InstIdPfmax_ExtendedIndex = 142,
-  kX86InstIdPfmin_ExtendedIndex = 142,
-  kX86InstIdPfmul_ExtendedIndex = 142,
-  kX86InstIdPfnacc_ExtendedIndex = 142,
-  kX86InstIdPfpnacc_ExtendedIndex = 142,
-  kX86InstIdPfrcp_ExtendedIndex = 142,
-  kX86InstIdPfrcpit1_ExtendedIndex = 142,
-  kX86InstIdPfrcpit2_ExtendedIndex = 142,
-  kX86InstIdPfrsqit1_ExtendedIndex = 142,
-  kX86InstIdPfrsqrt_ExtendedIndex = 142,
-  kX86InstIdPfsub_ExtendedIndex = 142,
-  kX86InstIdPfsubr_ExtendedIndex = 142,
-  kX86InstIdPhaddd_ExtendedIndex = 136,
-  kX86InstIdPhaddsw_ExtendedIndex = 136,
-  kX86InstIdPhaddw_ExtendedIndex = 136,
-  kX86InstIdPhminposuw_ExtendedIndex = 3,
-  kX86InstIdPhsubd_ExtendedIndex = 136,
-  kX86InstIdPhsubsw_ExtendedIndex = 136,
-  kX86InstIdPhsubw_ExtendedIndex = 136,
-  kX86InstIdPi2fd_ExtendedIndex = 142,
-  kX86InstIdPi2fw_ExtendedIndex = 142,
-  kX86InstIdPinsrb_ExtendedIndex = 143,
-  kX86InstIdPinsrd_ExtendedIndex = 143,
-  kX86InstIdPinsrq_ExtendedIndex = 144,
-  kX86InstIdPinsrw_ExtendedIndex = 145,
-  kX86InstIdPmaddubsw_ExtendedIndex = 136,
-  kX86InstIdPmaddwd_ExtendedIndex = 136,
-  kX86InstIdPmaxsb_ExtendedIndex = 3,
-  kX86InstIdPmaxsd_ExtendedIndex = 3,
-  kX86InstIdPmaxsw_ExtendedIndex = 136,
-  kX86InstIdPmaxub_ExtendedIndex = 136,
-  kX86InstIdPmaxud_ExtendedIndex = 3,
-  kX86InstIdPmaxuw_ExtendedIndex = 3,
-  kX86InstIdPminsb_ExtendedIndex = 3,
-  kX86InstIdPminsd_ExtendedIndex = 3,
-  kX86InstIdPminsw_ExtendedIndex = 136,
-  kX86InstIdPminub_ExtendedIndex = 136,
-  kX86InstIdPminud_ExtendedIndex = 3,
-  kX86InstIdPminuw_ExtendedIndex = 3,
-  kX86InstIdPmovmskb_ExtendedIndex = 146,
-  kX86InstIdPmovsxbd_ExtendedIndex = 36,
-  kX86InstIdPmovsxbq_ExtendedIndex = 36,
-  kX86InstIdPmovsxbw_ExtendedIndex = 36,
-  kX86InstIdPmovsxdq_ExtendedIndex = 36,
-  kX86InstIdPmovsxwd_ExtendedIndex = 36,
-  kX86InstIdPmovsxwq_ExtendedIndex = 36,
-  kX86InstIdPmovzxbd_ExtendedIndex = 36,
-  kX86InstIdPmovzxbq_ExtendedIndex = 36,
-  kX86InstIdPmovzxbw_ExtendedIndex = 36,
-  kX86InstIdPmovzxdq_ExtendedIndex = 36,
-  kX86InstIdPmovzxwd_ExtendedIndex = 36,
-  kX86InstIdPmovzxwq_ExtendedIndex = 36,
-  kX86InstIdPmuldq_ExtendedIndex = 3,
-  kX86InstIdPmulhrsw_ExtendedIndex = 136,
-  kX86InstIdPmulhuw_ExtendedIndex = 136,
-  kX86InstIdPmulhw_ExtendedIndex = 136,
-  kX86InstIdPmulld_ExtendedIndex = 3,
-  kX86InstIdPmullw_ExtendedIndex = 136,
-  kX86InstIdPmuludq_ExtendedIndex = 136,
-  kX86InstIdPop_ExtendedIndex = 147,
-  kX86InstIdPopa_ExtendedIndex = 16,
-  kX86InstIdPopcnt_ExtendedIndex = 9,
-  kX86InstIdPopf_ExtendedIndex = 148,
-  kX86InstIdPor_ExtendedIndex = 136,
-  kX86InstIdPrefetch_ExtendedIndex = 149,
-  kX86InstIdPrefetch3dNow_ExtendedIndex = 19,
-  kX86InstIdPrefetchw3dNow_ExtendedIndex = 19,
-  kX86InstIdPsadbw_ExtendedIndex = 136,
-  kX86InstIdPshufb_ExtendedIndex = 136,
-  kX86InstIdPshufd_ExtendedIndex = 150,
-  kX86InstIdPshufhw_ExtendedIndex = 150,
-  kX86InstIdPshuflw_ExtendedIndex = 150,
-  kX86InstIdPshufw_ExtendedIndex = 151,
-  kX86InstIdPsignb_ExtendedIndex = 136,
-  kX86InstIdPsignd_ExtendedIndex = 136,
-  kX86InstIdPsignw_ExtendedIndex = 136,
-  kX86InstIdPslld_ExtendedIndex = 152,
-  kX86InstIdPslldq_ExtendedIndex = 153,
-  kX86InstIdPsllq_ExtendedIndex = 154,
-  kX86InstIdPsllw_ExtendedIndex = 155,
-  kX86InstIdPsrad_ExtendedIndex = 156,
-  kX86InstIdPsraw_ExtendedIndex = 157,
-  kX86InstIdPsrld_ExtendedIndex = 158,
-  kX86InstIdPsrldq_ExtendedIndex = 159,
-  kX86InstIdPsrlq_ExtendedIndex = 160,
-  kX86InstIdPsrlw_ExtendedIndex = 161,
-  kX86InstIdPsubb_ExtendedIndex = 136,
-  kX86InstIdPsubd_ExtendedIndex = 136,
-  kX86InstIdPsubq_ExtendedIndex = 136,
-  kX86InstIdPsubsb_ExtendedIndex = 136,
-  kX86InstIdPsubsw_ExtendedIndex = 136,
-  kX86InstIdPsubusb_ExtendedIndex = 136,
-  kX86InstIdPsubusw_ExtendedIndex = 136,
-  kX86InstIdPsubw_ExtendedIndex = 136,
-  kX86InstIdPswapd_ExtendedIndex = 142,
-  kX86InstIdPtest_ExtendedIndex = 34,
-  kX86InstIdPunpckhbw_ExtendedIndex = 136,
-  kX86InstIdPunpckhdq_ExtendedIndex = 136,
-  kX86InstIdPunpckhqdq_ExtendedIndex = 3,
-  kX86InstIdPunpckhwd_ExtendedIndex = 136,
-  kX86InstIdPunpcklbw_ExtendedIndex = 136,
-  kX86InstIdPunpckldq_ExtendedIndex = 136,
-  kX86InstIdPunpcklqdq_ExtendedIndex = 3,
-  kX86InstIdPunpcklwd_ExtendedIndex = 136,
-  kX86InstIdPush_ExtendedIndex = 162,
-  kX86InstIdPusha_ExtendedIndex = 16,
-  kX86InstIdPushf_ExtendedIndex = 163,
-  kX86InstIdPxor_ExtendedIndex = 136,
-  kX86InstIdRcl_ExtendedIndex = 164,
-  kX86InstIdRcpps_ExtendedIndex = 36,
-  kX86InstIdRcpss_ExtendedIndex = 41,
-  kX86InstIdRcr_ExtendedIndex = 164,
-  kX86InstIdRdfsbase_ExtendedIndex = 165,
-  kX86InstIdRdgsbase_ExtendedIndex = 165,
-  kX86InstIdRdrand_ExtendedIndex = 166,
-  kX86InstIdRdtsc_ExtendedIndex = 16,
-  kX86InstIdRdtscp_ExtendedIndex = 16,
-  kX86InstIdRepLodsB_ExtendedIndex = 167,
-  kX86InstIdRepLodsD_ExtendedIndex = 167,
-  kX86InstIdRepLodsQ_ExtendedIndex = 167,
-  kX86InstIdRepLodsW_ExtendedIndex = 167,
-  kX86InstIdRepMovsB_ExtendedIndex = 168,
-  kX86InstIdRepMovsD_ExtendedIndex = 168,
-  kX86InstIdRepMovsQ_ExtendedIndex = 168,
-  kX86InstIdRepMovsW_ExtendedIndex = 168,
-  kX86InstIdRepStosB_ExtendedIndex = 167,
-  kX86InstIdRepStosD_ExtendedIndex = 167,
-  kX86InstIdRepStosQ_ExtendedIndex = 167,
-  kX86InstIdRepStosW_ExtendedIndex = 167,
-  kX86InstIdRepeCmpsB_ExtendedIndex = 169,
-  kX86InstIdRepeCmpsD_ExtendedIndex = 169,
-  kX86InstIdRepeCmpsQ_ExtendedIndex = 169,
-  kX86InstIdRepeCmpsW_ExtendedIndex = 169,
-  kX86InstIdRepeScasB_ExtendedIndex = 169,
-  kX86InstIdRepeScasD_ExtendedIndex = 169,
-  kX86InstIdRepeScasQ_ExtendedIndex = 169,
-  kX86InstIdRepeScasW_ExtendedIndex = 169,
-  kX86InstIdRepneCmpsB_ExtendedIndex = 169,
-  kX86InstIdRepneCmpsD_ExtendedIndex = 169,
-  kX86InstIdRepneCmpsQ_ExtendedIndex = 169,
-  kX86InstIdRepneCmpsW_ExtendedIndex = 169,
-  kX86InstIdRepneScasB_ExtendedIndex = 169,
-  kX86InstIdRepneScasD_ExtendedIndex = 169,
-  kX86InstIdRepneScasQ_ExtendedIndex = 169,
-  kX86InstIdRepneScasW_ExtendedIndex = 169,
-  kX86InstIdRet_ExtendedIndex = 170,
-  kX86InstIdRol_ExtendedIndex = 171,
-  kX86InstIdRor_ExtendedIndex = 171,
-  kX86InstIdRorx_ExtendedIndex = 172,
-  kX86InstIdRoundpd_ExtendedIndex = 150,
-  kX86InstIdRoundps_ExtendedIndex = 150,
-  kX86InstIdRoundsd_ExtendedIndex = 173,
-  kX86InstIdRoundss_ExtendedIndex = 174,
-  kX86InstIdRsqrtps_ExtendedIndex = 36,
-  kX86InstIdRsqrtss_ExtendedIndex = 41,
-  kX86InstIdSahf_ExtendedIndex = 175,
-  kX86InstIdSal_ExtendedIndex = 176,
-  kX86InstIdSar_ExtendedIndex = 176,
-  kX86InstIdSarx_ExtendedIndex = 177,
-  kX86InstIdSbb_ExtendedIndex = 1,
-  kX86InstIdScasB_ExtendedIndex = 30,
-  kX86InstIdScasD_ExtendedIndex = 30,
-  kX86InstIdScasQ_ExtendedIndex = 30,
-  kX86InstIdScasW_ExtendedIndex = 31,
-  kX86InstIdSeta_ExtendedIndex = 178,
-  kX86InstIdSetae_ExtendedIndex = 179,
-  kX86InstIdSetb_ExtendedIndex = 179,
-  kX86InstIdSetbe_ExtendedIndex = 178,
-  kX86InstIdSetc_ExtendedIndex = 179,
-  kX86InstIdSete_ExtendedIndex = 180,
-  kX86InstIdSetg_ExtendedIndex = 181,
-  kX86InstIdSetge_ExtendedIndex = 182,
-  kX86InstIdSetl_ExtendedIndex = 182,
-  kX86InstIdSetle_ExtendedIndex = 181,
-  kX86InstIdSetna_ExtendedIndex = 178,
-  kX86InstIdSetnae_ExtendedIndex = 179,
-  kX86InstIdSetnb_ExtendedIndex = 179,
-  kX86InstIdSetnbe_ExtendedIndex = 178,
-  kX86InstIdSetnc_ExtendedIndex = 179,
-  kX86InstIdSetne_ExtendedIndex = 180,
-  kX86InstIdSetng_ExtendedIndex = 181,
-  kX86InstIdSetnge_ExtendedIndex = 182,
-  kX86InstIdSetnl_ExtendedIndex = 182,
-  kX86InstIdSetnle_ExtendedIndex = 181,
-  kX86InstIdSetno_ExtendedIndex = 183,
-  kX86InstIdSetnp_ExtendedIndex = 184,
-  kX86InstIdSetns_ExtendedIndex = 185,
-  kX86InstIdSetnz_ExtendedIndex = 180,
-  kX86InstIdSeto_ExtendedIndex = 183,
-  kX86InstIdSetp_ExtendedIndex = 184,
-  kX86InstIdSetpe_ExtendedIndex = 184,
-  kX86InstIdSetpo_ExtendedIndex = 184,
-  kX86InstIdSets_ExtendedIndex = 185,
-  kX86InstIdSetz_ExtendedIndex = 180,
-  kX86InstIdSfence_ExtendedIndex = 91,
-  kX86InstIdShl_ExtendedIndex = 176,
-  kX86InstIdShld_ExtendedIndex = 186,
-  kX86InstIdShlx_ExtendedIndex = 177,
-  kX86InstIdShr_ExtendedIndex = 176,
-  kX86InstIdShrd_ExtendedIndex = 187,
-  kX86InstIdShrx_ExtendedIndex = 177,
-  kX86InstIdShufpd_ExtendedIndex = 4,
-  kX86InstIdShufps_ExtendedIndex = 4,
-  kX86InstIdSqrtpd_ExtendedIndex = 36,
-  kX86InstIdSqrtps_ExtendedIndex = 36,
-  kX86InstIdSqrtsd_ExtendedIndex = 44,
-  kX86InstIdSqrtss_ExtendedIndex = 41,
-  kX86InstIdStc_ExtendedIndex = 17,
-  kX86InstIdStd_ExtendedIndex = 18,
-  kX86InstIdStmxcsr_ExtendedIndex = 19,
-  kX86InstIdStosB_ExtendedIndex = 188,
-  kX86InstIdStosD_ExtendedIndex = 188,
-  kX86InstIdStosQ_ExtendedIndex = 188,
-  kX86InstIdStosW_ExtendedIndex = 189,
-  kX86InstIdSub_ExtendedIndex = 2,
-  kX86InstIdSubpd_ExtendedIndex = 3,
-  kX86InstIdSubps_ExtendedIndex = 3,
-  kX86InstIdSubsd_ExtendedIndex = 3,
-  kX86InstIdSubss_ExtendedIndex = 3,
-  kX86InstIdTest_ExtendedIndex = 190,
-  kX86InstIdTzcnt_ExtendedIndex = 191,
-  kX86InstIdUcomisd_ExtendedIndex = 34,
-  kX86InstIdUcomiss_ExtendedIndex = 34,
-  kX86InstIdUd2_ExtendedIndex = 48,
-  kX86InstIdUnpckhpd_ExtendedIndex = 3,
-  kX86InstIdUnpckhps_ExtendedIndex = 3,
-  kX86InstIdUnpcklpd_ExtendedIndex = 3,
-  kX86InstIdUnpcklps_ExtendedIndex = 3,
-  kX86InstIdVaddpd_ExtendedIndex = 192,
-  kX86InstIdVaddps_ExtendedIndex = 192,
-  kX86InstIdVaddsd_ExtendedIndex = 193,
-  kX86InstIdVaddss_ExtendedIndex = 193,
-  kX86InstIdVaddsubpd_ExtendedIndex = 192,
-  kX86InstIdVaddsubps_ExtendedIndex = 192,
-  kX86InstIdVaesdec_ExtendedIndex = 193,
-  kX86InstIdVaesdeclast_ExtendedIndex = 193,
-  kX86InstIdVaesenc_ExtendedIndex = 193,
-  kX86InstIdVaesenclast_ExtendedIndex = 193,
-  kX86InstIdVaesimc_ExtendedIndex = 194,
-  kX86InstIdVaeskeygenassist_ExtendedIndex = 195,
-  kX86InstIdVandnpd_ExtendedIndex = 192,
-  kX86InstIdVandnps_ExtendedIndex = 192,
-  kX86InstIdVandpd_ExtendedIndex = 192,
-  kX86InstIdVandps_ExtendedIndex = 192,
-  kX86InstIdVblendpd_ExtendedIndex = 196,
-  kX86InstIdVblendps_ExtendedIndex = 196,
-  kX86InstIdVblendvpd_ExtendedIndex = 197,
-  kX86InstIdVblendvps_ExtendedIndex = 197,
-  kX86InstIdVbroadcastf128_ExtendedIndex = 198,
-  kX86InstIdVbroadcasti128_ExtendedIndex = 198,
-  kX86InstIdVbroadcastsd_ExtendedIndex = 199,
-  kX86InstIdVbroadcastss_ExtendedIndex = 200,
-  kX86InstIdVcmppd_ExtendedIndex = 196,
-  kX86InstIdVcmpps_ExtendedIndex = 196,
-  kX86InstIdVcmpsd_ExtendedIndex = 201,
-  kX86InstIdVcmpss_ExtendedIndex = 201,
-  kX86InstIdVcomisd_ExtendedIndex = 194,
-  kX86InstIdVcomiss_ExtendedIndex = 194,
-  kX86InstIdVcvtdq2pd_ExtendedIndex = 202,
-  kX86InstIdVcvtdq2ps_ExtendedIndex = 203,
-  kX86InstIdVcvtpd2dq_ExtendedIndex = 204,
-  kX86InstIdVcvtpd2ps_ExtendedIndex = 204,
-  kX86InstIdVcvtph2ps_ExtendedIndex = 202,
-  kX86InstIdVcvtps2dq_ExtendedIndex = 203,
-  kX86InstIdVcvtps2pd_ExtendedIndex = 202,
-  kX86InstIdVcvtps2ph_ExtendedIndex = 205,
-  kX86InstIdVcvtsd2si_ExtendedIndex = 206,
-  kX86InstIdVcvtsd2ss_ExtendedIndex = 193,
-  kX86InstIdVcvtsi2sd_ExtendedIndex = 207,
-  kX86InstIdVcvtsi2ss_ExtendedIndex = 207,
-  kX86InstIdVcvtss2sd_ExtendedIndex = 193,
-  kX86InstIdVcvtss2si_ExtendedIndex = 206,
-  kX86InstIdVcvttpd2dq_ExtendedIndex = 208,
-  kX86InstIdVcvttps2dq_ExtendedIndex = 203,
-  kX86InstIdVcvttsd2si_ExtendedIndex = 206,
-  kX86InstIdVcvttss2si_ExtendedIndex = 206,
-  kX86InstIdVdivpd_ExtendedIndex = 192,
-  kX86InstIdVdivps_ExtendedIndex = 192,
-  kX86InstIdVdivsd_ExtendedIndex = 193,
-  kX86InstIdVdivss_ExtendedIndex = 193,
-  kX86InstIdVdppd_ExtendedIndex = 201,
-  kX86InstIdVdpps_ExtendedIndex = 196,
-  kX86InstIdVextractf128_ExtendedIndex = 209,
-  kX86InstIdVextracti128_ExtendedIndex = 209,
-  kX86InstIdVextractps_ExtendedIndex = 210,
-  kX86InstIdVfmadd132pd_ExtendedIndex = 192,
-  kX86InstIdVfmadd132ps_ExtendedIndex = 192,
-  kX86InstIdVfmadd132sd_ExtendedIndex = 193,
-  kX86InstIdVfmadd132ss_ExtendedIndex = 193,
-  kX86InstIdVfmadd213pd_ExtendedIndex = 192,
-  kX86InstIdVfmadd213ps_ExtendedIndex = 192,
-  kX86InstIdVfmadd213sd_ExtendedIndex = 193,
-  kX86InstIdVfmadd213ss_ExtendedIndex = 193,
-  kX86InstIdVfmadd231pd_ExtendedIndex = 192,
-  kX86InstIdVfmadd231ps_ExtendedIndex = 192,
-  kX86InstIdVfmadd231sd_ExtendedIndex = 193,
-  kX86InstIdVfmadd231ss_ExtendedIndex = 193,
-  kX86InstIdVfmaddpd_ExtendedIndex = 211,
-  kX86InstIdVfmaddps_ExtendedIndex = 211,
-  kX86InstIdVfmaddsd_ExtendedIndex = 212,
-  kX86InstIdVfmaddss_ExtendedIndex = 212,
-  kX86InstIdVfmaddsub132pd_ExtendedIndex = 192,
-  kX86InstIdVfmaddsub132ps_ExtendedIndex = 192,
-  kX86InstIdVfmaddsub213pd_ExtendedIndex = 192,
-  kX86InstIdVfmaddsub213ps_ExtendedIndex = 192,
-  kX86InstIdVfmaddsub231pd_ExtendedIndex = 192,
-  kX86InstIdVfmaddsub231ps_ExtendedIndex = 192,
-  kX86InstIdVfmaddsubpd_ExtendedIndex = 211,
-  kX86InstIdVfmaddsubps_ExtendedIndex = 211,
-  kX86InstIdVfmsub132pd_ExtendedIndex = 192,
-  kX86InstIdVfmsub132ps_ExtendedIndex = 192,
-  kX86InstIdVfmsub132sd_ExtendedIndex = 193,
-  kX86InstIdVfmsub132ss_ExtendedIndex = 193,
-  kX86InstIdVfmsub213pd_ExtendedIndex = 192,
-  kX86InstIdVfmsub213ps_ExtendedIndex = 192,
-  kX86InstIdVfmsub213sd_ExtendedIndex = 193,
-  kX86InstIdVfmsub213ss_ExtendedIndex = 193,
-  kX86InstIdVfmsub231pd_ExtendedIndex = 192,
-  kX86InstIdVfmsub231ps_ExtendedIndex = 192,
-  kX86InstIdVfmsub231sd_ExtendedIndex = 193,
-  kX86InstIdVfmsub231ss_ExtendedIndex = 193,
-  kX86InstIdVfmsubadd132pd_ExtendedIndex = 192,
-  kX86InstIdVfmsubadd132ps_ExtendedIndex = 192,
-  kX86InstIdVfmsubadd213pd_ExtendedIndex = 192,
-  kX86InstIdVfmsubadd213ps_ExtendedIndex = 192,
-  kX86InstIdVfmsubadd231pd_ExtendedIndex = 192,
-  kX86InstIdVfmsubadd231ps_ExtendedIndex = 192,
-  kX86InstIdVfmsubaddpd_ExtendedIndex = 211,
-  kX86InstIdVfmsubaddps_ExtendedIndex = 211,
-  kX86InstIdVfmsubpd_ExtendedIndex = 211,
-  kX86InstIdVfmsubps_ExtendedIndex = 211,
-  kX86InstIdVfmsubsd_ExtendedIndex = 212,
-  kX86InstIdVfmsubss_ExtendedIndex = 212,
-  kX86InstIdVfnmadd132pd_ExtendedIndex = 192,
-  kX86InstIdVfnmadd132ps_ExtendedIndex = 192,
-  kX86InstIdVfnmadd132sd_ExtendedIndex = 193,
-  kX86InstIdVfnmadd132ss_ExtendedIndex = 193,
-  kX86InstIdVfnmadd213pd_ExtendedIndex = 192,
-  kX86InstIdVfnmadd213ps_ExtendedIndex = 192,
-  kX86InstIdVfnmadd213sd_ExtendedIndex = 193,
-  kX86InstIdVfnmadd213ss_ExtendedIndex = 193,
-  kX86InstIdVfnmadd231pd_ExtendedIndex = 192,
-  kX86InstIdVfnmadd231ps_ExtendedIndex = 192,
-  kX86InstIdVfnmadd231sd_ExtendedIndex = 193,
-  kX86InstIdVfnmadd231ss_ExtendedIndex = 193,
-  kX86InstIdVfnmaddpd_ExtendedIndex = 211,
-  kX86InstIdVfnmaddps_ExtendedIndex = 211,
-  kX86InstIdVfnmaddsd_ExtendedIndex = 212,
-  kX86InstIdVfnmaddss_ExtendedIndex = 212,
-  kX86InstIdVfnmsub132pd_ExtendedIndex = 192,
-  kX86InstIdVfnmsub132ps_ExtendedIndex = 192,
-  kX86InstIdVfnmsub132sd_ExtendedIndex = 193,
-  kX86InstIdVfnmsub132ss_ExtendedIndex = 193,
-  kX86InstIdVfnmsub213pd_ExtendedIndex = 192,
-  kX86InstIdVfnmsub213ps_ExtendedIndex = 192,
-  kX86InstIdVfnmsub213sd_ExtendedIndex = 193,
-  kX86InstIdVfnmsub213ss_ExtendedIndex = 193,
-  kX86InstIdVfnmsub231pd_ExtendedIndex = 192,
-  kX86InstIdVfnmsub231ps_ExtendedIndex = 192,
-  kX86InstIdVfnmsub231sd_ExtendedIndex = 193,
-  kX86InstIdVfnmsub231ss_ExtendedIndex = 193,
-  kX86InstIdVfnmsubpd_ExtendedIndex = 211,
-  kX86InstIdVfnmsubps_ExtendedIndex = 211,
-  kX86InstIdVfnmsubsd_ExtendedIndex = 212,
-  kX86InstIdVfnmsubss_ExtendedIndex = 212,
-  kX86InstIdVfrczpd_ExtendedIndex = 213,
-  kX86InstIdVfrczps_ExtendedIndex = 213,
-  kX86InstIdVfrczsd_ExtendedIndex = 214,
-  kX86InstIdVfrczss_ExtendedIndex = 214,
-  kX86InstIdVgatherdpd_ExtendedIndex = 215,
-  kX86InstIdVgatherdps_ExtendedIndex = 215,
-  kX86InstIdVgatherqpd_ExtendedIndex = 215,
-  kX86InstIdVgatherqps_ExtendedIndex = 216,
-  kX86InstIdVhaddpd_ExtendedIndex = 192,
-  kX86InstIdVhaddps_ExtendedIndex = 192,
-  kX86InstIdVhsubpd_ExtendedIndex = 192,
-  kX86InstIdVhsubps_ExtendedIndex = 192,
-  kX86InstIdVinsertf128_ExtendedIndex = 217,
-  kX86InstIdVinserti128_ExtendedIndex = 217,
-  kX86InstIdVinsertps_ExtendedIndex = 201,
-  kX86InstIdVlddqu_ExtendedIndex = 218,
-  kX86InstIdVldmxcsr_ExtendedIndex = 219,
-  kX86InstIdVmaskmovdqu_ExtendedIndex = 220,
-  kX86InstIdVmaskmovpd_ExtendedIndex = 221,
-  kX86InstIdVmaskmovps_ExtendedIndex = 222,
-  kX86InstIdVmaxpd_ExtendedIndex = 192,
-  kX86InstIdVmaxps_ExtendedIndex = 192,
-  kX86InstIdVmaxsd_ExtendedIndex = 192,
-  kX86InstIdVmaxss_ExtendedIndex = 192,
-  kX86InstIdVminpd_ExtendedIndex = 192,
-  kX86InstIdVminps_ExtendedIndex = 192,
-  kX86InstIdVminsd_ExtendedIndex = 192,
-  kX86InstIdVminss_ExtendedIndex = 192,
-  kX86InstIdVmovapd_ExtendedIndex = 223,
-  kX86InstIdVmovaps_ExtendedIndex = 224,
-  kX86InstIdVmovd_ExtendedIndex = 225,
-  kX86InstIdVmovddup_ExtendedIndex = 203,
-  kX86InstIdVmovdqa_ExtendedIndex = 226,
-  kX86InstIdVmovdqu_ExtendedIndex = 227,
-  kX86InstIdVmovhlps_ExtendedIndex = 228,
-  kX86InstIdVmovhpd_ExtendedIndex = 229,
-  kX86InstIdVmovhps_ExtendedIndex = 230,
-  kX86InstIdVmovlhps_ExtendedIndex = 228,
-  kX86InstIdVmovlpd_ExtendedIndex = 231,
-  kX86InstIdVmovlps_ExtendedIndex = 232,
-  kX86InstIdVmovmskpd_ExtendedIndex = 233,
-  kX86InstIdVmovmskps_ExtendedIndex = 233,
-  kX86InstIdVmovntdq_ExtendedIndex = 234,
-  kX86InstIdVmovntdqa_ExtendedIndex = 218,
-  kX86InstIdVmovntpd_ExtendedIndex = 235,
-  kX86InstIdVmovntps_ExtendedIndex = 235,
-  kX86InstIdVmovq_ExtendedIndex = 225,
-  kX86InstIdVmovsd_ExtendedIndex = 236,
-  kX86InstIdVmovshdup_ExtendedIndex = 203,
-  kX86InstIdVmovsldup_ExtendedIndex = 203,
-  kX86InstIdVmovss_ExtendedIndex = 237,
-  kX86InstIdVmovupd_ExtendedIndex = 238,
-  kX86InstIdVmovups_ExtendedIndex = 239,
-  kX86InstIdVmpsadbw_ExtendedIndex = 196,
-  kX86InstIdVmulpd_ExtendedIndex = 192,
-  kX86InstIdVmulps_ExtendedIndex = 192,
-  kX86InstIdVmulsd_ExtendedIndex = 192,
-  kX86InstIdVmulss_ExtendedIndex = 192,
-  kX86InstIdVorpd_ExtendedIndex = 192,
-  kX86InstIdVorps_ExtendedIndex = 192,
-  kX86InstIdVpabsb_ExtendedIndex = 203,
-  kX86InstIdVpabsd_ExtendedIndex = 203,
-  kX86InstIdVpabsw_ExtendedIndex = 203,
-  kX86InstIdVpackssdw_ExtendedIndex = 192,
-  kX86InstIdVpacksswb_ExtendedIndex = 192,
-  kX86InstIdVpackusdw_ExtendedIndex = 192,
-  kX86InstIdVpackuswb_ExtendedIndex = 192,
-  kX86InstIdVpaddb_ExtendedIndex = 192,
-  kX86InstIdVpaddd_ExtendedIndex = 192,
-  kX86InstIdVpaddq_ExtendedIndex = 192,
-  kX86InstIdVpaddsb_ExtendedIndex = 192,
-  kX86InstIdVpaddsw_ExtendedIndex = 192,
-  kX86InstIdVpaddusb_ExtendedIndex = 192,
-  kX86InstIdVpaddusw_ExtendedIndex = 192,
-  kX86InstIdVpaddw_ExtendedIndex = 192,
-  kX86InstIdVpalignr_ExtendedIndex = 196,
-  kX86InstIdVpand_ExtendedIndex = 192,
-  kX86InstIdVpandn_ExtendedIndex = 192,
-  kX86InstIdVpavgb_ExtendedIndex = 192,
-  kX86InstIdVpavgw_ExtendedIndex = 192,
-  kX86InstIdVpblendd_ExtendedIndex = 196,
-  kX86InstIdVpblendvb_ExtendedIndex = 240,
-  kX86InstIdVpblendw_ExtendedIndex = 196,
-  kX86InstIdVpbroadcastb_ExtendedIndex = 202,
-  kX86InstIdVpbroadcastd_ExtendedIndex = 202,
-  kX86InstIdVpbroadcastq_ExtendedIndex = 202,
-  kX86InstIdVpbroadcastw_ExtendedIndex = 202,
-  kX86InstIdVpclmulqdq_ExtendedIndex = 201,
-  kX86InstIdVpcmov_ExtendedIndex = 241,
-  kX86InstIdVpcmpeqb_ExtendedIndex = 192,
-  kX86InstIdVpcmpeqd_ExtendedIndex = 192,
-  kX86InstIdVpcmpeqq_ExtendedIndex = 192,
-  kX86InstIdVpcmpeqw_ExtendedIndex = 192,
-  kX86InstIdVpcmpestri_ExtendedIndex = 195,
-  kX86InstIdVpcmpestrm_ExtendedIndex = 195,
-  kX86InstIdVpcmpgtb_ExtendedIndex = 192,
-  kX86InstIdVpcmpgtd_ExtendedIndex = 192,
-  kX86InstIdVpcmpgtq_ExtendedIndex = 192,
-  kX86InstIdVpcmpgtw_ExtendedIndex = 192,
-  kX86InstIdVpcmpistri_ExtendedIndex = 195,
-  kX86InstIdVpcmpistrm_ExtendedIndex = 195,
-  kX86InstIdVpcomb_ExtendedIndex = 242,
-  kX86InstIdVpcomd_ExtendedIndex = 242,
-  kX86InstIdVpcomq_ExtendedIndex = 242,
-  kX86InstIdVpcomub_ExtendedIndex = 242,
-  kX86InstIdVpcomud_ExtendedIndex = 242,
-  kX86InstIdVpcomuq_ExtendedIndex = 242,
-  kX86InstIdVpcomuw_ExtendedIndex = 242,
-  kX86InstIdVpcomw_ExtendedIndex = 242,
-  kX86InstIdVperm2f128_ExtendedIndex = 243,
-  kX86InstIdVperm2i128_ExtendedIndex = 243,
-  kX86InstIdVpermd_ExtendedIndex = 244,
-  kX86InstIdVpermil2pd_ExtendedIndex = 245,
-  kX86InstIdVpermil2ps_ExtendedIndex = 245,
-  kX86InstIdVpermilpd_ExtendedIndex = 246,
-  kX86InstIdVpermilps_ExtendedIndex = 247,
-  kX86InstIdVpermpd_ExtendedIndex = 248,
-  kX86InstIdVpermps_ExtendedIndex = 244,
-  kX86InstIdVpermq_ExtendedIndex = 248,
-  kX86InstIdVpextrb_ExtendedIndex = 249,
-  kX86InstIdVpextrd_ExtendedIndex = 210,
-  kX86InstIdVpextrq_ExtendedIndex = 250,
-  kX86InstIdVpextrw_ExtendedIndex = 251,
-  kX86InstIdVpgatherdd_ExtendedIndex = 215,
-  kX86InstIdVpgatherdq_ExtendedIndex = 215,
-  kX86InstIdVpgatherqd_ExtendedIndex = 216,
-  kX86InstIdVpgatherqq_ExtendedIndex = 215,
-  kX86InstIdVphaddbd_ExtendedIndex = 214,
-  kX86InstIdVphaddbq_ExtendedIndex = 214,
-  kX86InstIdVphaddbw_ExtendedIndex = 214,
-  kX86InstIdVphaddd_ExtendedIndex = 192,
-  kX86InstIdVphadddq_ExtendedIndex = 214,
-  kX86InstIdVphaddsw_ExtendedIndex = 192,
-  kX86InstIdVphaddubd_ExtendedIndex = 214,
-  kX86InstIdVphaddubq_ExtendedIndex = 214,
-  kX86InstIdVphaddubw_ExtendedIndex = 214,
-  kX86InstIdVphaddudq_ExtendedIndex = 214,
-  kX86InstIdVphadduwd_ExtendedIndex = 214,
-  kX86InstIdVphadduwq_ExtendedIndex = 214,
-  kX86InstIdVphaddw_ExtendedIndex = 192,
-  kX86InstIdVphaddwd_ExtendedIndex = 214,
-  kX86InstIdVphaddwq_ExtendedIndex = 214,
-  kX86InstIdVphminposuw_ExtendedIndex = 194,
-  kX86InstIdVphsubbw_ExtendedIndex = 214,
-  kX86InstIdVphsubd_ExtendedIndex = 192,
-  kX86InstIdVphsubdq_ExtendedIndex = 214,
-  kX86InstIdVphsubsw_ExtendedIndex = 192,
-  kX86InstIdVphsubw_ExtendedIndex = 192,
-  kX86InstIdVphsubwd_ExtendedIndex = 214,
-  kX86InstIdVpinsrb_ExtendedIndex = 252,
-  kX86InstIdVpinsrd_ExtendedIndex = 253,
-  kX86InstIdVpinsrq_ExtendedIndex = 254,
-  kX86InstIdVpinsrw_ExtendedIndex = 255,
-  kX86InstIdVpmacsdd_ExtendedIndex = 256,
-  kX86InstIdVpmacsdqh_ExtendedIndex = 256,
-  kX86InstIdVpmacsdql_ExtendedIndex = 256,
-  kX86InstIdVpmacssdd_ExtendedIndex = 256,
-  kX86InstIdVpmacssdqh_ExtendedIndex = 256,
-  kX86InstIdVpmacssdql_ExtendedIndex = 256,
-  kX86InstIdVpmacsswd_ExtendedIndex = 256,
-  kX86InstIdVpmacssww_ExtendedIndex = 256,
-  kX86InstIdVpmacswd_ExtendedIndex = 256,
-  kX86InstIdVpmacsww_ExtendedIndex = 256,
-  kX86InstIdVpmadcsswd_ExtendedIndex = 256,
-  kX86InstIdVpmadcswd_ExtendedIndex = 256,
-  kX86InstIdVpmaddubsw_ExtendedIndex = 192,
-  kX86InstIdVpmaddwd_ExtendedIndex = 192,
-  kX86InstIdVpmaskmovd_ExtendedIndex = 257,
-  kX86InstIdVpmaskmovq_ExtendedIndex = 257,
-  kX86InstIdVpmaxsb_ExtendedIndex = 192,
-  kX86InstIdVpmaxsd_ExtendedIndex = 192,
-  kX86InstIdVpmaxsw_ExtendedIndex = 192,
-  kX86InstIdVpmaxub_ExtendedIndex = 192,
-  kX86InstIdVpmaxud_ExtendedIndex = 192,
-  kX86InstIdVpmaxuw_ExtendedIndex = 192,
-  kX86InstIdVpminsb_ExtendedIndex = 192,
-  kX86InstIdVpminsd_ExtendedIndex = 192,
-  kX86InstIdVpminsw_ExtendedIndex = 192,
-  kX86InstIdVpminub_ExtendedIndex = 192,
-  kX86InstIdVpminud_ExtendedIndex = 192,
-  kX86InstIdVpminuw_ExtendedIndex = 192,
-  kX86InstIdVpmovmskb_ExtendedIndex = 233,
-  kX86InstIdVpmovsxbd_ExtendedIndex = 203,
-  kX86InstIdVpmovsxbq_ExtendedIndex = 203,
-  kX86InstIdVpmovsxbw_ExtendedIndex = 203,
-  kX86InstIdVpmovsxdq_ExtendedIndex = 203,
-  kX86InstIdVpmovsxwd_ExtendedIndex = 203,
-  kX86InstIdVpmovsxwq_ExtendedIndex = 203,
-  kX86InstIdVpmovzxbd_ExtendedIndex = 203,
-  kX86InstIdVpmovzxbq_ExtendedIndex = 203,
-  kX86InstIdVpmovzxbw_ExtendedIndex = 203,
-  kX86InstIdVpmovzxdq_ExtendedIndex = 203,
-  kX86InstIdVpmovzxwd_ExtendedIndex = 203,
-  kX86InstIdVpmovzxwq_ExtendedIndex = 203,
-  kX86InstIdVpmuldq_ExtendedIndex = 192,
-  kX86InstIdVpmulhrsw_ExtendedIndex = 192,
-  kX86InstIdVpmulhuw_ExtendedIndex = 192,
-  kX86InstIdVpmulhw_ExtendedIndex = 192,
-  kX86InstIdVpmulld_ExtendedIndex = 192,
-  kX86InstIdVpmullw_ExtendedIndex = 192,
-  kX86InstIdVpmuludq_ExtendedIndex = 192,
-  kX86InstIdVpor_ExtendedIndex = 192,
-  kX86InstIdVpperm_ExtendedIndex = 258,
-  kX86InstIdVprotb_ExtendedIndex = 259,
-  kX86InstIdVprotd_ExtendedIndex = 260,
-  kX86InstIdVprotq_ExtendedIndex = 261,
-  kX86InstIdVprotw_ExtendedIndex = 262,
-  kX86InstIdVpsadbw_ExtendedIndex = 192,
-  kX86InstIdVpshab_ExtendedIndex = 263,
-  kX86InstIdVpshad_ExtendedIndex = 263,
-  kX86InstIdVpshaq_ExtendedIndex = 263,
-  kX86InstIdVpshaw_ExtendedIndex = 263,
-  kX86InstIdVpshlb_ExtendedIndex = 263,
-  kX86InstIdVpshld_ExtendedIndex = 263,
-  kX86InstIdVpshlq_ExtendedIndex = 263,
-  kX86InstIdVpshlw_ExtendedIndex = 263,
-  kX86InstIdVpshufb_ExtendedIndex = 192,
-  kX86InstIdVpshufd_ExtendedIndex = 264,
-  kX86InstIdVpshufhw_ExtendedIndex = 264,
-  kX86InstIdVpshuflw_ExtendedIndex = 264,
-  kX86InstIdVpsignb_ExtendedIndex = 192,
-  kX86InstIdVpsignd_ExtendedIndex = 192,
-  kX86InstIdVpsignw_ExtendedIndex = 192,
-  kX86InstIdVpslld_ExtendedIndex = 265,
-  kX86InstIdVpslldq_ExtendedIndex = 266,
-  kX86InstIdVpsllq_ExtendedIndex = 267,
-  kX86InstIdVpsllvd_ExtendedIndex = 192,
-  kX86InstIdVpsllvq_ExtendedIndex = 192,
-  kX86InstIdVpsllw_ExtendedIndex = 268,
-  kX86InstIdVpsrad_ExtendedIndex = 269,
-  kX86InstIdVpsravd_ExtendedIndex = 192,
-  kX86InstIdVpsraw_ExtendedIndex = 270,
-  kX86InstIdVpsrld_ExtendedIndex = 271,
-  kX86InstIdVpsrldq_ExtendedIndex = 266,
-  kX86InstIdVpsrlq_ExtendedIndex = 272,
-  kX86InstIdVpsrlvd_ExtendedIndex = 192,
-  kX86InstIdVpsrlvq_ExtendedIndex = 192,
-  kX86InstIdVpsrlw_ExtendedIndex = 273,
-  kX86InstIdVpsubb_ExtendedIndex = 192,
-  kX86InstIdVpsubd_ExtendedIndex = 192,
-  kX86InstIdVpsubq_ExtendedIndex = 192,
-  kX86InstIdVpsubsb_ExtendedIndex = 192,
-  kX86InstIdVpsubsw_ExtendedIndex = 192,
-  kX86InstIdVpsubusb_ExtendedIndex = 192,
-  kX86InstIdVpsubusw_ExtendedIndex = 192,
-  kX86InstIdVpsubw_ExtendedIndex = 192,
-  kX86InstIdVptest_ExtendedIndex = 274,
-  kX86InstIdVpunpckhbw_ExtendedIndex = 192,
-  kX86InstIdVpunpckhdq_ExtendedIndex = 192,
-  kX86InstIdVpunpckhqdq_ExtendedIndex = 192,
-  kX86InstIdVpunpckhwd_ExtendedIndex = 192,
-  kX86InstIdVpunpcklbw_ExtendedIndex = 192,
-  kX86InstIdVpunpckldq_ExtendedIndex = 192,
-  kX86InstIdVpunpcklqdq_ExtendedIndex = 192,
-  kX86InstIdVpunpcklwd_ExtendedIndex = 192,
-  kX86InstIdVpxor_ExtendedIndex = 192,
-  kX86InstIdVrcpps_ExtendedIndex = 203,
-  kX86InstIdVrcpss_ExtendedIndex = 193,
-  kX86InstIdVroundpd_ExtendedIndex = 264,
-  kX86InstIdVroundps_ExtendedIndex = 264,
-  kX86InstIdVroundsd_ExtendedIndex = 201,
-  kX86InstIdVroundss_ExtendedIndex = 201,
-  kX86InstIdVrsqrtps_ExtendedIndex = 203,
-  kX86InstIdVrsqrtss_ExtendedIndex = 193,
-  kX86InstIdVshufpd_ExtendedIndex = 196,
-  kX86InstIdVshufps_ExtendedIndex = 196,
-  kX86InstIdVsqrtpd_ExtendedIndex = 203,
-  kX86InstIdVsqrtps_ExtendedIndex = 203,
-  kX86InstIdVsqrtsd_ExtendedIndex = 193,
-  kX86InstIdVsqrtss_ExtendedIndex = 193,
-  kX86InstIdVstmxcsr_ExtendedIndex = 219,
-  kX86InstIdVsubpd_ExtendedIndex = 192,
-  kX86InstIdVsubps_ExtendedIndex = 192,
-  kX86InstIdVsubsd_ExtendedIndex = 193,
-  kX86InstIdVsubss_ExtendedIndex = 193,
-  kX86InstIdVtestpd_ExtendedIndex = 275,
-  kX86InstIdVtestps_ExtendedIndex = 275,
-  kX86InstIdVucomisd_ExtendedIndex = 276,
-  kX86InstIdVucomiss_ExtendedIndex = 276,
-  kX86InstIdVunpckhpd_ExtendedIndex = 192,
-  kX86InstIdVunpckhps_ExtendedIndex = 192,
-  kX86InstIdVunpcklpd_ExtendedIndex = 192,
-  kX86InstIdVunpcklps_ExtendedIndex = 192,
-  kX86InstIdVxorpd_ExtendedIndex = 192,
-  kX86InstIdVxorps_ExtendedIndex = 192,
-  kX86InstIdVzeroall_ExtendedIndex = 277,
-  kX86InstIdVzeroupper_ExtendedIndex = 277,
-  kX86InstIdWrfsbase_ExtendedIndex = 278,
-  kX86InstIdWrgsbase_ExtendedIndex = 278,
-  kX86InstIdXadd_ExtendedIndex = 279,
-  kX86InstIdXchg_ExtendedIndex = 280,
-  kX86InstIdXgetbv_ExtendedIndex = 16,
-  kX86InstIdXor_ExtendedIndex = 2,
-  kX86InstIdXorpd_ExtendedIndex = 3,
-  kX86InstIdXorps_ExtendedIndex = 3,
-  kX86InstIdXrstor_ExtendedIndex = 281,
-  kX86InstIdXrstor64_ExtendedIndex = 281,
-  kX86InstIdXsave_ExtendedIndex = 281,
-  kX86InstIdXsave64_ExtendedIndex = 281,
-  kX86InstIdXsaveopt_ExtendedIndex = 281,
-  kX86InstIdXsaveopt64_ExtendedIndex = 281,
-  kX86InstIdXsetbv_ExtendedIndex = 16
-};
-// ${X86InstData:End}
-
-// Please run tools/src-gendefs.js (by using just node.js, without any dependencies) to regenerate the code above.
-const X86InstInfo _x86InstInfo[] = {
-  // <----------------------------+--------------------+-------------------------------------------+-------------------+------------------------------------+-------------+-------+---------------------------------------------------------------------------------------------------+
-  //                              |                    |           Instruction Opcodes             |                   |         Instruction Flags          |   E-FLAGS   | Write |              Operands (Gp/Fp/Mm/K/Xmm/Ymm/Zmm Regs, Mem, Imm, Label, None/Undefined)              |
-  //        Instruction Id        |  Instruction Name  +---------------------+---------------------+  Instruction Enc. +---------------+--------------------+-------------+---+---+-------------------+-------------------+-------------------+-------------------+-------------------+
-  //                              |                    | 0:PP-MMM OP/O L/W/EW| 1:PP-MMM OP/O L/W/EW|                   | Global Flags  |A512(ID|VL|kz|rnd|b)| EF:OSZAPCDX |Idx| Sz|  [0] 1st Operand  |  [1] 2nd Operand  |  [2] 3rd Operand  |  [3] 4th Operand  |  [4] 5th Operand  |
-  // <----------------------------+--------------------+---------------------+---------------------+-------------------+---------------+--------------------+-------------+---+---+-------------------+-------------------+-------------------+-------------------+-------------------+
-  INST(kInstIdNone                , ""                 , U                   , U                   , Enc(None)         , F(None)                            , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdAdc              , "adc"              , O_000000(10,2,_,_,_), U                   , Enc(X86Arith)     , F(Lock)                            , EF(WWWWWX__), 0 , 0 , O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdAdd              , "add"              , O_000000(00,0,_,_,_), U                   , Enc(X86Arith)     , F(Lock)                            , EF(WWWWWW__), 0 , 0 , O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdAddpd            , "addpd"            , O_660F00(58,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAddps            , "addps"            , O_000F00(58,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAddsd            , "addsd"            , O_F20F00(58,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAddss            , "addss"            , O_F30F00(58,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAddsubpd         , "addsubpd"         , O_660F00(D0,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAddsubps         , "addsubps"         , O_F20F00(D0,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAesdec           , "aesdec"           , O_660F38(DE,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAesdeclast       , "aesdeclast"       , O_660F38(DF,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAesenc           , "aesenc"           , O_660F38(DC,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAesenclast       , "aesenclast"       , O_660F38(DD,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAesimc           , "aesimc"           , O_660F38(DB,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAeskeygenassist  , "aeskeygenassist"  , O_660F3A(DF,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdAnd              , "and"              , O_000000(20,4,_,_,_), U                   , Enc(X86Arith)     , F(Lock)                            , EF(WWWUWW__), 0 , 0 , O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdAndn             , "andn"             , O_000F38(F2,U,_,_,_), U                   , Enc(AvxRvm)       , F(None)                            , EF(WWWUUW__), 0 , 0 , O(Gqd)            , O(Gqd)            , O(GqdMem)         , U                 , U                 ),
-  INST(kX86InstIdAndnpd           , "andnpd"           , O_660F00(55,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAndnps           , "andnps"           , O_000F00(55,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAndpd            , "andpd"            , O_660F00(54,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdAndps            , "andps"            , O_000F00(54,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdBextr            , "bextr"            , O_000F38(F7,U,_,_,_), U                   , Enc(AvxRmv)       , F(None)                            , EF(WUWUUW__), 0 , 0 , O(Gqd)            , O(GqdMem)         , O(Gqd)            , U                 , U                 ),
-  INST(kX86InstIdBlendpd          , "blendpd"          , O_660F3A(0D,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdBlendps          , "blendps"          , O_660F3A(0C,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdBlendvpd         , "blendvpd"         , O_660F38(15,U,_,_,_), U                   , Enc(ExtRm)        , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdBlendvps         , "blendvps"         , O_660F38(14,U,_,_,_), U                   , Enc(ExtRm)        , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdBlsi             , "blsi"             , O_000F38(F3,3,_,_,_), U                   , Enc(AvxVm)        , F(None)                            , EF(WWWUUW__), 0 , 0 , O(Gqd)            , O(GqdMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdBlsmsk           , "blsmsk"           , O_000F38(F3,2,_,_,_), U                   , Enc(AvxVm)        , F(None)                            , EF(WWWUUW__), 0 , 0 , O(Gqd)            , O(GqdMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdBlsr             , "blsr"             , O_000F38(F3,1,_,_,_), U                   , Enc(AvxVm)        , F(None)                            , EF(WWWUUW__), 0 , 0 , O(Gqd)            , O(GqdMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdBsf              , "bsf"              , O_000F00(BC,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(UUWUUU__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdBsr              , "bsr"              , O_000F00(BD,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(UUWUUU__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdBswap            , "bswap"            , O_000F00(C8,U,_,_,_), U                   , Enc(X86BSwap)     , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdBt               , "bt"               , O_000F00(A3,U,_,_,_), O_000F00(BA,4,_,_,_), Enc(X86BTest)     , F(Test)                            , EF(UU_UUW__), 0 , 0 , O(GqdwMem)        , O(Gqdw)|O(Imm)    , U                 , U                 , U                 ),
-  INST(kX86InstIdBtc              , "btc"              , O_000F00(BB,U,_,_,_), O_000F00(BA,7,_,_,_), Enc(X86BTest)     , F(Lock)                            , EF(UU_UUW__), 0 , 0 , O(GqdwMem)        , O(Gqdw)|O(Imm)    , U                 , U                 , U                 ),
-  INST(kX86InstIdBtr              , "btr"              , O_000F00(B3,U,_,_,_), O_000F00(BA,6,_,_,_), Enc(X86BTest)     , F(Lock)                            , EF(UU_UUW__), 0 , 0 , O(GqdwMem)        , O(Gqdw)|O(Imm)    , U                 , U                 , U                 ),
-  INST(kX86InstIdBts              , "bts"              , O_000F00(AB,U,_,_,_), O_000F00(BA,5,_,_,_), Enc(X86BTest)     , F(Lock)                            , EF(UU_UUW__), 0 , 0 , O(GqdwMem)        , O(Gqdw)|O(Imm)    , U                 , U                 , U                 ),
-  INST(kX86InstIdBzhi             , "bzhi"             , O_000F38(F5,U,_,_,_), U                   , Enc(AvxRmv)       , F(None)                            , EF(WWWUUW__), 0 , 0 , O(Gqd)            , O(GqdMem)         , O(Gqd)            , U                 , U                 ),
-  INST(kX86InstIdCall             , "call"             , O_000000(FF,2,_,_,_), O_000000(E8,U,_,_,_), Enc(X86Call)      , F(Flow)                            , EF(________), 0 , 0 , O(GqdMem)|O(LbImm), U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCbw              , "cbw"              , O_660000(98,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCdq              , "cdq"              , O_000000(99,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCdqe             , "cdqe"             , O_000000(98,U,_,W,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdClc              , "clc"              , O_000000(F8,U,_,_,_), U                   , Enc(X86Op)        , F(None)                            , EF(_____W__), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCld              , "cld"              , O_000000(FC,U,_,_,_), U                   , Enc(X86Op)        , F(None)                            , EF(______W_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdClflush          , "clflush"          , O_000F00(AE,7,_,_,_), U                   , Enc(X86M)         , F(None)                            , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCmc              , "cmc"              , O_000000(F5,U,_,_,_), U                   , Enc(X86Op)        , F(None)                            , EF(_____X__), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCmova            , "cmova"            , O_000F00(47,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(__R__R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovae           , "cmovae"           , O_000F00(43,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(_____R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovb            , "cmovb"            , O_000F00(42,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(_____R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovbe           , "cmovbe"           , O_000F00(46,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(__R__R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovc            , "cmovc"            , O_000F00(42,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(_____R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmove            , "cmove"            , O_000F00(44,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(__R_____), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovg            , "cmovg"            , O_000F00(4F,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(RRR_____), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovge           , "cmovge"           , O_000F00(4D,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(RR______), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovl            , "cmovl"            , O_000F00(4C,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(RR______), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovle           , "cmovle"           , O_000F00(4E,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(RRR_____), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovna           , "cmovna"           , O_000F00(46,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(__R__R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovnae          , "cmovnae"          , O_000F00(42,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(_____R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovnb           , "cmovnb"           , O_000F00(43,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(_____R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovnbe          , "cmovnbe"          , O_000F00(47,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(__R__R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovnc           , "cmovnc"           , O_000F00(43,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(_____R__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovne           , "cmovne"           , O_000F00(45,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(__R_____), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovng           , "cmovng"           , O_000F00(4E,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(RRR_____), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovnge          , "cmovnge"          , O_000F00(4C,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(RR______), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovnl           , "cmovnl"           , O_000F00(4D,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(RR______), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovnle          , "cmovnle"          , O_000F00(4F,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(RRR_____), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovno           , "cmovno"           , O_000F00(41,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(R_______), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovnp           , "cmovnp"           , O_000F00(4B,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(____R___), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovns           , "cmovns"           , O_000F00(49,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(_R______), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovnz           , "cmovnz"           , O_000F00(45,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(__R_____), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovo            , "cmovo"            , O_000F00(40,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(R_______), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovp            , "cmovp"            , O_000F00(4A,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(____R___), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovpe           , "cmovpe"           , O_000F00(4A,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(____R___), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovpo           , "cmovpo"           , O_000F00(4B,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(____R___), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovs            , "cmovs"            , O_000F00(48,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(_R______), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmovz            , "cmovz"            , O_000F00(44,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(__R_____), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdCmp              , "cmp"              , O_000000(38,7,_,_,_), U                   , Enc(X86Arith)     , F(Test)                            , EF(WWWWWW__), 0 , 0 , O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdCmppd            , "cmppd"            , O_660F00(C2,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdCmpps            , "cmpps"            , O_000F00(C2,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdCmpsB            , "cmps_b"           , O_000000(A6,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCmpsD            , "cmps_d"           , O_000000(A7,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCmpsQ            , "cmps_q"           , O_000000(A7,U,_,W,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCmpsW            , "cmps_w"           , O_000000(A7,U,_,_,_), U                   , Enc(X86Op_66H)    , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCmpsd            , "cmpsd"            , O_F20F00(C2,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdCmpss            , "cmpss"            , O_F30F00(C2,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdCmpxchg          , "cmpxchg"          , O_000F00(B0,U,_,_,_), U                   , Enc(X86RmReg)     , F(Lock)|F(Special)                 , EF(WWWWWW__), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCmpxchg16b       , "cmpxchg16b"       , O_000F00(C7,1,_,W,_), U                   , Enc(X86M)         , F(None)|F(Special)                 , EF(__W_____), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCmpxchg8b        , "cmpxchg8b"        , O_000F00(C7,1,_,_,_), U                   , Enc(X86M)         , F(None)|F(Special)                 , EF(__W_____), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdComisd           , "comisd"           , O_660F00(2F,U,_,_,_), U                   , Enc(ExtRm)        , F(Test)                            , EF(WWWWWW__), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdComiss           , "comiss"           , O_000F00(2F,U,_,_,_), U                   , Enc(ExtRm)        , F(Test)                            , EF(WWWWWW__), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCpuid            , "cpuid"            , O_000F00(A2,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCqo              , "cqo"              , O_000000(99,U,_,W,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCrc32            , "crc32"            , O_F20F38(F0,U,_,_,_), U                   , Enc(ExtCrc)       , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , O(GqdwbMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtdq2pd         , "cvtdq2pd"         , O_F30F00(E6,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtdq2ps         , "cvtdq2ps"         , O_000F00(5B,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtpd2dq         , "cvtpd2dq"         , O_F20F00(E6,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtpd2pi         , "cvtpd2pi"         , O_660F00(2D,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 8 , O(Mm)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtpd2ps         , "cvtpd2ps"         , O_660F00(5A,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtpi2pd         , "cvtpi2pd"         , O_660F00(2A,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtpi2ps         , "cvtpi2ps"         , O_000F00(2A,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 8 , O(Xmm)            , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtps2dq         , "cvtps2dq"         , O_660F00(5B,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtps2pd         , "cvtps2pd"         , O_000F00(5A,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtps2pi         , "cvtps2pi"         , O_000F00(2D,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 8 , O(Mm)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtsd2si         , "cvtsd2si"         , O_F20F00(2D,U,_,_,_), U                   , Enc(ExtRm_Q)      , F(Move)                            , EF(________), 0 , 8 , O(Gqd)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtsd2ss         , "cvtsd2ss"         , O_F20F00(5A,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 4 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtsi2sd         , "cvtsi2sd"         , O_F20F00(2A,U,_,_,_), U                   , Enc(ExtRm_Q)      , F(Move)                            , EF(________), 0 , 8 , O(Xmm)            , O(GqdMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtsi2ss         , "cvtsi2ss"         , O_F30F00(2A,U,_,_,_), U                   , Enc(ExtRm_Q)      , F(Move)                            , EF(________), 0 , 4 , O(Xmm)            , O(GqdMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtss2sd         , "cvtss2sd"         , O_F30F00(5A,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 8 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvtss2si         , "cvtss2si"         , O_F30F00(2D,U,_,_,_), U                   , Enc(ExtRm_Q)      , F(Move)                            , EF(________), 0 , 8 , O(Gqd)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvttpd2dq        , "cvttpd2dq"        , O_660F00(E6,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvttpd2pi        , "cvttpd2pi"        , O_660F00(2C,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 8 , O(Mm)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvttps2dq        , "cvttps2dq"        , O_F30F00(5B,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvttps2pi        , "cvttps2pi"        , O_000F00(2C,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 8 , O(Mm)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvttsd2si        , "cvttsd2si"        , O_F20F00(2C,U,_,_,_), U                   , Enc(ExtRm_Q)      , F(Move)                            , EF(________), 0 , 8 , O(Gqd)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCvttss2si        , "cvttss2si"        , O_F30F00(2C,U,_,_,_), U                   , Enc(ExtRm_Q)      , F(Move)                            , EF(________), 0 , 8 , O(Gqd)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdCwd              , "cwd"              , O_660000(99,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdCwde             , "cwde"             , O_000000(98,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdDaa              , "daa"              , O_000000(27,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(UWWXWX__), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdDas              , "das"              , O_000000(2F,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(UWWXWX__), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdDec              , "dec"              , O_000000(FE,1,_,_,_), O_000000(48,U,_,_,_), Enc(X86IncDec)    , F(Lock)                            , EF(WWWWW___), 0 , 0 , O(GqdwbMem)       , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdDiv              , "div"              , O_000000(F6,6,_,_,_), U                   , Enc(X86Rm_B)      , F(None)|F(Special)                 , EF(UUUUUU__), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdDivpd            , "divpd"            , O_660F00(5E,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdDivps            , "divps"            , O_000F00(5E,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdDivsd            , "divsd"            , O_F20F00(5E,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdDivss            , "divss"            , O_F30F00(5E,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdDppd             , "dppd"             , O_660F3A(41,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdDpps             , "dpps"             , O_660F3A(40,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdEmms             , "emms"             , O_000F00(77,U,_,_,_), U                   , Enc(X86Op)        , F(None)                            , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdEnter            , "enter"            , O_000000(C8,U,_,_,_), U                   , Enc(X86Enter)     , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdExtractps        , "extractps"        , O_660F3A(17,U,_,_,_), O_660F3A(17,U,_,_,_), Enc(ExtExtract)   , F(Move)                            , EF(________), 0 , 8 , O(GqdMem)         , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdExtrq            , "extrq"            , O_660F00(79,U,_,_,_), O_660F00(78,0,_,_,_), Enc(ExtExtrq)     , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)|O(Imm)     , O(None)|O(Imm)    , U                 , U                 ),
-  INST(kX86InstIdF2xm1            , "f2xm1"            , O_00_X(D9F0,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFabs             , "fabs"             , O_00_X(D9E1,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFadd             , "fadd"             , O_00_X(C0C0,0)      , U                   , Enc(FpuArith)     , F(Fp)|F(Mem4_8)                    , EF(________), 0 , 0 , O(FpMem)          , O(Fp)             , U                 , U                 , U                 ),
-  INST(kX86InstIdFaddp            , "faddp"            , O_00_X(DEC0,U)      , U                   , Enc(FpuRDef)      , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFbld             , "fbld"             , O_000000(DF,4,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFbstp            , "fbstp"            , O_000000(DF,6,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFchs             , "fchs"             , O_00_X(D9E0,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFclex            , "fclex"            , O_9B_X(DBE2,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcmovb           , "fcmovb"           , O_00_X(DAC0,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(_____R__), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcmovbe          , "fcmovbe"          , O_00_X(DAD0,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(__R__R__), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcmove           , "fcmove"           , O_00_X(DAC8,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(__R_____), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcmovnb          , "fcmovnb"          , O_00_X(DBC0,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(_____R__), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcmovnbe         , "fcmovnbe"         , O_00_X(DBD0,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(__R__R__), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcmovne          , "fcmovne"          , O_00_X(DBC8,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(__R_____), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcmovnu          , "fcmovnu"          , O_00_X(DBD8,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(____R___), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcmovu           , "fcmovu"           , O_00_X(DAD8,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(____R___), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcom             , "fcom"             , O_00_X(D0D0,2)      , U                   , Enc(FpuCom)       , F(Fp)                              , EF(________), 0 , 0 , O(Fp)|O(Mem)      , O(Fp)             , U                 , U                 , U                 ),
-  INST(kX86InstIdFcomi            , "fcomi"            , O_00_X(DBF0,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(WWWWWW__), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcomip           , "fcomip"           , O_00_X(DFF0,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(WWWWWW__), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcomp            , "fcomp"            , O_00_X(D8D8,3)      , U                   , Enc(FpuCom)       , F(Fp)                              , EF(________), 0 , 0 , O(Fp)|O(Mem)      , O(Fp)             , U                 , U                 , U                 ),
-  INST(kX86InstIdFcompp           , "fcompp"           , O_00_X(DED9,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFcos             , "fcos"             , O_00_X(D9FF,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFdecstp          , "fdecstp"          , O_00_X(D9F6,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFdiv             , "fdiv"             , O_00_X(F0F8,6)      , U                   , Enc(FpuArith)     , F(Fp)|F(Mem4_8)                    , EF(________), 0 , 0 , O(FpMem)          , O(Fp)             , U                 , U                 , U                 ),
-  INST(kX86InstIdFdivp            , "fdivp"            , O_00_X(DEF8,U)      , U                   , Enc(FpuRDef)      , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFdivr            , "fdivr"            , O_00_X(F8F0,7)      , U                   , Enc(FpuArith)     , F(Fp)|F(Mem4_8)                    , EF(________), 0 , 0 , O(FpMem)          , O(Fp)             , U                 , U                 , U                 ),
-  INST(kX86InstIdFdivrp           , "fdivrp"           , O_00_X(DEF0,U)      , U                   , Enc(FpuRDef)      , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFemms            , "femms"            , O_000F00(0E,U,_,_,_), U                   , Enc(X86Op)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFfree            , "ffree"            , O_00_X(DDC0,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFiadd            , "fiadd"            , O_000000(DA,0,_,_,_), U                   , Enc(FpuM)         , F(Fp)|F(Mem2_4)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFicom            , "ficom"            , O_000000(DA,2,_,_,_), U                   , Enc(FpuM)         , F(Fp)|F(Mem2_4)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFicomp           , "ficomp"           , O_000000(DA,3,_,_,_), U                   , Enc(FpuM)         , F(Fp)|F(Mem2_4)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFidiv            , "fidiv"            , O_000000(DA,6,_,_,_), U                   , Enc(FpuM)         , F(Fp)|F(Mem2_4)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFidivr           , "fidivr"           , O_000000(DA,7,_,_,_), U                   , Enc(FpuM)         , F(Fp)|F(Mem2_4)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFild             , "fild"             , O_000000(DB,0,_,_,_), O_000000(DF,5,_,_,_), Enc(FpuM)         , F(Fp)|F(Mem2_4_8)                  , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFimul            , "fimul"            , O_000000(DA,1,_,_,_), U                   , Enc(FpuM)         , F(Fp)|F(Mem2_4)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFincstp          , "fincstp"          , O_00_X(D9F7,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFinit            , "finit"            , O_9B_X(DBE3,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFist             , "fist"             , O_000000(DB,2,_,_,_), U                   , Enc(FpuM)         , F(Fp)|F(Mem2_4)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFistp            , "fistp"            , O_000000(DB,3,_,_,_), O_000000(DF,7,_,_,_), Enc(FpuM)         , F(Fp)|F(Mem2_4_8)                  , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFisttp           , "fisttp"           , O_000000(DB,1,_,_,_), O_000000(DD,1,_,_,_), Enc(FpuM)         , F(Fp)|F(Mem2_4_8)                  , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFisub            , "fisub"            , O_000000(DA,4,_,_,_), U                   , Enc(FpuM)         , F(Fp)|F(Mem2_4)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFisubr           , "fisubr"           , O_000000(DA,5,_,_,_), U                   , Enc(FpuM)         , F(Fp)|F(Mem2_4)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFld              , "fld"              , O_000000(D9,0,_,_,_), O_000000(DB,5,_,_,_), Enc(FpuFldFst)    , F(Fp)|F(Mem4_8_10)                 , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFld1             , "fld1"             , O_00_X(D9E8,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFldcw            , "fldcw"            , O_000000(D9,5,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFldenv           , "fldenv"           , O_000000(D9,4,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFldl2e           , "fldl2e"           , O_00_X(D9EA,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFldl2t           , "fldl2t"           , O_00_X(D9E9,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFldlg2           , "fldlg2"           , O_00_X(D9EC,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFldln2           , "fldln2"           , O_00_X(D9ED,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFldpi            , "fldpi"            , O_00_X(D9EB,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFldz             , "fldz"             , O_00_X(D9EE,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFmul             , "fmul"             , O_00_X(C8C8,1)      , U                   , Enc(FpuArith)     , F(Fp)|F(Mem4_8)                    , EF(________), 0 , 0 , O(FpMem)          , O(Fp)             , U                 , U                 , U                 ),
-  INST(kX86InstIdFmulp            , "fmulp"            , O_00_X(DEC8,U)      , U                   , Enc(FpuRDef)      , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFnclex           , "fnclex"           , O_00_X(DBE2,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFninit           , "fninit"           , O_00_X(DBE3,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFnop             , "fnop"             , O_00_X(D9D0,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFnsave           , "fnsave"           , O_000000(DD,6,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFnstcw           , "fnstcw"           , O_000000(D9,7,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFnstenv          , "fnstenv"          , O_000000(D9,6,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFnstsw           , "fnstsw"           , O_000000(DD,7,_,_,_), O_00_X(DFE0,U)      , Enc(FpuStsw)      , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFpatan           , "fpatan"           , O_00_X(D9F3,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFprem            , "fprem"            , O_00_X(D9F8,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFprem1           , "fprem1"           , O_00_X(D9F5,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFptan            , "fptan"            , O_00_X(D9F2,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFrndint          , "frndint"          , O_00_X(D9FC,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFrstor           , "frstor"           , O_000000(DD,4,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFsave            , "fsave"            , O_9B0000(DD,6,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFscale           , "fscale"           , O_00_X(D9FD,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFsin             , "fsin"             , O_00_X(D9FE,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFsincos          , "fsincos"          , O_00_X(D9FB,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFsqrt            , "fsqrt"            , O_00_X(D9FA,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFst              , "fst"              , O_000000(D9,2,_,_,_), U                   , Enc(FpuFldFst)    , F(Fp)|F(Mem4_8)                    , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFstcw            , "fstcw"            , O_9B0000(D9,7,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFstenv           , "fstenv"           , O_9B0000(D9,6,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFstp             , "fstp"             , O_000000(D9,3,_,_,_), O_000000(DB,7,_,_,_), Enc(FpuFldFst)    , F(Fp)|F(Mem4_8_10)                 , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFstsw            , "fstsw"            , O_9B0000(DD,7,_,_,_), O_9B_X(DFE0,U)      , Enc(FpuStsw)      , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFsub             , "fsub"             , O_00_X(E0E8,4)      , U                   , Enc(FpuArith)     , F(Fp)|F(Mem4_8)                    , EF(________), 0 , 0 , O(FpMem)          , O(Fp)             , U                 , U                 , U                 ),
-  INST(kX86InstIdFsubp            , "fsubp"            , O_00_X(DEE8,U)      , U                   , Enc(FpuRDef)      , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFsubr            , "fsubr"            , O_00_X(E8E0,5)      , U                   , Enc(FpuArith)     , F(Fp)|F(Mem4_8)                    , EF(________), 0 , 0 , O(FpMem)          , O(Fp)             , U                 , U                 , U                 ),
-  INST(kX86InstIdFsubrp           , "fsubrp"           , O_00_X(DEE0,U)      , U                   , Enc(FpuRDef)      , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFtst             , "ftst"             , O_00_X(D9E4,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFucom            , "fucom"            , O_00_X(DDE0,U)      , U                   , Enc(FpuRDef)      , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFucomi           , "fucomi"           , O_00_X(DBE8,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(WWWWWW__), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFucomip          , "fucomip"          , O_00_X(DFE8,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(WWWWWW__), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFucomp           , "fucomp"           , O_00_X(DDE8,U)      , U                   , Enc(FpuRDef)      , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFucompp          , "fucompp"          , O_00_X(DAE9,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFwait            , "fwait"            , O_000000(DB,U,_,_,_), U                   , Enc(X86Op)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFxam             , "fxam"             , O_00_X(D9E5,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFxch             , "fxch"             , O_00_X(D9C8,U)      , U                   , Enc(FpuR)         , F(Fp)                              , EF(________), 0 , 0 , O(Fp)             , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFxrstor          , "fxrstor"          , O_000F00(AE,1,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFxsave           , "fxsave"           , O_000F00(AE,0,_,_,_), U                   , Enc(X86M)         , F(Fp)                              , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFxtract          , "fxtract"          , O_00_X(D9F4,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFyl2x            , "fyl2x"            , O_00_X(D9F1,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdFyl2xp1          , "fyl2xp1"          , O_00_X(D9F9,U)      , U                   , Enc(FpuOp)        , F(Fp)                              , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdHaddpd           , "haddpd"           , O_660F00(7C,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdHaddps           , "haddps"           , O_F20F00(7C,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdHsubpd           , "hsubpd"           , O_660F00(7D,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdHsubps           , "hsubps"           , O_F20F00(7D,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdIdiv             , "idiv"             , O_000000(F6,7,_,_,_), U                   , Enc(X86Rm_B)      , F(None)|F(Special)                 , EF(UUUUUU__), 0 , 0 , 0                 , 0                 , U                 , U                 , U                 ),
-  INST(kX86InstIdImul             , "imul"             , U                   , U                   , Enc(X86Imul)      , F(None)|F(Special)                 , EF(WUUUUW__), 0 , 0 , 0                 , 0                 , U                 , U                 , U                 ),
-  INST(kX86InstIdInc              , "inc"              , O_000000(FE,0,_,_,_), O_000000(40,U,_,_,_), Enc(X86IncDec)    , F(Lock)                            , EF(WWWWW___), 0 , 0 , O(GqdwbMem)       , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdInsertps         , "insertps"         , O_660F3A(21,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdInsertq          , "insertq"          , O_F20F00(79,U,_,_,_), O_F20F00(78,U,_,_,_), Enc(ExtInsertq)   , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(None)|O(Imm)    , O(None)|O(Imm)    , U                 ),
-  INST(kX86InstIdInt              , "int"              , O_000000(CC,U,_,_,_), U                   , Enc(X86Int)       , F(None)                            , EF(_______W), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJa               , "ja"               , O_000000(77,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(__R__R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJae              , "jae"              , O_000000(73,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(_____R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJb               , "jb"               , O_000000(72,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(_____R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJbe              , "jbe"              , O_000000(76,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(__R__R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJc               , "jc"               , O_000000(72,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(_____R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJe               , "je"               , O_000000(74,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(__R_____), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJg               , "jg"               , O_000000(7F,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(RRR_____), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJge              , "jge"              , O_000000(7D,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(RR______), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJl               , "jl"               , O_000000(7C,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(RR______), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJle              , "jle"              , O_000000(7E,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(RRR_____), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJna              , "jna"              , O_000000(76,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(__R__R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJnae             , "jnae"             , O_000000(72,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(_____R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJnb              , "jnb"              , O_000000(73,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(_____R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJnbe             , "jnbe"             , O_000000(77,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(__R__R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJnc              , "jnc"              , O_000000(73,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(_____R__), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJne              , "jne"              , O_000000(75,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(__R_____), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJng              , "jng"              , O_000000(7E,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(RRR_____), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJnge             , "jnge"             , O_000000(7C,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(RR______), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJnl              , "jnl"              , O_000000(7D,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(RR______), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJnle             , "jnle"             , O_000000(7F,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(RRR_____), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJno              , "jno"              , O_000000(71,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(R_______), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJnp              , "jnp"              , O_000000(7B,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(____R___), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJns              , "jns"              , O_000000(79,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(_R______), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJnz              , "jnz"              , O_000000(75,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(__R_____), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJo               , "jo"               , O_000000(70,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(R_______), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJp               , "jp"               , O_000000(7A,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(____R___), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJpe              , "jpe"              , O_000000(7A,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(____R___), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJpo              , "jpo"              , O_000000(7B,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(____R___), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJs               , "js"               , O_000000(78,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(_R______), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJz               , "jz"               , O_000000(74,U,_,_,_), U                   , Enc(X86Jcc)       , F(Flow)                            , EF(__R_____), 0 , 0 , O(Label)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdJecxz            , "jecxz"            , O_000000(E3,U,_,_,_), U                   , Enc(X86Jecxz)     , F(Flow)|F(Special)                 , EF(________), 0 , 0 , O(Gqdw)           , O(Label)          , U                 , U                 , U                 ),
-  INST(kX86InstIdJmp              , "jmp"              , O_000000(FF,4,_,_,_), O_000000(E9,U,_,_,_), Enc(X86Jmp)       , F(Flow)                            , EF(________), 0 , 0 , O(Label)|O(Imm)   , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdLahf             , "lahf"             , O_000000(9F,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(_RRRRR__), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdLddqu            , "lddqu"            , O_F20F00(F0,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdLdmxcsr          , "ldmxcsr"          , O_000F00(AE,2,_,_,_), U                   , Enc(X86M)         , F(None)                            , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdLea              , "lea"              , O_000000(8D,U,_,_,_), U                   , Enc(X86Lea)       , F(Move)                            , EF(________), 0 , 0 , O(Gqd)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdLeave            , "leave"            , O_000000(C9,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdLfence           , "lfence"           , O_000F00(AE,5,_,_,_), U                   , Enc(ExtFence)     , F(None)                            , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdLodsB            , "lods_b"           , O_000000(AC,U,_,_,_), U                   , Enc(X86Op)        , F(Move)|F(Special)                 , EF(______R_), 0 , 1 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdLodsD            , "lods_d"           , O_000000(AD,U,_,_,_), U                   , Enc(X86Op)        , F(Move)|F(Special)                 , EF(______R_), 0 , 4 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdLodsQ            , "lods_q"           , O_000000(AD,U,_,W,_), U                   , Enc(X86Op)        , F(Move)|F(Special)                 , EF(______R_), 0 , 8 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdLodsW            , "lods_w"           , O_000000(AD,U,_,_,_), U                   , Enc(X86Op_66H)    , F(Move)|F(Special)                 , EF(______R_), 0 , 2 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdLzcnt            , "lzcnt"            , O_F30F00(BD,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(UUWUUW__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdMaskmovdqu       , "maskmovdqu"       , O_660F00(57,U,_,_,_), U                   , Enc(ExtRm)        , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMaskmovq         , "maskmovq"         , O_000F00(F7,U,_,_,_), U                   , Enc(ExtRm)        , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Mm)             , O(Mm)             , U                 , U                 , U                 ),
-  INST(kX86InstIdMaxpd            , "maxpd"            , O_660F00(5F,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMaxps            , "maxps"            , O_000F00(5F,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMaxsd            , "maxsd"            , O_F20F00(5F,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMaxss            , "maxss"            , O_F30F00(5F,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMfence           , "mfence"           , O_000F00(AE,6,_,_,_), U                   , Enc(ExtFence)     , F(None)                            , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdMinpd            , "minpd"            , O_660F00(5D,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMinps            , "minps"            , O_000F00(5D,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMinsd            , "minsd"            , O_F20F00(5D,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMinss            , "minss"            , O_F30F00(5D,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMonitor          , "monitor"          , O_000F01(C8,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdMov              , "mov"              , U                   , U                   , Enc(X86Mov)       , F(Move)                            , EF(________), 0 , 0 , O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdMovPtr           , "mov_ptr"          , O_000000(A0,U,_,_,_), O_000000(A2,U,_,_,_), Enc(X86MovPtr)    , F(Move)|F(Special)                 , EF(________), 0 , 0 , O(Gqdwb)          , O(Imm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovapd           , "movapd"           , O_660F00(28,U,_,_,_), O_660F00(29,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovaps           , "movaps"           , O_000F00(28,U,_,_,_), O_000F00(29,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovbe            , "movbe"            , O_000F38(F0,U,_,_,_), O_000F38(F1,U,_,_,_), Enc(ExtMovBe)     , F(Move)                            , EF(________), 0 , 0 , O(GqdwMem)        , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdMovd             , "movd"             , O_000F00(6E,U,_,_,_), O_000F00(7E,U,_,_,_), Enc(ExtMovD)      , F(Move)                            , EF(________), 0 , 16, O(Gd)|O(MmXmmMem) , O(Gd)|O(MmXmmMem) , U                 , U                 , U                 ),
-  INST(kX86InstIdMovddup          , "movddup"          , O_F20F00(12,U,_,_,_), U                   , Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovdq2q          , "movdq2q"          , O_F20F00(D6,U,_,_,_), U                   , Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 8 , O(Mm)             , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovdqa           , "movdqa"           , O_660F00(6F,U,_,_,_), O_660F00(7F,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovdqu           , "movdqu"           , O_F30F00(6F,U,_,_,_), O_F30F00(7F,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovhlps          , "movhlps"          , O_000F00(12,U,_,_,_), U                   , Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 8 , O(Xmm)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovhpd           , "movhpd"           , O_660F00(16,U,_,_,_), O_660F00(17,U,_,_,_), Enc(ExtMov)       , F(None)                            , EF(________), 8 , 8 , O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovhps           , "movhps"           , O_000F00(16,U,_,_,_), O_000F00(17,U,_,_,_), Enc(ExtMov)       , F(None)                            , EF(________), 8 , 8 , O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovlhps          , "movlhps"          , O_000F00(16,U,_,_,_), U                   , Enc(ExtMov)       , F(None)                            , EF(________), 8 , 8 , O(Xmm)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovlpd           , "movlpd"           , O_660F00(12,U,_,_,_), O_660F00(13,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 8 , O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovlps           , "movlps"           , O_000F00(12,U,_,_,_), O_000F00(13,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 8 , O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovmskpd         , "movmskpd"         , O_660F00(50,U,_,_,_), U                   , Enc(ExtMovNoRexW) , F(Move)                            , EF(________), 0 , 8 , O(Gqd)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovmskps         , "movmskps"         , O_000F00(50,U,_,_,_), U                   , Enc(ExtMovNoRexW) , F(Move)                            , EF(________), 0 , 8 , O(Gqd)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovntdq          , "movntdq"          , U                   , O_660F00(E7,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(Mem)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovntdqa         , "movntdqa"         , O_660F38(2A,U,_,_,_), U                   , Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovnti           , "movnti"           , U                   , O_000F00(C3,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 8 , O(Mem)            , O(Gqd)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovntpd          , "movntpd"          , U                   , O_660F00(2B,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(Mem)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovntps          , "movntps"          , U                   , O_000F00(2B,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(Mem)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovntq           , "movntq"           , U                   , O_000F00(E7,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 8 , O(Mem)            , O(Mm)             , U                 , U                 , U                 ),
-  INST(kX86InstIdMovntsd          , "movntsd"          , U                   , O_F20F00(2B,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 8 , O(Mem)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovntss          , "movntss"          , U                   , O_F30F00(2B,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 4 , O(Mem)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdMovq             , "movq"             , O_000F00(6E,U,_,W,_), O_000F00(7E,U,_,W,_), Enc(ExtMovQ)      , F(Move)                            , EF(________), 0 , 16, O(Gq)|O(MmXmmMem) , O(Gq)|O(MmXmmMem) , U                 , U                 , U                 ),
-  INST(kX86InstIdMovq2dq          , "movq2dq"          , O_F30F00(D6,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(Mm)             , U                 , U                 , U                 ),
-  INST(kX86InstIdMovsB            , "movs_b"           , O_000000(A4,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdMovsD            , "movs_d"           , O_000000(A5,U,_,_,_), U                   , Enc(X86Op)        , F(Move)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdMovsQ            , "movs_q"           , O_000000(A5,U,_,W,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdMovsW            , "movs_w"           , O_000000(A5,U,_,_,_), U                   , Enc(X86Op_66H)    , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdMovsd            , "movsd"            , O_F20F00(10,U,_,_,_), O_F20F00(11,U,_,_,_), Enc(ExtMov)       , F(Move)           |F(Z)            , EF(________), 0 , 8 , O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovshdup         , "movshdup"         , O_F30F00(16,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovsldup         , "movsldup"         , O_F30F00(12,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovss            , "movss"            , O_F30F00(10,U,_,_,_), O_F30F00(11,U,_,_,_), Enc(ExtMov)       , F(Move)           |F(Z)            , EF(________), 0 , 4 , O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovsx            , "movsx"            , O_000F00(BE,U,_,_,_), U                   , Enc(X86MovSxZx)   , F(Move)                            , EF(________), 0 , 0 , O(Gqdw)           , O(GwbMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovsxd           , "movsxd"           , O_000000(63,U,_,_,_), U                   , Enc(X86MovSxd)    , F(Move)                            , EF(________), 0 , 0 , O(Gq)             , O(GdMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdMovupd           , "movupd"           , O_660F00(10,U,_,_,_), O_660F00(11,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovups           , "movups"           , O_000F00(10,U,_,_,_), O_000F00(11,U,_,_,_), Enc(ExtMov)       , F(Move)                            , EF(________), 0 , 16, O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMovzx            , "movzx"            , O_000F00(B6,U,_,_,_), U                   , Enc(X86MovSxZx)   , F(Move)                            , EF(________), 0 , 0 , O(Gqdw)           , O(GwbMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMpsadbw          , "mpsadbw"          , O_660F3A(42,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdMul              , "mul"              , O_000000(F6,4,_,_,_), U                   , Enc(X86Rm_B)      , F(None)|F(Special)                 , EF(WUUUUW__), 0 , 0 , 0                 , 0                 , U                 , U                 , U                 ),
-  INST(kX86InstIdMulpd            , "mulpd"            , O_660F00(59,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMulps            , "mulps"            , O_000F00(59,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMulsd            , "mulsd"            , O_F20F00(59,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMulss            , "mulss"            , O_F30F00(59,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdMulx             , "mulx"             , O_F20F38(F6,U,_,_,_), U                   , Enc(AvxRvm)       , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , O(Gqd)            , O(GqdMem)         , U                 , U                 ),
-  INST(kX86InstIdMwait            , "mwait"            , O_000F01(C9,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdNeg              , "neg"              , O_000000(F6,3,_,_,_), U                   , Enc(X86Rm_B)      , F(Lock)                            , EF(WWWWWW__), 0 , 0 , O(GqdwbMem)       , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdNop              , "nop"              , O_000000(90,U,_,_,_), U                   , Enc(X86Op)        , F(None)                            , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdNot              , "not"              , O_000000(F6,2,_,_,_), U                   , Enc(X86Rm_B)      , F(Lock)                            , EF(________), 0 , 0 , O(GqdwbMem)       , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdOr               , "or"               , O_000000(08,1,_,_,_), U                   , Enc(X86Arith)     , F(Lock)                            , EF(WWWUWW__), 0 , 0 , O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdOrpd             , "orpd"             , O_660F00(56,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdOrps             , "orps"             , O_000F00(56,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPabsb            , "pabsb"            , O_000F38(1C,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPabsd            , "pabsd"            , O_000F38(1E,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPabsw            , "pabsw"            , O_000F38(1D,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPackssdw         , "packssdw"         , O_000F00(6B,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPacksswb         , "packsswb"         , O_000F00(63,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPackusdw         , "packusdw"         , O_660F38(2B,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPackuswb         , "packuswb"         , O_000F00(67,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPaddb            , "paddb"            , O_000F00(FC,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPaddd            , "paddd"            , O_000F00(FE,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPaddq            , "paddq"            , O_000F00(D4,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPaddsb           , "paddsb"           , O_000F00(EC,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPaddsw           , "paddsw"           , O_000F00(ED,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPaddusb          , "paddusb"          , O_000F00(DC,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPaddusw          , "paddusw"          , O_000F00(DD,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPaddw            , "paddw"            , O_000F00(FD,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPalignr          , "palignr"          , O_000F3A(0F,U,_,_,_), U                   , Enc(ExtRmi_P)     , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPand             , "pand"             , O_000F00(DB,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPandn            , "pandn"            , O_000F00(DF,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPause            , "pause"            , O_F30000(90,U,_,_,_), U                   , Enc(X86Op)        , F(None)                            , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdPavgb            , "pavgb"            , O_000F00(E0,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPavgw            , "pavgw"            , O_000F00(E3,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPblendvb         , "pblendvb"         , O_660F38(10,U,_,_,_), U                   , Enc(ExtRm)        , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPblendw          , "pblendw"          , O_660F3A(0E,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPclmulqdq        , "pclmulqdq"        , O_660F3A(44,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPcmpeqb          , "pcmpeqb"          , O_000F00(74,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPcmpeqd          , "pcmpeqd"          , O_000F00(76,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPcmpeqq          , "pcmpeqq"          , O_660F38(29,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPcmpeqw          , "pcmpeqw"          , O_000F00(75,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPcmpestri        , "pcmpestri"        , O_660F3A(61,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPcmpestrm        , "pcmpestrm"        , O_660F3A(60,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPcmpgtb          , "pcmpgtb"          , O_000F00(64,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPcmpgtd          , "pcmpgtd"          , O_000F00(66,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPcmpgtq          , "pcmpgtq"          , O_660F38(37,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPcmpgtw          , "pcmpgtw"          , O_000F00(65,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPcmpistri        , "pcmpistri"        , O_660F3A(63,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPcmpistrm        , "pcmpistrm"        , O_660F3A(62,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPdep             , "pdep"             , O_F20F38(F5,U,_,_,_), U                   , Enc(AvxRvm)       , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , O(Gqd)            , O(GqdMem)         , U                 , U                 ),
-  INST(kX86InstIdPext             , "pext"             , O_F30F38(F5,U,_,_,_), U                   , Enc(AvxRvm)       , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , O(Gqd)            , O(GqdMem)         , U                 , U                 ),
-  INST(kX86InstIdPextrb           , "pextrb"           , O_000F3A(14,U,_,_,_), O_000F3A(14,U,_,_,_), Enc(ExtExtract)   , F(Move)                            , EF(________), 0 , 8 , O(Gd)|O(Gb)|O(Mem), O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdPextrd           , "pextrd"           , O_000F3A(16,U,_,_,_), O_000F3A(16,U,_,_,_), Enc(ExtExtract)   , F(Move)                            , EF(________), 0 , 8 , O(GdMem)          , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdPextrq           , "pextrq"           , O_000F3A(16,U,_,W,_), O_000F3A(16,U,_,W,_), Enc(ExtExtract)   , F(Move)                            , EF(________), 0 , 8 , O(GqdMem)         , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdPextrw           , "pextrw"           , O_000F00(C5,U,_,_,_), O_000F3A(15,U,_,_,_), Enc(ExtExtract)   , F(Move)                            , EF(________), 0 , 8 , O(GdMem)          , O(MmXmm)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPf2id            , "pf2id"            , O_000F0F(1D,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPf2iw            , "pf2iw"            , O_000F0F(1C,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfacc            , "pfacc"            , O_000F0F(AE,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfadd            , "pfadd"            , O_000F0F(9E,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfcmpeq          , "pfcmpeq"          , O_000F0F(B0,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfcmpge          , "pfcmpge"          , O_000F0F(90,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfcmpgt          , "pfcmpgt"          , O_000F0F(A0,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfmax            , "pfmax"            , O_000F0F(A4,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfmin            , "pfmin"            , O_000F0F(94,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfmul            , "pfmul"            , O_000F0F(B4,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfnacc           , "pfnacc"           , O_000F0F(8A,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfpnacc          , "pfpnacc"          , O_000F0F(8E,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfrcp            , "pfrcp"            , O_000F0F(96,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfrcpit1         , "pfrcpit1"         , O_000F0F(A6,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfrcpit2         , "pfrcpit2"         , O_000F0F(B6,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfrsqit1         , "pfrsqit1"         , O_000F0F(A7,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfrsqrt          , "pfrsqrt"          , O_000F0F(97,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfsub            , "pfsub"            , O_000F0F(9A,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPfsubr           , "pfsubr"           , O_000F0F(AA,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPhaddd           , "phaddd"           , O_000F38(02,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPhaddsw          , "phaddsw"          , O_000F38(03,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPhaddw           , "phaddw"           , O_000F38(01,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPhminposuw       , "phminposuw"       , O_660F38(41,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPhsubd           , "phsubd"           , O_000F38(06,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPhsubsw          , "phsubsw"          , O_000F38(07,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPhsubw           , "phsubw"           , O_000F38(05,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPi2fd            , "pi2fd"            , O_000F0F(0D,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPi2fw            , "pi2fw"            , O_000F0F(0C,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPinsrb           , "pinsrb"           , O_660F3A(20,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(GdMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPinsrd           , "pinsrd"           , O_660F3A(22,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(GdMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPinsrq           , "pinsrq"           , O_660F3A(22,U,_,W,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(GqMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPinsrw           , "pinsrw"           , O_000F00(C4,U,_,_,_), U                   , Enc(ExtRmi_P)     , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(GdMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPmaddubsw        , "pmaddubsw"        , O_000F38(04,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPmaddwd          , "pmaddwd"          , O_000F00(F5,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPmaxsb           , "pmaxsb"           , O_660F38(3C,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmaxsd           , "pmaxsd"           , O_660F38(3D,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmaxsw           , "pmaxsw"           , O_000F00(EE,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPmaxub           , "pmaxub"           , O_000F00(DE,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPmaxud           , "pmaxud"           , O_660F38(3F,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmaxuw           , "pmaxuw"           , O_660F38(3E,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPminsb           , "pminsb"           , O_660F38(38,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPminsd           , "pminsd"           , O_660F38(39,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPminsw           , "pminsw"           , O_000F00(EA,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPminub           , "pminub"           , O_000F00(DA,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPminud           , "pminud"           , O_660F38(3B,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPminuw           , "pminuw"           , O_660F38(3A,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovmskb         , "pmovmskb"         , O_000F00(D7,U,_,_,_), U                   , Enc(ExtRm_PQ)     , F(Move)                            , EF(________), 0 , 8 , O(Gqd)            , O(MmXmm)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovsxbd         , "pmovsxbd"         , O_660F38(21,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovsxbq         , "pmovsxbq"         , O_660F38(22,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovsxbw         , "pmovsxbw"         , O_660F38(20,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovsxdq         , "pmovsxdq"         , O_660F38(25,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovsxwd         , "pmovsxwd"         , O_660F38(23,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovsxwq         , "pmovsxwq"         , O_660F38(24,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovzxbd         , "pmovzxbd"         , O_660F38(31,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovzxbq         , "pmovzxbq"         , O_660F38(32,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovzxbw         , "pmovzxbw"         , O_660F38(30,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovzxdq         , "pmovzxdq"         , O_660F38(35,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovzxwd         , "pmovzxwd"         , O_660F38(33,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmovzxwq         , "pmovzxwq"         , O_660F38(34,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmuldq           , "pmuldq"           , O_660F38(28,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmulhrsw         , "pmulhrsw"         , O_000F38(0B,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPmulhuw          , "pmulhuw"          , O_000F00(E4,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPmulhw           , "pmulhw"           , O_000F00(E5,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPmulld           , "pmulld"           , O_660F38(40,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPmullw           , "pmullw"           , O_000F00(D5,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPmuludq          , "pmuludq"          , O_000F00(F4,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPop              , "pop"              , O_000000(8F,0,_,_,_), O_000000(58,U,_,_,_), Enc(X86Pop)       , F(None)|F(Special)                 , EF(________), 0 , 0 , 0                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdPopa             , "popa"             , O_000000(61,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdPopcnt           , "popcnt"           , O_F30F00(B8,U,_,_,_), U                   , Enc(X86RegRm)     , F(None)                            , EF(WWWWWW__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdPopf             , "popf"             , O_000000(9D,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(WWWWWWWW), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdPor              , "por"              , O_000F00(EB,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPrefetch         , "prefetch"         , O_000F00(18,U,_,_,_), U                   , Enc(ExtPrefetch)  , F(None)                            , EF(________), 0 , 0 , O(Mem)            , O(Imm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdPrefetch3dNow    , "prefetch_3dnow"   , O_000F00(0D,0,_,_,_), U                   , Enc(X86M)         , F(None)                            , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdPrefetchw3dNow   , "prefetchw_3dnow"  , O_000F00(0D,1,_,_,_), U                   , Enc(X86M)         , F(None)                            , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdPsadbw           , "psadbw"           , O_000F00(F6,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPshufb           , "pshufb"           , O_000F38(00,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPshufd           , "pshufd"           , O_660F00(70,U,_,_,_), U                   , Enc(ExtRmi)       , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPshufhw          , "pshufhw"          , O_F30F00(70,U,_,_,_), U                   , Enc(ExtRmi)       , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPshuflw          , "pshuflw"          , O_F20F00(70,U,_,_,_), U                   , Enc(ExtRmi)       , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPshufw           , "pshufw"           , O_000F00(70,U,_,_,_), U                   , Enc(ExtRmi_P)     , F(Move)                            , EF(________), 0 , 8 , O(Mm)             , O(MmMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdPsignb           , "psignb"           , O_000F38(08,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPsignd           , "psignd"           , O_000F38(0A,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPsignw           , "psignw"           , O_000F38(09,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPslld            , "pslld"            , O_000F00(F2,U,_,_,_), O_000F00(72,6,_,_,_), Enc(ExtRmRi_P)    , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdPslldq           , "pslldq"           , U                   , O_660F00(73,7,_,_,_), Enc(ExtRmRi)      , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(Imm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdPsllq            , "psllq"            , O_000F00(F3,U,_,_,_), O_000F00(73,6,_,_,_), Enc(ExtRmRi_P)    , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdPsllw            , "psllw"            , O_000F00(F1,U,_,_,_), O_000F00(71,6,_,_,_), Enc(ExtRmRi_P)    , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdPsrad            , "psrad"            , O_000F00(E2,U,_,_,_), O_000F00(72,4,_,_,_), Enc(ExtRmRi_P)    , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdPsraw            , "psraw"            , O_000F00(E1,U,_,_,_), O_000F00(71,4,_,_,_), Enc(ExtRmRi_P)    , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdPsrld            , "psrld"            , O_000F00(D2,U,_,_,_), O_000F00(72,2,_,_,_), Enc(ExtRmRi_P)    , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdPsrldq           , "psrldq"           , U                   , O_660F00(73,3,_,_,_), Enc(ExtRmRi)      , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(Imm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdPsrlq            , "psrlq"            , O_000F00(D3,U,_,_,_), O_000F00(73,2,_,_,_), Enc(ExtRmRi_P)    , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdPsrlw            , "psrlw"            , O_000F00(D1,U,_,_,_), O_000F00(71,2,_,_,_), Enc(ExtRmRi_P)    , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdPsubb            , "psubb"            , O_000F00(F8,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPsubd            , "psubd"            , O_000F00(FA,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPsubq            , "psubq"            , O_000F00(FB,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPsubsb           , "psubsb"           , O_000F00(E8,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPsubsw           , "psubsw"           , O_000F00(E9,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPsubusb          , "psubusb"          , O_000F00(D8,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPsubusw          , "psubusw"          , O_000F00(D9,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPsubw            , "psubw"            , O_000F00(F9,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPswapd           , "pswapd"           , O_000F0F(BB,U,_,_,_), U                   , Enc(3dNow)        , F(None)                            , EF(________), 0 , 0 , O(Mm)             , O(MmMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdPtest            , "ptest"            , O_660F38(17,U,_,_,_), U                   , Enc(ExtRm)        , F(Test)                            , EF(WWWWWW__), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPunpckhbw        , "punpckhbw"        , O_000F00(68,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPunpckhdq        , "punpckhdq"        , O_000F00(6A,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPunpckhqdq       , "punpckhqdq"       , O_660F00(6D,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPunpckhwd        , "punpckhwd"        , O_000F00(69,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPunpcklbw        , "punpcklbw"        , O_000F00(60,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPunpckldq        , "punpckldq"        , O_000F00(62,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPunpcklqdq       , "punpcklqdq"       , O_660F00(6C,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdPunpcklwd        , "punpcklwd"        , O_000F00(61,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdPush             , "push"             , O_000000(FF,6,_,_,_), O_000000(50,U,_,_,_), Enc(X86Push)      , F(None)|F(Special)                 , EF(________), 0 , 0 , 0                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdPusha            , "pusha"            , O_000000(60,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdPushf            , "pushf"            , O_000000(9C,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(RRRRRRRR), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdPxor             , "pxor"             , O_000F00(EF,U,_,_,_), U                   , Enc(ExtRm_P)      , F(None)                            , EF(________), 0 , 0 , O(MmXmm)          , O(MmXmmMem)       , U                 , U                 , U                 ),
-  INST(kX86InstIdRcl              , "rcl"              , O_000000(D0,2,_,_,_), U                   , Enc(X86Rot)       , F(None)|F(Special)                 , EF(W____X__), 0 , 0 , O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                 ),
-  INST(kX86InstIdRcpps            , "rcpps"            , O_000F00(53,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdRcpss            , "rcpss"            , O_F30F00(53,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 4 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdRcr              , "rcr"              , O_000000(D0,3,_,_,_), U                   , Enc(X86Rot)       , F(None)|F(Special)                 , EF(W____X__), 0 , 0 , O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                 ),
-  INST(kX86InstIdRdfsbase         , "rdfsbase"         , O_F30F00(AE,0,_,_,_), U                   , Enc(X86Rm)        , F(Move)                            , EF(________), 0 , 8 , O(Gqd)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRdgsbase         , "rdgsbase"         , O_F30F00(AE,1,_,_,_), U                   , Enc(X86Rm)        , F(Move)                            , EF(________), 0 , 8 , O(Gqd)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRdrand           , "rdrand"           , O_000F00(C7,6,_,_,_), U                   , Enc(X86Rm)        , F(Move)                            , EF(WWWWWW__), 0 , 8 , O(Gqdw)           , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRdtsc            , "rdtsc"            , O_000F00(31,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRdtscp           , "rdtscp"           , O_000F01(F9,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRepLodsB         , "rep lods_b"       , O_000000(AC,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRepLodsD         , "rep lods_d"       , O_000000(AD,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRepLodsQ         , "rep lods_q"       , O_000000(AD,1,_,W,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRepLodsW         , "rep lods_w"       , O_660000(AD,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRepMovsB         , "rep movs_b"       , O_000000(A4,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepMovsD         , "rep movs_d"       , O_000000(A5,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepMovsQ         , "rep movs_q"       , O_000000(A5,1,_,W,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepMovsW         , "rep movs_w"       , O_660000(A5,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepStosB         , "rep stos_b"       , O_000000(AA,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRepStosD         , "rep stos_d"       , O_000000(AB,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRepStosQ         , "rep stos_q"       , O_000000(AB,1,_,W,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRepStosW         , "rep stos_w"       , O_660000(AB,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(______R_), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRepeCmpsB        , "repe cmps_b"      , O_000000(A6,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepeCmpsD        , "repe cmps_d"      , O_000000(A7,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepeCmpsQ        , "repe cmps_q"      , O_000000(A7,1,_,W,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepeCmpsW        , "repe cmps_w"      , O_660000(A7,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepeScasB        , "repe scas_b"      , O_000000(AE,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepeScasD        , "repe scas_d"      , O_000000(AF,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepeScasQ        , "repe scas_q"      , O_000000(AF,1,_,W,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepeScasW        , "repe scas_w"      , O_660000(AF,1,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepneCmpsB       , "repne cmps_b"     , O_000000(A6,0,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepneCmpsD       , "repne cmps_d"     , O_000000(A7,0,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepneCmpsQ       , "repne cmps_q"     , O_000000(A7,0,_,W,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepneCmpsW       , "repne cmps_w"     , O_660000(A7,0,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepneScasB       , "repne scas_b"     , O_000000(AE,0,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepneScasD       , "repne scas_d"     , O_000000(AF,0,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepneScasQ       , "repne scas_q"     , O_000000(AF,0,_,W,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRepneScasW       , "repne scas_w"     , O_660000(AF,0,_,_,_), U                   , Enc(X86Rep)       , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , O(Mem)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdRet              , "ret"              , O_000000(C2,U,_,_,_), U                   , Enc(X86Ret)       , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdRol              , "rol"              , O_000000(D0,0,_,_,_), U                   , Enc(X86Rot)       , F(None)|F(Special)                 , EF(W____W__), 0 , 0 , O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                 ),
-  INST(kX86InstIdRor              , "ror"              , O_000000(D0,1,_,_,_), U                   , Enc(X86Rot)       , F(None)|F(Special)                 , EF(W____W__), 0 , 0 , O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                 ),
-  INST(kX86InstIdRorx             , "rorx"             , O_F20F3A(F0,U,_,_,_), U                   , Enc(AvxRmi)       , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , O(GqdMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdRoundpd          , "roundpd"          , O_660F3A(09,U,_,_,_), U                   , Enc(ExtRmi)       , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdRoundps          , "roundps"          , O_660F3A(08,U,_,_,_), U                   , Enc(ExtRmi)       , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdRoundsd          , "roundsd"          , O_660F3A(0B,U,_,_,_), U                   , Enc(ExtRmi)       , F(Move)                            , EF(________), 0 , 8 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdRoundss          , "roundss"          , O_660F3A(0A,U,_,_,_), U                   , Enc(ExtRmi)       , F(Move)                            , EF(________), 0 , 4 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdRsqrtps          , "rsqrtps"          , O_000F00(52,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdRsqrtss          , "rsqrtss"          , O_F30F00(52,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 4 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdSahf             , "sahf"             , O_000000(9E,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(_WWWWW__), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSal              , "sal"              , O_000000(D0,4,_,_,_), U                   , Enc(X86Rot)       , F(None)|F(Special)                 , EF(WWWUWW__), 0 , 0 , O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                 ),
-  INST(kX86InstIdSar              , "sar"              , O_000000(D0,7,_,_,_), U                   , Enc(X86Rot)       , F(None)|F(Special)                 , EF(WWWUWW__), 0 , 0 , O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                 ),
-  INST(kX86InstIdSarx             , "sarx"             , O_F30F38(F7,U,_,_,_), U                   , Enc(AvxRmv)       , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , O(GqdMem)         , O(Gqd)            , U                 , U                 ),
-  INST(kX86InstIdSbb              , "sbb"              , O_000000(18,3,_,_,_), U                   , Enc(X86Arith)     , F(Lock)                            , EF(WWWWWX__), 0 , 0 , O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdScasB            , "scas_b"           , O_000000(AE,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdScasD            , "scas_d"           , O_000000(AF,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdScasQ            , "scas_q"           , O_000000(AF,U,_,W,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdScasW            , "scas_w"           , O_000000(AF,U,_,_,_), U                   , Enc(X86Op_66H)    , F(None)|F(Special)                 , EF(WWWWWWR_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSeta             , "seta"             , O_000F00(97,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(__R__R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetae            , "setae"            , O_000F00(93,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(_____R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetb             , "setb"             , O_000F00(92,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(_____R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetbe            , "setbe"            , O_000F00(96,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(__R__R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetc             , "setc"             , O_000F00(92,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(_____R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSete             , "sete"             , O_000F00(94,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(__R_____), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetg             , "setg"             , O_000F00(9F,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(RRR_____), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetge            , "setge"            , O_000F00(9D,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(RR______), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetl             , "setl"             , O_000F00(9C,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(RR______), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetle            , "setle"            , O_000F00(9E,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(RRR_____), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetna            , "setna"            , O_000F00(96,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(__R__R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetnae           , "setnae"           , O_000F00(92,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(_____R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetnb            , "setnb"            , O_000F00(93,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(_____R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetnbe           , "setnbe"           , O_000F00(97,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(__R__R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetnc            , "setnc"            , O_000F00(93,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(_____R__), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetne            , "setne"            , O_000F00(95,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(__R_____), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetng            , "setng"            , O_000F00(9E,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(RRR_____), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetnge           , "setnge"           , O_000F00(9C,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(RR______), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetnl            , "setnl"            , O_000F00(9D,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(RR______), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetnle           , "setnle"           , O_000F00(9F,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(RRR_____), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetno            , "setno"            , O_000F00(91,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(R_______), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetnp            , "setnp"            , O_000F00(9B,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(____R___), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetns            , "setns"            , O_000F00(99,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(_R______), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetnz            , "setnz"            , O_000F00(95,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(__R_____), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSeto             , "seto"             , O_000F00(90,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(R_______), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetp             , "setp"             , O_000F00(9A,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(____R___), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetpe            , "setpe"            , O_000F00(9A,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(____R___), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetpo            , "setpo"            , O_000F00(9B,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(____R___), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSets             , "sets"             , O_000F00(98,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(_R______), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSetz             , "setz"             , O_000F00(94,U,_,_,_), U                   , Enc(X86Set)       , F(Move)                            , EF(__R_____), 0 , 1 , O(GbMem)          , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSfence           , "sfence"           , O_000F00(AE,7,_,_,_), U                   , Enc(ExtFence)     , F(None)                            , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdShl              , "shl"              , O_000000(D0,4,_,_,_), U                   , Enc(X86Rot)       , F(None)|F(Special)                 , EF(WWWUWW__), 0 , 0 , O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                 ),
-  INST(kX86InstIdShld             , "shld"             , O_000F00(A4,U,_,_,_), U                   , Enc(X86Shlrd)     , F(None)|F(Special)                 , EF(UWWUWW__), 0 , 0 , O(GqdwbMem)       , O(Gb)             , U                 , U                 , U                 ),
-  INST(kX86InstIdShlx             , "shlx"             , O_660F38(F7,U,_,_,_), U                   , Enc(AvxRmv)       , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , O(GqdMem)         , O(Gqd)            , U                 , U                 ),
-  INST(kX86InstIdShr              , "shr"              , O_000000(D0,5,_,_,_), U                   , Enc(X86Rot)       , F(None)|F(Special)                 , EF(WWWUWW__), 0 , 0 , O(GqdwbMem)       , O(Gb)|O(Imm)      , U                 , U                 , U                 ),
-  INST(kX86InstIdShrd             , "shrd"             , O_000F00(AC,U,_,_,_), U                   , Enc(X86Shlrd)     , F(None)|F(Special)                 , EF(UWWUWW__), 0 , 0 , O(GqdwbMem)       , O(Gqdwb)          , U                 , U                 , U                 ),
-  INST(kX86InstIdShrx             , "shrx"             , O_F20F38(F7,U,_,_,_), U                   , Enc(AvxRmv)       , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , O(GqdMem)         , O(Gqd)            , U                 , U                 ),
-  INST(kX86InstIdShufpd           , "shufpd"           , O_660F00(C6,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdShufps           , "shufps"           , O_000F00(C6,U,_,_,_), U                   , Enc(ExtRmi)       , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdSqrtpd           , "sqrtpd"           , O_660F00(51,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdSqrtps           , "sqrtps"           , O_000F00(51,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 16, O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdSqrtsd           , "sqrtsd"           , O_F20F00(51,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 8 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdSqrtss           , "sqrtss"           , O_F30F00(51,U,_,_,_), U                   , Enc(ExtRm)        , F(Move)                            , EF(________), 0 , 4 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdStc              , "stc"              , O_000000(F9,U,_,_,_), U                   , Enc(X86Op)        , F(None)                            , EF(_____W__), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdStd              , "std"              , O_000000(FD,U,_,_,_), U                   , Enc(X86Op)        , F(None)                            , EF(______W_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdStmxcsr          , "stmxcsr"          , O_000F00(AE,3,_,_,_), U                   , Enc(X86M)         , F(None)                            , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdStosB            , "stos_b"           , O_000000(AA,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(______R_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdStosD            , "stos_d"           , O_000000(AB,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(______R_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdStosQ            , "stos_q"           , O_000000(AB,U,_,W,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(______R_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdStosW            , "stos_w"           , O_000000(AB,U,_,_,_), U                   , Enc(X86Op_66H)    , F(None)|F(Special)                 , EF(______R_), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdSub              , "sub"              , O_000000(28,5,_,_,_), U                   , Enc(X86Arith)     , F(Lock)                            , EF(WWWWWW__), 0 , 0 , O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdSubpd            , "subpd"            , O_660F00(5C,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdSubps            , "subps"            , O_000F00(5C,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdSubsd            , "subsd"            , O_F20F00(5C,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdSubss            , "subss"            , O_F30F00(5C,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdTest             , "test"             , O_000000(84,U,_,_,_), O_000000(F6,U,_,_,_), Enc(X86Test)      , F(Test)                            , EF(WWWUWW__), 0 , 0 , O(GqdwbMem)       , O(Gqdwb)|O(Imm)   , U                 , U                 , U                 ),
-  INST(kX86InstIdTzcnt            , "tzcnt"            , O_F30F00(BC,U,_,_,_), U                   , Enc(X86RegRm)     , F(Move)                            , EF(UUWUUW__), 0 , 0 , O(Gqdw)           , O(GqdwMem)        , U                 , U                 , U                 ),
-  INST(kX86InstIdUcomisd          , "ucomisd"          , O_660F00(2E,U,_,_,_), U                   , Enc(ExtRm)        , F(Test)                            , EF(WWWWWW__), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdUcomiss          , "ucomiss"          , O_000F00(2E,U,_,_,_), U                   , Enc(ExtRm)        , F(Test)                            , EF(WWWWWW__), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdUd2              , "ud2"              , O_000F00(0B,U,_,_,_), U                   , Enc(X86Op)        , F(None)                            , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdUnpckhpd         , "unpckhpd"         , O_660F00(15,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdUnpckhps         , "unpckhps"         , O_000F00(15,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdUnpcklpd         , "unpcklpd"         , O_660F00(14,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdUnpcklps         , "unpcklps"         , O_000F00(14,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVaddpd           , "vaddpd"           , O_660F00(58,U,_,I,1), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVaddps           , "vaddps"           , O_000F00(58,U,_,I,0), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVaddsd           , "vaddsd"           , O_F20F00(58,U,0,I,1), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVaddss           , "vaddss"           , O_F30F00(58,U,0,I,0), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVaddsubpd        , "vaddsubpd"        , O_660F00(D0,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVaddsubps        , "vaddsubps"        , O_F20F00(D0,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVaesdec          , "vaesdec"          , O_660F38(DE,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVaesdeclast      , "vaesdeclast"      , O_660F38(DF,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVaesenc          , "vaesenc"          , O_660F38(DC,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVaesenclast      , "vaesenclast"      , O_660F38(DD,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVaesimc          , "vaesimc"          , O_660F38(DB,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVaeskeygenassist , "vaeskeygenassist" , O_660F3A(DF,U,_,_,_), U                   , Enc(AvxRmi)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVandnpd          , "vandnpd"          , O_660F00(55,U,_,_,1), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVandnps          , "vandnps"          , O_000F00(55,U,_,_,0), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVandpd           , "vandpd"           , O_660F00(54,U,_,_,1), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVandps           , "vandps"           , O_000F00(54,U,_,_,0), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVblendpd         , "vblendpd"         , O_660F3A(0D,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVblendps         , "vblendps"         , O_660F3A(0C,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVblendvpd        , "vblendvpd"        , O_660F3A(4B,U,_,_,_), U                   , Enc(AvxRvmr_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Xy)             , U                 ),
-  INST(kX86InstIdVblendvps        , "vblendvps"        , O_660F3A(4A,U,_,_,_), U                   , Enc(AvxRvmr_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Xy)             , U                 ),
-  INST(kX86InstIdVbroadcastf128   , "vbroadcastf128"   , O_660F38(1A,U,L,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdVbroadcasti128   , "vbroadcasti128"   , O_660F38(5A,U,L,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdVbroadcastsd     , "vbroadcastsd"     , O_660F38(19,U,L,0,1), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVbroadcastss     , "vbroadcastss"     , O_660F38(18,U,_,0,0), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVcmppd           , "vcmppd"           , O_660F00(C2,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVcmpps           , "vcmpps"           , O_000F00(C2,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVcmpsd           , "vcmpsd"           , O_F20F00(C2,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVcmpss           , "vcmpss"           , O_F30F00(C2,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVcomisd          , "vcomisd"          , O_660F00(2F,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVcomiss          , "vcomiss"          , O_000F00(2F,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvtdq2pd        , "vcvtdq2pd"        , O_F30F00(E6,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvtdq2ps        , "vcvtdq2ps"        , O_000F00(5B,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvtpd2dq        , "vcvtpd2dq"        , O_F20F00(E6,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvtpd2ps        , "vcvtpd2ps"        , O_660F00(5A,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvtph2ps        , "vcvtph2ps"        , O_660F38(13,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvtps2dq        , "vcvtps2dq"        , O_660F00(5B,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvtps2pd        , "vcvtps2pd"        , O_000F00(5A,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvtps2ph        , "vcvtps2ph"        , O_660F3A(1D,U,_,_,_), U                   , Enc(AvxMri_P)     , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(Xy)             , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVcvtsd2si        , "vcvtsd2si"        , O_F20F00(2D,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Gqd)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvtsd2ss        , "vcvtsd2ss"        , O_F20F00(5A,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVcvtsi2sd        , "vcvtsi2sd"        , O_F20F00(2A,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(GqdMem)         , U                 , U                 ),
-  INST(kX86InstIdVcvtsi2ss        , "vcvtsi2ss"        , O_F30F00(2A,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(GqdMem)         , U                 , U                 ),
-  INST(kX86InstIdVcvtss2sd        , "vcvtss2sd"        , O_F30F00(5A,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVcvtss2si        , "vcvtss2si"        , O_F20F00(2D,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Gqd)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvttpd2dq       , "vcvttpd2dq"       , O_660F00(E6,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvttps2dq       , "vcvttps2dq"       , O_F30F00(5B,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvttsd2si       , "vcvttsd2si"       , O_F20F00(2C,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Gqd)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVcvttss2si       , "vcvttss2si"       , O_F30F00(2C,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Gqd)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVdivpd           , "vdivpd"           , O_660F00(5E,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVdivps           , "vdivps"           , O_000F00(5E,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVdivsd           , "vdivsd"           , O_F20F00(5E,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVdivss           , "vdivss"           , O_F30F00(5E,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVdppd            , "vdppd"            , O_660F3A(41,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVdpps            , "vdpps"            , O_660F3A(40,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVextractf128     , "vextractf128"     , O_660F3A(19,U,L,_,_), U                   , Enc(AvxMri)       , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(Ymm)            , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVextracti128     , "vextracti128"     , O_660F3A(39,U,L,_,_), U                   , Enc(AvxMri)       , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(Ymm)            , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVextractps       , "vextractps"       , O_660F3A(17,U,_,_,_), U                   , Enc(AvxMri)       , F(Avx)                             , EF(________), 0 , 0 , O(GqdMem)         , O(Xmm)            , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVfmadd132pd      , "vfmadd132pd"      , O_660F38(98,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmadd132ps      , "vfmadd132ps"      , O_660F38(98,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmadd132sd      , "vfmadd132sd"      , O_660F38(99,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmadd132ss      , "vfmadd132ss"      , O_660F38(99,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmadd213pd      , "vfmadd213pd"      , O_660F38(A8,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmadd213ps      , "vfmadd213ps"      , O_660F38(A8,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmadd213sd      , "vfmadd213sd"      , O_660F38(A9,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmadd213ss      , "vfmadd213ss"      , O_660F38(A9,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmadd231pd      , "vfmadd231pd"      , O_660F38(B8,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmadd231ps      , "vfmadd231ps"      , O_660F38(B8,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmadd231sd      , "vfmadd231sd"      , O_660F38(B9,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmadd231ss      , "vfmadd231ss"      , O_660F38(B9,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmaddpd         , "vfmaddpd"         , O_660F3A(69,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfmaddps         , "vfmaddps"         , O_660F3A(68,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfmaddsd         , "vfmaddsd"         , O_660F3A(6B,U,_,_,_), U                   , Enc(Fma4)         , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 ),
-  INST(kX86InstIdVfmaddss         , "vfmaddss"         , O_660F3A(6A,U,_,_,_), U                   , Enc(Fma4)         , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 ),
-  INST(kX86InstIdVfmaddsub132pd   , "vfmaddsub132pd"   , O_660F38(96,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmaddsub132ps   , "vfmaddsub132ps"   , O_660F38(96,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmaddsub213pd   , "vfmaddsub213pd"   , O_660F38(A6,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmaddsub213ps   , "vfmaddsub213ps"   , O_660F38(A6,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmaddsub231pd   , "vfmaddsub231pd"   , O_660F38(B6,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmaddsub231ps   , "vfmaddsub231ps"   , O_660F38(B6,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmaddsubpd      , "vfmaddsubpd"      , O_660F3A(5D,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfmaddsubps      , "vfmaddsubps"      , O_660F3A(5C,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfmsub132pd      , "vfmsub132pd"      , O_660F38(9A,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsub132ps      , "vfmsub132ps"      , O_660F38(9A,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsub132sd      , "vfmsub132sd"      , O_660F38(9B,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmsub132ss      , "vfmsub132ss"      , O_660F38(9B,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmsub213pd      , "vfmsub213pd"      , O_660F38(AA,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsub213ps      , "vfmsub213ps"      , O_660F38(AA,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsub213sd      , "vfmsub213sd"      , O_660F38(AB,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmsub213ss      , "vfmsub213ss"      , O_660F38(AB,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmsub231pd      , "vfmsub231pd"      , O_660F38(BA,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsub231ps      , "vfmsub231ps"      , O_660F38(BA,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsub231sd      , "vfmsub231sd"      , O_660F38(BB,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmsub231ss      , "vfmsub231ss"      , O_660F38(BB,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfmsubadd132pd   , "vfmsubadd132pd"   , O_660F38(97,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsubadd132ps   , "vfmsubadd132ps"   , O_660F38(97,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsubadd213pd   , "vfmsubadd213pd"   , O_660F38(A7,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsubadd213ps   , "vfmsubadd213ps"   , O_660F38(A7,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsubadd231pd   , "vfmsubadd231pd"   , O_660F38(B7,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsubadd231ps   , "vfmsubadd231ps"   , O_660F38(B7,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfmsubaddpd      , "vfmsubaddpd"      , O_660F3A(5F,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfmsubaddps      , "vfmsubaddps"      , O_660F3A(5E,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfmsubpd         , "vfmsubpd"         , O_660F3A(6D,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfmsubps         , "vfmsubps"         , O_660F3A(6C,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfmsubsd         , "vfmsubsd"         , O_660F3A(6F,U,_,_,_), U                   , Enc(Fma4)         , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 ),
-  INST(kX86InstIdVfmsubss         , "vfmsubss"         , O_660F3A(6E,U,_,_,_), U                   , Enc(Fma4)         , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 ),
-  INST(kX86InstIdVfnmadd132pd     , "vfnmadd132pd"     , O_660F38(9C,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmadd132ps     , "vfnmadd132ps"     , O_660F38(9C,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmadd132sd     , "vfnmadd132sd"     , O_660F38(9D,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmadd132ss     , "vfnmadd132ss"     , O_660F38(9D,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmadd213pd     , "vfnmadd213pd"     , O_660F38(AC,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmadd213ps     , "vfnmadd213ps"     , O_660F38(AC,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmadd213sd     , "vfnmadd213sd"     , O_660F38(AD,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmadd213ss     , "vfnmadd213ss"     , O_660F38(AD,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmadd231pd     , "vfnmadd231pd"     , O_660F38(BC,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmadd231ps     , "vfnmadd231ps"     , O_660F38(BC,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmadd231sd     , "vfnmadd231sd"     , O_660F38(BC,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmadd231ss     , "vfnmadd231ss"     , O_660F38(BC,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmaddpd        , "vfnmaddpd"        , O_660F3A(79,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfnmaddps        , "vfnmaddps"        , O_660F3A(78,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfnmaddsd        , "vfnmaddsd"        , O_660F3A(7B,U,_,_,_), U                   , Enc(Fma4)         , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 ),
-  INST(kX86InstIdVfnmaddss        , "vfnmaddss"        , O_660F3A(7A,U,_,_,_), U                   , Enc(Fma4)         , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 ),
-  INST(kX86InstIdVfnmsub132pd     , "vfnmsub132pd"     , O_660F38(9E,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmsub132ps     , "vfnmsub132ps"     , O_660F38(9E,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmsub132sd     , "vfnmsub132sd"     , O_660F38(9F,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmsub132ss     , "vfnmsub132ss"     , O_660F38(9F,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmsub213pd     , "vfnmsub213pd"     , O_660F38(AE,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmsub213ps     , "vfnmsub213ps"     , O_660F38(AE,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmsub213sd     , "vfnmsub213sd"     , O_660F38(AF,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmsub213ss     , "vfnmsub213ss"     , O_660F38(AF,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmsub231pd     , "vfnmsub231pd"     , O_660F38(BE,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmsub231ps     , "vfnmsub231ps"     , O_660F38(BE,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVfnmsub231sd     , "vfnmsub231sd"     , O_660F38(BF,U,_,W,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmsub231ss     , "vfnmsub231ss"     , O_660F38(BF,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVfnmsubpd        , "vfnmsubpd"        , O_660F3A(7D,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfnmsubps        , "vfnmsubps"        , O_660F3A(7C,U,_,_,_), U                   , Enc(Fma4_P)       , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVfnmsubsd        , "vfnmsubsd"        , O_660F3A(7F,U,_,_,_), U                   , Enc(Fma4)         , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 ),
-  INST(kX86InstIdVfnmsubss        , "vfnmsubss"        , O_660F3A(7E,U,_,_,_), U                   , Enc(Fma4)         , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 ),
-  INST(kX86InstIdVfrczpd          , "vfrczpd"          , O_00_M09(81,U,_,_,_), U                   , Enc(XopRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVfrczps          , "vfrczps"          , O_00_M09(80,U,_,_,_), U                   , Enc(XopRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVfrczsd          , "vfrczsd"          , O_00_M09(83,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVfrczss          , "vfrczss"          , O_00_M09(82,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVgatherdpd       , "vgatherdpd"       , O_660F38(92,U,_,W,_), U                   , Enc(AvxGather)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Mem)            , O(Xy)             , U                 , U                 ),
-  INST(kX86InstIdVgatherdps       , "vgatherdps"       , O_660F38(92,U,_,_,_), U                   , Enc(AvxGather)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Mem)            , O(Xy)             , U                 , U                 ),
-  INST(kX86InstIdVgatherqpd       , "vgatherqpd"       , O_660F38(93,U,_,W,_), U                   , Enc(AvxGather)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Mem)            , O(Xy)             , U                 , U                 ),
-  INST(kX86InstIdVgatherqps       , "vgatherqps"       , O_660F38(93,U,_,_,_), U                   , Enc(AvxGatherEx)  , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Mem)            , O(Xmm)            , U                 , U                 ),
-  INST(kX86InstIdVhaddpd          , "vhaddpd"          , O_660F00(7C,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVhaddps          , "vhaddps"          , O_F20F00(7C,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVhsubpd          , "vhsubpd"          , O_660F00(7D,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVhsubps          , "vhsubps"          , O_F20F00(7D,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVinsertf128      , "vinsertf128"      , O_660F3A(18,U,L,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(Ymm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVinserti128      , "vinserti128"      , O_660F3A(38,U,L,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(Ymm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVinsertps        , "vinsertps"        , O_660F3A(21,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVlddqu           , "vlddqu"           , O_F20F00(F0,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdVldmxcsr         , "vldmxcsr"         , O_000F00(AE,2,_,_,_), U                   , Enc(AvxM)         , F(Avx)                             , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdVmaskmovdqu      , "vmaskmovdqu"      , O_660F00(F7,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , U                 , U                 , U                 ),
-  INST(kX86InstIdVmaskmovpd       , "vmaskmovpd"       , O_660F38(2D,U,_,_,_), O_660F38(2F,U,_,_,_), Enc(AvxRvmMvr_P)  , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVmaskmovps       , "vmaskmovps"       , O_660F38(2C,U,_,_,_), O_660F38(2E,U,_,_,_), Enc(AvxRvmMvr_P)  , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVmaxpd           , "vmaxpd"           , O_660F00(5F,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVmaxps           , "vmaxps"           , O_000F00(5F,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVmaxsd           , "vmaxsd"           , O_F20F00(5F,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVmaxss           , "vmaxss"           , O_F30F00(5F,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVminpd           , "vminpd"           , O_660F00(5D,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVminps           , "vminps"           , O_000F00(5D,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVminsd           , "vminsd"           , O_F20F00(5D,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVminss           , "vminss"           , O_F30F00(5D,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVmovapd          , "vmovapd"          , O_660F00(28,U,_,_,_), O_660F00(29,U,_,_,_), Enc(AvxRmMr_P)    , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovaps          , "vmovaps"          , O_000F00(28,U,_,_,_), O_000F00(29,U,_,_,_), Enc(AvxRmMr_P)    , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovd            , "vmovd"            , O_660F00(6E,U,_,_,_), O_660F00(7E,U,_,_,_), Enc(AvxRmMr)      , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovddup         , "vmovddup"         , O_F20F00(12,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovdqa          , "vmovdqa"          , O_660F00(6F,U,_,_,_), O_660F00(7F,U,_,_,_), Enc(AvxRmMr_P)    , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovdqu          , "vmovdqu"          , O_F30F00(6F,U,_,_,_), O_F30F00(7F,U,_,_,_), Enc(AvxRmMr_P)    , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovhlps         , "vmovhlps"         , O_000F00(12,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(Xmm)            , U                 , U                 ),
-  INST(kX86InstIdVmovhpd          , "vmovhpd"          , O_660F00(16,U,_,_,_), O_660F00(17,U,_,_,_), Enc(AvxRvmMr)     , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(Xmm)            , O(Mem)            , U                 , U                 ),
-  INST(kX86InstIdVmovhps          , "vmovhps"          , O_000F00(16,U,_,_,_), O_000F00(17,U,_,_,_), Enc(AvxRvmMr)     , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(Xmm)            , O(Mem)            , U                 , U                 ),
-  INST(kX86InstIdVmovlhps         , "vmovlhps"         , O_000F00(16,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(Xmm)            , U                 , U                 ),
-  INST(kX86InstIdVmovlpd          , "vmovlpd"          , O_660F00(12,U,_,_,_), O_660F00(13,U,_,_,_), Enc(AvxRvmMr)     , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(Xmm)            , O(Mem)            , U                 , U                 ),
-  INST(kX86InstIdVmovlps          , "vmovlps"          , O_000F00(12,U,_,_,_), O_000F00(13,U,_,_,_), Enc(AvxRvmMr)     , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(Xmm)            , O(Mem)            , U                 , U                 ),
-  INST(kX86InstIdVmovmskpd        , "vmovmskpd"        , O_660F00(50,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Gqd)            , O(Xy)             , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovmskps        , "vmovmskps"        , O_000F00(50,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Gqd)            , O(Xy)             , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovntdq         , "vmovntdq"         , O_660F00(E7,U,_,_,_), U                   , Enc(AvxMr)        , F(Avx)                             , EF(________), 0 , 0 , O(Mem)            , O(Xy)             , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovntdqa        , "vmovntdqa"        , O_660F38(2A,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Mem)            , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovntpd         , "vmovntpd"         , O_660F00(2B,U,_,_,_), U                   , Enc(AvxMr_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Mem)            , O(Xy)             , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovntps         , "vmovntps"         , O_000F00(2B,U,_,_,_), U                   , Enc(AvxMr_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Mem)            , O(Xy)             , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovq            , "vmovq"            , O_660F00(6E,U,_,W,_), O_660F00(7E,U,_,_,_), Enc(AvxRmMr)      , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovsd           , "vmovsd"           , O_F20F00(10,U,_,_,_), O_F20F00(11,U,_,_,_), Enc(AvxMovSsSd)   , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(XmmMem)         , O(Xmm)            , U                 , U                 ),
-  INST(kX86InstIdVmovshdup        , "vmovshdup"        , O_F30F00(16,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovsldup        , "vmovsldup"        , O_F30F00(12,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovss           , "vmovss"           , O_F30F00(10,U,_,_,_), O_F30F00(11,U,_,_,_), Enc(AvxMovSsSd)   , F(Avx)                             , EF(________), 0 , 0 , O(XmmMem)         , O(Xmm)            , O(Xmm)            , U                 , U                 ),
-  INST(kX86InstIdVmovupd          , "vmovupd"          , O_660F00(10,U,_,_,_), O_660F00(11,U,_,_,_), Enc(AvxRmMr_P)    , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVmovups          , "vmovups"          , O_000F00(10,U,_,_,_), O_000F00(11,U,_,_,_), Enc(AvxRmMr_P)    , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVmpsadbw         , "vmpsadbw"         , O_660F3A(42,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVmulpd           , "vmulpd"           , O_660F00(59,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVmulps           , "vmulps"           , O_000F00(59,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVmulsd           , "vmulsd"           , O_F20F00(59,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVmulss           , "vmulss"           , O_F30F00(59,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVorpd            , "vorpd"            , O_660F00(56,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVorps            , "vorps"            , O_000F00(56,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpabsb           , "vpabsb"           , O_660F38(1C,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpabsd           , "vpabsd"           , O_660F38(1E,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpabsw           , "vpabsw"           , O_660F38(1D,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpackssdw        , "vpackssdw"        , O_660F00(6B,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpacksswb        , "vpacksswb"        , O_660F00(63,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpackusdw        , "vpackusdw"        , O_660F38(2B,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpackuswb        , "vpackuswb"        , O_660F00(67,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpaddb           , "vpaddb"           , O_660F00(FC,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpaddd           , "vpaddd"           , O_660F00(FE,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpaddq           , "vpaddq"           , O_660F00(D4,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpaddsb          , "vpaddsb"          , O_660F00(EC,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpaddsw          , "vpaddsw"          , O_660F00(ED,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpaddusb         , "vpaddusb"         , O_660F00(DC,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpaddusw         , "vpaddusw"         , O_660F00(DD,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpaddw           , "vpaddw"           , O_660F00(FD,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpalignr         , "vpalignr"         , O_660F3A(0F,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVpand            , "vpand"            , O_660F00(DB,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpandn           , "vpandn"           , O_660F00(DF,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpavgb           , "vpavgb"           , O_660F00(E0,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpavgw           , "vpavgw"           , O_660F00(E3,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpblendd         , "vpblendd"         , O_660F3A(02,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVpblendvb        , "vpblendvb"        , O_660F3A(4C,U,_,_,_), U                   , Enc(AvxRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Xy)             , U                 ),
-  INST(kX86InstIdVpblendw         , "vpblendw"         , O_660F3A(0E,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVpbroadcastb     , "vpbroadcastb"     , O_660F38(78,U,_,_,0), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVpbroadcastd     , "vpbroadcastd"     , O_660F38(58,U,_,_,0), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVpbroadcastq     , "vpbroadcastq"     , O_660F38(59,U,_,_,1), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVpbroadcastw     , "vpbroadcastw"     , O_660F38(79,U,_,_,0), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVpclmulqdq       , "vpclmulqdq"       , O_660F3A(44,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpcmov           , "vpcmov"           , O_00_M08(A2,U,_,_,_), U                   , Enc(XopRvrmRvmr_P), F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVpcmpeqb         , "vpcmpeqb"         , O_660F00(74,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpcmpeqd         , "vpcmpeqd"         , O_660F00(76,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpcmpeqq         , "vpcmpeqq"         , O_660F38(29,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpcmpeqw         , "vpcmpeqw"         , O_660F00(75,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpcmpestri       , "vpcmpestri"       , O_660F3A(61,U,_,_,_), U                   , Enc(AvxRmi)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpcmpestrm       , "vpcmpestrm"       , O_660F3A(60,U,_,_,_), U                   , Enc(AvxRmi)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpcmpgtb         , "vpcmpgtb"         , O_660F00(64,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpcmpgtd         , "vpcmpgtd"         , O_660F00(66,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpcmpgtq         , "vpcmpgtq"         , O_660F38(37,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpcmpgtw         , "vpcmpgtw"         , O_660F00(65,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpcmpistri       , "vpcmpistri"       , O_660F3A(63,U,_,_,_), U                   , Enc(AvxRmi)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpcmpistrm       , "vpcmpistrm"       , O_660F3A(62,U,_,_,_), U                   , Enc(AvxRmi)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpcomb           , "vpcomb"           , O_00_M08(CC,U,_,_,_), U                   , Enc(XopRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpcomd           , "vpcomd"           , O_00_M08(CE,U,_,_,_), U                   , Enc(XopRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpcomq           , "vpcomq"           , O_00_M08(CF,U,_,_,_), U                   , Enc(XopRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpcomub          , "vpcomub"          , O_00_M08(EC,U,_,_,_), U                   , Enc(XopRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpcomud          , "vpcomud"          , O_00_M08(EE,U,_,_,_), U                   , Enc(XopRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpcomuq          , "vpcomuq"          , O_00_M08(EF,U,_,_,_), U                   , Enc(XopRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpcomuw          , "vpcomuw"          , O_00_M08(ED,U,_,_,_), U                   , Enc(XopRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpcomw           , "vpcomw"           , O_00_M08(CD,U,_,_,_), U                   , Enc(XopRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVperm2f128       , "vperm2f128"       , O_660F3A(06,U,L,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(Ymm)            , O(YmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVperm2i128       , "vperm2i128"       , O_660F3A(46,U,L,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(Ymm)            , O(YmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpermd           , "vpermd"           , O_660F38(36,U,L,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(Ymm)            , O(YmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpermil2pd       , "vpermil2pd"       , O_66_M03(49,U,_,_,_), U                   , Enc(AvxRvrmRvmr_P), F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVpermil2ps       , "vpermil2ps"       , O_66_M03(48,U,_,_,_), U                   , Enc(AvxRvrmRvmr_P), F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(XyMem)          , U                 ),
-  INST(kX86InstIdVpermilpd        , "vpermilpd"        , O_660F38(0D,U,_,_,_), O_660F3A(05,U,_,_,_), Enc(AvxRvmRmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpermilps        , "vpermilps"        , O_660F38(0C,U,_,_,_), O_660F3A(04,U,_,_,_), Enc(AvxRvmRmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpermpd          , "vpermpd"          , O_660F3A(01,U,L,W,_), U                   , Enc(AvxRmi)       , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(YmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpermps          , "vpermps"          , O_660F38(16,U,L,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(Ymm)            , O(YmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpermq           , "vpermq"           , O_660F3A(00,U,L,W,_), U                   , Enc(AvxRmi)       , F(Avx)                             , EF(________), 0 , 0 , O(Ymm)            , O(YmmMem)         , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpextrb          , "vpextrb"          , O_660F3A(14,U,_,_,_), U                   , Enc(AvxMri)       , F(Avx)                             , EF(________), 0 , 0 , O(GqdwbMem)       , O(Xmm)            , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpextrd          , "vpextrd"          , O_660F3A(16,U,_,_,_), U                   , Enc(AvxMri)       , F(Avx)                             , EF(________), 0 , 0 , O(GqdMem)         , O(Xmm)            , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpextrq          , "vpextrq"          , O_660F3A(16,U,_,W,_), U                   , Enc(AvxMri)       , F(Avx)                             , EF(________), 0 , 0 , O(GqMem)          , O(Xmm)            , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpextrw          , "vpextrw"          , O_660F3A(15,U,_,_,_), U                   , Enc(AvxMri)       , F(Avx)                             , EF(________), 0 , 0 , O(GqdwMem)        , O(Xmm)            , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpgatherdd       , "vpgatherdd"       , O_660F38(90,U,_,_,_), U                   , Enc(AvxGather)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Mem)            , O(Xy)             , U                 , U                 ),
-  INST(kX86InstIdVpgatherdq       , "vpgatherdq"       , O_660F38(90,U,_,W,_), U                   , Enc(AvxGather)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Mem)            , O(Xy)             , U                 , U                 ),
-  INST(kX86InstIdVpgatherqd       , "vpgatherqd"       , O_660F38(91,U,_,_,_), U                   , Enc(AvxGatherEx)  , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Mem)            , O(Xmm)            , U                 , U                 ),
-  INST(kX86InstIdVpgatherqq       , "vpgatherqq"       , O_660F38(91,U,_,W,_), U                   , Enc(AvxGather)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Mem)            , O(Xy)             , U                 , U                 ),
-  INST(kX86InstIdVphaddbd         , "vphaddbd"         , O_00_M09(C2,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphaddbq         , "vphaddbq"         , O_00_M09(C3,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphaddbw         , "vphaddbw"         , O_00_M09(C1,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphaddd          , "vphaddd"          , O_660F38(02,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVphadddq         , "vphadddq"         , O_00_M09(CB,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphaddsw         , "vphaddsw"         , O_660F38(03,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVphaddubd        , "vphaddubd"        , O_00_M09(D2,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphaddubq        , "vphaddubq"        , O_00_M09(D3,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphaddubw        , "vphaddubw"        , O_00_M09(D1,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphaddudq        , "vphaddudq"        , O_00_M09(DB,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphadduwd        , "vphadduwd"        , O_00_M09(D6,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphadduwq        , "vphadduwq"        , O_00_M09(D7,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphaddw          , "vphaddw"          , O_660F38(01,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVphaddwd         , "vphaddwd"         , O_00_M09(C6,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphaddwq         , "vphaddwq"         , O_00_M09(C7,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphminposuw      , "vphminposuw"      , O_660F38(41,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphsubbw         , "vphsubbw"         , O_00_M09(E1,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphsubd          , "vphsubd"          , O_660F38(06,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVphsubdq         , "vphsubdq"         , O_00_M09(E3,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVphsubsw         , "vphsubsw"         , O_660F38(07,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVphsubw          , "vphsubw"          , O_660F38(05,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVphsubwd         , "vphsubwd"         , O_00_M09(E2,U,_,_,_), U                   , Enc(XopRm)        , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVpinsrb          , "vpinsrb"          , O_660F3A(20,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(GqdwbMem)       , O(Imm)            , U                 ),
-  INST(kX86InstIdVpinsrd          , "vpinsrd"          , O_660F3A(22,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(GqdMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVpinsrq          , "vpinsrq"          , O_660F3A(22,U,_,W,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(GqMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVpinsrw          , "vpinsrw"          , O_660F00(C4,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(GqdwMem)        , O(Imm)            , U                 ),
-  INST(kX86InstIdVpmacsdd         , "vpmacsdd"         , O_00_M08(9E,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmacsdqh        , "vpmacsdqh"        , O_00_M08(9F,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmacsdql        , "vpmacsdql"        , O_00_M08(97,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmacssdd        , "vpmacssdd"        , O_00_M08(8E,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmacssdqh       , "vpmacssdqh"       , O_00_M08(8F,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmacssdql       , "vpmacssdql"       , O_00_M08(87,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmacsswd        , "vpmacsswd"        , O_00_M08(86,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmacssww        , "vpmacssww"        , O_00_M08(85,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmacswd         , "vpmacswd"         , O_00_M08(96,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmacsww         , "vpmacsww"         , O_00_M08(95,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmadcsswd       , "vpmadcsswd"       , O_00_M08(A6,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmadcswd        , "vpmadcswd"        , O_00_M08(B6,U,_,_,_), U                   , Enc(XopRvmr)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Xmm)            , U                 ),
-  INST(kX86InstIdVpmaddubsw       , "vpmaddubsw"       , O_660F38(04,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmaddwd         , "vpmaddwd"         , O_660F00(F5,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmaskmovd       , "vpmaskmovd"       , O_660F38(8C,U,_,_,_), O_660F38(8E,U,_,_,_), Enc(AvxRvmMvr_P)  , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmaskmovq       , "vpmaskmovq"       , O_660F38(8C,U,_,W,_), O_660F38(8E,U,_,_,_), Enc(AvxRvmMvr_P)  , F(Avx)                             , EF(________), 0 , 0 , O(XyMem)          , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmaxsb          , "vpmaxsb"          , O_660F38(3C,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmaxsd          , "vpmaxsd"          , O_660F38(3D,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmaxsw          , "vpmaxsw"          , O_660F00(EE,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmaxub          , "vpmaxub"          , O_660F00(DE,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmaxud          , "vpmaxud"          , O_660F38(3F,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmaxuw          , "vpmaxuw"          , O_660F38(3E,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpminsb          , "vpminsb"          , O_660F38(38,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpminsd          , "vpminsd"          , O_660F38(39,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpminsw          , "vpminsw"          , O_660F00(EA,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpminub          , "vpminub"          , O_660F00(DA,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpminud          , "vpminud"          , O_660F38(3B,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpminuw          , "vpminuw"          , O_660F38(3A,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmovmskb        , "vpmovmskb"        , O_660F00(D7,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Gqd)            , O(Xy)             , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovsxbd        , "vpmovsxbd"        , O_660F38(21,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovsxbq        , "vpmovsxbq"        , O_660F38(22,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovsxbw        , "vpmovsxbw"        , O_660F38(20,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovsxdq        , "vpmovsxdq"        , O_660F38(25,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovsxwd        , "vpmovsxwd"        , O_660F38(23,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovsxwq        , "vpmovsxwq"        , O_660F38(24,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovzxbd        , "vpmovzxbd"        , O_660F38(31,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovzxbq        , "vpmovzxbq"        , O_660F38(32,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovzxbw        , "vpmovzxbw"        , O_660F38(30,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovzxdq        , "vpmovzxdq"        , O_660F38(35,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovzxwd        , "vpmovzxwd"        , O_660F38(33,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmovzxwq        , "vpmovzxwq"        , O_660F38(34,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpmuldq          , "vpmuldq"          , O_660F38(28,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmulhrsw        , "vpmulhrsw"        , O_660F38(0B,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmulhuw         , "vpmulhuw"         , O_660F00(E4,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmulhw          , "vpmulhw"          , O_660F00(E5,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmulld          , "vpmulld"          , O_660F38(40,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmullw          , "vpmullw"          , O_660F00(D5,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpmuludq         , "vpmuludq"         , O_660F00(F4,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpor             , "vpor"             , O_660F00(EB,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpperm           , "vpperm"           , O_00_M08(A3,U,_,_,_), U                   , Enc(XopRvrmRvmr)  , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 ),
-  INST(kX86InstIdVprotb           , "vprotb"           , O_00_M09(90,U,_,_,_), O_00_M08(C0,U,_,_,_), Enc(XopRvmRmi)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)|O(Imm)  , U                 , U                 ),
-  INST(kX86InstIdVprotd           , "vprotd"           , O_00_M09(92,U,_,_,_), O_00_M08(C2,U,_,_,_), Enc(XopRvmRmi)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)|O(Imm)  , U                 , U                 ),
-  INST(kX86InstIdVprotq           , "vprotq"           , O_00_M09(93,U,_,_,_), O_00_M08(C3,U,_,_,_), Enc(XopRvmRmi)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)|O(Imm)  , U                 , U                 ),
-  INST(kX86InstIdVprotw           , "vprotw"           , O_00_M09(91,U,_,_,_), O_00_M08(C1,U,_,_,_), Enc(XopRvmRmi)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)|O(Imm)  , U                 , U                 ),
-  INST(kX86InstIdVpsadbw          , "vpsadbw"          , O_660F00(F6,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpshab           , "vpshab"           , O_00_M09(98,U,_,_,_), U                   , Enc(XopRvmRmv)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpshad           , "vpshad"           , O_00_M09(9A,U,_,_,_), U                   , Enc(XopRvmRmv)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpshaq           , "vpshaq"           , O_00_M09(9B,U,_,_,_), U                   , Enc(XopRvmRmv)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpshaw           , "vpshaw"           , O_00_M09(99,U,_,_,_), U                   , Enc(XopRvmRmv)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpshlb           , "vpshlb"           , O_00_M09(94,U,_,_,_), U                   , Enc(XopRvmRmv)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpshld           , "vpshld"           , O_00_M09(96,U,_,_,_), U                   , Enc(XopRvmRmv)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpshlq           , "vpshlq"           , O_00_M09(97,U,_,_,_), U                   , Enc(XopRvmRmv)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpshlw           , "vpshlw"           , O_00_M09(95,U,_,_,_), U                   , Enc(XopRvmRmv)    , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVpshufb          , "vpshufb"          , O_660F38(00,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpshufd          , "vpshufd"          , O_660F00(70,U,_,_,_), U                   , Enc(AvxRmi_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpshufhw         , "vpshufhw"         , O_F30F00(70,U,_,_,_), U                   , Enc(AvxRmi_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpshuflw         , "vpshuflw"         , O_F20F00(70,U,_,_,_), U                   , Enc(AvxRmi_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpsignb          , "vpsignb"          , O_660F38(08,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsignd          , "vpsignd"          , O_660F38(0A,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsignw          , "vpsignw"          , O_660F38(09,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpslld           , "vpslld"           , O_660F00(F2,U,_,_,_), O_660F00(72,6,_,_,_), Enc(AvxRvmVmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpslldq          , "vpslldq"          , O_660F00(73,7,_,_,_), U                   , Enc(AvxVmi_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpsllq           , "vpsllq"           , O_660F00(F3,U,_,_,_), O_660F00(73,6,_,_,_), Enc(AvxRvmVmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpsllvd          , "vpsllvd"          , O_660F38(47,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsllvq          , "vpsllvq"          , O_660F38(47,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsllw           , "vpsllw"           , O_660F00(F1,U,_,_,_), O_660F00(71,6,_,_,_), Enc(AvxRvmVmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpsrad           , "vpsrad"           , O_660F00(E2,U,_,_,_), O_660F00(72,4,_,_,_), Enc(AvxRvmVmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpsravd          , "vpsravd"          , O_660F38(46,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsraw           , "vpsraw"           , O_660F00(E1,U,_,_,_), O_660F00(71,4,_,_,_), Enc(AvxRvmVmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpsrld           , "vpsrld"           , O_660F00(D2,U,_,_,_), O_660F00(72,2,_,_,_), Enc(AvxRvmVmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpsrldq          , "vpsrldq"          , O_660F00(73,3,_,_,_), U                   , Enc(AvxVmi_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVpsrlq           , "vpsrlq"           , O_660F00(D3,U,_,_,_), O_660F00(73,2,_,_,_), Enc(AvxRvmVmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpsrlvd          , "vpsrlvd"          , O_660F38(45,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsrlvq          , "vpsrlvq"          , O_660F38(45,U,_,W,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsrlw           , "vpsrlw"           , O_660F00(D1,U,_,_,_), O_660F00(71,2,_,_,_), Enc(AvxRvmVmi_P)  , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(XyMem)|O(Imm)   , U                 , U                 ),
-  INST(kX86InstIdVpsubb           , "vpsubb"           , O_660F00(F8,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsubd           , "vpsubd"           , O_660F00(FA,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsubq           , "vpsubq"           , O_660F00(FB,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsubsb          , "vpsubsb"          , O_660F00(E8,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsubsw          , "vpsubsw"          , O_660F00(E9,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsubusb         , "vpsubusb"         , O_660F00(D8,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsubusw         , "vpsubusw"         , O_660F00(D9,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpsubw           , "vpsubw"           , O_660F00(F9,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVptest           , "vptest"           , O_660F38(17,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(WWWWWW__), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVpunpckhbw       , "vpunpckhbw"       , O_660F00(68,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpunpckhdq       , "vpunpckhdq"       , O_660F00(6A,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpunpckhqdq      , "vpunpckhqdq"      , O_660F00(6D,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpunpckhwd       , "vpunpckhwd"       , O_660F00(69,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpunpcklbw       , "vpunpcklbw"       , O_660F00(60,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpunpckldq       , "vpunpckldq"       , O_660F00(62,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpunpcklqdq      , "vpunpcklqdq"      , O_660F00(6C,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpunpcklwd       , "vpunpcklwd"       , O_660F00(61,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVpxor            , "vpxor"            , O_660F00(EF,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVrcpps           , "vrcpps"           , O_000F00(53,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVrcpss           , "vrcpss"           , O_F30F00(53,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVroundpd         , "vroundpd"         , O_660F3A(09,U,_,_,_), U                   , Enc(AvxRmi_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVroundps         , "vroundps"         , O_660F3A(08,U,_,_,_), U                   , Enc(AvxRmi_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , O(Imm)            , U                 , U                 ),
-  INST(kX86InstIdVroundsd         , "vroundsd"         , O_660F3A(0B,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVroundss         , "vroundss"         , O_660F3A(0A,U,_,_,_), U                   , Enc(AvxRvmi)      , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , O(Imm)            , U                 ),
-  INST(kX86InstIdVrsqrtps         , "vrsqrtps"         , O_000F00(52,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVrsqrtss         , "vrsqrtss"         , O_F30F00(52,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVshufpd          , "vshufpd"          , O_660F00(C6,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVshufps          , "vshufps"          , O_000F00(C6,U,_,_,_), U                   , Enc(AvxRvmi_P)    , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , O(Imm)            , U                 ),
-  INST(kX86InstIdVsqrtpd          , "vsqrtpd"          , O_660F00(51,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVsqrtps          , "vsqrtps"          , O_000F00(51,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVsqrtsd          , "vsqrtsd"          , O_F20F00(51,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVsqrtss          , "vsqrtss"          , O_F30F00(51,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVstmxcsr         , "vstmxcsr"         , O_000F00(AE,3,_,_,_), U                   , Enc(AvxM)         , F(Avx)                             , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdVsubpd           , "vsubpd"           , O_660F00(5C,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVsubps           , "vsubps"           , O_000F00(5C,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVsubsd           , "vsubsd"           , O_F20F00(5C,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVsubss           , "vsubss"           , O_F30F00(5C,U,_,_,_), U                   , Enc(AvxRvm)       , F(Avx)                             , EF(________), 0 , 0 , O(Xmm)            , O(Xmm)            , O(XmmMem)         , U                 , U                 ),
-  INST(kX86InstIdVtestpd          , "vtestpd"          , O_660F38(0F,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Test)                            , EF(WWWWWW__), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVtestps          , "vtestps"          , O_660F38(0E,U,_,_,_), U                   , Enc(AvxRm_P)      , F(Test)                            , EF(WWWWWW__), 0 , 0 , O(Xy)             , O(XyMem)          , U                 , U                 , U                 ),
-  INST(kX86InstIdVucomisd         , "vucomisd"         , O_660F00(2E,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(WWWWWW__), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVucomiss         , "vucomiss"         , O_000F00(2E,U,_,_,_), U                   , Enc(AvxRm)        , F(Avx)                             , EF(WWWWWW__), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdVunpckhpd        , "vunpckhpd"        , O_660F00(15,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVunpckhps        , "vunpckhps"        , O_000F00(15,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVunpcklpd        , "vunpcklpd"        , O_660F00(14,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVunpcklps        , "vunpcklps"        , O_000F00(14,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVxorpd           , "vxorpd"           , O_660F00(57,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVxorps           , "vxorps"           , O_000F00(57,U,_,_,_), U                   , Enc(AvxRvm_P)     , F(Avx)                             , EF(________), 0 , 0 , O(Xy)             , O(Xy)             , O(XyMem)          , U                 , U                 ),
-  INST(kX86InstIdVzeroall         , "vzeroall"         , O_000F00(77,U,L,_,_), U                   , Enc(AvxOp)        , F(Avx)                             , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdVzeroupper       , "vzeroupper"       , O_000F00(77,U,_,_,_), U                   , Enc(AvxOp)        , F(Avx)                             , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdWrfsbase         , "wrfsbase"         , O_F30F00(AE,2,_,_,_), U                   , Enc(X86Rm)        , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdWrgsbase         , "wrgsbase"         , O_F30F00(AE,3,_,_,_), U                   , Enc(X86Rm)        , F(None)                            , EF(________), 0 , 0 , O(Gqd)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdXadd             , "xadd"             , O_000F00(C0,U,_,_,_), U                   , Enc(X86Xadd)      , F(Xchg)|F(Lock)                    , EF(WWWWWW__), 0 , 0 , O(GqdwbMem)       , O(Gqdwb)          , U                 , U                 , U                 ),
-  INST(kX86InstIdXchg             , "xchg"             , O_000000(86,U,_,_,_), U                   , Enc(X86Xchg)      , F(Xchg)|F(Lock)                    , EF(________), 0 , 0 , O(GqdwbMem)       , O(Gqdwb)          , U                 , U                 , U                 ),
-  INST(kX86InstIdXgetbv           , "xgetbv"           , O_000F01(D0,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdXor              , "xor"              , O_000000(30,6,_,_,_), U                   , Enc(X86Arith)     , F(Lock)                            , EF(WWWUWW__), 0 , 0 , O(GqdwbMem)       , O(GqdwbMem)|O(Imm), U                 , U                 , U                 ),
-  INST(kX86InstIdXorpd            , "xorpd"            , O_660F00(57,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdXorps            , "xorps"            , O_000F00(57,U,_,_,_), U                   , Enc(ExtRm)        , F(None)                            , EF(________), 0 , 0 , O(Xmm)            , O(XmmMem)         , U                 , U                 , U                 ),
-  INST(kX86InstIdXrstor           , "xrstor"           , O_000F00(AE,5,_,_,_), U                   , Enc(X86M)         , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdXrstor64         , "xrstor64"         , O_000F00(AE,5,_,W,_), U                   , Enc(X86M)         , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdXsave            , "xsave"            , O_000F00(AE,4,_,_,_), U                   , Enc(X86M)         , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdXsave64          , "xsave64"          , O_000F00(AE,4,_,W,_), U                   , Enc(X86M)         , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdXsaveopt         , "xsaveopt"         , O_000F00(AE,6,_,_,_), U                   , Enc(X86M)         , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdXsaveopt64       , "xsaveopt64"       , O_000F00(AE,6,_,W,_), U                   , Enc(X86M)         , F(None)|F(Special)                 , EF(________), 0 , 0 , O(Mem)            , U                 , U                 , U                 , U                 ),
-  INST(kX86InstIdXsetbv           , "xsetbv"           , O_000F01(D1,U,_,_,_), U                   , Enc(X86Op)        , F(None)|F(Special)                 , EF(________), 0 , 0 , U                 , U                 , U                 , U                 , U                 )
-};
-
+#undef NAME_DATA_INDEX
 #undef INST
 
-#undef O_00_X
-#undef O_9B_X
+// ${altOpCodeData:Begin}
+// ------------------- Automatically generated, do not edit -------------------
+const uint32_t X86InstDB::altOpCodeData[] = {
+  0                         , // #0
+  O(660F00,1B,_,_,_,_,_,_  ), // #1
+  O(000F00,BA,4,_,x,_,_,_  ), // #2
+  O(000F00,BA,7,_,x,_,_,_  ), // #3
+  O(000F00,BA,6,_,x,_,_,_  ), // #4
+  O(000F00,BA,5,_,x,_,_,_  ), // #5
+  O(000000,48,_,_,x,_,_,_  ), // #6
+  O(660F00,78,0,_,_,_,_,_  ), // #7
+  O_FPU(00,00DF,5)          , // #8
+  O_FPU(00,00DF,7)          , // #9
+  O_FPU(00,00DD,1)          , // #10
+  O_FPU(00,00DB,5)          , // #11
+  O_FPU(00,DFE0,_)          , // #12
+  O(000000,DB,7,_,_,_,_,_  ), // #13
+  O_FPU(9B,DFE0,_)          , // #14
+  O(000000,E4,_,_,_,_,_,_  ), // #15
+  O(000000,40,_,_,x,_,_,_  ), // #16
+  O(F20F00,78,_,_,_,_,_,_  ), // #17
+  O(000000,77,_,_,_,_,_,_  ), // #18
+  O(000000,73,_,_,_,_,_,_  ), // #19
+  O(000000,72,_,_,_,_,_,_  ), // #20
+  O(000000,76,_,_,_,_,_,_  ), // #21
+  O(000000,74,_,_,_,_,_,_  ), // #22
+  O(000000,E3,_,_,_,_,_,_  ), // #23
+  O(000000,7F,_,_,_,_,_,_  ), // #24
+  O(000000,7D,_,_,_,_,_,_  ), // #25
+  O(000000,7C,_,_,_,_,_,_  ), // #26
+  O(000000,7E,_,_,_,_,_,_  ), // #27
+  O(000000,EB,_,_,_,_,_,_  ), // #28
+  O(000000,75,_,_,_,_,_,_  ), // #29
+  O(000000,71,_,_,_,_,_,_  ), // #30
+  O(000000,7B,_,_,_,_,_,_  ), // #31
+  O(000000,79,_,_,_,_,_,_  ), // #32
+  O(000000,70,_,_,_,_,_,_  ), // #33
+  O(000000,7A,_,_,_,_,_,_  ), // #34
+  O(000000,78,_,_,_,_,_,_  ), // #35
+  V(660F00,92,_,0,0,_,_,_  ), // #36
+  V(F20F00,92,_,0,0,_,_,_  ), // #37
+  V(F20F00,92,_,0,1,_,_,_  ), // #38
+  V(000F00,92,_,0,0,_,_,_  ), // #39
+  O(000000,E2,_,_,_,_,_,_  ), // #40
+  O(000000,E1,_,_,_,_,_,_  ), // #41
+  O(000000,E0,_,_,_,_,_,_  ), // #42
+  O(660F00,29,_,_,_,_,_,_  ), // #43
+  O(000F00,29,_,_,_,_,_,_  ), // #44
+  O(000F38,F1,_,_,x,_,_,_  ), // #45
+  O(000F00,7E,_,_,_,_,_,_  ), // #46
+  O(660F00,7F,_,_,_,_,_,_  ), // #47
+  O(F30F00,7F,_,_,_,_,_,_  ), // #48
+  O(660F00,17,_,_,_,_,_,_  ), // #49
+  O(000F00,17,_,_,_,_,_,_  ), // #50
+  O(660F00,13,_,_,_,_,_,_  ), // #51
+  O(000F00,13,_,_,_,_,_,_  ), // #52
+  O(660F00,E7,_,_,_,_,_,_  ), // #53
+  O(660F00,2B,_,_,_,_,_,_  ), // #54
+  O(000F00,2B,_,_,_,_,_,_  ), // #55
+  O(000F00,E7,_,_,_,_,_,_  ), // #56
+  O(F20F00,2B,_,_,_,_,_,_  ), // #57
+  O(F30F00,2B,_,_,_,_,_,_  ), // #58
+  O(000F00,7E,_,_,x,_,_,_  ), // #59
+  O(F20F00,11,_,_,_,_,_,_  ), // #60
+  O(F30F00,11,_,_,_,_,_,_  ), // #61
+  O(660F00,11,_,_,_,_,_,_  ), // #62
+  O(000F00,11,_,_,_,_,_,_  ), // #63
+  O(000000,E6,_,_,_,_,_,_  ), // #64
+  O(000F3A,15,_,_,_,_,_,_  ), // #65
+  O(000000,58,_,_,_,_,_,_  ), // #66
+  O(000F00,72,6,_,_,_,_,_  ), // #67
+  O(660F00,73,7,_,_,_,_,_  ), // #68
+  O(000F00,73,6,_,_,_,_,_  ), // #69
+  O(000F00,71,6,_,_,_,_,_  ), // #70
+  O(000F00,72,4,_,_,_,_,_  ), // #71
+  O(000F00,71,4,_,_,_,_,_  ), // #72
+  O(000F00,72,2,_,_,_,_,_  ), // #73
+  O(660F00,73,3,_,_,_,_,_  ), // #74
+  O(000F00,73,2,_,_,_,_,_  ), // #75
+  O(000F00,71,2,_,_,_,_,_  ), // #76
+  O(000000,50,_,_,_,_,_,_  ), // #77
+  O(000000,F6,_,_,x,_,_,_  ), // #78
+  V(660F38,92,_,x,_,1,3,T1S), // #79
+  V(660F38,92,_,x,_,0,2,T1S), // #80
+  V(660F38,93,_,x,_,1,3,T1S), // #81
+  V(660F38,93,_,x,_,0,2,T1S), // #82
+  V(660F38,2F,_,x,0,_,_,_  ), // #83
+  V(660F38,2E,_,x,0,_,_,_  ), // #84
+  V(660F00,29,_,x,I,1,4,FVM), // #85
+  V(000F00,29,_,x,I,0,4,FVM), // #86
+  V(660F00,7E,_,0,0,0,2,T1S), // #87
+  V(660F00,7F,_,x,I,_,_,_  ), // #88
+  V(660F00,7F,_,x,_,0,4,FVM), // #89
+  V(660F00,7F,_,x,_,1,4,FVM), // #90
+  V(F30F00,7F,_,x,I,_,_,_  ), // #91
+  V(F20F00,7F,_,x,_,1,4,FVM), // #92
+  V(F30F00,7F,_,x,_,0,4,FVM), // #93
+  V(F30F00,7F,_,x,_,1,4,FVM), // #94
+  V(F20F00,7F,_,x,_,0,4,FVM), // #95
+  V(660F00,17,_,0,I,1,3,T1S), // #96
+  V(000F00,17,_,0,I,0,3,T2 ), // #97
+  V(660F00,13,_,0,I,1,3,T1S), // #98
+  V(000F00,13,_,0,I,0,3,T2 ), // #99
+  V(660F00,7E,_,0,I,1,3,T1S), // #100
+  V(F20F00,11,_,I,I,1,3,T1S), // #101
+  V(F30F00,11,_,I,I,0,2,T1S), // #102
+  V(660F00,11,_,x,I,1,4,FVM), // #103
+  V(000F00,11,_,x,I,0,4,FVM), // #104
+  V(660F3A,05,_,x,0,1,4,FV ), // #105
+  V(660F3A,04,_,x,0,0,4,FV ), // #106
+  V(660F3A,00,_,x,1,1,4,FV ), // #107
+  V(660F38,90,_,x,_,0,2,T1S), // #108
+  V(660F38,90,_,x,_,1,3,T1S), // #109
+  V(660F38,91,_,x,_,0,2,T1S), // #110
+  V(660F38,91,_,x,_,1,3,T1S), // #111
+  V(660F38,8E,_,x,0,_,_,_  ), // #112
+  V(660F38,8E,_,x,1,_,_,_  ), // #113
+  V(XOP_M8,C0,_,0,x,_,_,_  ), // #114
+  V(XOP_M8,C2,_,0,x,_,_,_  ), // #115
+  V(XOP_M8,C3,_,0,x,_,_,_  ), // #116
+  V(XOP_M8,C1,_,0,x,_,_,_  ), // #117
+  V(660F00,72,6,x,I,0,4,FV ), // #118
+  V(660F00,73,6,x,I,1,4,FV ), // #119
+  V(660F00,71,6,x,I,I,4,FVM), // #120
+  V(660F00,72,4,x,I,0,4,FV ), // #121
+  V(660F00,72,4,x,_,1,4,FV ), // #122
+  V(660F00,71,4,x,I,I,4,FVM), // #123
+  V(660F00,72,2,x,I,0,4,FV ), // #124
+  V(660F00,73,2,x,I,1,4,FV ), // #125
+  V(660F00,71,2,x,I,I,4,FVM)  // #126
+};
+// ----------------------------------------------------------------------------
+// ${altOpCodeData:End}
 
-#undef O_66_M03
-#undef O_00_M09
-#undef O_00_M08
-
-#undef O_F30F3A
-#undef O_F30F38
-#undef O_F30F00
-#undef O_F30000
-#undef O_F20F3A
-#undef O_F20F38
-#undef O_F20F00
-#undef O_F20000
-#undef O_9B0000
-#undef O_660F3A
-#undef O_660F38
-#undef O_660F00
-#undef O_660000
-#undef O_000F3A
-#undef O_000F38
-#undef O_000F0F
-#undef O_000F01
-#undef O_000F00
-#undef O_000000
-
+#undef O_FPU
 #undef O
-#undef EF
-#undef A
+#undef V
+
+// ${commonData:Begin}
+// ------------------- Automatically generated, do not edit -------------------
+#define F(VAL) X86Inst::kFlag##VAL
+#define JUMP_TYPE(VAL) Inst::kJumpType##VAL
+#define SINGLE_REG(VAL) X86Inst::kSingleReg##VAL
+const X86Inst::CommonData X86InstDB::commonData[] = {
+  { F(UseR)                                               , 0  , 0  , 0  , 0  , 0 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #0
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 0  , 383, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #1
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 0  , 384, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #2
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 0  , 15 , 12, JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #3
+  { F(UseX)                                               , 0  , 0  , 0  , 25 , 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #4
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 336, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #5
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 385, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #6
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 386, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #7
+  { F(UseW)|F(Vec)                                        , 0  , 0  , 0  , 87 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #8
+  { F(UseW)|F(Vec)                                        , 0  , 0  , 0  , 94 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #9
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 0  , 39 , 11, JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #10
+  { F(UseW)|F(Vex)                                        , 0  , 0  , 0  , 273, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #11
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 336, 1 , JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #12
+  { F(UseX)                                               , 0  , 0  , 0  , 387, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #13
+  { F(UseW)|F(Vex)                                        , 0  , 0  , 0  , 275, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #14
+  { F(UseW)|F(Vex)                                        , 0  , 0  , 0  , 184, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #15
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 338, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #16
+  { F(UseX)|F(FixedReg)|F(Vec)                            , 0  , 0  , 0  , 388, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #17
+  { F(UseR)                                               , 0  , 0  , 0  , 277, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #18
+  { F(UseW)|F(Mib)                                        , 0  , 0  , 0  , 389, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #19
+  { F(UseW)                                               , 0  , 0  , 0  , 390, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #20
+  { F(UseW)                                               , 0  , 0  , 1  , 279, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #21
+  { F(UseW)|F(Mib)                                        , 0  , 0  , 0  , 391, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #22
+  { F(UseR)                                               , 0  , 0  , 0  , 281, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #23
+  { F(UseX)                                               , 0  , 0  , 0  , 24 , 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #24
+  { F(UseX)                                               , 0  , 0  , 0  , 392, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #25
+  { F(UseR)                                               , 0  , 0  , 2  , 126, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #26
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 3  , 130, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #27
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 4  , 130, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #28
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 5  , 130, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #29
+  { F(UseR)                                               , 0  , 0  , 0  , 283, 2 , JUMP_TYPE(Call)       , SINGLE_REG(None), 0 }, // #30
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 0  , 393, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #31
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 0  , 394, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #32
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 0  , 395, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #33
+  { F(UseR)                                               , 0  , 0  , 0  , 291, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #34
+  { F(UseR)                                               , 0  , 0  , 0  , 396, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #35
+  { F(UseR)|F(FixedRM)                                    , 0  , 0  , 0  , 397, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #36
+  { F(UseR)                                               , 0  , 0  , 0  , 27 , 12, JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #37
+  { F(UseX)|F(FixedRM)|F(Rep)|F(Repnz)                    , 0  , 0  , 0  , 398, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #38
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 399, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #39
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 400, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #40
+  { F(UseX)|F(FixedReg)|F(Lock)|F(XAcquire)|F(XRelease)   , 0  , 0  , 0  , 134, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #41
+  { F(UseX)|F(FixedReg)|F(Lock)|F(XAcquire)|F(XRelease)   , 0  , 0  , 0  , 401, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #42
+  { F(UseX)|F(FixedReg)|F(Lock)|F(XAcquire)|F(XRelease)   , 0  , 0  , 0  , 402, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #43
+  { F(UseR)|F(Vec)                                        , 0  , 0  , 0  , 403, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #44
+  { F(UseR)|F(Vec)                                        , 0  , 0  , 0  , 404, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #45
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 0  , 405, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #46
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 0  , 406, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #47
+  { F(UseX)                                               , 0  , 0  , 0  , 285, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #48
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 0  , 85 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #49
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 0  , 87 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #50
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 8  , 0  , 407, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #51
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 16 , 0  , 408, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #52
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 8  , 0  , 408, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #53
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 8  , 0  , 409, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #54
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 410, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #55
+  { F(UseW)|F(Vec)                                        , 0  , 4  , 0  , 85 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #56
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 411, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #57
+  { F(UseW)|F(Vec)                                        , 0  , 4  , 0  , 411, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #58
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 255, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #59
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 412, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #60
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 0  , 413, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #61
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 0  , 414, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #62
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 6  , 287, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #63
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 0  , 138, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #64
+  { F(UseR)|F(Mmx)                                        , 0  , 0  , 0  , 291, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #65
+  { F(UseR)                                               , 0  , 0  , 0  , 415, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #66
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 416, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #67
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 7  , 289, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #68
+  { F(UseA)|F(FixedReg)|F(FpuM32)|F(FpuM64)               , 0  , 0  , 0  , 174, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #69
+  { F(UseX)                                               , 0  , 0  , 0  , 291, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #70
+  { F(UseR)|F(FpuM80)                                     , 0  , 0  , 0  , 417, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #71
+  { F(UseW)|F(FpuM80)                                     , 0  , 0  , 0  , 418, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #72
+  { F(UseX)                                               , 0  , 0  , 0  , 292, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #73
+  { F(UseR)|F(FpuM32)|F(FpuM64)                           , 0  , 0  , 0  , 293, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #74
+  { F(UseR)                                               , 0  , 0  , 0  , 296, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #75
+  { F(UseR)|F(FpuM16)|F(FpuM32)                           , 0  , 0  , 0  , 419, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #76
+  { F(UseR)|F(FpuM16)|F(FpuM32)|F(FpuM64)                 , 0  , 0  , 8  , 420, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #77
+  { F(UseW)|F(FpuM16)|F(FpuM32)                           , 0  , 0  , 0  , 421, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #78
+  { F(UseW)|F(FpuM16)|F(FpuM32)|F(FpuM64)                 , 0  , 0  , 9  , 422, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #79
+  { F(UseW)|F(FpuM16)|F(FpuM32)|F(FpuM64)                 , 0  , 0  , 10 , 422, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #80
+  { F(UseR)|F(FpuM32)|F(FpuM64)|F(FpuM80)                 , 0  , 0  , 11 , 423, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #81
+  { F(UseR)|F(FpuM16)                                     , 0  , 0  , 0  , 424, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #82
+  { F(UseX)|F(FixedReg)|F(FpuM32)|F(FpuM64)               , 0  , 0  , 0  , 177, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #83
+  { F(UseW)                                               , 0  , 0  , 0  , 425, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #84
+  { F(UseW)|F(FpuM16)                                     , 0  , 0  , 0  , 426, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #85
+  { F(UseW)|F(FixedReg)|F(FpuM16)                         , 0  , 0  , 12 , 427, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #86
+  { F(UseW)|F(FpuM32)|F(FpuM64)                           , 0  , 0  , 0  , 428, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #87
+  { F(UseW)|F(FpuM32)|F(FpuM64)|F(FpuM80)                 , 0  , 0  , 13 , 429, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #88
+  { F(UseW)|F(FixedReg)|F(FpuM16)                         , 0  , 0  , 14 , 427, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #89
+  { F(UseR)                                               , 0  , 0  , 0  , 295, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #90
+  { F(UseR)                                               , 0  , 0  , 0  , 430, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #91
+  { F(UseW)                                               , 0  , 0  , 0  , 431, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #92
+  { F(UseA)|F(FixedReg)                                   , 0  , 0  , 0  , 50 , 10, JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #93
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 15 , 432, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #94
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 16 , 287, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #95
+  { F(UseW)|F(FixedRM)|F(Rep)|F(Repnz)                    , 0  , 0  , 0  , 433, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #96
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 17 , 297, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #97
+  { F(UseR)                                               , 0  , 0  , 0  , 434, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #98
+  { F(UseR)                                               , 0  , 0  , 0  , 435, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #99
+  { F(UseR)                                               , 0  , 0  , 0  , 299, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #100
+  { F(UseR)                                               , 0  , 0  , 0  , 436, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #101
+  { F(UseR)                                               , 0  , 0  , 18 , 437, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #102
+  { F(UseR)                                               , 0  , 0  , 19 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #103
+  { F(UseR)                                               , 0  , 0  , 20 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #104
+  { F(UseR)                                               , 0  , 0  , 21 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #105
+  { F(UseR)                                               , 0  , 0  , 20 , 438, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #106
+  { F(UseR)                                               , 0  , 0  , 22 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #107
+  { F(UseR)|F(FixedReg)                                   , 0  , 0  , 23 , 301, 2 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #108
+  { F(UseR)                                               , 0  , 0  , 24 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #109
+  { F(UseR)                                               , 0  , 0  , 25 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #110
+  { F(UseR)                                               , 0  , 0  , 26 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #111
+  { F(UseR)                                               , 0  , 0  , 27 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #112
+  { F(UseR)                                               , 0  , 0  , 28 , 303, 2 , JUMP_TYPE(Direct)     , SINGLE_REG(None), 0 }, // #113
+  { F(UseR)                                               , 0  , 0  , 19 , 438, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #114
+  { F(UseR)                                               , 0  , 0  , 29 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #115
+  { F(UseR)                                               , 0  , 0  , 30 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #116
+  { F(UseR)                                               , 0  , 0  , 31 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #117
+  { F(UseR)                                               , 0  , 0  , 32 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #118
+  { F(UseR)                                               , 0  , 0  , 33 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #119
+  { F(UseR)                                               , 0  , 0  , 34 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #120
+  { F(UseR)                                               , 0  , 0  , 35 , 437, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #121
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 439, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #122
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 36 , 305, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #123
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 37 , 307, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #124
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 38 , 309, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #125
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 39 , 311, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #126
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 440, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #127
+  { F(UseR)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 441, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #128
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 442, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #129
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 0  , 443, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #130
+  { F(UseW)                                               , 0  , 0  , 0  , 313, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #131
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 0  , 228, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #132
+  { F(UseR)                                               , 0  , 0  , 0  , 444, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #133
+  { F(UseX)                                               , 0  , 0  , 0  , 315, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #134
+  { F(UseW)                                               , 0  , 0  , 0  , 445, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #135
+  { F(UseX)                                               , 0  , 0  , 0  , 180, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #136
+  { F(UseR)                                               , 0  , 0  , 0  , 446, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #137
+  { F(UseW)|F(FixedRM)|F(Rep)|F(Repnz)                    , 0  , 0  , 0  , 447, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #138
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 40 , 317, 2 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #139
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 41 , 317, 2 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #140
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 42 , 317, 2 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #141
+  { F(UseW)                                               , 0  , 0  , 0  , 319, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #142
+  { F(UseW)                                               , 0  , 0  , 0  , 183, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #143
+  { F(UseX)|F(FixedRM)|F(Vec)                             , 0  , 0  , 0  , 448, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #144
+  { F(UseX)|F(FixedRM)|F(Mmx)                             , 0  , 0  , 0  , 449, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #145
+  { F(UseR)|F(FixedRM)                                    , 0  , 0  , 0  , 450, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #146
+  { F(UseW)|F(XRelease)                                   , 0  , 0  , 0  , 0  , 15, JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #147
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 43 , 87 , 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #148
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 44 , 87 , 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #149
+  { F(UseW)                                               , 0  , 0  , 45 , 75 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #150
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 16 , 46 , 321, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #151
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 8  , 0  , 451, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #152
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 47 , 87 , 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #153
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 48 , 87 , 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #154
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 452, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #155
+  { F(UseW)|F(Vec)                                        , 8  , 8  , 49 , 234, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #156
+  { F(UseW)|F(Vec)                                        , 8  , 8  , 50 , 234, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #157
+  { F(UseW)|F(Vec)                                        , 8  , 8  , 0  , 452, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #158
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 51 , 234, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #159
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 52 , 234, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #160
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 453, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #161
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 53 , 225, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #162
+  { F(UseW)                                               , 0  , 8  , 0  , 79 , 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #163
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 54 , 225, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #164
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 55 , 225, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #165
+  { F(UseW)|F(Mmx)                                        , 0  , 8  , 56 , 454, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #166
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 57 , 234, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #167
+  { F(UseW)|F(Vec)                                        , 0  , 4  , 58 , 237, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #168
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 16 , 59 , 81 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #169
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 16 , 0  , 455, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #170
+  { F(UseX)|F(FixedRM)|F(Rep)|F(Repnz)                    , 0  , 0  , 0  , 456, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #171
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 60 , 323, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #172
+  { F(UseW)|F(Vec)                                        , 0  , 4  , 61 , 325, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #173
+  { F(UseW)                                               , 0  , 0  , 0  , 327, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #174
+  { F(UseW)                                               , 0  , 0  , 0  , 457, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #175
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 62 , 87 , 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #176
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 63 , 87 , 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #177
+  { F(UseA)|F(FixedReg)                                   , 0  , 0  , 0  , 50 , 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #178
+  { F(UseW)|F(FixedReg)|F(Vex)                            , 0  , 0  , 0  , 329, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #179
+  { F(UseR)|F(FixedReg)                                   , 0  , 0  , 0  , 458, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #180
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 0  , 288, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #181
+  { F(UseR)                                               , 0  , 0  , 0  , 331, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #182
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 0  , 15 , 12, JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #183
+  { F(UseR)|F(FixedReg)                                   , 0  , 0  , 64 , 459, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #184
+  { F(UseR)|F(FixedRM)|F(Rep)|F(Repnz)                    , 0  , 0  , 0  , 460, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #185
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 0  , 0  , 333, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #186
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 0  , 335, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #187
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 0  , 337, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #188
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 0  , 335, 2 , JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #189
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 0  , 335, 2 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #190
+  { F(UseX)|F(Mmx)                                        , 0  , 0  , 0  , 335, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #191
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 336, 1 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #192
+  { F(UseR)|F(FixedReg)|F(Vec)                            , 0  , 0  , 0  , 461, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #193
+  { F(UseR)|F(FixedReg)|F(Vec)                            , 0  , 0  , 0  , 462, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #194
+  { F(UseR)|F(FixedReg)|F(Vec)                            , 0  , 0  , 0  , 463, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #195
+  { F(UseR)|F(FixedReg)|F(Vec)                            , 0  , 0  , 0  , 464, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #196
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 465, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #197
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 466, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #198
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 8  , 65 , 339, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #199
+  { F(UseW)|F(Mmx)                                        , 0  , 8  , 0  , 333, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #200
+  { F(UseW)|F(Mmx)                                        , 0  , 0  , 0  , 333, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #201
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 467, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #202
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 468, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #203
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 0  , 469, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #204
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 0  , 470, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #205
+  { F(UseW)|F(Mmx)|F(Vec)                                 , 0  , 8  , 0  , 471, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #206
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 0  , 255, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #207
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 0  , 258, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #208
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 66 , 142, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #209
+  { F(UseW)|F(Vec)                                        , 0  , 16 , 0  , 94 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #210
+  { F(UseW)|F(Mmx)                                        , 0  , 8  , 0  , 472, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #211
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 67 , 341, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #212
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 68 , 473, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #213
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 69 , 341, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #214
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 70 , 341, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #215
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 71 , 341, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #216
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 72 , 341, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #217
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 73 , 341, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #218
+  { F(UseX)|F(Vec)                                        , 0  , 0  , 74 , 473, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #219
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 75 , 341, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #220
+  { F(UseX)|F(Mmx)|F(Vec)                                 , 0  , 0  , 76 , 341, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #221
+  { F(UseR)|F(Vec)                                        , 0  , 0  , 0  , 379, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #222
+  { F(UseA)|F(FixedReg)                                   , 0  , 0  , 77 , 146, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #223
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 0  , 474, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #224
+  { F(UseW)|F(Vec)                                        , 0  , 4  , 0  , 255, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #225
+  { F(UseW)                                               , 0  , 8  , 0  , 475, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #226
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 0  , 476, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #227
+  { F(UseW)                                               , 0  , 8  , 0  , 477, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #228
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 0  , 478, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #229
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 0  , 479, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #230
+  { F(UseR)                                               , 0  , 0  , 0  , 343, 2 , JUMP_TYPE(Return)     , SINGLE_REG(None), 0 }, // #231
+  { F(UseW)|F(Vex)                                        , 0  , 0  , 0  , 345, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #232
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 480, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #233
+  { F(UseW)|F(Vec)                                        , 0  , 4  , 0  , 481, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #234
+  { F(UseR)|F(FixedReg)                                   , 0  , 0  , 0  , 482, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #235
+  { F(UseR)|F(FixedRM)|F(Rep)|F(Repnz)                    , 0  , 0  , 0  , 483, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #236
+  { F(UseW)                                               , 0  , 1  , 0  , 484, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #237
+  { F(UseX)|F(FixedReg)                                   , 0  , 0  , 0  , 186, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #238
+  { F(UseW)                                               , 0  , 0  , 0  , 485, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #239
+  { F(UseW)|F(Vec)                                        , 0  , 8  , 0  , 85 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #240
+  { F(UseW)                                               , 0  , 0  , 0  , 486, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #241
+  { F(UseX)|F(FixedRM)|F(Rep)|F(Repnz)                    , 0  , 0  , 0  , 487, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #242
+  { F(UseX)|F(Lock)|F(XAcquire)|F(XRelease)               , 0  , 0  , 0  , 15 , 12, JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #243
+  { F(UseR)                                               , 0  , 0  , 78 , 68 , 7 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #244
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512T4X)|F(Avx512KZ)       , 0  , 0  , 0  , 488, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #245
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE_B64)  , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #246
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE_B32)  , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #247
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE)      , 0  , 0  , 0  , 489, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #248
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE)      , 0  , 0  , 0  , 490, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #249
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 189, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #250
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 93 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #251
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 87 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #252
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 94 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #253
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 192, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #254
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 192, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #255
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B64)         , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #256
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #257
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B64)         , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #258
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #259
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #260
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #261
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #262
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 192, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #263
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 347, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #264
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 491, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #265
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 492, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #266
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 493, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #267
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 494, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #268
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 495, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #269
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 260, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #270
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 492, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #271
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 363, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #272
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE_B64)     , 0  , 0  , 0  , 195, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #273
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE_B32)     , 0  , 0  , 0  , 195, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #274
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE)         , 0  , 0  , 0  , 496, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #275
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE)         , 0  , 0  , 0  , 497, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #276
+  { F(UseR)|F(Vec)|F(Vex)|F(Evex)|F(Avx512SAE)            , 0  , 0  , 0  , 403, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #277
+  { F(UseR)|F(Vec)|F(Vex)|F(Evex)|F(Avx512SAE)            , 0  , 0  , 0  , 404, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #278
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 198, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #279
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 0  , 201, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #280
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE_B32)  , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #281
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE_B64)  , 0  , 0  , 0  , 349, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #282
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE_B64)  , 0  , 0  , 0  , 207, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #283
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_ER_SAE_B64)         , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #284
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_ER_SAE_B64)         , 0  , 0  , 0  , 349, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #285
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE)         , 0  , 0  , 0  , 201, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #286
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE_B32)  , 0  , 0  , 0  , 201, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #287
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE)         , 0  , 0  , 0  , 210, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #288
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_ER_SAE_B32)         , 0  , 0  , 0  , 201, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #289
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_ER_SAE_B32)         , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #290
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512ER_SAE)         , 0  , 0  , 0  , 410, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #291
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512ER_SAE)                , 0  , 0  , 0  , 410, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #292
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512ER_SAE)         , 0  , 0  , 0  , 498, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #293
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE)         , 0  , 0  , 0  , 490, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #294
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512ER_SAE)         , 0  , 0  , 0  , 412, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #295
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512ER_SAE)                , 0  , 0  , 0  , 412, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #296
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE_B64)     , 0  , 0  , 0  , 349, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #297
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B64)            , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #298
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B64)            , 0  , 0  , 0  , 349, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #299
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE_B32)     , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #300
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B32)            , 0  , 0  , 0  , 201, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #301
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B32)            , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #302
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512SAE)            , 0  , 0  , 0  , 410, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #303
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512SAE)                   , 0  , 0  , 0  , 410, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #304
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512SAE)            , 0  , 0  , 0  , 412, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #305
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512SAE)                   , 0  , 0  , 0  , 412, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #306
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 201, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #307
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512ER_SAE)                , 0  , 0  , 0  , 498, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #308
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 192, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #309
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 192, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #310
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B64)            , 0  , 0  , 0  , 91 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #311
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B32)            , 0  , 0  , 0  , 91 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #312
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #313
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 211, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #314
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 499, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #315
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 212, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #316
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 416, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #317
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B64)            , 0  , 0  , 0  , 213, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #318
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B32)            , 0  , 0  , 0  , 213, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #319
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 500, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #320
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 501, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #321
+  { F(UseX)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE_B64)  , 0  , 0  , 0  , 216, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #322
+  { F(UseX)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE_B32)  , 0  , 0  , 0  , 216, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #323
+  { F(UseX)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE)      , 0  , 0  , 0  , 502, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #324
+  { F(UseX)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE)      , 0  , 0  , 0  , 503, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #325
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 150, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #326
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 351, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #327
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 353, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #328
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K_B64)                 , 0  , 0  , 0  , 504, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #329
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K_B32)                 , 0  , 0  , 0  , 504, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #330
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K)                     , 0  , 0  , 0  , 505, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #331
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K)                     , 0  , 0  , 0  , 506, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #332
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 204, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #333
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 85 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #334
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 255, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #335
+  { F(UseX)|F(Vec)|F(Vsib)|F(Vex)|F(Evex)|F(Avx512K)      , 0  , 0  , 79 , 111, 5 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #336
+  { F(UseX)|F(Vec)|F(Vsib)|F(Vex)|F(Evex)|F(Avx512K)      , 0  , 0  , 80 , 116, 5 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #337
+  { F(UseR)|F(Vsib)|F(Evex)|F(Avx512K)                    , 0  , 0  , 0  , 507, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #338
+  { F(UseR)|F(Vsib)|F(Evex)|F(Avx512K)                    , 0  , 0  , 0  , 508, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #339
+  { F(UseR)|F(Vsib)|F(Evex)|F(Avx512K)                    , 0  , 0  , 0  , 509, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #340
+  { F(UseX)|F(Vec)|F(Vsib)|F(Vex)|F(Evex)|F(Avx512K)      , 0  , 0  , 81 , 121, 5 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #341
+  { F(UseX)|F(Vec)|F(Vsib)|F(Vex)|F(Evex)|F(Avx512K)      , 0  , 0  , 82 , 154, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #342
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 85 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #343
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 255, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #344
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B64)            , 0  , 0  , 0  , 219, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #345
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B32)            , 0  , 0  , 0  , 219, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #346
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 480, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #347
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 481, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #348
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 355, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #349
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 355, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #350
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 510, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #351
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 511, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #352
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 228, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #353
+  { F(UseR)|F(Vex)                                        , 0  , 0  , 0  , 444, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #354
+  { F(UseR)|F(FixedRM)|F(Vec)|F(Vex)                      , 0  , 0  , 0  , 512, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #355
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 83 , 158, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #356
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 84 , 158, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #357
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE_B64)     , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #358
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE_B32)     , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #359
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_SAE)         , 0  , 0  , 0  , 489, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #360
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 85 , 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #361
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 86 , 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #362
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 87 , 357, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #363
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 222, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #364
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 88 , 87 , 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #365
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 89 , 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #366
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 90 , 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #367
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 91 , 87 , 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #368
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 92 , 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #369
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 93 , 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #370
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 94 , 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #371
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 95 , 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #372
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 236, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #373
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 96 , 359, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #374
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 97 , 359, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #375
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 98 , 359, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #376
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 99 , 359, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #377
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 513, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #378
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 225, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #379
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 228, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #380
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 100, 231, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #381
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 101, 234, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #382
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #383
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 102, 237, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #384
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 103, 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #385
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 104, 87 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #386
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512T4X)|F(Avx512KZ)       , 0  , 0  , 0  , 514, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #387
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #388
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 192, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #389
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 189, 2 , JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #390
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #391
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 189, 2 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #392
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #393
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #394
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #395
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 361, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #396
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 363, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #397
+  { F(UseW)|F(Vec)|F(Evex)                                , 0  , 0  , 0  , 515, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #398
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 516, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #399
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 365, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #400
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K)                     , 0  , 0  , 0  , 240, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #401
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K_B32)                 , 0  , 0  , 0  , 240, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #402
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512K)              , 0  , 0  , 0  , 243, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #403
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512K_B32)          , 0  , 0  , 0  , 243, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #404
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512K_B64)          , 0  , 0  , 0  , 243, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #405
+  { F(UseR)|F(FixedReg)|F(Vec)|F(Vex)                     , 0  , 0  , 0  , 461, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #406
+  { F(UseR)|F(FixedReg)|F(Vec)|F(Vex)                     , 0  , 0  , 0  , 462, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #407
+  { F(UseR)|F(FixedReg)|F(Vec)|F(Vex)                     , 0  , 0  , 0  , 463, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #408
+  { F(UseR)|F(FixedReg)|F(Vec)|F(Vex)                     , 0  , 0  , 0  , 464, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #409
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K_B64)                 , 0  , 0  , 0  , 240, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #410
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #411
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 193, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #412
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 0  , 167, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #413
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 216, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #414
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 216, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #415
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 216, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #416
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 162, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #417
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B64)         , 0  , 0  , 105, 93 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #418
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B64)         , 0  , 0  , 106, 93 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #419
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 96 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #420
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 95 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #421
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B64)         , 0  , 0  , 107, 166, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #422
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 465, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #423
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 466, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #424
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 340, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #425
+  { F(UseX)|F(Vec)|F(Vsib)|F(Vex)|F(Evex)|F(Avx512K)      , 0  , 0  , 108, 116, 5 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #426
+  { F(UseX)|F(Vec)|F(Vsib)|F(Vex)|F(Evex)|F(Avx512K)      , 0  , 0  , 109, 111, 5 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #427
+  { F(UseX)|F(Vec)|F(Vsib)|F(Vex)|F(Evex)|F(Avx512K)      , 0  , 0  , 110, 154, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #428
+  { F(UseX)|F(Vec)|F(Vsib)|F(Vex)|F(Evex)|F(Avx512K)      , 0  , 0  , 111, 121, 5 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #429
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 367, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #430
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 369, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #431
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 371, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #432
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 517, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #433
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #434
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 151, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #435
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 112, 158, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #436
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 113, 158, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #437
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #438
+  { F(UseW)|F(Vec)|F(Evex)                                , 0  , 0  , 0  , 518, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #439
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 246, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #440
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 249, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #441
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 252, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #442
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 255, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #443
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 258, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #444
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 201, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #445
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 261, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #446
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 91 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #447
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 91 , 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #448
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 150, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #449
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 219, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #450
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 219, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #451
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 114, 373, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #452
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 115, 373, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #453
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 116, 373, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #454
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 117, 373, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #455
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #456
+  { F(UseW)|F(Vec)|F(Vsib)|F(Evex)|F(Avx512K)             , 0  , 0  , 0  , 264, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #457
+  { F(UseW)|F(Vec)|F(Vsib)|F(Evex)|F(Avx512K)             , 0  , 0  , 0  , 375, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #458
+  { F(UseW)|F(Vec)|F(Vsib)|F(Evex)|F(Avx512K)             , 0  , 0  , 0  , 267, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #459
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 377, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #460
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 0  , 219, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #461
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 219, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #462
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 118, 99 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #463
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)                         , 0  , 0  , 0  , 219, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #464
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B64)         , 0  , 0  , 119, 99 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #465
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 120, 99 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #466
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 121, 99 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #467
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 122, 105, 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #468
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 123, 99 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #469
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 124, 99 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #470
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B64)         , 0  , 0  , 125, 99 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #471
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 126, 99 , 6 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #472
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ)             , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #473
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #474
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B64)         , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(WO)  , 0 }, // #475
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 213, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #476
+  { F(UseX)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 213, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #477
+  { F(UseR)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 379, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #478
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K)                     , 0  , 0  , 0  , 270, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #479
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K_B32)                 , 0  , 0  , 0  , 270, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #480
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512K_B64)                 , 0  , 0  , 0  , 270, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #481
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B64)            , 0  , 0  , 0  , 192, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #482
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE_B32)            , 0  , 0  , 0  , 192, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #483
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 519, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #484
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 511, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #485
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 489, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #486
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 490, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #487
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 489, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #488
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_SAE)                , 0  , 0  , 0  , 490, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #489
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 490, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #490
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 519, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #491
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ)                    , 0  , 0  , 0  , 511, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #492
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 101, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #493
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 519, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #494
+  { F(UseW)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 511, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #495
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_ER_SAE_B64)         , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #496
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_ER_SAE_B32)         , 0  , 0  , 0  , 189, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #497
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_ER_SAE)             , 0  , 0  , 0  , 489, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #498
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_ER_SAE)             , 0  , 0  , 0  , 490, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #499
+  { F(UseW)|F(Vec)|F(Vsib)|F(Evex)|F(Avx512K)             , 0  , 0  , 0  , 381, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #500
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B32)                , 0  , 0  , 0  , 193, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #501
+  { F(UseW)|F(Vec)|F(Evex)|F(Avx512KZ_B64)                , 0  , 0  , 0  , 193, 2 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #502
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B32)         , 0  , 0  , 0  , 192, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #503
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_B64)         , 0  , 0  , 0  , 192, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #504
+  { F(UseW)|F(Vec)|F(Vex)|F(Evex)|F(Avx512KZ_ER_SAE_B64)  , 0  , 0  , 0  , 204, 3 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #505
+  { F(UseW)|F(Vex)                                        , 0  , 0  , 0  , 486, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #506
+  { F(UseR)|F(Vec)|F(Vex)                                 , 0  , 0  , 0  , 291, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #507
+  { F(UseR)                                               , 0  , 0  , 0  , 520, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #508
+  { F(UseR)|F(FixedReg)                                   , 0  , 0  , 0  , 521, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #509
+  { F(UseX)|F(UseXX)|F(Lock)|F(XAcquire)|F(XRelease)      , 0  , 0  , 0  , 170, 4 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #510
+  { F(UseR)                                               , 0  , 0  , 0  , 522, 1 , JUMP_TYPE(Conditional), SINGLE_REG(None), 0 }, // #511
+  { F(UseX)|F(UseXX)|F(Lock)|F(XAcquire)                  , 0  , 0  , 0  , 60 , 8 , JUMP_TYPE(None)       , SINGLE_REG(RO)  , 0 }, // #512
+  { F(UseR)|F(FixedReg)                                   , 0  , 0  , 0  , 523, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #513
+  { F(UseR)|F(FixedReg)                                   , 0  , 0  , 0  , 524, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #514
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 0  , 525, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }, // #515
+  { F(UseW)|F(FixedReg)                                   , 0  , 0  , 0  , 526, 1 , JUMP_TYPE(None)       , SINGLE_REG(None), 0 }  // #516
+};
+#undef SINGLE_REG
+#undef JUMP_TYPE
 #undef F
-#undef Enc
+// ----------------------------------------------------------------------------
+// ${commonData:End}
 
-#undef U
+#pragma warning(push)
+#pragma warning(disable : 4838)
+// ${operationData:Begin}
+// ------------------- Automatically generated, do not edit -------------------
+#define OP_FLAG(F) X86Inst::kOperation##F
+#define FEATURE(F) CpuInfo::kX86Feature##F
+#define SPECIAL(F) x86::kSpecialReg_##F
+const X86Inst::OperationData X86InstDB::operationData[] = {
+  { 0, { 0 }, 0, 0 }, // #0
+  { 0, { 0 }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #1
+  { 0, { 0 }, SPECIAL(FLAGS_CF), SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #2
+  { 0, { FEATURE(ADX) }, SPECIAL(FLAGS_CF), SPECIAL(FLAGS_CF) }, // #3
+  { 0, { FEATURE(SSE2) }, 0, 0 }, // #4
+  { 0, { FEATURE(SSE) }, 0, 0 }, // #5
+  { 0, { FEATURE(SSE3) }, 0, 0 }, // #6
+  { 0, { FEATURE(ADX) }, SPECIAL(FLAGS_OF), SPECIAL(FLAGS_OF) }, // #7
+  { 0, { FEATURE(AESNI) }, 0, 0 }, // #8
+  { 0, { FEATURE(BMI) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #9
+  { 0, { 0 }, 0, SPECIAL(FLAGS_ZF) }, // #10
+  { 0, { FEATURE(TBM) }, 0, 0 }, // #11
+  { 0, { FEATURE(SSE4_1) }, 0, 0 }, // #12
+  { 0, { FEATURE(MPX) }, 0, 0 }, // #13
+  { 0, { 0 }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) }, // #14
+  { 0, { FEATURE(BMI2) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #15
+  { OP_FLAG(Volatile), { 0 }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #16
+  { OP_FLAG(Volatile), { FEATURE(SMAP) }, 0, SPECIAL(FLAGS_AC) }, // #17
+  { 0, { 0 }, 0, SPECIAL(FLAGS_CF) }, // #18
+  { 0, { 0 }, 0, SPECIAL(FLAGS_DF) }, // #19
+  { OP_FLAG(Volatile), { FEATURE(CLFLUSH) }, 0, 0 }, // #20
+  { OP_FLAG(Volatile), { FEATURE(CLFLUSHOPT) }, 0, 0 }, // #21
+  { OP_FLAG(Volatile), { 0 }, 0, SPECIAL(FLAGS_IF) }, // #22
+  { OP_FLAG(Volatile) | OP_FLAG(Privileged), { 0 }, 0, 0 }, // #23
+  { OP_FLAG(Volatile), { FEATURE(CLWB) }, 0, 0 }, // #24
+  { OP_FLAG(Volatile), { FEATURE(CLZERO) }, 0, 0 }, // #25
+  { 0, { 0 }, SPECIAL(FLAGS_CF), SPECIAL(FLAGS_CF) }, // #26
+  { 0, { FEATURE(CMOV) }, SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_ZF), 0 }, // #27
+  { 0, { FEATURE(CMOV) }, SPECIAL(FLAGS_CF), 0 }, // #28
+  { 0, { FEATURE(CMOV) }, SPECIAL(FLAGS_ZF), 0 }, // #29
+  { 0, { FEATURE(CMOV) }, SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF), 0 }, // #30
+  { 0, { FEATURE(CMOV) }, SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_SF), 0 }, // #31
+  { 0, { FEATURE(CMOV) }, SPECIAL(FLAGS_OF), 0 }, // #32
+  { 0, { FEATURE(CMOV) }, SPECIAL(FLAGS_PF), 0 }, // #33
+  { 0, { FEATURE(CMOV) }, SPECIAL(FLAGS_SF), 0 }, // #34
+  { 0, { 0 }, SPECIAL(FLAGS_DF), SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #35
+  { 0, { FEATURE(I486) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #36
+  { OP_FLAG(Volatile), { FEATURE(CMPXCHG16B) }, 0, SPECIAL(FLAGS_ZF) }, // #37
+  { OP_FLAG(Volatile), { FEATURE(CMPXCHG8B) }, 0, SPECIAL(FLAGS_ZF) }, // #38
+  { 0, { FEATURE(SSE2) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #39
+  { 0, { FEATURE(SSE) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #40
+  { OP_FLAG(Volatile), { FEATURE(I486) }, 0, 0 }, // #41
+  { 0, { FEATURE(SSE4_2) }, 0, 0 }, // #42
+  { 0, { 0 }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #43
+  { OP_FLAG(Volatile), { FEATURE(MMX) }, 0, 0 }, // #44
+  { OP_FLAG(Volatile), { 0 }, 0, 0 }, // #45
+  { 0, { FEATURE(SSE4A) }, 0, 0 }, // #46
+  { 0, { 0 }, 0, SPECIAL(X87SW_C0) | SPECIAL(X87SW_C1) | SPECIAL(X87SW_C2) | SPECIAL(X87SW_C3) }, // #47
+  { 0, { FEATURE(CMOV) }, 0, SPECIAL(X87SW_C0) | SPECIAL(X87SW_C1) | SPECIAL(X87SW_C2) | SPECIAL(X87SW_C3) }, // #48
+  { 0, { 0 }, 0, SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_ZF) | SPECIAL(X87SW_C1) }, // #49
+  { OP_FLAG(Volatile), { FEATURE(3DNOW) }, 0, 0 }, // #50
+  { 0, { FEATURE(SSE3) }, 0, SPECIAL(X87SW_C0) | SPECIAL(X87SW_C1) | SPECIAL(X87SW_C2) | SPECIAL(X87SW_C3) }, // #51
+  { OP_FLAG(Volatile), { FEATURE(FXSR) }, 0, SPECIAL(X87SW_C0) | SPECIAL(X87SW_C1) | SPECIAL(X87SW_C2) | SPECIAL(X87SW_C3) }, // #52
+  { OP_FLAG(Volatile), { FEATURE(FXSR) }, 0, 0 }, // #53
+  { OP_FLAG(Volatile), { 0 }, SPECIAL(FLAGS_OF), 0 }, // #54
+  { OP_FLAG(Volatile) | OP_FLAG(Privileged), { FEATURE(I486) }, 0, 0 }, // #55
+  { OP_FLAG(Volatile), { 0 }, SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_ZF), 0 }, // #56
+  { OP_FLAG(Volatile), { 0 }, SPECIAL(FLAGS_CF), 0 }, // #57
+  { OP_FLAG(Volatile), { 0 }, SPECIAL(FLAGS_ZF), 0 }, // #58
+  { OP_FLAG(Volatile), { 0 }, SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF), 0 }, // #59
+  { OP_FLAG(Volatile), { 0 }, SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_SF), 0 }, // #60
+  { OP_FLAG(Volatile), { 0 }, SPECIAL(FLAGS_PF), 0 }, // #61
+  { OP_FLAG(Volatile), { 0 }, SPECIAL(FLAGS_SF), 0 }, // #62
+  { 0, { FEATURE(AVX512_DQ) }, 0, 0 }, // #63
+  { 0, { FEATURE(AVX512_BW) }, 0, 0 }, // #64
+  { 0, { FEATURE(AVX512_F) }, 0, 0 }, // #65
+  { 0, { FEATURE(AVX512_DQ) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #66
+  { 0, { FEATURE(AVX512_BW) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #67
+  { 0, { FEATURE(AVX512_F) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #68
+  { OP_FLAG(Volatile), { FEATURE(LAHFSAHF) }, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF), 0 }, // #69
+  { OP_FLAG(Volatile), { 0 }, 0, SPECIAL(FLAGS_ZF) }, // #70
+  { OP_FLAG(Barrier) | OP_FLAG(Volatile), { FEATURE(SSE2) }, 0, 0 }, // #71
+  { 0, { 0 }, SPECIAL(FLAGS_DF), 0 }, // #72
+  { 0, { FEATURE(LZCNT) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #73
+  { 0, { FEATURE(MMX2) }, 0, 0 }, // #74
+  { OP_FLAG(Volatile) | OP_FLAG(Privileged), { FEATURE(MONITOR) }, 0, 0 }, // #75
+  { OP_FLAG(MovCrDr), { 0 }, 0, 0 }, // #76
+  { 0, { FEATURE(MOVBE) }, 0, 0 }, // #77
+  { 0, { FEATURE(MMX), FEATURE(SSE2) }, 0, 0 }, // #78
+  { OP_FLAG(MovSsSd), { FEATURE(SSE2) }, 0, 0 }, // #79
+  { OP_FLAG(MovSsSd), { FEATURE(SSE) }, 0, 0 }, // #80
+  { 0, { FEATURE(BMI2) }, 0, 0 }, // #81
+  { 0, { FEATURE(SSSE3) }, 0, 0 }, // #82
+  { 0, { FEATURE(MMX2), FEATURE(SSE2) }, 0, 0 }, // #83
+  { 0, { FEATURE(3DNOW) }, 0, 0 }, // #84
+  { 0, { FEATURE(PCLMULQDQ) }, 0, 0 }, // #85
+  { 0, { FEATURE(SSE4_2) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #86
+  { OP_FLAG(Volatile), { FEATURE(PCOMMIT) }, 0, 0 }, // #87
+  { 0, { FEATURE(MMX2), FEATURE(SSE2), FEATURE(SSE4_1) }, 0, 0 }, // #88
+  { 0, { FEATURE(3DNOW2) }, 0, 0 }, // #89
+  { 0, { FEATURE(GEODE) }, 0, 0 }, // #90
+  { 0, { FEATURE(POPCNT) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #91
+  { OP_FLAG(Prefetch), { FEATURE(3DNOW) }, 0, 0 }, // #92
+  { OP_FLAG(Prefetch), { FEATURE(MMX2) }, 0, 0 }, // #93
+  { OP_FLAG(Prefetch), { FEATURE(PREFETCHW) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #94
+  { OP_FLAG(Prefetch), { FEATURE(PREFETCHWT1) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #95
+  { 0, { FEATURE(SSE4_1) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #96
+  { 0, { 0 }, 0, SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) }, // #97
+  { OP_FLAG(Volatile), { FEATURE(FSGSBASE) }, 0, 0 }, // #98
+  { OP_FLAG(Volatile) | OP_FLAG(Privileged), { FEATURE(MSR) }, SPECIAL(MSR), 0 }, // #99
+  { OP_FLAG(Volatile), { FEATURE(RDRAND) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #100
+  { OP_FLAG(Volatile), { FEATURE(RDSEED) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #101
+  { OP_FLAG(Volatile), { FEATURE(RDTSC) }, 0, 0 }, // #102
+  { OP_FLAG(Volatile), { FEATURE(RDTSCP) }, 0, 0 }, // #103
+  { OP_FLAG(Volatile), { FEATURE(LAHFSAHF) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #104
+  { 0, { 0 }, SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_ZF), 0 }, // #105
+  { 0, { 0 }, SPECIAL(FLAGS_CF), 0 }, // #106
+  { 0, { 0 }, SPECIAL(FLAGS_ZF), 0 }, // #107
+  { 0, { 0 }, SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF), 0 }, // #108
+  { 0, { 0 }, SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_SF), 0 }, // #109
+  { 0, { 0 }, SPECIAL(FLAGS_OF), 0 }, // #110
+  { 0, { 0 }, SPECIAL(FLAGS_PF), 0 }, // #111
+  { 0, { 0 }, SPECIAL(FLAGS_SF), 0 }, // #112
+  { OP_FLAG(Barrier) | OP_FLAG(Volatile), { FEATURE(MMX2) }, 0, 0 }, // #113
+  { 0, { FEATURE(SHA) }, 0, 0 }, // #114
+  { 0, { FEATURE(AVX512_4FMAPS) }, 0, 0 }, // #115
+  { 0, { FEATURE(AVX), FEATURE(AVX512_F), FEATURE(AVX512_VL) }, 0, 0 }, // #116
+  { 0, { FEATURE(AVX), FEATURE(AVX512_F) }, 0, 0 }, // #117
+  { 0, { FEATURE(AVX) }, 0, 0 }, // #118
+  { 0, { FEATURE(AESNI), FEATURE(AVX) }, 0, 0 }, // #119
+  { 0, { FEATURE(AVX512_F), FEATURE(AVX512_VL) }, 0, 0 }, // #120
+  { 0, { FEATURE(AVX), FEATURE(AVX512_DQ), FEATURE(AVX512_VL) }, 0, 0 }, // #121
+  { 0, { FEATURE(AVX512_BW), FEATURE(AVX512_VL) }, 0, 0 }, // #122
+  { 0, { FEATURE(AVX512_DQ), FEATURE(AVX512_VL) }, 0, 0 }, // #123
+  { 0, { FEATURE(AVX2) }, 0, 0 }, // #124
+  { 0, { FEATURE(AVX), FEATURE(AVX2), FEATURE(AVX512_F), FEATURE(AVX512_VL) }, 0, 0 }, // #125
+  { 0, { FEATURE(AVX), FEATURE(AVX512_F) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #126
+  { 0, { FEATURE(AVX512_F), FEATURE(AVX512_VL), FEATURE(F16C) }, 0, 0 }, // #127
+  { 0, { FEATURE(AVX512_ERI) }, 0, 0 }, // #128
+  { 0, { FEATURE(AVX512_F), FEATURE(AVX512_VL), FEATURE(FMA) }, 0, 0 }, // #129
+  { 0, { FEATURE(AVX512_F), FEATURE(FMA) }, 0, 0 }, // #130
+  { 0, { FEATURE(FMA4) }, 0, 0 }, // #131
+  { 0, { FEATURE(XOP) }, 0, 0 }, // #132
+  { 0, { FEATURE(AVX2), FEATURE(AVX512_F), FEATURE(AVX512_VL) }, 0, 0 }, // #133
+  { 0, { FEATURE(AVX512_PFI) }, 0, 0 }, // #134
+  { 0, { FEATURE(AVX), FEATURE(AVX2) }, 0, 0 }, // #135
+  { 0, { FEATURE(AVX512_4VNNIW) }, 0, 0 }, // #136
+  { 0, { FEATURE(AVX), FEATURE(AVX2), FEATURE(AVX512_BW), FEATURE(AVX512_VL) }, 0, 0 }, // #137
+  { 0, { FEATURE(AVX2), FEATURE(AVX512_BW), FEATURE(AVX512_VL) }, 0, 0 }, // #138
+  { 0, { FEATURE(AVX512_CDI), FEATURE(AVX512_VL) }, 0, 0 }, // #139
+  { 0, { FEATURE(AVX), FEATURE(PCLMULQDQ) }, 0, 0 }, // #140
+  { 0, { FEATURE(AVX) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }, // #141
+  { 0, { FEATURE(AVX512_VBMI), FEATURE(AVX512_VL) }, 0, 0 }, // #142
+  { 0, { FEATURE(AVX), FEATURE(AVX512_BW) }, 0, 0 }, // #143
+  { 0, { FEATURE(AVX), FEATURE(AVX512_DQ) }, 0, 0 }, // #144
+  { 0, { FEATURE(AVX512_IFMA), FEATURE(AVX512_VL) }, 0, 0 }, // #145
+  { 0, { FEATURE(AVX512_VPOPCNTDQ) }, 0, 0 }, // #146
+  { OP_FLAG(Volatile) | OP_FLAG(Privileged), { FEATURE(MSR) }, 0, SPECIAL(MSR) }, // #147
+  { OP_FLAG(Volatile), { FEATURE(RTM) }, 0, 0 }, // #148
+  { OP_FLAG(Volatile), { FEATURE(XSAVE) }, SPECIAL(XCR), 0 }, // #149
+  { OP_FLAG(Volatile), { FEATURE(XSAVES) }, SPECIAL(XCR), 0 }, // #150
+  { OP_FLAG(Volatile), { FEATURE(XSAVEC) }, SPECIAL(XCR), 0 }, // #151
+  { OP_FLAG(Volatile), { FEATURE(XSAVEOPT) }, SPECIAL(XCR), 0 }, // #152
+  { OP_FLAG(Volatile) | OP_FLAG(Privileged), { FEATURE(XSAVE) }, 0, SPECIAL(XCR) }, // #153
+  { OP_FLAG(Volatile), { FEATURE(TSX) }, 0, SPECIAL(FLAGS_AF) | SPECIAL(FLAGS_CF) | SPECIAL(FLAGS_OF) | SPECIAL(FLAGS_PF) | SPECIAL(FLAGS_SF) | SPECIAL(FLAGS_ZF) }  // #154
+};
+#undef SPECIAL
+#undef FEATURE
+#undef OP_FLAG
+// ----------------------------------------------------------------------------
+// ${operationData:End}
+#pragma warning(pop)
+
+// ${sseToAvxData:Begin}
+// ------------------- Automatically generated, do not edit -------------------
+const X86Inst::SseToAvxData X86InstDB::sseToAvxData[] = {
+  { X86Inst::kSseToAvxNone     , 0    }, // #0
+  { X86Inst::kSseToAvxExtend   , 725  }, // #1
+  { X86Inst::kSseToAvxExtend   , 724  }, // #2
+  { X86Inst::kSseToAvxMove     , 724  }, // #3
+  { X86Inst::kSseToAvxExtend   , 723  }, // #4
+  { X86Inst::kSseToAvxBlend    , 723  }, // #5
+  { X86Inst::kSseToAvxExtend   , 671  }, // #6
+  { X86Inst::kSseToAvxExtend   , 670  }, // #7
+  { X86Inst::kSseToAvxMove     , 667  }, // #8
+  { X86Inst::kSseToAvxMove     , 666  }, // #9
+  { X86Inst::kSseToAvxMove     , 665  }, // #10
+  { X86Inst::kSseToAvxMove     , 672  }, // #11
+  { X86Inst::kSseToAvxExtend   , 672  }, // #12
+  { X86Inst::kSseToAvxExtend   , 673  }, // #13
+  { X86Inst::kSseToAvxMove     , 673  }, // #14
+  { X86Inst::kSseToAvxMove     , 674  }, // #15
+  { X86Inst::kSseToAvxMove     , 676  }, // #16
+  { X86Inst::kSseToAvxMove     , 678  }, // #17
+  { X86Inst::kSseToAvxMove     , 679  }, // #18
+  { X86Inst::kSseToAvxExtend   , 681  }, // #19
+  { X86Inst::kSseToAvxMove     , 695  }, // #20
+  { X86Inst::kSseToAvxExtend   , 708  }, // #21
+  { X86Inst::kSseToAvxExtend   , 707  }, // #22
+  { X86Inst::kSseToAvxExtend   , 712  }, // #23
+  { X86Inst::kSseToAvxMove     , 616  }, // #24
+  { X86Inst::kSseToAvxMove     , 597  }, // #25
+  { X86Inst::kSseToAvxExtend   , 598  }, // #26
+  { X86Inst::kSseToAvxExtend   , 597  }, // #27
+  { X86Inst::kSseToAvxMove     , 595  }, // #28
+  { X86Inst::kSseToAvxMove     , 594  }, // #29
+  { X86Inst::kSseToAvxMove     , 593  }, // #30
+  { X86Inst::kSseToAvxExtend   , 599  }, // #31
+  { X86Inst::kSseToAvxMoveIfMem, 599  }, // #32
+  { X86Inst::kSseToAvxMove     , 599  }, // #33
+  { X86Inst::kSseToAvxMove     , 598  }, // #34
+  { X86Inst::kSseToAvxMoveIfMem, 593  }, // #35
+  { X86Inst::kSseToAvxMove     , 591  }, // #36
+  { X86Inst::kSseToAvxExtend   , 590  }, // #37
+  { X86Inst::kSseToAvxExtend   , 589  }, // #38
+  { X86Inst::kSseToAvxExtend   , 583  }, // #39
+  { X86Inst::kSseToAvxMove     , 583  }, // #40
+  { X86Inst::kSseToAvxMove     , 584  }, // #41
+  { X86Inst::kSseToAvxExtend   , 584  }, // #42
+  { X86Inst::kSseToAvxExtend   , 585  }, // #43
+  { X86Inst::kSseToAvxExtend   , 587  }, // #44
+  { X86Inst::kSseToAvxExtend   , 586  }, // #45
+  { X86Inst::kSseToAvxBlend    , 587  }, // #46
+  { X86Inst::kSseToAvxExtend   , 593  }, // #47
+  { X86Inst::kSseToAvxExtend   , 596  }, // #48
+  { X86Inst::kSseToAvxMove     , 596  }, // #49
+  { X86Inst::kSseToAvxMove     , 637  }, // #50
+  { X86Inst::kSseToAvxExtend   , 623  }, // #51
+  { X86Inst::kSseToAvxExtend   , 624  }, // #52
+  { X86Inst::kSseToAvxExtend   , 630  }, // #53
+  { X86Inst::kSseToAvxMove     , 632  }, // #54
+  { X86Inst::kSseToAvxExtend   , 633  }, // #55
+  { X86Inst::kSseToAvxExtend   , 634  }, // #56
+  { X86Inst::kSseToAvxMove     , 633  }, // #57
+  { X86Inst::kSseToAvxExtend   , 649  }, // #58
+  { X86Inst::kSseToAvxExtend   , 651  }, // #59
+  { X86Inst::kSseToAvxExtend   , 652  }, // #60
+  { X86Inst::kSseToAvxExtend   , 653  }, // #61
+  { X86Inst::kSseToAvxExtend   , 654  }, // #62
+  { X86Inst::kSseToAvxExtend   , 655  }, // #63
+  { X86Inst::kSseToAvxMove     , 663  }, // #64
+  { X86Inst::kSseToAvxMove     , 681  }, // #65
+  { X86Inst::kSseToAvxExtend   , 680  }, // #66
+  { X86Inst::kSseToAvxExtend   , 682  }, // #67
+  { X86Inst::kSseToAvxExtend   , 677  }, // #68
+  { X86Inst::kSseToAvxExtend   , 685  }, // #69
+  { X86Inst::kSseToAvxExtend   , 697  }, // #70
+  { X86Inst::kSseToAvxMove     , 697  }, // #71
+  { X86Inst::kSseToAvxExtend   , 696  }, // #72
+  { X86Inst::kSseToAvxExtend   , 699  }, // #73
+  { X86Inst::kSseToAvxExtend   , 703  }, // #74
+  { X86Inst::kSseToAvxExtend   , 706  }, // #75
+  { X86Inst::kSseToAvxMove     , 707  }, // #76
+  { X86Inst::kSseToAvxExtend   , 715  }, // #77
+  { X86Inst::kSseToAvxExtend   , 709  }, // #78
+  { X86Inst::kSseToAvxMove     , 722  }, // #79
+  { X86Inst::kSseToAvxExtend   , 722  }, // #80
+  { X86Inst::kSseToAvxMove     , 717  }, // #81
+  { X86Inst::kSseToAvxExtend   , 717  }, // #82
+  { X86Inst::kSseToAvxExtend   , 693  }, // #83
+  { X86Inst::kSseToAvxMove     , 690  }, // #84
+  { X86Inst::kSseToAvxExtend   , 690  }, // #85
+  { X86Inst::kSseToAvxExtend   , 683  }, // #86
+  { X86Inst::kSseToAvxExtend   , -16  }  // #87
+};
+// ----------------------------------------------------------------------------
+// ${sseToAvxData:End}
 
 // ============================================================================
-// [asmjit::X86Cond]
+// [asmjit::X86Inst - Id <-> Name]
 // ============================================================================
 
-#define CC_TO_INST(_Inst_) { \
-  _Inst_##o,  \
-  _Inst_##no, \
-  _Inst_##b,  \
-  _Inst_##ae, \
-  _Inst_##e,  \
-  _Inst_##ne, \
-  _Inst_##be, \
-  _Inst_##a,  \
-  _Inst_##s,  \
-  _Inst_##ns, \
-  _Inst_##pe, \
-  _Inst_##po, \
-  _Inst_##l,  \
-  _Inst_##ge, \
-  _Inst_##le, \
-  _Inst_##g,  \
-  \
-  kInstIdNone,  \
-  kInstIdNone,  \
-  kInstIdNone,  \
-  kInstIdNone   \
-}
+#if !defined(ASMJIT_DISABLE_TEXT)
+// ${nameData:Begin}
+// ------------------- Automatically generated, do not edit -------------------
+const char X86InstDB::nameData[] =
+  "\0" "aaa\0" "aad\0" "aam\0" "aas\0" "adc\0" "adcx\0" "adox\0" "arpl\0"
+  "bextr\0" "blcfill\0" "blci\0" "blcic\0" "blcmsk\0" "blcs\0" "blsfill\0"
+  "blsi\0" "blsic\0" "blsmsk\0" "blsr\0" "bndcl\0" "bndcn\0" "bndcu\0"
+  "bndldx\0" "bndmk\0" "bndmov\0" "bndstx\0" "bound\0" "bsf\0" "bsr\0"
+  "bswap\0" "bt\0" "btc\0" "btr\0" "bts\0" "bzhi\0" "cbw\0" "cdq\0" "cdqe\0"
+  "clac\0" "clc\0" "cld\0" "clflush\0" "clflushopt\0" "cli\0" "clts\0" "clwb\0"
+  "clzero\0" "cmc\0" "cmova\0" "cmovae\0" "cmovc\0" "cmovg\0" "cmovge\0"
+  "cmovl\0" "cmovle\0" "cmovna\0" "cmovnae\0" "cmovnc\0" "cmovng\0" "cmovnge\0"
+  "cmovnl\0" "cmovnle\0" "cmovno\0" "cmovnp\0" "cmovns\0" "cmovnz\0" "cmovo\0"
+  "cmovp\0" "cmovpe\0" "cmovpo\0" "cmovs\0" "cmovz\0" "cmp\0" "cmps\0"
+  "cmpxchg\0" "cmpxchg16b\0" "cmpxchg8b\0" "cpuid\0" "cqo\0" "crc32\0"
+  "cvtpd2pi\0" "cvtpi2pd\0" "cvtpi2ps\0" "cvtps2pi\0" "cvttpd2pi\0"
+  "cvttps2pi\0" "cwd\0" "cwde\0" "daa\0" "das\0" "f2xm1\0" "fabs\0" "faddp\0"
+  "fbld\0" "fbstp\0" "fchs\0" "fclex\0" "fcmovb\0" "fcmovbe\0" "fcmove\0"
+  "fcmovnb\0" "fcmovnbe\0" "fcmovne\0" "fcmovnu\0" "fcmovu\0" "fcom\0"
+  "fcomi\0" "fcomip\0" "fcomp\0" "fcompp\0" "fcos\0" "fdecstp\0" "fdiv\0"
+  "fdivp\0" "fdivr\0" "fdivrp\0" "femms\0" "ffree\0" "fiadd\0" "ficom\0"
+  "ficomp\0" "fidiv\0" "fidivr\0" "fild\0" "fimul\0" "fincstp\0" "finit\0"
+  "fist\0" "fistp\0" "fisttp\0" "fisub\0" "fisubr\0" "fld\0" "fld1\0" "fldcw\0"
+  "fldenv\0" "fldl2e\0" "fldl2t\0" "fldlg2\0" "fldln2\0" "fldpi\0" "fldz\0"
+  "fmulp\0" "fnclex\0" "fninit\0" "fnop\0" "fnsave\0" "fnstcw\0" "fnstenv\0"
+  "fnstsw\0" "fpatan\0" "fprem\0" "fprem1\0" "fptan\0" "frndint\0" "frstor\0"
+  "fsave\0" "fscale\0" "fsin\0" "fsincos\0" "fsqrt\0" "fst\0" "fstcw\0"
+  "fstenv\0" "fstp\0" "fstsw\0" "fsubp\0" "fsubrp\0" "ftst\0" "fucom\0"
+  "fucomi\0" "fucomip\0" "fucomp\0" "fucompp\0" "fwait\0" "fxam\0" "fxch\0"
+  "fxrstor\0" "fxrstor64\0" "fxsave\0" "fxsave64\0" "fxtract\0" "fyl2x\0"
+  "fyl2xp1\0" "hlt\0" "inc\0" "ins\0" "insertq\0" "int3\0" "into\0" "invlpg\0"
+  "invpcid\0" "iret\0" "iretd\0" "iretq\0" "iretw\0" "ja\0" "jae\0" "jb\0"
+  "jbe\0" "jc\0" "je\0" "jecxz\0" "jg\0" "jge\0" "jl\0" "jle\0" "jmp\0" "jna\0"
+  "jnae\0" "jnb\0" "jnbe\0" "jnc\0" "jne\0" "jng\0" "jnge\0" "jnl\0" "jnle\0"
+  "jno\0" "jnp\0" "jns\0" "jnz\0" "jo\0" "jp\0" "jpe\0" "jpo\0" "js\0" "jz\0"
+  "kaddb\0" "kaddd\0" "kaddq\0" "kaddw\0" "kandb\0" "kandd\0" "kandnb\0"
+  "kandnd\0" "kandnq\0" "kandnw\0" "kandq\0" "kandw\0" "kmovb\0" "kmovw\0"
+  "knotb\0" "knotd\0" "knotq\0" "knotw\0" "korb\0" "kord\0" "korq\0"
+  "kortestb\0" "kortestd\0" "kortestq\0" "kortestw\0" "korw\0" "kshiftlb\0"
+  "kshiftld\0" "kshiftlq\0" "kshiftlw\0" "kshiftrb\0" "kshiftrd\0" "kshiftrq\0"
+  "kshiftrw\0" "ktestb\0" "ktestd\0" "ktestq\0" "ktestw\0" "kunpckbw\0"
+  "kunpckdq\0" "kunpckwd\0" "kxnorb\0" "kxnord\0" "kxnorq\0" "kxnorw\0"
+  "kxorb\0" "kxord\0" "kxorq\0" "kxorw\0" "lahf\0" "lar\0" "lds\0" "lea\0"
+  "leave\0" "les\0" "lfence\0" "lfs\0" "lgdt\0" "lgs\0" "lidt\0" "lldt\0"
+  "lmsw\0" "lods\0" "loop\0" "loope\0" "loopne\0" "lsl\0" "ltr\0" "lzcnt\0"
+  "mfence\0" "monitor\0" "movdq2q\0" "movnti\0" "movntq\0" "movntsd\0"
+  "movntss\0" "movq2dq\0" "movsx\0" "movsxd\0" "movzx\0" "mulx\0" "mwait\0"
+  "neg\0" "not\0" "out\0" "outs\0" "pause\0" "pavgusb\0" "pcommit\0" "pdep\0"
+  "pext\0" "pf2id\0" "pf2iw\0" "pfacc\0" "pfadd\0" "pfcmpeq\0" "pfcmpge\0"
+  "pfcmpgt\0" "pfmax\0" "pfmin\0" "pfmul\0" "pfnacc\0" "pfpnacc\0" "pfrcp\0"
+  "pfrcpit1\0" "pfrcpit2\0" "pfrcpv\0" "pfrsqit1\0" "pfrsqrt\0" "pfrsqrtv\0"
+  "pfsub\0" "pfsubr\0" "pi2fd\0" "pi2fw\0" "pmulhrw\0" "pop\0" "popa\0"
+  "popad\0" "popcnt\0" "popf\0" "popfd\0" "popfq\0" "prefetch\0"
+  "prefetchnta\0" "prefetcht0\0" "prefetcht1\0" "prefetcht2\0" "prefetchw\0"
+  "prefetchwt1\0" "pshufw\0" "pswapd\0" "push\0" "pusha\0" "pushad\0" "pushf\0"
+  "pushfd\0" "pushfq\0" "rcl\0" "rcr\0" "rdfsbase\0" "rdgsbase\0" "rdmsr\0"
+  "rdpmc\0" "rdrand\0" "rdseed\0" "rdtsc\0" "rdtscp\0" "rol\0" "ror\0" "rorx\0"
+  "rsm\0" "sahf\0" "sal\0" "sar\0" "sarx\0" "sbb\0" "scas\0" "seta\0" "setae\0"
+  "setb\0" "setbe\0" "setc\0" "sete\0" "setg\0" "setge\0" "setl\0" "setle\0"
+  "setna\0" "setnae\0" "setnb\0" "setnbe\0" "setnc\0" "setne\0" "setng\0"
+  "setnge\0" "setnl\0" "setnle\0" "setno\0" "setnp\0" "setns\0" "setnz\0"
+  "seto\0" "setp\0" "setpe\0" "setpo\0" "sets\0" "setz\0" "sfence\0" "sgdt\0"
+  "sha1msg1\0" "sha1msg2\0" "sha1nexte\0" "sha1rnds4\0" "sha256msg1\0"
+  "sha256msg2\0" "sha256rnds2\0" "shl\0" "shlx\0" "shr\0" "shrd\0" "shrx\0"
+  "sidt\0" "sldt\0" "smsw\0" "stac\0" "stc\0" "sti\0" "stos\0" "str\0"
+  "swapgs\0" "syscall\0" "sysenter\0" "sysexit\0" "sysexit64\0" "sysret\0"
+  "sysret64\0" "t1mskc\0" "tzcnt\0" "tzmsk\0" "ud2\0" "v4fmaddps\0"
+  "v4fnmaddps\0" "vaddpd\0" "vaddps\0" "vaddsd\0" "vaddss\0" "vaddsubpd\0"
+  "vaddsubps\0" "vaesdec\0" "vaesdeclast\0" "vaesenc\0" "vaesenclast\0"
+  "vaesimc\0" "vaeskeygenassist\0" "valignd\0" "valignq\0" "vandnpd\0"
+  "vandnps\0" "vandpd\0" "vandps\0" "vblendmb\0" "vblendmd\0" "vblendmpd\0"
+  "vblendmps\0" "vblendmq\0" "vblendmw\0" "vblendpd\0" "vblendps\0"
+  "vblendvpd\0" "vblendvps\0" "vbroadcastf128\0" "vbroadcastf32x2\0"
+  "vbroadcastf32x4\0" "vbroadcastf32x8\0" "vbroadcastf64x2\0"
+  "vbroadcastf64x4\0" "vbroadcasti128\0" "vbroadcasti32x2\0"
+  "vbroadcasti32x4\0" "vbroadcasti32x8\0" "vbroadcasti64x2\0"
+  "vbroadcasti64x4\0" "vbroadcastsd\0" "vbroadcastss\0" "vcmppd\0" "vcmpps\0"
+  "vcmpsd\0" "vcmpss\0" "vcomisd\0" "vcomiss\0" "vcompresspd\0" "vcompressps\0"
+  "vcvtdq2pd\0" "vcvtdq2ps\0" "vcvtpd2dq\0" "vcvtpd2ps\0" "vcvtpd2qq\0"
+  "vcvtpd2udq\0" "vcvtpd2uqq\0" "vcvtph2ps\0" "vcvtps2dq\0" "vcvtps2pd\0"
+  "vcvtps2ph\0" "vcvtps2qq\0" "vcvtps2udq\0" "vcvtps2uqq\0" "vcvtqq2pd\0"
+  "vcvtqq2ps\0" "vcvtsd2si\0" "vcvtsd2ss\0" "vcvtsd2usi\0" "vcvtsi2sd\0"
+  "vcvtsi2ss\0" "vcvtss2sd\0" "vcvtss2si\0" "vcvtss2usi\0" "vcvttpd2dq\0"
+  "vcvttpd2qq\0" "vcvttpd2udq\0" "vcvttpd2uqq\0" "vcvttps2dq\0" "vcvttps2qq\0"
+  "vcvttps2udq\0" "vcvttps2uqq\0" "vcvttsd2si\0" "vcvttsd2usi\0" "vcvttss2si\0"
+  "vcvttss2usi\0" "vcvtudq2pd\0" "vcvtudq2ps\0" "vcvtuqq2pd\0" "vcvtuqq2ps\0"
+  "vcvtusi2sd\0" "vcvtusi2ss\0" "vdbpsadbw\0" "vdivpd\0" "vdivps\0" "vdivsd\0"
+  "vdivss\0" "vdppd\0" "vdpps\0" "verr\0" "verw\0" "vexp2pd\0" "vexp2ps\0"
+  "vexpandpd\0" "vexpandps\0" "vextractf128\0" "vextractf32x4\0"
+  "vextractf32x8\0" "vextractf64x2\0" "vextractf64x4\0" "vextracti128\0"
+  "vextracti32x4\0" "vextracti32x8\0" "vextracti64x2\0" "vextracti64x4\0"
+  "vextractps\0" "vfixupimmpd\0" "vfixupimmps\0" "vfixupimmsd\0"
+  "vfixupimmss\0" "vfmadd132pd\0" "vfmadd132ps\0" "vfmadd132sd\0"
+  "vfmadd132ss\0" "vfmadd213pd\0" "vfmadd213ps\0" "vfmadd213sd\0"
+  "vfmadd213ss\0" "vfmadd231pd\0" "vfmadd231ps\0" "vfmadd231sd\0"
+  "vfmadd231ss\0" "vfmaddpd\0" "vfmaddps\0" "vfmaddsd\0" "vfmaddss\0"
+  "vfmaddsub132pd\0" "vfmaddsub132ps\0" "vfmaddsub213pd\0" "vfmaddsub213ps\0"
+  "vfmaddsub231pd\0" "vfmaddsub231ps\0" "vfmaddsubpd\0" "vfmaddsubps\0"
+  "vfmsub132pd\0" "vfmsub132ps\0" "vfmsub132sd\0" "vfmsub132ss\0"
+  "vfmsub213pd\0" "vfmsub213ps\0" "vfmsub213sd\0" "vfmsub213ss\0"
+  "vfmsub231pd\0" "vfmsub231ps\0" "vfmsub231sd\0" "vfmsub231ss\0"
+  "vfmsubadd132pd\0" "vfmsubadd132ps\0" "vfmsubadd213pd\0" "vfmsubadd213ps\0"
+  "vfmsubadd231pd\0" "vfmsubadd231ps\0" "vfmsubaddpd\0" "vfmsubaddps\0"
+  "vfmsubpd\0" "vfmsubps\0" "vfmsubsd\0" "vfmsubss\0" "vfnmadd132pd\0"
+  "vfnmadd132ps\0" "vfnmadd132sd\0" "vfnmadd132ss\0" "vfnmadd213pd\0"
+  "vfnmadd213ps\0" "vfnmadd213sd\0" "vfnmadd213ss\0" "vfnmadd231pd\0"
+  "vfnmadd231ps\0" "vfnmadd231sd\0" "vfnmadd231ss\0" "vfnmaddpd\0"
+  "vfnmaddps\0" "vfnmaddsd\0" "vfnmaddss\0" "vfnmsub132pd\0" "vfnmsub132ps\0"
+  "vfnmsub132sd\0" "vfnmsub132ss\0" "vfnmsub213pd\0" "vfnmsub213ps\0"
+  "vfnmsub213sd\0" "vfnmsub213ss\0" "vfnmsub231pd\0" "vfnmsub231ps\0"
+  "vfnmsub231sd\0" "vfnmsub231ss\0" "vfnmsubpd\0" "vfnmsubps\0" "vfnmsubsd\0"
+  "vfnmsubss\0" "vfpclasspd\0" "vfpclassps\0" "vfpclasssd\0" "vfpclassss\0"
+  "vfrczpd\0" "vfrczps\0" "vfrczsd\0" "vfrczss\0" "vgatherdpd\0" "vgatherdps\0"
+  "vgatherpf0dpd\0" "vgatherpf0dps\0" "vgatherpf0qpd\0" "vgatherpf0qps\0"
+  "vgatherpf1dpd\0" "vgatherpf1dps\0" "vgatherpf1qpd\0" "vgatherpf1qps\0"
+  "vgatherqpd\0" "vgatherqps\0" "vgetexppd\0" "vgetexpps\0" "vgetexpsd\0"
+  "vgetexpss\0" "vgetmantpd\0" "vgetmantps\0" "vgetmantsd\0" "vgetmantss\0"
+  "vhaddpd\0" "vhaddps\0" "vhsubpd\0" "vhsubps\0" "vinsertf128\0"
+  "vinsertf32x4\0" "vinsertf32x8\0" "vinsertf64x2\0" "vinsertf64x4\0"
+  "vinserti128\0" "vinserti32x4\0" "vinserti32x8\0" "vinserti64x2\0"
+  "vinserti64x4\0" "vinsertps\0" "vlddqu\0" "vldmxcsr\0" "vmaskmovdqu\0"
+  "vmaskmovpd\0" "vmaskmovps\0" "vmaxpd\0" "vmaxps\0" "vmaxsd\0" "vmaxss\0"
+  "vminpd\0" "vminps\0" "vminsd\0" "vminss\0" "vmovapd\0" "vmovaps\0" "vmovd\0"
+  "vmovddup\0" "vmovdqa\0" "vmovdqa32\0" "vmovdqa64\0" "vmovdqu\0"
+  "vmovdqu16\0" "vmovdqu32\0" "vmovdqu64\0" "vmovdqu8\0" "vmovhlps\0"
+  "vmovhpd\0" "vmovhps\0" "vmovlhps\0" "vmovlpd\0" "vmovlps\0" "vmovmskpd\0"
+  "vmovmskps\0" "vmovntdq\0" "vmovntdqa\0" "vmovntpd\0" "vmovntps\0" "vmovq\0"
+  "vmovsd\0" "vmovshdup\0" "vmovsldup\0" "vmovss\0" "vmovupd\0" "vmovups\0"
+  "vmpsadbw\0" "vmulpd\0" "vmulps\0" "vmulsd\0" "vmulss\0" "vorpd\0" "vorps\0"
+  "vp4dpwssd\0" "vp4dpwssds\0" "vpabsb\0" "vpabsd\0" "vpabsq\0" "vpabsw\0"
+  "vpackssdw\0" "vpacksswb\0" "vpackusdw\0" "vpackuswb\0" "vpaddb\0" "vpaddd\0"
+  "vpaddq\0" "vpaddsb\0" "vpaddsw\0" "vpaddusb\0" "vpaddusw\0" "vpaddw\0"
+  "vpalignr\0" "vpand\0" "vpandd\0" "vpandn\0" "vpandnd\0" "vpandnq\0"
+  "vpandq\0" "vpavgb\0" "vpavgw\0" "vpblendd\0" "vpblendvb\0" "vpblendw\0"
+  "vpbroadcastb\0" "vpbroadcastd\0" "vpbroadcastmb2d\0" "vpbroadcastmb2q\0"
+  "vpbroadcastq\0" "vpbroadcastw\0" "vpclmulqdq\0" "vpcmov\0" "vpcmpb\0"
+  "vpcmpd\0" "vpcmpeqb\0" "vpcmpeqd\0" "vpcmpeqq\0" "vpcmpeqw\0" "vpcmpestri\0"
+  "vpcmpestrm\0" "vpcmpgtb\0" "vpcmpgtd\0" "vpcmpgtq\0" "vpcmpgtw\0"
+  "vpcmpistri\0" "vpcmpistrm\0" "vpcmpq\0" "vpcmpub\0" "vpcmpud\0" "vpcmpuq\0"
+  "vpcmpuw\0" "vpcmpw\0" "vpcomb\0" "vpcomd\0" "vpcompressd\0" "vpcompressq\0"
+  "vpcomq\0" "vpcomub\0" "vpcomud\0" "vpcomuq\0" "vpcomuw\0" "vpcomw\0"
+  "vpconflictd\0" "vpconflictq\0" "vperm2f128\0" "vperm2i128\0" "vpermb\0"
+  "vpermd\0" "vpermi2b\0" "vpermi2d\0" "vpermi2pd\0" "vpermi2ps\0" "vpermi2q\0"
+  "vpermi2w\0" "vpermil2pd\0" "vpermil2ps\0" "vpermilpd\0" "vpermilps\0"
+  "vpermpd\0" "vpermps\0" "vpermq\0" "vpermt2b\0" "vpermt2d\0" "vpermt2pd\0"
+  "vpermt2ps\0" "vpermt2q\0" "vpermt2w\0" "vpermw\0" "vpexpandd\0"
+  "vpexpandq\0" "vpextrb\0" "vpextrd\0" "vpextrq\0" "vpextrw\0" "vpgatherdd\0"
+  "vpgatherdq\0" "vpgatherqd\0" "vpgatherqq\0" "vphaddbd\0" "vphaddbq\0"
+  "vphaddbw\0" "vphaddd\0" "vphadddq\0" "vphaddsw\0" "vphaddubd\0"
+  "vphaddubq\0" "vphaddubw\0" "vphaddudq\0" "vphadduwd\0" "vphadduwq\0"
+  "vphaddw\0" "vphaddwd\0" "vphaddwq\0" "vphminposuw\0" "vphsubbw\0"
+  "vphsubd\0" "vphsubdq\0" "vphsubsw\0" "vphsubw\0" "vphsubwd\0" "vpinsrb\0"
+  "vpinsrd\0" "vpinsrq\0" "vpinsrw\0" "vplzcntd\0" "vplzcntq\0" "vpmacsdd\0"
+  "vpmacsdqh\0" "vpmacsdql\0" "vpmacssdd\0" "vpmacssdqh\0" "vpmacssdql\0"
+  "vpmacsswd\0" "vpmacssww\0" "vpmacswd\0" "vpmacsww\0" "vpmadcsswd\0"
+  "vpmadcswd\0" "vpmadd52huq\0" "vpmadd52luq\0" "vpmaddubsw\0" "vpmaddwd\0"
+  "vpmaskmovd\0" "vpmaskmovq\0" "vpmaxsb\0" "vpmaxsd\0" "vpmaxsq\0" "vpmaxsw\0"
+  "vpmaxub\0" "vpmaxud\0" "vpmaxuq\0" "vpmaxuw\0" "vpminsb\0" "vpminsd\0"
+  "vpminsq\0" "vpminsw\0" "vpminub\0" "vpminud\0" "vpminuq\0" "vpminuw\0"
+  "vpmovb2m\0" "vpmovd2m\0" "vpmovdb\0" "vpmovdw\0" "vpmovm2b\0" "vpmovm2d\0"
+  "vpmovm2q\0" "vpmovm2w\0" "vpmovmskb\0" "vpmovq2m\0" "vpmovqb\0" "vpmovqd\0"
+  "vpmovqw\0" "vpmovsdb\0" "vpmovsdw\0" "vpmovsqb\0" "vpmovsqd\0" "vpmovsqw\0"
+  "vpmovswb\0" "vpmovsxbd\0" "vpmovsxbq\0" "vpmovsxbw\0" "vpmovsxdq\0"
+  "vpmovsxwd\0" "vpmovsxwq\0" "vpmovusdb\0" "vpmovusdw\0" "vpmovusqb\0"
+  "vpmovusqd\0" "vpmovusqw\0" "vpmovuswb\0" "vpmovw2m\0" "vpmovwb\0"
+  "vpmovzxbd\0" "vpmovzxbq\0" "vpmovzxbw\0" "vpmovzxdq\0" "vpmovzxwd\0"
+  "vpmovzxwq\0" "vpmuldq\0" "vpmulhrsw\0" "vpmulhuw\0" "vpmulhw\0" "vpmulld\0"
+  "vpmullq\0" "vpmullw\0" "vpmultishiftqb\0" "vpmuludq\0" "vpopcntd\0"
+  "vpopcntq\0" "vpor\0" "vpord\0" "vporq\0" "vpperm\0" "vprold\0" "vprolq\0"
+  "vprolvd\0" "vprolvq\0" "vprord\0" "vprorq\0" "vprorvd\0" "vprorvq\0"
+  "vprotb\0" "vprotd\0" "vprotq\0" "vprotw\0" "vpsadbw\0" "vpscatterdd\0"
+  "vpscatterdq\0" "vpscatterqd\0" "vpscatterqq\0" "vpshab\0" "vpshad\0"
+  "vpshaq\0" "vpshaw\0" "vpshlb\0" "vpshld\0" "vpshlq\0" "vpshlw\0" "vpshufb\0"
+  "vpshufd\0" "vpshufhw\0" "vpshuflw\0" "vpsignb\0" "vpsignd\0" "vpsignw\0"
+  "vpslld\0" "vpslldq\0" "vpsllq\0" "vpsllvd\0" "vpsllvq\0" "vpsllvw\0"
+  "vpsllw\0" "vpsrad\0" "vpsraq\0" "vpsravd\0" "vpsravq\0" "vpsravw\0"
+  "vpsraw\0" "vpsrld\0" "vpsrldq\0" "vpsrlq\0" "vpsrlvd\0" "vpsrlvq\0"
+  "vpsrlvw\0" "vpsrlw\0" "vpsubb\0" "vpsubd\0" "vpsubq\0" "vpsubsb\0"
+  "vpsubsw\0" "vpsubusb\0" "vpsubusw\0" "vpsubw\0" "vpternlogd\0"
+  "vpternlogq\0" "vptest\0" "vptestmb\0" "vptestmd\0" "vptestmq\0" "vptestmw\0"
+  "vptestnmb\0" "vptestnmd\0" "vptestnmq\0" "vptestnmw\0" "vpunpckhbw\0"
+  "vpunpckhdq\0" "vpunpckhqdq\0" "vpunpckhwd\0" "vpunpcklbw\0" "vpunpckldq\0"
+  "vpunpcklqdq\0" "vpunpcklwd\0" "vpxor\0" "vpxord\0" "vpxorq\0" "vrangepd\0"
+  "vrangeps\0" "vrangesd\0" "vrangess\0" "vrcp14pd\0" "vrcp14ps\0" "vrcp14sd\0"
+  "vrcp14ss\0" "vrcp28pd\0" "vrcp28ps\0" "vrcp28sd\0" "vrcp28ss\0" "vrcpps\0"
+  "vrcpss\0" "vreducepd\0" "vreduceps\0" "vreducesd\0" "vreducess\0"
+  "vrndscalepd\0" "vrndscaleps\0" "vrndscalesd\0" "vrndscaless\0" "vroundpd\0"
+  "vroundps\0" "vroundsd\0" "vroundss\0" "vrsqrt14pd\0" "vrsqrt14ps\0"
+  "vrsqrt14sd\0" "vrsqrt14ss\0" "vrsqrt28pd\0" "vrsqrt28ps\0" "vrsqrt28sd\0"
+  "vrsqrt28ss\0" "vrsqrtps\0" "vrsqrtss\0" "vscalefpd\0" "vscalefps\0"
+  "vscalefsd\0" "vscalefss\0" "vscatterdpd\0" "vscatterdps\0"
+  "vscatterpf0dpd\0" "vscatterpf0dps\0" "vscatterpf0qpd\0" "vscatterpf0qps\0"
+  "vscatterpf1dpd\0" "vscatterpf1dps\0" "vscatterpf1qpd\0" "vscatterpf1qps\0"
+  "vscatterqpd\0" "vscatterqps\0" "vshuff32x4\0" "vshuff64x2\0" "vshufi32x4\0"
+  "vshufi64x2\0" "vshufpd\0" "vshufps\0" "vsqrtpd\0" "vsqrtps\0" "vsqrtsd\0"
+  "vsqrtss\0" "vstmxcsr\0" "vsubpd\0" "vsubps\0" "vsubsd\0" "vsubss\0"
+  "vtestpd\0" "vtestps\0" "vucomisd\0" "vucomiss\0" "vunpckhpd\0" "vunpckhps\0"
+  "vunpcklpd\0" "vunpcklps\0" "vxorpd\0" "vxorps\0" "vzeroall\0" "vzeroupper\0"
+  "wbinvd\0" "wrfsbase\0" "wrgsbase\0" "wrmsr\0" "xabort\0" "xadd\0" "xbegin\0"
+  "xend\0" "xgetbv\0" "xlatb\0" "xrstors\0" "xrstors64\0" "xsavec\0"
+  "xsavec64\0" "xsaveopt\0" "xsaveopt64\0" "xsaves\0" "xsaves64\0" "xsetbv\0"
+  "xtest";
 
-const uint32_t _x86ReverseCond[20] = {
-  /* kX86CondO  -> */ kX86CondO,
-  /* kX86CondNO -> */ kX86CondNO,
-  /* kX86CondB  -> */ kX86CondA,
-  /* kX86CondAE -> */ kX86CondBE,
-  /* kX86CondE  -> */ kX86CondE,
-  /* kX86CondNE -> */ kX86CondNE,
-  /* kX86CondBE -> */ kX86CondAE,
-  /* kX86CondA  -> */ kX86CondB,
-  /* kX86CondS  -> */ kX86CondS,
-  /* kX86CondNS -> */ kX86CondNS,
-  /* kX86CondPE -> */ kX86CondPE,
-  /* kX86CondPO -> */ kX86CondPO,
-  /* kX86CondL  -> */ kX86CondG,
-  /* kX86CondGE -> */ kX86CondLE,
-  /* kX86CondLE -> */ kX86CondGE,
-  /* kX86CondG  -> */ kX86CondL,
-
-  /* kX86CondFpuUnordered    -> */ kX86CondFpuUnordered,
-  /* kX86CondFpuNotUnordered -> */ kX86CondFpuNotUnordered,
-
-  0x12,
-  0x13
+enum {
+  kX86InstMaxLength = 16
 };
 
-const uint32_t _x86CondToCmovcc[20] = CC_TO_INST(kX86InstIdCmov);
-const uint32_t _x86CondToJcc   [20] = CC_TO_INST(kX86InstIdJ   );
-const uint32_t _x86CondToSetcc [20] = CC_TO_INST(kX86InstIdSet );
+struct InstNameAZ {
+  uint16_t start;
+  uint16_t end;
+};
+
+static const InstNameAZ X86InstNameAZ[26] = {
+  { X86Inst::kIdAaa       , X86Inst::kIdArpl       + 1 },
+  { X86Inst::kIdBextr     , X86Inst::kIdBzhi       + 1 },
+  { X86Inst::kIdCall      , X86Inst::kIdCwde       + 1 },
+  { X86Inst::kIdDaa       , X86Inst::kIdDpps       + 1 },
+  { X86Inst::kIdEmms      , X86Inst::kIdExtrq      + 1 },
+  { X86Inst::kIdF2xm1     , X86Inst::kIdFyl2xp1    + 1 },
+  { X86Inst::kIdNone      , X86Inst::kIdNone       + 1 },
+  { X86Inst::kIdHaddpd    , X86Inst::kIdHsubps     + 1 },
+  { X86Inst::kIdIdiv      , X86Inst::kIdIretw      + 1 },
+  { X86Inst::kIdJa        , X86Inst::kIdJz         + 1 },
+  { X86Inst::kIdKaddb     , X86Inst::kIdKxorw      + 1 },
+  { X86Inst::kIdLahf      , X86Inst::kIdLzcnt      + 1 },
+  { X86Inst::kIdMaskmovdqu, X86Inst::kIdMwait      + 1 },
+  { X86Inst::kIdNeg       , X86Inst::kIdNot        + 1 },
+  { X86Inst::kIdOr        , X86Inst::kIdOuts       + 1 },
+  { X86Inst::kIdPabsb     , X86Inst::kIdPxor       + 1 },
+  { X86Inst::kIdNone      , X86Inst::kIdNone       + 1 },
+  { X86Inst::kIdRcl       , X86Inst::kIdRsqrtss    + 1 },
+  { X86Inst::kIdSahf      , X86Inst::kIdSysret64   + 1 },
+  { X86Inst::kIdT1mskc    , X86Inst::kIdTzmsk      + 1 },
+  { X86Inst::kIdUcomisd   , X86Inst::kIdUnpcklps   + 1 },
+  { X86Inst::kIdV4fmaddps , X86Inst::kIdVzeroupper + 1 },
+  { X86Inst::kIdWbinvd    , X86Inst::kIdWrmsr      + 1 },
+  { X86Inst::kIdXabort    , X86Inst::kIdXtest      + 1 },
+  { X86Inst::kIdNone      , X86Inst::kIdNone       + 1 },
+  { X86Inst::kIdNone      , X86Inst::kIdNone       + 1 }
+};
+// ----------------------------------------------------------------------------
+// ${nameData:End}
+
+uint32_t X86Inst::getIdByName(const char* name, size_t len) noexcept {
+  if (ASMJIT_UNLIKELY(!name))
+    return Inst::kIdNone;
+
+  if (len == Globals::kInvalidIndex)
+    len = ::strlen(name);
+
+  if (ASMJIT_UNLIKELY(len == 0 || len > kX86InstMaxLength))
+    return Inst::kIdNone;
+
+  uint32_t prefix = static_cast<uint32_t>(name[0]) - 'a';
+  if (ASMJIT_UNLIKELY(prefix > 'z' - 'a'))
+    return Inst::kIdNone;
+
+  uint32_t index = X86InstNameAZ[prefix].start;
+  if (ASMJIT_UNLIKELY(!index))
+    return Inst::kIdNone;
+
+  const char* nameData = X86InstDB::nameData;
+  const X86Inst* instData = X86InstDB::instData;
+
+  const X86Inst* base = instData + index;
+  const X86Inst* end  = instData + X86InstNameAZ[prefix].end;
+
+  for (size_t lim = (size_t)(end - base); lim != 0; lim >>= 1) {
+    const X86Inst* cur = base + (lim >> 1);
+    int result = Utils::cmpInstName(nameData + cur[0].getNameDataIndex(), name, len);
+
+    if (result < 0) {
+      base = cur + 1;
+      lim--;
+      continue;
+    }
+
+    if (result > 0)
+      continue;
+
+    return static_cast<uint32_t>((size_t)(cur - instData));
+  }
+
+  return Inst::kIdNone;
+}
+
+const char* X86Inst::getNameById(uint32_t id) noexcept {
+  if (ASMJIT_UNLIKELY(id >= X86Inst::_kIdCount))
+    return nullptr;
+  return X86Inst::getInst(id).getName();
+}
+#else
+const char X86InstDB::nameData[] = "";
+#endif // !ASMJIT_DISABLE_TEXT
+
+// ============================================================================
+// [asmjit::X86Inst - Validation]
+// ============================================================================
+
+#if !defined(ASMJIT_DISABLE_VALIDATION)
+// ${signatureData:Begin}
+// ------------------- Automatically generated, do not edit -------------------
+#define FLAG(flag) X86Inst::kOp##flag
+#define MEM(mem) X86Inst::kMemOp##mem
+#define OSIGNATURE(flags, memFlags, extFlags, regId) \
+  { uint32_t(flags), uint16_t(memFlags), uint8_t(extFlags), uint8_t(regId) }
+const X86Inst::OSignature X86InstDB::oSignatureData[] = {
+  OSIGNATURE(0, 0, 0, 0xFF),
+  OSIGNATURE(FLAG(W) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Mem), MEM(Any) | MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(GpbHi), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpw) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Seg), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpd) | FLAG(Seg) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpd), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(Seg) | FLAG(I32), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(GpbLo) | FLAG(GpbHi), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Mem) | FLAG(I8) | FLAG(U8), MEM(Any) | MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpw) | FLAG(Seg), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpd), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpd) | FLAG(Seg) | FLAG(Mem) | FLAG(I32) | FLAG(U32), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpq) | FLAG(Seg), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpw) | FLAG(Mem), MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(I16) | FLAG(U16), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpq), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Cr) | FLAG(Dr) | FLAG(I64) | FLAG(U64), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Mem), MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(I8) | FLAG(U8), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpd) | FLAG(Mem), MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(I32) | FLAG(U32), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Cr) | FLAG(Dr), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Cr) | FLAG(Dr), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq), 0, 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Mem), MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpw) | FLAG(Mem), MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpd) | FLAG(Mem), MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(I32), 0, 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M16) | MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(I8), 0, 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Mem), MEM(Any) | MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpw) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw), 0, 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpd) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(GpbLo) | FLAG(GpbHi), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Mem), MEM(Any) | MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpw), 0, 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpd), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpd) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpq), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Mem), MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Mem), MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpd) | FLAG(Mem), MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M16) | MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M8) | MEM(M16) | MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Gpw), 0, 0, 0x01),
+  OSIGNATURE(FLAG(W) | FLAG(Implicit) | FLAG(Gpw), 0, 0, 0x04),
+  OSIGNATURE(FLAG(W) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x04),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x01),
+  OSIGNATURE(FLAG(W) | FLAG(Implicit) | FLAG(Gpq), 0, 0, 0x04),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Gpq), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Mem) | FLAG(I8) | FLAG(I16), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpd) | FLAG(Mem) | FLAG(I8) | FLAG(I32), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(Mem) | FLAG(I8) | FLAG(I32), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpw), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(I8) | FLAG(I16) | FLAG(U16), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(I8) | FLAG(I32) | FLAG(U32), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(I8) | FLAG(I32), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(Mm) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpq) | FLAG(Mm) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Xmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M128), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M128), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Ymm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Ymm) | FLAG(Mem), MEM(Any) | MEM(M256), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Ymm) | FLAG(Mem), MEM(Any) | MEM(M256), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Ymm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Zmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Zmm) | FLAG(Mem), MEM(Any) | MEM(M512), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Zmm) | FLAG(Mem), MEM(Any) | MEM(M512), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Zmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(U8), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Mem) | FLAG(U8), MEM(Any) | MEM(M128), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Xmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Vm), MEM(Vm32x), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Ymm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Vm), MEM(Vm32y), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Zmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Vm), MEM(Vm32z), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Vm), MEM(Vm64x), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Vm), MEM(Vm64y), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Vm), MEM(Vm64z), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(U8), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Mem), MEM(M16) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Mem), MEM(M16) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(GpbLo), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpw), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpq), 0, 0, 0x01),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Gpw), 0, 0, 0x04),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x04),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Gpq), 0, 0, 0x04),
+  OSIGNATURE(FLAG(W) | FLAG(Gpw) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M16) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Seg), 0, 0, 0x1A),
+  OSIGNATURE(FLAG(W) | FLAG(Seg), 0, 0, 0x60),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Gpq) | FLAG(Mem) | FLAG(I8) | FLAG(I16) | FLAG(I32), MEM(Any) | MEM(M16) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Seg), 0, 0, 0x1E),
+  OSIGNATURE(FLAG(R) | FLAG(Seg), 0, 0, 0x60),
+  OSIGNATURE(FLAG(R) | FLAG(Vm), MEM(Vm64x) | MEM(Vm64y), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(Any) | MEM(M128), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(Any) | MEM(M256), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any) | MEM(M128), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any) | MEM(M256), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(U4), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Fp), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Fp), 0, 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Fp), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Fp), 0, 0, 0x01),
+  OSIGNATURE(FLAG(X) | FLAG(Mem), MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any) | MEM(M48), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any) | MEM(M80), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(U8), 0, 0, 0x02),
+  OSIGNATURE(FLAG(W) | FLAG(K) | FLAG(Xmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(K) | FLAG(Ymm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(K), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Ymm) | FLAG(Mem), MEM(M64) | MEM(M128) | MEM(M256), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Mem), MEM(M128), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Ymm) | FLAG(Mem), MEM(M256), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(Any) | MEM(M512), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any) | MEM(M512), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M256), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Vm), MEM(Vm32x), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Vm), MEM(Vm32y), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Vm), MEM(Vm32z), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Vm), MEM(Vm64x), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Vm), MEM(Vm64y), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Vm), MEM(Vm64z), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Bnd), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Bnd), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Bnd) | FLAG(Mem), MEM(Any), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Bnd) | FLAG(Mem), MEM(Any), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(Mem) | FLAG(I32) | FLAG(I64) | FLAG(Rel32), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Mem), MEM(M8) | MEM(M16) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Gpq) | FLAG(Mem), MEM(M8) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpw) | FLAG(Gpd), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Fp) | FLAG(Mem), MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpw) | FLAG(Gpd), 0, 0, 0x02),
+  OSIGNATURE(FLAG(R) | FLAG(I32) | FLAG(I64) | FLAG(Rel8), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpd) | FLAG(Gpq), 0, 0, 0x02),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(Mem) | FLAG(I32) | FLAG(I64) | FLAG(Rel8) | FLAG(Rel32), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq) | FLAG(K) | FLAG(Mem), MEM(Any) | MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(K), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpd) | FLAG(Gpq) | FLAG(K) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpq) | FLAG(K) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq) | FLAG(K) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Gpw) | FLAG(Gpd), 0, 0, 0x02),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Gpd) | FLAG(Gpq), 0, 0, 0x02),
+  OSIGNATURE(FLAG(W) | FLAG(Gpd) | FLAG(Gpq), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mm) | FLAG(Xmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mm) | FLAG(Xmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x04),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpq), 0, 0, 0x04),
+  OSIGNATURE(FLAG(R) | FLAG(Mm) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Mm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mm) | FLAG(Mem) | FLAG(U8), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(U16), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Ymm) | FLAG(Mem), MEM(M128) | MEM(M256), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Xmm) | FLAG(Ymm) | FLAG(Zmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Mem), MEM(Any) | MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpd) | FLAG(Gpq), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(GpbHi) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M8), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(U8), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Vm), MEM(Vm64x) | MEM(Vm64y), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Ymm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Xmm), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Mib), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(Mib), 0, 0x00),
+  OSIGNATURE(FLAG(X) | FLAG(Gpd) | FLAG(Gpq), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Mem), MEM(BaseOnly) | MEM(Ds), 0, 0x01),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Mem), MEM(BaseOnly) | MEM(Ds), 0, 0x40),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Mem), MEM(BaseOnly) | MEM(Es), 0, 0x80),
+  OSIGNATURE(FLAG(X) | FLAG(Mem), MEM(Any) | MEM(M128), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpq), 0, 0, 0x02),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpq), 0, 0, 0x08),
+  OSIGNATURE(FLAG(X) | FLAG(Mem), MEM(Any) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x02),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x08),
+  OSIGNATURE(FLAG(W) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x08),
+  OSIGNATURE(FLAG(X) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x02),
+  OSIGNATURE(FLAG(R) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(Any) | MEM(M80), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(M16) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(M16) | MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(M16) | MEM(M32), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(M16) | MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Fp) | FLAG(Mem), MEM(M32) | MEM(M64) | MEM(M80), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(Any), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Gpw) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x01),
+  OSIGNATURE(FLAG(W) | FLAG(Fp) | FLAG(Mem), MEM(M32) | MEM(M64), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Fp) | FLAG(Mem), MEM(M32) | MEM(M64) | MEM(M80), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(GpbLo) | FLAG(Gpw) | FLAG(Gpd), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(U8), 0, 0, 0x04),
+  OSIGNATURE(FLAG(W) | FLAG(Mem), MEM(BaseOnly) | MEM(Es), 0, 0x80),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw), 0, 0, 0x04),
+  OSIGNATURE(FLAG(R) | FLAG(I32) | FLAG(I64) | FLAG(Rel8) | FLAG(Rel32), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Implicit) | FLAG(GpbHi), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(Any) | MEM(M8) | MEM(M16) | MEM(M32) | MEM(M48) | MEM(M64) | MEM(M80) | MEM(M128) | MEM(M256) | MEM(M512) | MEM(M1024), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq) | FLAG(Mem), MEM(Any) | MEM(M16), 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Implicit) | FLAG(GpbLo) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(Mem), MEM(BaseOnly) | MEM(Ds), 0, 0x80),
+  OSIGNATURE(FLAG(R) | FLAG(GpbLo) | FLAG(Gpw) | FLAG(Gpd), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Mem), MEM(BaseOnly) | MEM(Ds), 0, 0x40),
+  OSIGNATURE(FLAG(W) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x02),
+  OSIGNATURE(FLAG(W) | FLAG(Implicit) | FLAG(Xmm), 0, 0, 0x01),
+  OSIGNATURE(FLAG(X) | FLAG(Mm) | FLAG(Xmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(W) | FLAG(Implicit) | FLAG(Gpd), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(GpbHi), 0, 0, 0x01),
+  OSIGNATURE(FLAG(R) | FLAG(Implicit) | FLAG(GpbLo) | FLAG(Gpw) | FLAG(Gpd) | FLAG(Gpq), 0, 0, 0x01),
+  OSIGNATURE(FLAG(W) | FLAG(Ymm) | FLAG(Zmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Ymm) | FLAG(Zmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Ymm) | FLAG(Zmm) | FLAG(Mem), MEM(M128) | MEM(M256) | MEM(M512), 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(Xmm) | FLAG(Ymm) | FLAG(Zmm), 0, 0, 0x00),
+  OSIGNATURE(FLAG(R) | FLAG(I32) | FLAG(I64) | FLAG(Rel32), 0, 0, 0x00)
+};
+#undef OSIGNATURE
+#undef MEM
+#undef FLAG
+
+#define ISIGNATURE(count, x86, x64, implicit, o0, o1, o2, o3, o4, o5) \
+  { count, (x86 ? uint8_t(X86Inst::kArchMaskX86) : uint8_t(0)) |      \
+           (x64 ? uint8_t(X86Inst::kArchMaskX64) : uint8_t(0)) ,      \
+    implicit,                                                         \
+    0,                                                                \
+    { o0, o1, o2, o3, o4, o5 }                                        \
+  }
+const X86Inst::ISignature X86InstDB::iSignatureData[] = {
+  ISIGNATURE(2, 1, 1, 0, 1  , 2  , 0  , 0  , 0  , 0  ), // #0   {W:r8lo|r8hi|m8|mem, R:r8lo|r8hi}
+  ISIGNATURE(2, 1, 1, 0, 3  , 4  , 0  , 0  , 0  , 0  ), //      {W:r16|m16|mem, R:r16|sreg}
+  ISIGNATURE(2, 1, 1, 0, 5  , 6  , 0  , 0  , 0  , 0  ), //      {W:r32|m32|mem|sreg, R:r32}
+  ISIGNATURE(2, 0, 1, 0, 7  , 8  , 0  , 0  , 0  , 0  ), //      {W:r64|m64|mem, R:r64|sreg|i32}
+  ISIGNATURE(2, 1, 1, 0, 9  , 10 , 0  , 0  , 0  , 0  ), //      {W:r8lo|r8hi, R:r8lo|r8hi|m8|mem|i8|u8}
+  ISIGNATURE(2, 1, 1, 0, 11 , 12 , 0  , 0  , 0  , 0  ), //      {W:r16|sreg, R:r16|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 13 , 14 , 0  , 0  , 0  , 0  ), //      {W:r32, R:r32|m32|mem|sreg|i32|u32}
+  ISIGNATURE(2, 0, 1, 0, 15 , 16 , 0  , 0  , 0  , 0  ), //      {W:r64|sreg, R:r64|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 17 , 18 , 0  , 0  , 0  , 0  ), //      {W:r16|m16, R:i16|u16}
+  ISIGNATURE(2, 0, 1, 0, 19 , 20 , 0  , 0  , 0  , 0  ), //      {W:r64, R:i64|u64|creg|dreg}
+  ISIGNATURE(2, 1, 1, 0, 21 , 22 , 0  , 0  , 0  , 0  ), //      {W:r8lo|r8hi|m8, R:i8|u8}
+  ISIGNATURE(2, 1, 1, 0, 23 , 24 , 0  , 0  , 0  , 0  ), //      {W:r32|m32, R:i32|u32}
+  ISIGNATURE(2, 1, 0, 0, 13 , 25 , 0  , 0  , 0  , 0  ), //      {W:r32, R:creg|dreg}
+  ISIGNATURE(2, 1, 0, 0, 26 , 6  , 0  , 0  , 0  , 0  ), //      {W:creg|dreg, R:r32}
+  ISIGNATURE(2, 0, 1, 0, 26 , 27 , 0  , 0  , 0  , 0  ), //      {W:creg|dreg, R:r64}
+  ISIGNATURE(2, 1, 1, 0, 28 , 22 , 0  , 0  , 0  , 0  ), // #15  {X:r8lo|r8hi|m8, R:i8|u8}
+  ISIGNATURE(2, 1, 1, 0, 29 , 18 , 0  , 0  , 0  , 0  ), //      {X:r16|m16, R:i16|u16}
+  ISIGNATURE(2, 1, 1, 0, 30 , 24 , 0  , 0  , 0  , 0  ), //      {X:r32|m32, R:i32|u32}
+  ISIGNATURE(2, 0, 1, 0, 31 , 32 , 0  , 0  , 0  , 0  ), //      {X:r64|m64|mem, R:i32|r64}
+  ISIGNATURE(2, 1, 1, 0, 33 , 34 , 0  , 0  , 0  , 0  ), //      {X:r16|m16|r32|m32|r64|m64|mem, R:i8}
+  ISIGNATURE(2, 1, 1, 0, 35 , 2  , 0  , 0  , 0  , 0  ), //      {X:r8lo|r8hi|m8|mem, R:r8lo|r8hi}
+  ISIGNATURE(2, 1, 1, 0, 36 , 37 , 0  , 0  , 0  , 0  ), //      {X:r16|m16|mem, R:r16}
+  ISIGNATURE(2, 1, 1, 0, 38 , 6  , 0  , 0  , 0  , 0  ), //      {X:r32|m32|mem, R:r32}
+  ISIGNATURE(2, 1, 1, 0, 39 , 40 , 0  , 0  , 0  , 0  ), //      {X:r8lo|r8hi, R:r8lo|r8hi|m8|mem}
+  ISIGNATURE(2, 1, 1, 0, 41 , 12 , 0  , 0  , 0  , 0  ), // #24  {X:r16, R:r16|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 42 , 43 , 0  , 0  , 0  , 0  ), // #25  {X:r32, R:r32|m32|mem}
+  ISIGNATURE(2, 0, 1, 0, 44 , 16 , 0  , 0  , 0  , 0  ), //      {X:r64, R:r64|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 45 , 22 , 0  , 0  , 0  , 0  ), // #27  {R:r8lo|r8hi|m8, R:i8|u8}
+  ISIGNATURE(2, 1, 1, 0, 46 , 18 , 0  , 0  , 0  , 0  ), //      {R:r16|m16, R:i16|u16}
+  ISIGNATURE(2, 1, 1, 0, 47 , 24 , 0  , 0  , 0  , 0  ), //      {R:r32|m32, R:i32|u32}
+  ISIGNATURE(2, 0, 1, 0, 16 , 32 , 0  , 0  , 0  , 0  ), //      {R:r64|m64|mem, R:i32|r64}
+  ISIGNATURE(2, 1, 1, 0, 48 , 34 , 0  , 0  , 0  , 0  ), //      {R:r16|m16|r32|m32|r64|m64|mem, R:i8}
+  ISIGNATURE(2, 1, 1, 0, 40 , 2  , 0  , 0  , 0  , 0  ), //      {R:r8lo|r8hi|m8|mem, R:r8lo|r8hi}
+  ISIGNATURE(2, 1, 1, 0, 12 , 37 , 0  , 0  , 0  , 0  ), //      {R:r16|m16|mem, R:r16}
+  ISIGNATURE(2, 1, 1, 0, 43 , 6  , 0  , 0  , 0  , 0  ), //      {R:r32|m32|mem, R:r32}
+  ISIGNATURE(2, 1, 1, 0, 2  , 40 , 0  , 0  , 0  , 0  ), //      {R:r8lo|r8hi, R:r8lo|r8hi|m8|mem}
+  ISIGNATURE(2, 1, 1, 0, 37 , 12 , 0  , 0  , 0  , 0  ), //      {R:r16, R:r16|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 6  , 43 , 0  , 0  , 0  , 0  ), //      {R:r32, R:r32|m32|mem}
+  ISIGNATURE(2, 0, 1, 0, 27 , 16 , 0  , 0  , 0  , 0  ), //      {R:r64, R:r64|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 49 , 22 , 0  , 0  , 0  , 0  ), // #39  {X:r8lo|r8hi|m8|r16|m16|r32|m32|r64|m64|mem, R:i8|u8}
+  ISIGNATURE(2, 1, 1, 0, 29 , 18 , 0  , 0  , 0  , 0  ), //      {X:r16|m16, R:i16|u16}
+  ISIGNATURE(2, 1, 1, 0, 30 , 24 , 0  , 0  , 0  , 0  ), //      {X:r32|m32, R:i32|u32}
+  ISIGNATURE(2, 0, 1, 0, 31 , 32 , 0  , 0  , 0  , 0  ), //      {X:r64|m64|mem, R:i32|r64}
+  ISIGNATURE(2, 1, 1, 0, 35 , 2  , 0  , 0  , 0  , 0  ), //      {X:r8lo|r8hi|m8|mem, R:r8lo|r8hi}
+  ISIGNATURE(2, 1, 1, 0, 36 , 37 , 0  , 0  , 0  , 0  ), //      {X:r16|m16|mem, R:r16}
+  ISIGNATURE(2, 1, 1, 0, 38 , 6  , 0  , 0  , 0  , 0  ), //      {X:r32|m32|mem, R:r32}
+  ISIGNATURE(2, 1, 1, 0, 39 , 40 , 0  , 0  , 0  , 0  ), //      {X:r8lo|r8hi, R:r8lo|r8hi|m8|mem}
+  ISIGNATURE(2, 1, 1, 0, 41 , 12 , 0  , 0  , 0  , 0  ), //      {X:r16, R:r16|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 42 , 43 , 0  , 0  , 0  , 0  ), //      {X:r32, R:r32|m32|mem}
+  ISIGNATURE(2, 0, 1, 0, 44 , 16 , 0  , 0  , 0  , 0  ), //      {X:r64, R:r64|m64|mem}
+  ISIGNATURE(2, 1, 1, 1, 50 , 40 , 0  , 0  , 0  , 0  ), // #50  {X:<ax>, R:r8lo|r8hi|m8|mem}
+  ISIGNATURE(3, 1, 1, 2, 51 , 50 , 12 , 0  , 0  , 0  ), //      {W:<dx>, X:<ax>, R:r16|m16|mem}
+  ISIGNATURE(3, 1, 1, 2, 52 , 53 , 43 , 0  , 0  , 0  ), //      {W:<edx>, X:<eax>, R:r32|m32|mem}
+  ISIGNATURE(3, 0, 1, 2, 54 , 55 , 16 , 0  , 0  , 0  ), //      {W:<rdx>, X:<rax>, R:r64|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 41 , 56 , 0  , 0  , 0  , 0  ), //      {X:r16, R:r16|m16|mem|i8|i16}
+  ISIGNATURE(2, 1, 1, 0, 42 , 57 , 0  , 0  , 0  , 0  ), //      {X:r32, R:r32|m32|mem|i8|i32}
+  ISIGNATURE(2, 0, 1, 0, 44 , 58 , 0  , 0  , 0  , 0  ), //      {X:r64, R:r64|m64|mem|i8|i32}
+  ISIGNATURE(3, 1, 1, 0, 59 , 12 , 60 , 0  , 0  , 0  ), //      {W:r16, R:r16|m16|mem, R:i8|i16|u16}
+  ISIGNATURE(3, 1, 1, 0, 13 , 43 , 61 , 0  , 0  , 0  ), //      {W:r32, R:r32|m32|mem, R:i8|i32|u32}
+  ISIGNATURE(3, 0, 1, 0, 19 , 16 , 62 , 0  , 0  , 0  ), //      {W:r64, R:r64|m64|mem, R:i8|i32}
+  ISIGNATURE(2, 1, 1, 0, 36 , 41 , 0  , 0  , 0  , 0  ), // #60  {X:r16|m16|mem, X:r16}
+  ISIGNATURE(2, 1, 1, 0, 38 , 42 , 0  , 0  , 0  , 0  ), //      {X:r32|m32|mem, X:r32}
+  ISIGNATURE(2, 0, 1, 0, 31 , 44 , 0  , 0  , 0  , 0  ), //      {X:r64|m64|mem, X:r64}
+  ISIGNATURE(2, 1, 1, 0, 41 , 36 , 0  , 0  , 0  , 0  ), //      {X:r16, X:r16|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 42 , 38 , 0  , 0  , 0  , 0  ), //      {X:r32, X:r32|m32|mem}
+  ISIGNATURE(2, 0, 1, 0, 44 , 31 , 0  , 0  , 0  , 0  ), //      {X:r64, X:r64|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 35 , 39 , 0  , 0  , 0  , 0  ), //      {X:r8lo|r8hi|m8|mem, X:r8lo|r8hi}
+  ISIGNATURE(2, 1, 1, 0, 39 , 35 , 0  , 0  , 0  , 0  ), //      {X:r8lo|r8hi, X:r8lo|r8hi|m8|mem}
+  ISIGNATURE(2, 1, 1, 0, 45 , 22 , 0  , 0  , 0  , 0  ), // #68  {R:r8lo|r8hi|m8, R:i8|u8}
+  ISIGNATURE(2, 1, 1, 0, 46 , 18 , 0  , 0  , 0  , 0  ), //      {R:r16|m16, R:i16|u16}
+  ISIGNATURE(2, 1, 1, 0, 47 , 24 , 0  , 0  , 0  , 0  ), //      {R:r32|m32, R:i32|u32}
+  ISIGNATURE(2, 0, 1, 0, 16 , 32 , 0  , 0  , 0  , 0  ), //      {R:r64|m64|mem, R:i32|r64}
+  ISIGNATURE(2, 1, 1, 0, 40 , 2  , 0  , 0  , 0  , 0  ), //      {R:r8lo|r8hi|m8|mem, R:r8lo|r8hi}
+  ISIGNATURE(2, 1, 1, 0, 12 , 37 , 0  , 0  , 0  , 0  ), //      {R:r16|m16|mem, R:r16}
+  ISIGNATURE(2, 1, 1, 0, 43 , 6  , 0  , 0  , 0  , 0  ), //      {R:r32|m32|mem, R:r32}
+  ISIGNATURE(2, 1, 1, 0, 59 , 63 , 0  , 0  , 0  , 0  ), // #75  {W:r16, R:m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 13 , 64 , 0  , 0  , 0  , 0  ), //      {W:r32, R:m32|mem}
+  ISIGNATURE(2, 0, 1, 0, 19 , 65 , 0  , 0  , 0  , 0  ), //      {W:r64, R:m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 66 , 37 , 0  , 0  , 0  , 0  ), //      {W:m16|mem, R:r16}
+  ISIGNATURE(2, 1, 1, 0, 67 , 6  , 0  , 0  , 0  , 0  ), // #79  {W:m32|mem, R:r32}
+  ISIGNATURE(2, 0, 1, 0, 68 , 27 , 0  , 0  , 0  , 0  ), //      {W:m64|mem, R:r64}
+  ISIGNATURE(2, 1, 1, 0, 69 , 70 , 0  , 0  , 0  , 0  ), // #81  {W:mm, R:mm|m64|mem|r64|xmm}
+  ISIGNATURE(2, 1, 1, 0, 71 , 72 , 0  , 0  , 0  , 0  ), //      {W:mm|m64|mem|r64|xmm, R:mm}
+  ISIGNATURE(2, 0, 1, 0, 7  , 73 , 0  , 0  , 0  , 0  ), //      {W:r64|m64|mem, R:xmm}
+  ISIGNATURE(2, 0, 1, 0, 74 , 16 , 0  , 0  , 0  , 0  ), //      {W:xmm, R:r64|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 74 , 75 , 0  , 0  , 0  , 0  ), // #85  {W:xmm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 76 , 73 , 0  , 0  , 0  , 0  ), //      {W:xmm|m64|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 77 , 0  , 0  , 0  , 0  ), // #87  {W:xmm, R:xmm|m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 78 , 73 , 0  , 0  , 0  , 0  ), //      {W:xmm|m128|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 79 , 80 , 0  , 0  , 0  , 0  ), //      {W:ymm, R:ymm|m256|mem}
+  ISIGNATURE(2, 1, 1, 0, 81 , 82 , 0  , 0  , 0  , 0  ), //      {W:ymm|m256|mem, R:ymm}
+  ISIGNATURE(2, 1, 1, 0, 83 , 84 , 0  , 0  , 0  , 0  ), // #91  {W:zmm, R:zmm|m512|mem}
+  ISIGNATURE(2, 1, 1, 0, 85 , 86 , 0  , 0  , 0  , 0  ), //      {W:zmm|m512|mem, R:zmm}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 77 , 0  , 0  , 0  ), // #93  {W:xmm, R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 77 , 87 , 0  , 0  , 0  ), // #94  {W:xmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 79 , 82 , 80 , 0  , 0  , 0  ), // #95  {W:ymm, R:ymm, R:ymm|m256|mem}
+  ISIGNATURE(3, 1, 1, 0, 79 , 80 , 87 , 0  , 0  , 0  ), // #96  {W:ymm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 83 , 86 , 84 , 0  , 0  , 0  ), //      {W:zmm, R:zmm, R:zmm|m512|mem}
+  ISIGNATURE(3, 1, 1, 0, 83 , 84 , 87 , 0  , 0  , 0  ), //      {W:zmm, R:zmm|m512|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 88 , 0  , 0  , 0  ), // #99  {W:xmm, R:xmm, R:u8|xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 79 , 82 , 88 , 0  , 0  , 0  ), //      {W:ymm, R:ymm, R:u8|xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 77 , 87 , 0  , 0  , 0  ), // #101 {W:xmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 79 , 80 , 87 , 0  , 0  , 0  ), //      {W:ymm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 83 , 86 , 77 , 0  , 0  , 0  ), //      {W:zmm, R:zmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 83 , 84 , 87 , 0  , 0  , 0  ), //      {W:zmm, R:zmm|m512|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 77 , 0  , 0  , 0  ), // #105 {W:xmm, R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 77 , 87 , 0  , 0  , 0  ), //      {W:xmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 79 , 82 , 77 , 0  , 0  , 0  ), //      {W:ymm, R:ymm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 79 , 80 , 87 , 0  , 0  , 0  ), //      {W:ymm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 83 , 86 , 77 , 0  , 0  , 0  ), //      {W:zmm, R:zmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 83 , 84 , 87 , 0  , 0  , 0  ), //      {W:zmm, R:zmm|m512|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 89 , 90 , 89 , 0  , 0  , 0  ), // #111 {X:xmm, R:vm32x, X:xmm}
+  ISIGNATURE(3, 1, 1, 0, 91 , 90 , 91 , 0  , 0  , 0  ), //      {X:ymm, R:vm32x, X:ymm}
+  ISIGNATURE(2, 1, 1, 0, 89 , 90 , 0  , 0  , 0  , 0  ), //      {X:xmm, R:vm32x}
+  ISIGNATURE(2, 1, 1, 0, 91 , 92 , 0  , 0  , 0  , 0  ), //      {X:ymm, R:vm32y}
+  ISIGNATURE(2, 1, 1, 0, 93 , 94 , 0  , 0  , 0  , 0  ), //      {X:zmm, R:vm32z}
+  ISIGNATURE(3, 1, 1, 0, 89 , 90 , 89 , 0  , 0  , 0  ), // #116 {X:xmm, R:vm32x, X:xmm}
+  ISIGNATURE(3, 1, 1, 0, 91 , 92 , 91 , 0  , 0  , 0  ), //      {X:ymm, R:vm32y, X:ymm}
+  ISIGNATURE(2, 1, 1, 0, 89 , 90 , 0  , 0  , 0  , 0  ), //      {X:xmm, R:vm32x}
+  ISIGNATURE(2, 1, 1, 0, 91 , 92 , 0  , 0  , 0  , 0  ), //      {X:ymm, R:vm32y}
+  ISIGNATURE(2, 1, 1, 0, 93 , 94 , 0  , 0  , 0  , 0  ), //      {X:zmm, R:vm32z}
+  ISIGNATURE(3, 1, 1, 0, 89 , 95 , 89 , 0  , 0  , 0  ), // #121 {X:xmm, R:vm64x, X:xmm}
+  ISIGNATURE(3, 1, 1, 0, 91 , 96 , 91 , 0  , 0  , 0  ), //      {X:ymm, R:vm64y, X:ymm}
+  ISIGNATURE(2, 1, 1, 0, 89 , 95 , 0  , 0  , 0  , 0  ), //      {X:xmm, R:vm64x}
+  ISIGNATURE(2, 1, 1, 0, 91 , 96 , 0  , 0  , 0  , 0  ), //      {X:ymm, R:vm64y}
+  ISIGNATURE(2, 1, 1, 0, 93 , 97 , 0  , 0  , 0  , 0  ), //      {X:zmm, R:vm64z}
+  ISIGNATURE(2, 1, 1, 0, 12 , 37 , 0  , 0  , 0  , 0  ), // #126 {R:r16|m16|mem, R:r16}
+  ISIGNATURE(2, 1, 1, 0, 43 , 6  , 0  , 0  , 0  , 0  ), //      {R:r32|m32|mem, R:r32}
+  ISIGNATURE(2, 0, 1, 0, 16 , 98 , 0  , 0  , 0  , 0  ), //      {R:r64|m64|mem, R:r64|u8}
+  ISIGNATURE(2, 1, 1, 0, 99 , 87 , 0  , 0  , 0  , 0  ), //      {R:r16|m16|r32|m32, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 36 , 37 , 0  , 0  , 0  , 0  ), // #130 {X:r16|m16|mem, R:r16}
+  ISIGNATURE(2, 1, 1, 0, 38 , 6  , 0  , 0  , 0  , 0  ), //      {X:r32|m32|mem, R:r32}
+  ISIGNATURE(2, 0, 1, 0, 31 , 98 , 0  , 0  , 0  , 0  ), //      {X:r64|m64|mem, R:r64|u8}
+  ISIGNATURE(2, 1, 1, 0, 100, 87 , 0  , 0  , 0  , 0  ), //      {X:r16|m16|r32|m32, R:u8}
+  ISIGNATURE(3, 1, 1, 1, 35 , 2  , 101, 0  , 0  , 0  ), // #134 {X:r8lo|r8hi|m8|mem, R:r8lo|r8hi, R:<al>}
+  ISIGNATURE(3, 1, 1, 1, 36 , 37 , 102, 0  , 0  , 0  ), //      {X:r16|m16|mem, R:r16, R:<ax>}
+  ISIGNATURE(3, 1, 1, 1, 38 , 6  , 103, 0  , 0  , 0  ), //      {X:r32|m32|mem, R:r32, R:<eax>}
+  ISIGNATURE(3, 0, 1, 1, 31 , 27 , 104, 0  , 0  , 0  ), //      {X:r64|m64|mem, R:r64, R:<rax>}
+  ISIGNATURE(2, 1, 1, 1, 50 , 40 , 0  , 0  , 0  , 0  ), // #138 {X:<ax>, R:r8lo|r8hi|m8|mem}
+  ISIGNATURE(3, 1, 1, 2, 105, 50 , 12 , 0  , 0  , 0  ), //      {X:<dx>, X:<ax>, R:r16|m16|mem}
+  ISIGNATURE(3, 1, 1, 2, 106, 53 , 43 , 0  , 0  , 0  ), //      {X:<edx>, X:<eax>, R:r32|m32|mem}
+  ISIGNATURE(3, 0, 1, 2, 107, 55 , 16 , 0  , 0  , 0  ), //      {X:<rdx>, X:<rax>, R:r64|m64|mem}
+  ISIGNATURE(1, 1, 1, 0, 108, 0  , 0  , 0  , 0  , 0  ), // #142 {W:r16|m16|r64|m64|mem}
+  ISIGNATURE(1, 1, 0, 0, 23 , 0  , 0  , 0  , 0  , 0  ), //      {W:r32|m32}
+  ISIGNATURE(1, 1, 0, 0, 109, 0  , 0  , 0  , 0  , 0  ), //      {W:ds|es|ss}
+  ISIGNATURE(1, 1, 1, 0, 110, 0  , 0  , 0  , 0  , 0  ), //      {W:fs|gs}
+  ISIGNATURE(1, 1, 1, 0, 111, 0  , 0  , 0  , 0  , 0  ), // #146 {R:r16|m16|r64|m64|mem|i8|i16|i32}
+  ISIGNATURE(1, 1, 0, 0, 47 , 0  , 0  , 0  , 0  , 0  ), //      {R:r32|m32}
+  ISIGNATURE(1, 1, 0, 0, 112, 0  , 0  , 0  , 0  , 0  ), //      {R:cs|ss|ds|es}
+  ISIGNATURE(1, 1, 1, 0, 113, 0  , 0  , 0  , 0  , 0  ), //      {R:fs|gs}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 73 , 77 , 0  , 0  ), // #150 {W:xmm, R:xmm, R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 77 , 73 , 0  , 0  ), // #151 {W:xmm, R:xmm, R:xmm|m128|mem, R:xmm}
+  ISIGNATURE(4, 1, 1, 0, 79 , 82 , 82 , 80 , 0  , 0  ), //      {W:ymm, R:ymm, R:ymm, R:ymm|m256|mem}
+  ISIGNATURE(4, 1, 1, 0, 79 , 82 , 80 , 82 , 0  , 0  ), //      {W:ymm, R:ymm, R:ymm|m256|mem, R:ymm}
+  ISIGNATURE(3, 1, 1, 0, 89 , 114, 89 , 0  , 0  , 0  ), // #154 {X:xmm, R:vm64x|vm64y, X:xmm}
+  ISIGNATURE(2, 1, 1, 0, 89 , 95 , 0  , 0  , 0  , 0  ), //      {X:xmm, R:vm64x}
+  ISIGNATURE(2, 1, 1, 0, 91 , 96 , 0  , 0  , 0  , 0  ), //      {X:ymm, R:vm64y}
+  ISIGNATURE(2, 1, 1, 0, 93 , 97 , 0  , 0  , 0  , 0  ), //      {X:zmm, R:vm64z}
+  ISIGNATURE(3, 1, 1, 0, 115, 73 , 73 , 0  , 0  , 0  ), // #158 {W:m128|mem, R:xmm, R:xmm}
+  ISIGNATURE(3, 1, 1, 0, 116, 82 , 82 , 0  , 0  , 0  ), //      {W:m256|mem, R:ymm, R:ymm}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 117, 0  , 0  , 0  ), //      {W:xmm, R:xmm, R:m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 79 , 82 , 118, 0  , 0  , 0  ), //      {W:ymm, R:ymm, R:m256|mem}
+  ISIGNATURE(5, 1, 1, 0, 74 , 73 , 77 , 73 , 119, 0  ), // #162 {W:xmm, R:xmm, R:xmm|m128|mem, R:xmm, R:u4}
+  ISIGNATURE(5, 1, 1, 0, 74 , 73 , 73 , 77 , 119, 0  ), //      {W:xmm, R:xmm, R:xmm, R:xmm|m128|mem, R:u4}
+  ISIGNATURE(5, 1, 1, 0, 79 , 82 , 80 , 82 , 119, 0  ), //      {W:ymm, R:ymm, R:ymm|m256|mem, R:ymm, R:u4}
+  ISIGNATURE(5, 1, 1, 0, 79 , 82 , 82 , 80 , 119, 0  ), //      {W:ymm, R:ymm, R:ymm, R:ymm|m256|mem, R:u4}
+  ISIGNATURE(3, 1, 1, 0, 79 , 80 , 87 , 0  , 0  , 0  ), // #166 {W:ymm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 79 , 82 , 80 , 0  , 0  , 0  ), // #167 {W:ymm, R:ymm, R:ymm|m256|mem}
+  ISIGNATURE(3, 1, 1, 0, 83 , 86 , 84 , 0  , 0  , 0  ), //      {W:zmm, R:zmm, R:zmm|m512|mem}
+  ISIGNATURE(3, 1, 1, 0, 83 , 84 , 87 , 0  , 0  , 0  ), //      {W:zmm, R:zmm|m512|mem, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 35 , 39 , 0  , 0  , 0  , 0  ), // #170 {X:r8lo|r8hi|m8|mem, X:r8lo|r8hi}
+  ISIGNATURE(2, 1, 1, 0, 36 , 41 , 0  , 0  , 0  , 0  ), //      {X:r16|m16|mem, X:r16}
+  ISIGNATURE(2, 1, 1, 0, 38 , 42 , 0  , 0  , 0  , 0  ), //      {X:r32|m32|mem, X:r32}
+  ISIGNATURE(2, 0, 1, 0, 31 , 44 , 0  , 0  , 0  , 0  ), //      {X:r64|m64|mem, X:r64}
+  ISIGNATURE(1, 1, 1, 0, 120, 0  , 0  , 0  , 0  , 0  ), // #174 {R:m32|m64}
+  ISIGNATURE(2, 1, 1, 0, 121, 122, 0  , 0  , 0  , 0  ), //      {X:fp0, R:fp}
+  ISIGNATURE(2, 1, 1, 0, 123, 124, 0  , 0  , 0  , 0  ), //      {X:fp, R:fp0}
+  ISIGNATURE(1, 1, 1, 0, 125, 0  , 0  , 0  , 0  , 0  ), // #177 {X:m32|m64}
+  ISIGNATURE(2, 1, 1, 0, 121, 122, 0  , 0  , 0  , 0  ), //      {X:fp0, R:fp}
+  ISIGNATURE(2, 1, 1, 0, 123, 124, 0  , 0  , 0  , 0  ), //      {X:fp, R:fp0}
+  ISIGNATURE(2, 1, 1, 0, 41 , 64 , 0  , 0  , 0  , 0  ), // #180 {X:r16, R:m32|mem}
+  ISIGNATURE(2, 1, 1, 0, 42 , 126, 0  , 0  , 0  , 0  ), //      {X:r32, R:m48|mem}
+  ISIGNATURE(2, 0, 1, 0, 44 , 127, 0  , 0  , 0  , 0  ), //      {X:r64, R:m80|mem}
+  ISIGNATURE(2, 1, 1, 0, 59 , 12 , 0  , 0  , 0  , 0  ), // #183 {W:r16, R:r16|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 13 , 43 , 0  , 0  , 0  , 0  ), // #184 {W:r32, R:r32|m32|mem}
+  ISIGNATURE(2, 0, 1, 0, 19 , 16 , 0  , 0  , 0  , 0  ), //      {W:r64, R:r64|m64|mem}
+  ISIGNATURE(3, 1, 1, 0, 36 , 37 , 128, 0  , 0  , 0  ), // #186 {X:r16|m16|mem, R:r16, R:u8|cl}
+  ISIGNATURE(3, 1, 1, 0, 38 , 6  , 128, 0  , 0  , 0  ), //      {X:r32|m32|mem, R:r32, R:u8|cl}
+  ISIGNATURE(3, 0, 1, 0, 31 , 27 , 128, 0  , 0  , 0  ), //      {X:r64|m64|mem, R:r64, R:u8|cl}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 77 , 0  , 0  , 0  ), // #189 {W:xmm, R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 79 , 82 , 80 , 0  , 0  , 0  ), //      {W:ymm, R:ymm, R:ymm|m256|mem}
+  ISIGNATURE(3, 1, 1, 0, 83 , 86 , 84 , 0  , 0  , 0  ), //      {W:zmm, R:zmm, R:zmm|m512|mem}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 77 , 87 , 0  , 0  ), // #192 {W:xmm, R:xmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 79 , 82 , 80 , 87 , 0  , 0  ), // #193 {W:ymm, R:ymm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 83 , 86 , 84 , 87 , 0  , 0  ), //      {W:zmm, R:zmm, R:zmm|m512|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 129, 73 , 77 , 87 , 0  , 0  ), // #195 {W:xmm|k, R:xmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 130, 82 , 80 , 87 , 0  , 0  ), //      {W:ymm|k, R:ymm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 131, 86 , 84 , 87 , 0  , 0  ), //      {W:k, R:zmm, R:zmm|m512|mem, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 78 , 73 , 0  , 0  , 0  , 0  ), // #198 {W:xmm|m128|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 81 , 82 , 0  , 0  , 0  , 0  ), //      {W:ymm|m256|mem, R:ymm}
+  ISIGNATURE(2, 1, 1, 0, 85 , 86 , 0  , 0  , 0  , 0  ), //      {W:zmm|m512|mem, R:zmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 75 , 0  , 0  , 0  , 0  ), // #201 {W:xmm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 79 , 77 , 0  , 0  , 0  , 0  ), //      {W:ymm, R:xmm|m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 83 , 80 , 0  , 0  , 0  , 0  ), //      {W:zmm, R:ymm|m256|mem}
+  ISIGNATURE(2, 1, 1, 0, 74 , 77 , 0  , 0  , 0  , 0  ), // #204 {W:xmm, R:xmm|m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 79 , 80 , 0  , 0  , 0  , 0  ), //      {W:ymm, R:ymm|m256|mem}
+  ISIGNATURE(2, 1, 1, 0, 83 , 84 , 0  , 0  , 0  , 0  ), //      {W:zmm, R:zmm|m512|mem}
+  ISIGNATURE(2, 1, 1, 0, 74 , 132, 0  , 0  , 0  , 0  ), // #207 {W:xmm, R:xmm|m128|ymm|m256|m64}
+  ISIGNATURE(2, 1, 1, 0, 79 , 133, 0  , 0  , 0  , 0  ), //      {W:ymm, R:xmm|m128}
+  ISIGNATURE(2, 1, 1, 0, 83 , 134, 0  , 0  , 0  , 0  ), //      {W:zmm, R:ymm|m256}
+  ISIGNATURE(3, 1, 1, 0, 76 , 73 , 87 , 0  , 0  , 0  ), // #210 {W:xmm|m64|mem, R:xmm, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 78 , 82 , 87 , 0  , 0  , 0  ), // #211 {W:xmm|m128|mem, R:ymm, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 81 , 86 , 87 , 0  , 0  , 0  ), // #212 {W:ymm|m256|mem, R:zmm, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 89 , 73 , 77 , 87 , 0  , 0  ), // #213 {X:xmm, R:xmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 91 , 82 , 80 , 87 , 0  , 0  ), //      {X:ymm, R:ymm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 93 , 86 , 84 , 87 , 0  , 0  ), //      {X:zmm, R:zmm, R:zmm|m512|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 89 , 73 , 77 , 0  , 0  , 0  ), // #216 {X:xmm, R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 91 , 82 , 80 , 0  , 0  , 0  ), //      {X:ymm, R:ymm, R:ymm|m256|mem}
+  ISIGNATURE(3, 1, 1, 0, 93 , 86 , 84 , 0  , 0  , 0  ), //      {X:zmm, R:zmm, R:zmm|m512|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 77 , 87 , 0  , 0  , 0  ), // #219 {W:xmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 79 , 80 , 87 , 0  , 0  , 0  ), //      {W:ymm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 83 , 84 , 87 , 0  , 0  , 0  ), //      {W:zmm, R:zmm|m512|mem, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 74 , 75 , 0  , 0  , 0  , 0  ), // #222 {W:xmm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 79 , 80 , 0  , 0  , 0  , 0  ), //      {W:ymm, R:ymm|m256|mem}
+  ISIGNATURE(2, 1, 1, 0, 83 , 84 , 0  , 0  , 0  , 0  ), //      {W:zmm, R:zmm|m512|mem}
+  ISIGNATURE(2, 1, 1, 0, 115, 73 , 0  , 0  , 0  , 0  ), // #225 {W:m128|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 116, 82 , 0  , 0  , 0  , 0  ), //      {W:m256|mem, R:ymm}
+  ISIGNATURE(2, 1, 1, 0, 135, 86 , 0  , 0  , 0  , 0  ), //      {W:m512|mem, R:zmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 117, 0  , 0  , 0  , 0  ), // #228 {W:xmm, R:m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 79 , 118, 0  , 0  , 0  , 0  ), //      {W:ymm, R:m256|mem}
+  ISIGNATURE(2, 1, 1, 0, 83 , 136, 0  , 0  , 0  , 0  ), //      {W:zmm, R:m512|mem}
+  ISIGNATURE(2, 0, 1, 0, 7  , 73 , 0  , 0  , 0  , 0  ), // #231 {W:r64|m64|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 137, 0  , 0  , 0  , 0  ), //      {W:xmm, R:xmm|m64|mem|r64}
+  ISIGNATURE(2, 1, 1, 0, 76 , 73 , 0  , 0  , 0  , 0  ), //      {W:xmm|m64|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 68 , 73 , 0  , 0  , 0  , 0  ), // #234 {W:m64|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 65 , 0  , 0  , 0  , 0  ), //      {W:xmm, R:m64|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 73 , 0  , 0  , 0  ), // #236 {W:xmm, R:xmm, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 67 , 73 , 0  , 0  , 0  , 0  ), // #237 {W:m32|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 64 , 0  , 0  , 0  , 0  ), //      {W:xmm, R:m32|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 73 , 0  , 0  , 0  ), //      {W:xmm, R:xmm, R:xmm}
+  ISIGNATURE(4, 1, 1, 0, 131, 73 , 77 , 87 , 0  , 0  ), // #240 {W:k, R:xmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 131, 82 , 80 , 87 , 0  , 0  ), //      {W:k, R:ymm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 131, 86 , 84 , 87 , 0  , 0  ), //      {W:k, R:zmm, R:zmm|m512|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 129, 73 , 77 , 0  , 0  , 0  ), // #243 {W:xmm|k, R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 130, 82 , 80 , 0  , 0  , 0  ), //      {W:ymm|k, R:ymm, R:ymm|m256|mem}
+  ISIGNATURE(3, 1, 1, 0, 131, 86 , 84 , 0  , 0  , 0  ), //      {W:k, R:zmm, R:zmm|m512|mem}
+  ISIGNATURE(2, 1, 1, 0, 138, 73 , 0  , 0  , 0  , 0  ), // #246 {W:xmm|m32|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 76 , 82 , 0  , 0  , 0  , 0  ), //      {W:xmm|m64|mem, R:ymm}
+  ISIGNATURE(2, 1, 1, 0, 78 , 86 , 0  , 0  , 0  , 0  ), //      {W:xmm|m128|mem, R:zmm}
+  ISIGNATURE(2, 1, 1, 0, 76 , 73 , 0  , 0  , 0  , 0  ), // #249 {W:xmm|m64|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 78 , 82 , 0  , 0  , 0  , 0  ), //      {W:xmm|m128|mem, R:ymm}
+  ISIGNATURE(2, 1, 1, 0, 81 , 86 , 0  , 0  , 0  , 0  ), //      {W:ymm|m256|mem, R:zmm}
+  ISIGNATURE(2, 1, 1, 0, 139, 73 , 0  , 0  , 0  , 0  ), // #252 {W:xmm|m16|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 138, 82 , 0  , 0  , 0  , 0  ), //      {W:xmm|m32|mem, R:ymm}
+  ISIGNATURE(2, 1, 1, 0, 76 , 86 , 0  , 0  , 0  , 0  ), //      {W:xmm|m64|mem, R:zmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 140, 0  , 0  , 0  , 0  ), // #255 {W:xmm, R:xmm|m32|mem}
+  ISIGNATURE(2, 1, 1, 0, 79 , 75 , 0  , 0  , 0  , 0  ), //      {W:ymm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 83 , 77 , 0  , 0  , 0  , 0  ), //      {W:zmm, R:xmm|m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 74 , 141, 0  , 0  , 0  , 0  ), // #258 {W:xmm, R:xmm|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 79 , 140, 0  , 0  , 0  , 0  ), //      {W:ymm, R:xmm|m32|mem}
+  ISIGNATURE(2, 1, 1, 0, 83 , 75 , 0  , 0  , 0  , 0  ), // #260 {W:zmm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 74 , 75 , 0  , 0  , 0  , 0  ), // #261 {W:xmm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 79 , 77 , 0  , 0  , 0  , 0  ), //      {W:ymm, R:xmm|m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 83 , 142, 0  , 0  , 0  , 0  ), //      {W:zmm, R:xmm|m256|mem}
+  ISIGNATURE(2, 1, 1, 0, 143, 73 , 0  , 0  , 0  , 0  ), // #264 {W:vm32x, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 144, 82 , 0  , 0  , 0  , 0  ), //      {W:vm32y, R:ymm}
+  ISIGNATURE(2, 1, 1, 0, 145, 86 , 0  , 0  , 0  , 0  ), //      {W:vm32z, R:zmm}
+  ISIGNATURE(2, 1, 1, 0, 146, 73 , 0  , 0  , 0  , 0  ), // #267 {W:vm64x, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 147, 82 , 0  , 0  , 0  , 0  ), //      {W:vm64y, R:ymm}
+  ISIGNATURE(2, 1, 1, 0, 148, 86 , 0  , 0  , 0  , 0  ), //      {W:vm64z, R:zmm}
+  ISIGNATURE(3, 1, 1, 0, 131, 73 , 77 , 0  , 0  , 0  ), // #270 {W:k, R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 131, 82 , 80 , 0  , 0  , 0  ), //      {W:k, R:ymm, R:ymm|m256|mem}
+  ISIGNATURE(3, 1, 1, 0, 131, 86 , 84 , 0  , 0  , 0  ), //      {W:k, R:zmm, R:zmm|m512|mem}
+  ISIGNATURE(3, 1, 1, 0, 13 , 6  , 43 , 0  , 0  , 0  ), // #273 {W:r32, R:r32, R:r32|m32|mem}
+  ISIGNATURE(3, 0, 1, 0, 19 , 27 , 16 , 0  , 0  , 0  ), //      {W:r64, R:r64, R:r64|m64|mem}
+  ISIGNATURE(3, 1, 1, 0, 13 , 43 , 6  , 0  , 0  , 0  ), // #275 {W:r32, R:r32|m32|mem, R:r32}
+  ISIGNATURE(3, 0, 1, 0, 19 , 16 , 27 , 0  , 0  , 0  ), //      {W:r64, R:r64|m64|mem, R:r64}
+  ISIGNATURE(2, 1, 0, 0, 149, 43 , 0  , 0  , 0  , 0  ), // #277 {R:bnd, R:r32|m32|mem}
+  ISIGNATURE(2, 0, 1, 0, 149, 16 , 0  , 0  , 0  , 0  ), //      {R:bnd, R:r64|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 150, 151, 0  , 0  , 0  , 0  ), // #279 {W:bnd, R:bnd|mem}
+  ISIGNATURE(2, 1, 1, 0, 152, 149, 0  , 0  , 0  , 0  ), //      {W:bnd|mem, R:bnd}
+  ISIGNATURE(2, 1, 0, 0, 37 , 64 , 0  , 0  , 0  , 0  ), // #281 {R:r16, R:m32|mem}
+  ISIGNATURE(2, 1, 0, 0, 6  , 65 , 0  , 0  , 0  , 0  ), //      {R:r32, R:m64|mem}
+  ISIGNATURE(1, 1, 1, 0, 153, 0  , 0  , 0  , 0  , 0  ), // #283 {R:rel32|r64|m64|mem}
+  ISIGNATURE(1, 1, 0, 0, 43 , 0  , 0  , 0  , 0  , 0  ), //      {R:r32|m32|mem}
+  ISIGNATURE(2, 1, 1, 0, 42 , 154, 0  , 0  , 0  , 0  ), // #285 {X:r32, R:r8lo|r8hi|m8|r16|m16|r32|m32}
+  ISIGNATURE(2, 0, 1, 0, 44 , 155, 0  , 0  , 0  , 0  ), //      {X:r64, R:r8lo|r8hi|m8|r64|m64}
+  ISIGNATURE(1, 1, 0, 0, 156, 0  , 0  , 0  , 0  , 0  ), // #287 {X:r16|r32}
+  ISIGNATURE(1, 1, 1, 0, 49 , 0  , 0  , 0  , 0  , 0  ), // #288 {X:r8lo|r8hi|m8|r16|m16|r32|m32|r64|m64|mem}
+  ISIGNATURE(3, 1, 1, 0, 89 , 87 , 87 , 0  , 0  , 0  ), // #289 {X:xmm, R:u8, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 89 , 73 , 0  , 0  , 0  , 0  ), //      {X:xmm, R:xmm}
+  ISIGNATURE(0, 1, 1, 0, 0  , 0  , 0  , 0  , 0  , 0  ), // #291 {}
+  ISIGNATURE(1, 1, 1, 0, 123, 0  , 0  , 0  , 0  , 0  ), // #292 {X:fp}
+  ISIGNATURE(0, 1, 1, 0, 0  , 0  , 0  , 0  , 0  , 0  ), // #293 {}
+  ISIGNATURE(1, 1, 1, 0, 157, 0  , 0  , 0  , 0  , 0  ), //      {R:m32|m64|fp}
+  ISIGNATURE(0, 1, 1, 0, 0  , 0  , 0  , 0  , 0  , 0  ), // #295 {}
+  ISIGNATURE(1, 1, 1, 0, 122, 0  , 0  , 0  , 0  , 0  ), // #296 {R:fp}
+  ISIGNATURE(2, 1, 1, 0, 89 , 73 , 0  , 0  , 0  , 0  ), // #297 {X:xmm, R:xmm}
+  ISIGNATURE(4, 1, 1, 0, 89 , 73 , 87 , 87 , 0  , 0  ), //      {X:xmm, R:xmm, R:u8, R:u8}
+  ISIGNATURE(2, 1, 0, 0, 6  , 117, 0  , 0  , 0  , 0  ), // #299 {R:r32, R:m128|mem}
+  ISIGNATURE(2, 0, 1, 0, 27 , 117, 0  , 0  , 0  , 0  ), //      {R:r64, R:m128|mem}
+  ISIGNATURE(2, 1, 0, 1, 158, 159, 0  , 0  , 0  , 0  ), // #301 {R:<cx|ecx>, R:rel8}
+  ISIGNATURE(2, 0, 1, 1, 160, 159, 0  , 0  , 0  , 0  ), //      {R:<ecx|rcx>, R:rel8}
+  ISIGNATURE(1, 1, 1, 0, 161, 0  , 0  , 0  , 0  , 0  ), // #303 {R:rel8|rel32|r64|m64|mem}
+  ISIGNATURE(1, 1, 0, 0, 43 , 0  , 0  , 0  , 0  , 0  ), //      {R:r32|m32|mem}
+  ISIGNATURE(2, 1, 1, 0, 131, 162, 0  , 0  , 0  , 0  ), // #305 {W:k, R:k|m8|mem|r32|r64|r8lo|r8hi|r16}
+  ISIGNATURE(2, 1, 1, 0, 163, 164, 0  , 0  , 0  , 0  ), //      {W:m8|mem|r32|r64|r8lo|r8hi|r16, R:k}
+  ISIGNATURE(2, 1, 1, 0, 131, 165, 0  , 0  , 0  , 0  ), // #307 {W:k, R:k|m32|mem|r32|r64}
+  ISIGNATURE(2, 1, 1, 0, 166, 164, 0  , 0  , 0  , 0  ), //      {W:m32|mem|r32|r64, R:k}
+  ISIGNATURE(2, 1, 1, 0, 131, 167, 0  , 0  , 0  , 0  ), // #309 {W:k, R:k|m64|mem|r64}
+  ISIGNATURE(2, 1, 1, 0, 7  , 164, 0  , 0  , 0  , 0  ), //      {W:m64|mem|r64, R:k}
+  ISIGNATURE(2, 1, 1, 0, 131, 168, 0  , 0  , 0  , 0  ), // #311 {W:k, R:k|m16|mem|r32|r64|r16}
+  ISIGNATURE(2, 1, 1, 0, 169, 164, 0  , 0  , 0  , 0  ), //      {W:m16|mem|r32|r64|r16, R:k}
+  ISIGNATURE(2, 1, 1, 0, 59 , 12 , 0  , 0  , 0  , 0  ), // #313 {W:r16, R:r16|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 13 , 170, 0  , 0  , 0  , 0  ), //      {W:r32, R:r32|m16|mem|r16}
+  ISIGNATURE(2, 1, 0, 0, 41 , 64 , 0  , 0  , 0  , 0  ), // #315 {X:r16, R:m32|mem}
+  ISIGNATURE(2, 1, 0, 0, 42 , 126, 0  , 0  , 0  , 0  ), //      {X:r32, R:m48|mem}
+  ISIGNATURE(2, 1, 0, 1, 171, 159, 0  , 0  , 0  , 0  ), // #317 {X:<cx|ecx>, R:rel8}
+  ISIGNATURE(2, 0, 1, 1, 172, 159, 0  , 0  , 0  , 0  ), //      {X:<ecx|rcx>, R:rel8}
+  ISIGNATURE(2, 1, 1, 0, 59 , 12 , 0  , 0  , 0  , 0  ), // #319 {W:r16, R:r16|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 173, 170, 0  , 0  , 0  , 0  ), //      {W:r32|r64, R:r32|m16|mem|r16}
+  ISIGNATURE(2, 1, 1, 0, 174, 175, 0  , 0  , 0  , 0  ), // #321 {W:mm|xmm, R:r32|m32|mem|r64}
+  ISIGNATURE(2, 1, 1, 0, 166, 176, 0  , 0  , 0  , 0  ), //      {W:r32|m32|mem|r64, R:mm|xmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 75 , 0  , 0  , 0  , 0  ), // #323 {W:xmm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 68 , 73 , 0  , 0  , 0  , 0  ), //      {W:m64|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 140, 0  , 0  , 0  , 0  ), // #325 {W:xmm, R:xmm|m32|mem}
+  ISIGNATURE(2, 1, 1, 0, 67 , 73 , 0  , 0  , 0  , 0  ), //      {W:m32|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 177, 45 , 0  , 0  , 0  , 0  ), // #327 {W:r16|r32|r64, R:r8lo|r8hi|m8}
+  ISIGNATURE(2, 1, 1, 0, 173, 46 , 0  , 0  , 0  , 0  ), //      {W:r32|r64, R:r16|m16}
+  ISIGNATURE(4, 1, 1, 1, 13 , 13 , 43 , 178, 0  , 0  ), // #329 {W:r32, W:r32, R:r32|m32|mem, R:<edx>}
+  ISIGNATURE(4, 0, 1, 1, 19 , 19 , 16 , 179, 0  , 0  ), //      {W:r64, W:r64, R:r64|m64|mem, R:<rdx>}
+  ISIGNATURE(0, 1, 1, 0, 0  , 0  , 0  , 0  , 0  , 0  ), // #331 {}
+  ISIGNATURE(1, 1, 1, 0, 99 , 0  , 0  , 0  , 0  , 0  ), //      {R:r16|m16|r32|m32}
+  ISIGNATURE(2, 1, 1, 0, 69 , 180, 0  , 0  , 0  , 0  ), // #333 {W:mm, R:mm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 74 , 77 , 0  , 0  , 0  , 0  ), //      {W:xmm, R:xmm|m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 181, 180, 0  , 0  , 0  , 0  ), // #335 {X:mm, R:mm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 89 , 77 , 0  , 0  , 0  , 0  ), // #336 {X:xmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 181, 180, 87 , 0  , 0  , 0  ), // #337 {X:mm, R:mm|m64|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 89 , 77 , 87 , 0  , 0  , 0  ), // #338 {X:xmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 173, 72 , 87 , 0  , 0  , 0  ), // #339 {W:r32|r64, R:mm, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 169, 73 , 87 , 0  , 0  , 0  ), // #340 {W:r32|r64|m16|mem|r16, R:xmm, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 181, 182, 0  , 0  , 0  , 0  ), // #341 {X:mm, R:u8|mm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 89 , 88 , 0  , 0  , 0  , 0  ), //      {X:xmm, R:u8|xmm|m128|mem}
+  ISIGNATURE(0, 1, 1, 0, 0  , 0  , 0  , 0  , 0  , 0  ), // #343 {}
+  ISIGNATURE(1, 1, 1, 0, 183, 0  , 0  , 0  , 0  , 0  ), //      {R:u16}
+  ISIGNATURE(3, 1, 1, 0, 13 , 43 , 87 , 0  , 0  , 0  ), // #345 {W:r32, R:r32|m32|mem, R:u8}
+  ISIGNATURE(3, 0, 1, 0, 19 , 16 , 87 , 0  , 0  , 0  ), //      {W:r64, R:r64|m64|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 77 , 73 , 0  , 0  ), // #347 {W:xmm, R:xmm, R:xmm|m128|mem, R:xmm}
+  ISIGNATURE(4, 1, 1, 0, 79 , 82 , 80 , 82 , 0  , 0  ), //      {W:ymm, R:ymm, R:ymm|m256|mem, R:ymm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 184, 0  , 0  , 0  , 0  ), // #349 {W:xmm, R:xmm|m128|ymm|m256}
+  ISIGNATURE(2, 1, 1, 0, 79 , 84 , 0  , 0  , 0  , 0  ), //      {W:ymm, R:zmm|m512|mem}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 73 , 75 , 0  , 0  ), // #351 {W:xmm, R:xmm, R:xmm, R:xmm|m64|mem}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 75 , 73 , 0  , 0  ), //      {W:xmm, R:xmm, R:xmm|m64|mem, R:xmm}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 73 , 140, 0  , 0  ), // #353 {W:xmm, R:xmm, R:xmm, R:xmm|m32|mem}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 140, 73 , 0  , 0  ), //      {W:xmm, R:xmm, R:xmm|m32|mem, R:xmm}
+  ISIGNATURE(4, 1, 1, 0, 79 , 82 , 77 , 87 , 0  , 0  ), // #355 {W:ymm, R:ymm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 83 , 86 , 77 , 87 , 0  , 0  ), //      {W:zmm, R:zmm, R:xmm|m128|mem, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 166, 73 , 0  , 0  , 0  , 0  ), // #357 {W:r32|m32|mem|r64, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 175, 0  , 0  , 0  , 0  ), //      {W:xmm, R:r32|m32|mem|r64}
+  ISIGNATURE(2, 1, 1, 0, 68 , 73 , 0  , 0  , 0  , 0  ), // #359 {W:m64|mem, R:xmm}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 65 , 0  , 0  , 0  ), //      {W:xmm, R:xmm, R:m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 185, 186, 0  , 0  , 0  , 0  ), // #361 {W:xmm|ymm|zmm, R:xmm|m8|mem}
+  ISIGNATURE(2, 1, 1, 0, 185, 187, 0  , 0  , 0  , 0  ), //      {W:xmm|ymm|zmm, R:r32|r64}
+  ISIGNATURE(2, 1, 1, 0, 185, 140, 0  , 0  , 0  , 0  ), // #363 {W:xmm|ymm|zmm, R:xmm|m32|mem}
+  ISIGNATURE(2, 1, 1, 0, 185, 187, 0  , 0  , 0  , 0  ), //      {W:xmm|ymm|zmm, R:r32|r64}
+  ISIGNATURE(2, 1, 1, 0, 185, 141, 0  , 0  , 0  , 0  ), // #365 {W:xmm|ymm|zmm, R:xmm|m16|mem}
+  ISIGNATURE(2, 1, 1, 0, 185, 187, 0  , 0  , 0  , 0  ), //      {W:xmm|ymm|zmm, R:r32|r64}
+  ISIGNATURE(3, 1, 1, 0, 74 , 188, 87 , 0  , 0  , 0  ), // #367 {W:xmm, R:r32|m8|mem|r8lo|r8hi|r16|r64, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 188, 87 , 0  , 0  ), //      {W:xmm, R:xmm, R:r32|m8|mem|r8lo|r8hi|r16|r64, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 74 , 175, 87 , 0  , 0  , 0  ), // #369 {W:xmm, R:r32|m32|mem|r64, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 175, 87 , 0  , 0  ), //      {W:xmm, R:xmm, R:r32|m32|mem|r64, R:u8}
+  ISIGNATURE(3, 0, 1, 0, 74 , 16 , 87 , 0  , 0  , 0  ), // #371 {W:xmm, R:r64|m64|mem, R:u8}
+  ISIGNATURE(4, 0, 1, 0, 74 , 73 , 16 , 87 , 0  , 0  ), //      {W:xmm, R:xmm, R:r64|m64|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 77 , 0  , 0  , 0  ), // #373 {W:xmm, R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 77 , 189, 0  , 0  , 0  ), //      {W:xmm, R:xmm|m128|mem, R:u8|xmm}
+  ISIGNATURE(2, 1, 1, 0, 190, 73 , 0  , 0  , 0  , 0  ), // #375 {W:vm64x|vm64y, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 148, 82 , 0  , 0  , 0  , 0  ), //      {W:vm64z, R:ymm}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 77 , 0  , 0  , 0  ), // #377 {W:xmm, R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 77 , 73 , 0  , 0  , 0  ), //      {W:xmm, R:xmm|m128|mem, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 73 , 77 , 0  , 0  , 0  , 0  ), // #379 {R:xmm, R:xmm|m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 82 , 80 , 0  , 0  , 0  , 0  ), //      {R:ymm, R:ymm|m256|mem}
+  ISIGNATURE(2, 1, 1, 0, 143, 191, 0  , 0  , 0  , 0  ), // #381 {W:vm32x, R:xmm|ymm}
+  ISIGNATURE(2, 1, 1, 0, 144, 86 , 0  , 0  , 0  , 0  ), //      {W:vm32y, R:zmm}
+  ISIGNATURE(1, 1, 0, 1, 50 , 0  , 0  , 0  , 0  , 0  ), // #383 {X:<ax>}
+  ISIGNATURE(2, 1, 0, 1, 50 , 87 , 0  , 0  , 0  , 0  ), // #384 {X:<ax>, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 89 , 75 , 0  , 0  , 0  , 0  ), // #385 {X:xmm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 89 , 140, 0  , 0  , 0  , 0  ), // #386 {X:xmm, R:xmm|m32|mem}
+  ISIGNATURE(2, 1, 0, 0, 36 , 37 , 0  , 0  , 0  , 0  ), // #387 {X:r16|m16|mem, R:r16}
+  ISIGNATURE(3, 1, 1, 1, 89 , 77 , 192, 0  , 0  , 0  ), // #388 {X:xmm, R:xmm|m128|mem, R:<xmm0>}
+  ISIGNATURE(2, 1, 1, 0, 150, 193, 0  , 0  , 0  , 0  ), // #389 {W:bnd, R:mib}
+  ISIGNATURE(2, 1, 1, 0, 150, 194, 0  , 0  , 0  , 0  ), // #390 {W:bnd, R:mem}
+  ISIGNATURE(2, 1, 1, 0, 195, 149, 0  , 0  , 0  , 0  ), // #391 {W:mib, R:bnd}
+  ISIGNATURE(1, 1, 1, 0, 196, 0  , 0  , 0  , 0  , 0  ), // #392 {X:r32|r64}
+  ISIGNATURE(1, 1, 1, 1, 50 , 0  , 0  , 0  , 0  , 0  ), // #393 {X:<ax>}
+  ISIGNATURE(2, 1, 1, 2, 52 , 103, 0  , 0  , 0  , 0  ), // #394 {W:<edx>, R:<eax>}
+  ISIGNATURE(1, 0, 1, 1, 55 , 0  , 0  , 0  , 0  , 0  ), // #395 {X:<rax>}
+  ISIGNATURE(1, 1, 1, 0, 194, 0  , 0  , 0  , 0  , 0  ), // #396 {R:mem}
+  ISIGNATURE(1, 1, 1, 1, 197, 0  , 0  , 0  , 0  , 0  ), // #397 {R:<ds:[zax]>}
+  ISIGNATURE(2, 1, 1, 2, 198, 199, 0  , 0  , 0  , 0  ), // #398 {X:<ds:[zsi]>, X:<es:[zdi]>}
+  ISIGNATURE(3, 1, 1, 0, 89 , 75 , 87 , 0  , 0  , 0  ), // #399 {X:xmm, R:xmm|m64|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 89 , 140, 87 , 0  , 0  , 0  ), // #400 {X:xmm, R:xmm|m32|mem, R:u8}
+  ISIGNATURE(5, 0, 1, 4, 200, 107, 55 , 201, 202, 0  ), // #401 {X:m128|mem, X:<rdx>, X:<rax>, R:<rcx>, R:<rbx>}
+  ISIGNATURE(5, 1, 1, 4, 203, 106, 53 , 204, 205, 0  ), // #402 {X:m64|mem, X:<edx>, X:<eax>, R:<ecx>, R:<ebx>}
+  ISIGNATURE(2, 1, 1, 0, 73 , 75 , 0  , 0  , 0  , 0  ), // #403 {R:xmm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 73 , 140, 0  , 0  , 0  , 0  ), // #404 {R:xmm, R:xmm|m32|mem}
+  ISIGNATURE(4, 1, 1, 4, 53 , 206, 207, 52 , 0  , 0  ), // #405 {X:<eax>, W:<ebx>, X:<ecx>, W:<edx>}
+  ISIGNATURE(2, 0, 1, 2, 54 , 104, 0  , 0  , 0  , 0  ), // #406 {W:<rdx>, R:<rax>}
+  ISIGNATURE(2, 1, 1, 0, 69 , 77 , 0  , 0  , 0  , 0  ), // #407 {W:mm, R:xmm|m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 74 , 180, 0  , 0  , 0  , 0  ), // #408 {W:xmm, R:mm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 69 , 75 , 0  , 0  , 0  , 0  ), // #409 {W:mm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 173, 75 , 0  , 0  , 0  , 0  ), // #410 {W:r32|r64, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 74 , 208, 0  , 0  , 0  , 0  ), // #411 {W:xmm, R:r32|m32|mem|r64|m64}
+  ISIGNATURE(2, 1, 1, 0, 173, 140, 0  , 0  , 0  , 0  ), // #412 {W:r32|r64, R:xmm|m32|mem}
+  ISIGNATURE(2, 1, 1, 2, 51 , 102, 0  , 0  , 0  , 0  ), // #413 {W:<dx>, R:<ax>}
+  ISIGNATURE(1, 1, 1, 1, 53 , 0  , 0  , 0  , 0  , 0  ), // #414 {X:<eax>}
+  ISIGNATURE(2, 1, 1, 0, 183, 87 , 0  , 0  , 0  , 0  ), // #415 {R:u16, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 166, 73 , 87 , 0  , 0  , 0  ), // #416 {W:r32|m32|mem|r64, R:xmm, R:u8}
+  ISIGNATURE(1, 1, 1, 0, 127, 0  , 0  , 0  , 0  , 0  ), // #417 {R:m80|mem}
+  ISIGNATURE(1, 1, 1, 0, 209, 0  , 0  , 0  , 0  , 0  ), // #418 {W:m80|mem}
+  ISIGNATURE(1, 1, 1, 0, 210, 0  , 0  , 0  , 0  , 0  ), // #419 {R:m16|m32}
+  ISIGNATURE(1, 1, 1, 0, 211, 0  , 0  , 0  , 0  , 0  ), // #420 {R:m16|m32|m64}
+  ISIGNATURE(1, 1, 1, 0, 212, 0  , 0  , 0  , 0  , 0  ), // #421 {W:m16|m32}
+  ISIGNATURE(1, 1, 1, 0, 213, 0  , 0  , 0  , 0  , 0  ), // #422 {W:m16|m32|m64}
+  ISIGNATURE(1, 1, 1, 0, 214, 0  , 0  , 0  , 0  , 0  ), // #423 {R:m32|m64|m80|fp}
+  ISIGNATURE(1, 1, 1, 0, 63 , 0  , 0  , 0  , 0  , 0  ), // #424 {R:m16|mem}
+  ISIGNATURE(1, 1, 1, 0, 215, 0  , 0  , 0  , 0  , 0  ), // #425 {W:mem}
+  ISIGNATURE(1, 1, 1, 0, 66 , 0  , 0  , 0  , 0  , 0  ), // #426 {W:m16|mem}
+  ISIGNATURE(1, 1, 1, 0, 216, 0  , 0  , 0  , 0  , 0  ), // #427 {W:ax|m16|mem}
+  ISIGNATURE(1, 1, 1, 0, 217, 0  , 0  , 0  , 0  , 0  ), // #428 {W:m32|m64|fp}
+  ISIGNATURE(1, 1, 1, 0, 218, 0  , 0  , 0  , 0  , 0  ), // #429 {W:m32|m64|m80|fp}
+  ISIGNATURE(1, 0, 1, 0, 194, 0  , 0  , 0  , 0  , 0  ), // #430 {R:mem}
+  ISIGNATURE(1, 0, 1, 0, 215, 0  , 0  , 0  , 0  , 0  ), // #431 {W:mem}
+  ISIGNATURE(2, 1, 1, 0, 219, 220, 0  , 0  , 0  , 0  ), // #432 {W:al|ax|eax, R:u8|dx}
+  ISIGNATURE(2, 1, 1, 0, 221, 222, 0  , 0  , 0  , 0  ), // #433 {W:es:[zdi], R:dx}
+  ISIGNATURE(1, 1, 1, 0, 87 , 0  , 0  , 0  , 0  , 0  ), // #434 {R:u8}
+  ISIGNATURE(0, 1, 0, 0, 0  , 0  , 0  , 0  , 0  , 0  ), // #435 {}
+  ISIGNATURE(0, 0, 1, 0, 0  , 0  , 0  , 0  , 0  , 0  ), // #436 {}
+  ISIGNATURE(1, 1, 1, 0, 223, 0  , 0  , 0  , 0  , 0  ), // #437 {R:rel8|rel32}
+  ISIGNATURE(1, 1, 1, 0, 159, 0  , 0  , 0  , 0  , 0  ), // #438 {R:rel8}
+  ISIGNATURE(3, 1, 1, 0, 131, 164, 164, 0  , 0  , 0  ), // #439 {W:k, R:k, R:k}
+  ISIGNATURE(2, 1, 1, 0, 131, 164, 0  , 0  , 0  , 0  ), // #440 {W:k, R:k}
+  ISIGNATURE(2, 1, 1, 0, 164, 164, 0  , 0  , 0  , 0  ), // #441 {R:k, R:k}
+  ISIGNATURE(3, 1, 1, 0, 131, 164, 87 , 0  , 0  , 0  ), // #442 {W:k, R:k, R:u8}
+  ISIGNATURE(1, 1, 1, 1, 224, 0  , 0  , 0  , 0  , 0  ), // #443 {W:<ah>}
+  ISIGNATURE(1, 1, 1, 0, 64 , 0  , 0  , 0  , 0  , 0  ), // #444 {R:m32|mem}
+  ISIGNATURE(2, 1, 1, 0, 177, 225, 0  , 0  , 0  , 0  ), // #445 {W:r16|r32|r64, R:mem|m8|m16|m32|m48|m64|m80|m128|m256|m512|m1024}
+  ISIGNATURE(1, 1, 1, 0, 226, 0  , 0  , 0  , 0  , 0  ), // #446 {R:r16|m16|mem|r32|r64}
+  ISIGNATURE(2, 1, 1, 2, 227, 198, 0  , 0  , 0  , 0  ), // #447 {W:<al|ax|eax|rax>, X:<ds:[zsi]>}
+  ISIGNATURE(3, 1, 1, 1, 89 , 73 , 228, 0  , 0  , 0  ), // #448 {X:xmm, R:xmm, R:<ds:[zdi]>}
+  ISIGNATURE(3, 1, 1, 1, 181, 72 , 228, 0  , 0  , 0  ), // #449 {X:mm, R:mm, R:<ds:[zdi]>}
+  ISIGNATURE(3, 1, 1, 3, 197, 204, 178, 0  , 0  , 0  ), // #450 {R:<ds:[zax]>, R:<ecx>, R:<edx>}
+  ISIGNATURE(2, 1, 1, 0, 69 , 73 , 0  , 0  , 0  , 0  ), // #451 {W:mm, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 73 , 0  , 0  , 0  , 0  ), // #452 {W:xmm, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 173, 73 , 0  , 0  , 0  , 0  ), // #453 {W:r32|r64, R:xmm}
+  ISIGNATURE(2, 1, 1, 0, 68 , 72 , 0  , 0  , 0  , 0  ), // #454 {W:m64|mem, R:mm}
+  ISIGNATURE(2, 1, 1, 0, 74 , 72 , 0  , 0  , 0  , 0  ), // #455 {W:xmm, R:mm}
+  ISIGNATURE(2, 1, 1, 2, 199, 198, 0  , 0  , 0  , 0  ), // #456 {X:<es:[zdi]>, X:<ds:[zsi]>}
+  ISIGNATURE(2, 0, 1, 0, 19 , 43 , 0  , 0  , 0  , 0  ), // #457 {W:r64, R:r32|m32|mem}
+  ISIGNATURE(2, 1, 1, 2, 103, 204, 0  , 0  , 0  , 0  ), // #458 {R:<eax>, R:<ecx>}
+  ISIGNATURE(2, 1, 1, 0, 220, 229, 0  , 0  , 0  , 0  ), // #459 {R:u8|dx, R:al|ax|eax}
+  ISIGNATURE(2, 1, 1, 0, 222, 230, 0  , 0  , 0  , 0  ), // #460 {R:dx, R:ds:[zsi]}
+  ISIGNATURE(6, 1, 1, 3, 73 , 77 , 87 , 231, 103, 178), // #461 {R:xmm, R:xmm|m128|mem, R:u8, W:<ecx>, R:<eax>, R:<edx>}
+  ISIGNATURE(6, 1, 1, 3, 73 , 77 , 87 , 232, 103, 178), // #462 {R:xmm, R:xmm|m128|mem, R:u8, W:<xmm0>, R:<eax>, R:<edx>}
+  ISIGNATURE(4, 1, 1, 1, 73 , 77 , 87 , 231, 0  , 0  ), // #463 {R:xmm, R:xmm|m128|mem, R:u8, W:<ecx>}
+  ISIGNATURE(4, 1, 1, 1, 73 , 77 , 87 , 232, 0  , 0  ), // #464 {R:xmm, R:xmm|m128|mem, R:u8, W:<xmm0>}
+  ISIGNATURE(3, 1, 1, 0, 163, 73 , 87 , 0  , 0  , 0  ), // #465 {W:r32|m8|mem|r8lo|r8hi|r16|r64, R:xmm, R:u8}
+  ISIGNATURE(3, 0, 1, 0, 7  , 73 , 87 , 0  , 0  , 0  ), // #466 {W:r64|m64|mem, R:xmm, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 89 , 188, 87 , 0  , 0  , 0  ), // #467 {X:xmm, R:r32|m8|mem|r8lo|r8hi|r16|r64, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 89 , 175, 87 , 0  , 0  , 0  ), // #468 {X:xmm, R:r32|m32|mem|r64, R:u8}
+  ISIGNATURE(3, 0, 1, 0, 89 , 16 , 87 , 0  , 0  , 0  ), // #469 {X:xmm, R:r64|m64|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 233, 226, 87 , 0  , 0  , 0  ), // #470 {X:mm|xmm, R:r32|m16|mem|r16|r64, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 173, 176, 0  , 0  , 0  , 0  ), // #471 {W:r32|r64, R:mm|xmm}
+  ISIGNATURE(3, 1, 1, 0, 69 , 180, 87 , 0  , 0  , 0  ), // #472 {W:mm, R:mm|m64|mem, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 89 , 87 , 0  , 0  , 0  , 0  ), // #473 {X:xmm, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 49 , 128, 0  , 0  , 0  , 0  ), // #474 {X:r8lo|r8hi|m8|r16|m16|r32|m32|r64|m64|mem, R:cl|u8}
+  ISIGNATURE(1, 0, 1, 0, 173, 0  , 0  , 0  , 0  , 0  ), // #475 {W:r32|r64}
+  ISIGNATURE(3, 1, 1, 3, 52 , 234, 204, 0  , 0  , 0  ), // #476 {W:<edx>, W:<eax>, R:<ecx>}
+  ISIGNATURE(1, 1, 1, 0, 177, 0  , 0  , 0  , 0  , 0  ), // #477 {W:r16|r32|r64}
+  ISIGNATURE(2, 1, 1, 2, 52 , 234, 0  , 0  , 0  , 0  ), // #478 {W:<edx>, W:<eax>}
+  ISIGNATURE(3, 1, 1, 3, 52 , 234, 231, 0  , 0  , 0  ), // #479 {W:<edx>, W:<eax>, W:<ecx>}
+  ISIGNATURE(3, 1, 1, 0, 74 , 75 , 87 , 0  , 0  , 0  ), // #480 {W:xmm, R:xmm|m64|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 74 , 140, 87 , 0  , 0  , 0  ), // #481 {W:xmm, R:xmm|m32|mem, R:u8}
+  ISIGNATURE(1, 1, 1, 1, 235, 0  , 0  , 0  , 0  , 0  ), // #482 {R:<ah>}
+  ISIGNATURE(2, 1, 1, 2, 236, 199, 0  , 0  , 0  , 0  ), // #483 {R:<al|ax|eax|rax>, X:<es:[zdi]>}
+  ISIGNATURE(1, 1, 1, 0, 1  , 0  , 0  , 0  , 0  , 0  ), // #484 {W:r8lo|r8hi|m8|mem}
+  ISIGNATURE(1, 1, 1, 0, 169, 0  , 0  , 0  , 0  , 0  ), // #485 {W:r16|m16|mem|r32|r64}
+  ISIGNATURE(1, 1, 1, 0, 67 , 0  , 0  , 0  , 0  , 0  ), // #486 {W:m32|mem}
+  ISIGNATURE(2, 1, 1, 2, 199, 236, 0  , 0  , 0  , 0  ), // #487 {X:<es:[zdi]>, R:<al|ax|eax|rax>}
+  ISIGNATURE(6, 1, 1, 0, 93 , 86 , 86 , 86 , 86 , 117), // #488 {X:zmm, R:zmm, R:zmm, R:zmm, R:zmm, R:m128|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 75 , 0  , 0  , 0  ), // #489 {W:xmm, R:xmm, R:xmm|m64|mem}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 140, 0  , 0  , 0  ), // #490 {W:xmm, R:xmm, R:xmm|m32|mem}
+  ISIGNATURE(2, 1, 1, 0, 79 , 117, 0  , 0  , 0  , 0  ), // #491 {W:ymm, R:m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 237, 75 , 0  , 0  , 0  , 0  ), // #492 {W:ymm|zmm, R:xmm|m64|mem}
+  ISIGNATURE(2, 1, 1, 0, 237, 117, 0  , 0  , 0  , 0  ), // #493 {W:ymm|zmm, R:m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 83 , 118, 0  , 0  , 0  , 0  ), // #494 {W:zmm, R:m256|mem}
+  ISIGNATURE(2, 1, 1, 0, 185, 75 , 0  , 0  , 0  , 0  ), // #495 {W:xmm|ymm|zmm, R:xmm|m64|mem}
+  ISIGNATURE(4, 1, 1, 0, 129, 73 , 75 , 87 , 0  , 0  ), // #496 {W:xmm|k, R:xmm, R:xmm|m64|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 129, 73 , 140, 87 , 0  , 0  ), // #497 {W:xmm|k, R:xmm, R:xmm|m32|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 74 , 73 , 208, 0  , 0  , 0  ), // #498 {W:xmm, R:xmm, R:r32|m32|mem|r64|m64}
+  ISIGNATURE(3, 1, 1, 0, 78 , 238, 87 , 0  , 0  , 0  ), // #499 {W:xmm|m128|mem, R:ymm|zmm, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 89 , 73 , 75 , 87 , 0  , 0  ), // #500 {X:xmm, R:xmm, R:xmm|m64|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 89 , 73 , 140, 87 , 0  , 0  ), // #501 {X:xmm, R:xmm, R:xmm|m32|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 89 , 73 , 75 , 0  , 0  , 0  ), // #502 {X:xmm, R:xmm, R:xmm|m64|mem}
+  ISIGNATURE(3, 1, 1, 0, 89 , 73 , 140, 0  , 0  , 0  ), // #503 {X:xmm, R:xmm, R:xmm|m32|mem}
+  ISIGNATURE(3, 1, 1, 0, 131, 239, 87 , 0  , 0  , 0  ), // #504 {W:k, R:xmm|m128|ymm|m256|zmm|m512, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 131, 75 , 87 , 0  , 0  , 0  ), // #505 {W:k, R:xmm|m64|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 0, 131, 140, 87 , 0  , 0  , 0  ), // #506 {W:k, R:xmm|m32|mem, R:u8}
+  ISIGNATURE(1, 1, 1, 0, 92 , 0  , 0  , 0  , 0  , 0  ), // #507 {R:vm32y}
+  ISIGNATURE(1, 1, 1, 0, 94 , 0  , 0  , 0  , 0  , 0  ), // #508 {R:vm32z}
+  ISIGNATURE(1, 1, 1, 0, 97 , 0  , 0  , 0  , 0  , 0  ), // #509 {R:vm64z}
+  ISIGNATURE(4, 1, 1, 0, 83 , 86 , 80 , 87 , 0  , 0  ), // #510 {W:zmm, R:zmm, R:ymm|m256|mem, R:u8}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 140, 87 , 0  , 0  ), // #511 {W:xmm, R:xmm, R:xmm|m32|mem, R:u8}
+  ISIGNATURE(3, 1, 1, 1, 73 , 73 , 228, 0  , 0  , 0  ), // #512 {R:xmm, R:xmm, R:<ds:[zdi]>}
+  ISIGNATURE(2, 1, 1, 0, 173, 191, 0  , 0  , 0  , 0  ), // #513 {W:r32|r64, R:xmm|ymm}
+  ISIGNATURE(6, 1, 1, 0, 83 , 86 , 86 , 86 , 86 , 117), // #514 {W:zmm, R:zmm, R:zmm, R:zmm, R:zmm, R:m128|mem}
+  ISIGNATURE(2, 1, 1, 0, 185, 164, 0  , 0  , 0  , 0  ), // #515 {W:xmm|ymm|zmm, R:k}
+  ISIGNATURE(2, 1, 1, 0, 185, 137, 0  , 0  , 0  , 0  ), // #516 {W:xmm|ymm|zmm, R:xmm|m64|mem|r64}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 226, 87 , 0  , 0  ), // #517 {W:xmm, R:xmm, R:r32|m16|mem|r16|r64, R:u8}
+  ISIGNATURE(2, 1, 1, 0, 131, 240, 0  , 0  , 0  , 0  ), // #518 {W:k, R:xmm|ymm|zmm}
+  ISIGNATURE(4, 1, 1, 0, 74 , 73 , 75 , 87 , 0  , 0  ), // #519 {W:xmm, R:xmm, R:xmm|m64|mem, R:u8}
+  ISIGNATURE(1, 0, 1, 0, 187, 0  , 0  , 0  , 0  , 0  ), // #520 {R:r32|r64}
+  ISIGNATURE(3, 1, 1, 3, 178, 103, 204, 0  , 0  , 0  ), // #521 {R:<edx>, R:<eax>, R:<ecx>}
+  ISIGNATURE(1, 1, 1, 0, 241, 0  , 0  , 0  , 0  , 0  ), // #522 {R:rel16|rel32}
+  ISIGNATURE(3, 1, 1, 2, 194, 178, 103, 0  , 0  , 0  ), // #523 {R:mem, R:<edx>, R:<eax>}
+  ISIGNATURE(3, 0, 1, 2, 194, 178, 103, 0  , 0  , 0  ), // #524 {R:mem, R:<edx>, R:<eax>}
+  ISIGNATURE(3, 1, 1, 2, 215, 178, 103, 0  , 0  , 0  ), // #525 {W:mem, R:<edx>, R:<eax>}
+  ISIGNATURE(3, 0, 1, 2, 215, 178, 103, 0  , 0  , 0  )  // #526 {W:mem, R:<edx>, R:<eax>}
+};
+#undef ISIGNATURE
+// ----------------------------------------------------------------------------
+// ${signatureData:End}
+#endif // !ASMJIT_DISABLE_VALIDATION
+
+// ============================================================================
+// [asmjit::X86Inst - MiscData]
+// ============================================================================
+
+#define CC_TO_INST(inst) {               \
+  inst##o, inst##no, inst##b , inst##ae, \
+  inst##e, inst##ne, inst##be, inst##a , \
+  inst##s, inst##ns, inst##pe, inst##po, \
+  inst##l, inst##ge, inst##le, inst##g   \
+}
+
+const X86Inst::MiscData X86InstDB::miscData = {
+  CC_TO_INST(X86Inst::kIdJ),
+  CC_TO_INST(X86Inst::kIdSet),
+  CC_TO_INST(X86Inst::kIdCmov),
+
+  // ReversedCond[]:
+  {
+    x86::kCondO, x86::kCondNO, x86::kCondA , x86::kCondBE, // O|NO|B |AE
+    x86::kCondE, x86::kCondNE, x86::kCondAE, x86::kCondB , // E|NE|BE|A
+    x86::kCondS, x86::kCondNS, x86::kCondPE, x86::kCondPO, // S|NS|PE|PO
+    x86::kCondG, x86::kCondLE, x86::kCondGE, x86::kCondL   // L|GE|LE|G
+  }
+};
 
 #undef CC_TO_INST
 
 // ============================================================================
-// [asmjit::X86Util]
+// [asmjit::X86Inst - Test]
 // ============================================================================
 
-#if !defined(ASMJIT_DISABLE_NAMES)
-// Compare two instruction names.
-//
-// `a` is null terminated instruction name from `_x86InstName[]` table.
-// `b` is non-null terminated instruction name passed to `getInstIdByName()`.
-static ASMJIT_INLINE int X86Util_cmpInstName(const char* a, const char* b, size_t len) {
-  for (size_t i = 0; i < len; i++) {
-    int c = static_cast<int>(static_cast<uint8_t>(a[i])) -
-            static_cast<int>(static_cast<uint8_t>(b[i])) ;
-    if (c != 0)
-      return c;
-  }
+#if defined(ASMJIT_TEST)
+UNIT(x86_inst_bits) {
+  INFO("Checking validity of X86Inst enums");
 
-  return static_cast<int>(a[len]);
+  // Cross-validate prefixes.
+  EXPECT(X86Inst::kOptionRex  == 0x80000000U, "REX prefix must be at 0x80000000");
+  EXPECT(X86Inst::kOptionVex3 == 0x00000400U, "VEX3 prefix must be at 0x00000400");
+  EXPECT(X86Inst::kOptionEvex == 0x00001000U, "EVEX prefix must be at 0x00001000");
+
+  // These could be combined together to form a valid REX prefix, they must match.
+  EXPECT(int(X86Inst::kOptionOpCodeB) == int(X86Inst::kOpCode_B));
+  EXPECT(int(X86Inst::kOptionOpCodeX) == int(X86Inst::kOpCode_X));
+  EXPECT(int(X86Inst::kOptionOpCodeR) == int(X86Inst::kOpCode_R));
+  EXPECT(int(X86Inst::kOptionOpCodeW) == int(X86Inst::kOpCode_W));
+
+  uint32_t rex_rb = (X86Inst::kOpCode_R >> X86Inst::kOpCode_REX_Shift) |
+                    (X86Inst::kOpCode_B >> X86Inst::kOpCode_REX_Shift) | 0x40;
+  uint32_t rex_rw = (X86Inst::kOpCode_R >> X86Inst::kOpCode_REX_Shift) |
+                    (X86Inst::kOpCode_W >> X86Inst::kOpCode_REX_Shift) | 0x40;
+  EXPECT(rex_rb == 0x45, "kOpCode_R|B must form a valid REX prefix 0x45 if combined with 0x40");
+  EXPECT(rex_rw == 0x4C, "kOpCode_R|W must form a valid REX prefix 0x4C if combined with 0x40");
 }
+#endif // ASMJIT_TEST
 
-uint32_t X86Util::getInstIdByName(const char* name, size_t len) {
-  if (name == NULL)
-    return kInstIdNone;
-
-  if (len == kInvalidIndex)
-    len = ::strlen(name);
-
-  if (len == 0)
-    return kInstIdNone;
-
-  uint32_t prefix = name[0] - kX86InstAlphaIndexFirst;
-  if (prefix > kX86InstAlphaIndexLast - kX86InstAlphaIndexFirst)
-    return kInstIdNone;
-
-  uint32_t index = _x86InstAlphaIndex[prefix];
-  if (index == kX86InstAlphaIndexInvalid)
-    return kInstIdNone;
-
-  const X86InstInfo* base = _x86InstInfo + index;
-  const X86InstInfo* end = _x86InstInfo + _kX86InstIdCount;
-
-  // Handle instructions starting with 'j' specially. `jcc` instruction breaks
-  // the sorting, because of the suffixes (it's considered as one instruction),
-  // so basically `jecxz` and `jmp` are stored after all `jcc` instructions.
-  bool linearSearch = prefix == ('j' - kX86InstAlphaIndexFirst);
-
-  while (++prefix <= kX86InstAlphaIndexLast - kX86InstAlphaIndexFirst) {
-    index = _x86InstAlphaIndex[prefix];
-    if (index == kX86InstAlphaIndexInvalid)
-      continue;
-    end = _x86InstInfo + index;
-    break;
-  }
-
-  if (linearSearch) {
-    while (base != end) {
-      if (X86Util_cmpInstName(base->getInstName(), name, len) == 0)
-        return static_cast<uint32_t>((size_t)(base - _x86InstInfo));
-      base++;
-    }
-  }
-  else {
-    for (size_t lim = (size_t)(end - base); lim != 0; lim >>= 1) {
-      const X86InstInfo* cur = base + (lim >> 1);
-      int result = X86Util_cmpInstName(cur->getInstName(), name, len);
-
-      if (result < 0) {
-        base = cur + 1;
-        lim--;
-        continue;
-      }
-
-      if (result > 0)
-        continue;
-
-      return static_cast<uint32_t>((size_t)(cur - _x86InstInfo));
-    }
-  }
-
-  return kInstIdNone;
-}
-#endif // ASMJIT_DISABLE_NAMES
-
-// ============================================================================
-// [asmjit::X86Util - Test]
-// ============================================================================
-
-#if defined(ASMJIT_TEST) && !defined(ASMJIT_DISABLE_NAMES)
-UNIT(x86_inst_name) {
+#if defined(ASMJIT_TEST) && !defined(ASMJIT_DISABLE_TEXT)
+UNIT(x86_inst_names) {
   // All known instructions should be matched.
-  INFO("Matching all X86/X64 instructions.");
-  for (uint32_t a = 0; a < _kX86InstIdCount; a++) {
-    uint32_t b = X86Util::getInstIdByName(_x86InstInfo[a].getInstName());
-
+  INFO("Matching all X86/X64 instructions");
+  for (uint32_t a = 0; a < X86Inst::_kIdCount; a++) {
+    uint32_t b = X86Inst::getIdByName(X86Inst::getInst(a).getName());
     EXPECT(a == b,
-      "Should match existing instruction \"%s\" {id:%u} != \"%s\" {id:%u}.",
-        _x86InstInfo[a].getInstName(), a,
-        _x86InstInfo[b].getInstName(), b);
+      "Should match existing instruction \"%s\" {id:%u} != \"%s\" {id:%u}",
+        X86Inst::getInst(a).getName(), a,
+        X86Inst::getInst(b).getName(), b);
   }
 
-  // Everything else should return kInstIdNone
-  INFO("Trying to look-up instructions that don't exist.");
-  EXPECT(X86Util::getInstIdByName(NULL) == kInstIdNone,
-    "Should return kInstIdNone for NULL input.");
-
-  EXPECT(X86Util::getInstIdByName("") == kInstIdNone,
-    "Should return kInstIdNone for empty string.");
-
-  EXPECT(X86Util::getInstIdByName("_") == kInstIdNone,
-    "Should return kInstIdNone for unknown instruction.");
-
-  EXPECT(X86Util::getInstIdByName("123xyz") == kInstIdNone,
-    "Should return kInstIdNone for unknown instruction.");
+  // Everything else should return `Inst::kIdNone`.
+  INFO("Trying to look-up instructions that don't exist");
+  EXPECT(X86Inst::getIdByName(nullptr)  == Inst::kIdNone, "Should return Inst::kIdNone for null input");
+  EXPECT(X86Inst::getIdByName("")       == Inst::kIdNone, "Should return Inst::kIdNone for empty string");
+  EXPECT(X86Inst::getIdByName("_")      == Inst::kIdNone, "Should return Inst::kIdNone for unknown instruction");
+  EXPECT(X86Inst::getIdByName("123xyz") == Inst::kIdNone, "Should return Inst::kIdNone for unknown instruction");
 }
-#endif // ASMJIT_TEST && !ASMJIT_DISABLE_NAMES
+#endif // ASMJIT_TEST && !ASMJIT_DISABLE_TEXT
 
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
-#endif // ASMJIT_BUILD_X86 || ASMJIT_BUILD_X64
+#endif // ASMJIT_BUILD_X86

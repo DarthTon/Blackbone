@@ -308,7 +308,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
     proc.remote().AddReturnWithEvent( *a, mod.type );
     a->GenEpilogue();
 
-    NTSTATUS status = proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+    NTSTATUS status = proc.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     if (result != 0)
     {
         _hVEH = result;
@@ -349,7 +349,7 @@ NTSTATUS MExcept::RemoveVEH( Process& proc, bool partial, eModType mt )
     // Destroy table and handler
     if (!partial)
     {
-        proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+        proc.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
         _pVEHCode.Free();
         _hVEH = 0;
 

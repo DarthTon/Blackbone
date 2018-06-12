@@ -2,9 +2,11 @@
 
 
 #include "../Config.h"
-#pragma warning(disable : 4100)
+
+#pragma warning(push)
+#pragma warning(disable : 4100 4804 4245)
 #include "../../3rd_party/AsmJit/AsmJit.h"
-#pragma warning(default : 4100)
+#pragma warning(pop)
 
 #include <vector>
 
@@ -121,25 +123,25 @@ struct AsmVariant
         , size( sizeof( double ) )
         , imm_double_val( _imm_fpu ) { }
 
-    BLACKBONE_API AsmVariant( asmjit::GpReg _reg )
+    BLACKBONE_API AsmVariant( asmjit::X86Gp _reg )
         : type( reg )
         , size( sizeof( uintptr_t ) )
         , reg_val( _reg ) { }
 
     // Stack variable
-    BLACKBONE_API AsmVariant( asmjit::Mem _mem )
+    BLACKBONE_API AsmVariant( asmjit::X86Mem _mem )
         : type( mem )
         , size( sizeof( uintptr_t ) )
         , mem_val( _mem ) { }
 
     // Pointer to stack address
-    BLACKBONE_API AsmVariant( asmjit::Mem* _mem )
+    BLACKBONE_API AsmVariant( asmjit::X86Mem* _mem )
         : type( mem_ptr )
         , size( sizeof( uintptr_t ) )
         , mem_val( *_mem ) { }
 
-    BLACKBONE_API AsmVariant( const asmjit::Mem* _mem )
-        : AsmVariant( const_cast<asmjit::Mem*>(_mem) ) { }
+    BLACKBONE_API AsmVariant( const asmjit::X86Mem* _mem )
+        : AsmVariant( const_cast<asmjit::X86Mem*>(_mem) ) { }
 
     BLACKBONE_API AsmVariant( const AsmVariant& ) = default;
     BLACKBONE_API AsmVariant( AsmVariant&& ) = default;
@@ -174,8 +176,8 @@ struct AsmVariant
 
     eType  type = noarg;    // Variable type
     size_t size = 0;        // Variable size
-    asmjit::GpReg reg_val;  // General purpose register
-    asmjit::Mem   mem_val;  // Memory pointer
+    asmjit::X86Gp  reg_val; // General purpose register
+    asmjit::X86Mem mem_val; // Memory pointer
 
     // Immediate values
     union
@@ -220,7 +222,7 @@ struct AsmFunctionPtr: public AsmVariant
     AsmFunctionPtr( const void* ptr )
         : AsmVariant( reinterpret_cast<uintptr_t>(ptr) ) { }
 
-    AsmFunctionPtr( asmjit::GpReg reg_ )
+    AsmFunctionPtr( asmjit::X86Gp reg_ )
         : AsmVariant( reg_ ) { }
 };
 

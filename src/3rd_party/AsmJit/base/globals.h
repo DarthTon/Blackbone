@@ -8,34 +8,25 @@
 #ifndef _ASMJIT_BASE_GLOBALS_H
 #define _ASMJIT_BASE_GLOBALS_H
 
-// [Dependencies - AsmJit]
-#include "../build.h"
+// [Dependencies]
+#include "../asmjit_build.h"
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
-//! \addtogroup asmjit_base_general
+//! \addtogroup asmjit_base
 //! \{
 
 // ============================================================================
-// [asmjit::Ptr / SignedPtr]
+// [asmjit::Globals]
 // ============================================================================
 
-//! 64-bit unsigned pointer, compatible with JIT and non-JIT generators.
-//!
-//! This is the preferred pointer type to use with AsmJit library. It has a
-//! capability to hold any pointer for any architecture making it an ideal
-//! candidate for cross-platform code generation.
-typedef uint64_t Ptr;
+enum { kInvalidValue = 0xFFFFFFFFU };
 
-//! 64-bit signed pointer, like \ref Ptr, but made signed.
-typedef int64_t SignedPtr;
-
-// ============================================================================
-// [asmjit::kGlobals]
-// ============================================================================
+//! AsmJit globals.
+namespace Globals {
 
 //! Invalid index
 //!
@@ -45,68 +36,287 @@ typedef int64_t SignedPtr;
 static const size_t kInvalidIndex = ~static_cast<size_t>(0);
 
 //! Invalid base address.
-static const Ptr kNoBaseAddress = static_cast<Ptr>(static_cast<SignedPtr>(-1));
+static const uint64_t kNoBaseAddress = ~static_cast<uint64_t>(0);
 
-//! Global constants.
-ASMJIT_ENUM(kGlobals) {
-  //! Invalid value or operand id.
-  kInvalidValue = 0xFFFFFFFF,
-
-  //! Invalid register index.
-  kInvalidReg = 0xFF,
-  //! Invalid variable type.
-  kInvalidVar = 0xFF,
+//! Global definitions.
+ASMJIT_ENUM(Defs) {
+  //! Invalid register id.
+  kInvalidRegId = 0xFF,
 
   //! Host memory allocator overhead.
-  //!
-  //! The overhead is decremented from all zone allocators so the operating
-  //! system doesn't have allocate extra virtual page to keep tract of the
-  //! requested memory block.
-  //!
-  //! The number is actually a guess.
-  kMemAllocOverhead = sizeof(intptr_t) * 4,
+  kAllocOverhead = static_cast<int>(sizeof(intptr_t) * 4),
+  //! Aggressive growing strategy threshold.
+  kAllocThreshold = 8192 * 1024
+};
 
-  //! Memory grow threshold.
+ASMJIT_ENUM(Limits) {
+  //! Count of register kinds that are important to Function API and CodeCompiler.
+  //! The target architecture can define more register kinds for special registers,
+  //! but these will never map to virtual registers and will never be used to pass
+  //! and return function arguments and function return values, respectively.
+  kMaxVRegKinds = 4,
+
+  //! Maximum number of physical registers of all kinds of all supported
+  //! architectures. This is only important for \ref CodeCompiler and its
+  //! \ref RAPass (register allocator pass).
   //!
-  //! After the grow threshold is reached the capacity won't be doubled
-  //! anymore.
-  kMemAllocGrowMax = 8192 * 1024
+  //! NOTE: The distribution of these registers is architecture specific.
+  kMaxPhysRegs = 64,
+
+  //! Maximum alignment.
+  kMaxAlignment = 64,
+
+  //! Maximum label or symbol length in bytes (take into consideration that a
+  //! single UTF-8 character can take more than single byte to encode it).
+  kMaxLabelLength = 2048
+};
+
+} // Globals namespace
+
+// ============================================================================
+// [asmjit::Error]
+// ============================================================================
+
+//! AsmJit error type (uint32_t).
+typedef uint32_t Error;
+
+//! AsmJit error codes.
+ASMJIT_ENUM(ErrorCode) {
+  //! No error (success).
+  //!
+  //! This is default state and state you want.
+  kErrorOk = 0,
+
+  //! Heap memory allocation failed.
+  kErrorNoHeapMemory,
+
+  //! Virtual memory allocation failed.
+  kErrorNoVirtualMemory,
+
+  //! Invalid argument.
+  kErrorInvalidArgument,
+
+  //! Invalid state.
+  //!
+  //! If this error is returned it means that either you are doing something
+  //! wrong or AsmJit caught itself by doing something wrong. This error should
+  //! not be underestimated.
+  kErrorInvalidState,
+
+  //! Invalid or incompatible architecture.
+  kErrorInvalidArch,
+
+  //! The object is not initialized.
+  kErrorNotInitialized,
+  //! The object is already initialized.
+  kErrorAlreadyInitialized,
+
+  //! Built-in feature was disabled at compile time and it's not available.
+  kErrorFeatureNotEnabled,
+
+  //! CodeHolder can't have attached more than one \ref Assembler at a time.
+  kErrorSlotOccupied,
+
+  //! No code generated.
+  //!
+  //! Returned by runtime if the \ref CodeHolder contains no code.
+  kErrorNoCodeGenerated,
+  //! Code generated is larger than allowed.
+  kErrorCodeTooLarge,
+
+  //! Attempt to use uninitialized label.
+  kErrorInvalidLabel,
+  //! Label index overflow - a single `Assembler` instance can hold more than
+  //! 2 billion labels (2147483391 to be exact). If there is an attempt to
+  //! create more labels this error is returned.
+  kErrorLabelIndexOverflow,
+  //! Label is already bound.
+  kErrorLabelAlreadyBound,
+  //! Label is already defined (named labels).
+  kErrorLabelAlreadyDefined,
+  //! Label name is too long.
+  kErrorLabelNameTooLong,
+  //! Label must always be local if it's anonymous (without a name).
+  kErrorInvalidLabelName,
+  //! Parent id passed to `CodeHolder::newNamedLabelId()` was invalid.
+  kErrorInvalidParentLabel,
+  //! Parent id specified for a non-local (global) label.
+  kErrorNonLocalLabelCantHaveParent,
+
+  //! Relocation index overflow.
+  kErrorRelocIndexOverflow,
+  //! Invalid relocation entry.
+  kErrorInvalidRelocEntry,
+
+  //! Invalid instruction.
+  kErrorInvalidInstruction,
+  //! Invalid register type.
+  kErrorInvalidRegType,
+  //! Invalid register kind.
+  kErrorInvalidRegKind,
+  //! Invalid register's physical id.
+  kErrorInvalidPhysId,
+  //! Invalid register's virtual id.
+  kErrorInvalidVirtId,
+  //! Invalid prefix combination.
+  kErrorInvalidPrefixCombination,
+  //! Invalid LOCK prefix.
+  kErrorInvalidLockPrefix,
+  //! Invalid XACQUIRE prefix.
+  kErrorInvalidXAcquirePrefix,
+  //! Invalid XACQUIRE prefix.
+  kErrorInvalidXReleasePrefix,
+  //! Invalid REP prefix.
+  kErrorInvalidRepPrefix,
+  //! Invalid REX prefix.
+  kErrorInvalidRexPrefix,
+  //! Invalid mask register (not 'k').
+  kErrorInvalidKMaskReg,
+  //! Invalid {k} use (not supported by the instruction).
+  kErrorInvalidKMaskUse,
+  //! Invalid {k}{z} use (not supported by the instruction).
+  kErrorInvalidKZeroUse,
+  //! Invalid broadcast - Currently only related to invalid use of AVX-512 {1tox}.
+  kErrorInvalidBroadcast,
+  //! Invalid 'embedded-rounding' {er} or 'suppress-all-exceptions' {sae} (AVX-512).
+  kErrorInvalidEROrSAE,
+  //! Invalid address used (not encodable).
+  kErrorInvalidAddress,
+  //! Invalid index register used in memory address (not encodable).
+  kErrorInvalidAddressIndex,
+  //! Invalid address scale (not encodable).
+  kErrorInvalidAddressScale,
+  //! Invalid use of 64-bit address.
+  kErrorInvalidAddress64Bit,
+  //! Invalid displacement (not encodable).
+  kErrorInvalidDisplacement,
+  //! Invalid segment (X86).
+  kErrorInvalidSegment,
+
+  //! Invalid immediate (out of bounds on X86 and invalid pattern on ARM).
+  kErrorInvalidImmediate,
+
+  //! Invalid operand size.
+  kErrorInvalidOperandSize,
+  //! Ambiguous operand size (memory has zero size while it's required to determine the operation type.
+  kErrorAmbiguousOperandSize,
+  //! Mismatching operand size (size of multiple operands doesn't match the operation size).
+  kErrorOperandSizeMismatch,
+
+  //! Invalid TypeId.
+  kErrorInvalidTypeId,
+  //! Invalid use of a 8-bit GPB-HIGH register.
+  kErrorInvalidUseOfGpbHi,
+  //! Invalid use of a 64-bit GPQ register in 32-bit mode.
+  kErrorInvalidUseOfGpq,
+  //! Invalid use of an 80-bit float (TypeId::kF80).
+  kErrorInvalidUseOfF80,
+  //! Some registers in the instruction muse be consecutive (some ARM and AVX512 neural-net instructions).
+  kErrorNotConsecutiveRegs,
+
+  //! AsmJit requires a physical register, but no one is available.
+  kErrorNoMorePhysRegs,
+  //! A variable has been assigned more than once to a function argument (CodeCompiler).
+  kErrorOverlappedRegs,
+  //! Invalid register to hold stack arguments offset.
+  kErrorOverlappingStackRegWithRegArg,
+
+  //! Count of AsmJit error codes.
+  kErrorCount
 };
 
 // ============================================================================
-// [asmjit::kArch]
+// [asmjit::Internal]
 // ============================================================================
 
-//! Architecture.
-ASMJIT_ENUM(kArch) {
-  //! No/Unknown architecture.
-  kArchNone = 0,
+namespace Internal {
 
-  //! X86 architecture.
-  kArchX86 = 1,
-  //! X64 architecture, also called AMD64.
-  kArchX64 = 2,
+#if defined(ASMJIT_CUSTOM_ALLOC)   && \
+    defined(ASMJIT_CUSTOM_REALLOC) && \
+    defined(ASMJIT_CUSTOM_FREE)
+static ASMJIT_INLINE void* allocMemory(size_t size) noexcept { return ASMJIT_CUSTOM_ALLOC(size); }
+static ASMJIT_INLINE void* reallocMemory(void* p, size_t size) noexcept { return ASMJIT_CUSTOM_REALLOC(p, size); }
+static ASMJIT_INLINE void releaseMemory(void* p) noexcept { ASMJIT_CUSTOM_FREE(p); }
+#elif !defined(ASMJIT_CUSTOM_ALLOC)   && \
+      !defined(ASMJIT_CUSTOM_REALLOC) && \
+      !defined(ASMJIT_CUSTOM_FREE)
+static ASMJIT_INLINE void* allocMemory(size_t size) noexcept { return ::malloc(size); }
+static ASMJIT_INLINE void* reallocMemory(void* p, size_t size) noexcept { return ::realloc(p, size); }
+static ASMJIT_INLINE void releaseMemory(void* p) noexcept { ::free(p); }
+#else
+# error "[asmjit] You must provide either none or all of ASMJIT_CUSTOM_[ALLOC|REALLOC|FREE]"
+#endif
 
-  //! Arm architecture.
-  kArchArm = 4,
+//! Cast designed to cast between function and void* pointers.
+template<typename Dst, typename Src>
+static ASMJIT_INLINE Dst ptr_cast(Src p) noexcept { return (Dst)p; }
 
-#if defined(ASMJIT_HOST_X86)
-  kArchHost = kArchX86,
-#endif // ASMJIT_HOST_X86
+} // Internal namespace
 
-#if defined(ASMJIT_HOST_X64)
-  kArchHost = kArchX64,
-#endif // ASMJIT_HOST_X64
+template<typename Func>
+static ASMJIT_INLINE Func ptr_as_func(void* func) noexcept { return Internal::ptr_cast<Func, void*>(func); }
 
-#if defined(ASMJIT_HOST_ARM)
-  kArchHost = kArchArm,
-#endif // ASMJIT_HOST_ARM
+template<typename Func>
+static ASMJIT_INLINE void* func_as_ptr(Func func) noexcept { return Internal::ptr_cast<void*, Func>(func); }
 
-  //! Whether the host is 64-bit.
-  kArchHost64Bit = sizeof(intptr_t) >= 8
-};
+// ============================================================================
+// [asmjit::DebugUtils]
+// ============================================================================
 
-//! \}
+namespace DebugUtils {
+
+//! Returns the error `err` passed.
+//!
+//! Provided for debugging purposes. Putting a breakpoint inside `errored` can
+//! help with tracing the origin of any error reported / returned by AsmJit.
+static ASMJIT_INLINE Error errored(Error err) noexcept { return err; }
+
+//! Get a printable version of `asmjit::Error` code.
+ASMJIT_API const char* errorAsString(Error err) noexcept;
+
+//! Called to output debugging message(s).
+ASMJIT_API void debugOutput(const char* str) noexcept;
+
+//! Called on assertion failure.
+//!
+//! \param file Source file name where it happened.
+//! \param line Line in the source file.
+//! \param msg Message to display.
+//!
+//! If you have problems with assertions put a breakpoint at assertionFailed()
+//! function (asmjit/base/globals.cpp) and check the call stack to locate the
+//! failing code.
+ASMJIT_API void ASMJIT_NORETURN assertionFailed(const char* file, int line, const char* msg) noexcept;
+
+#if defined(ASMJIT_DEBUG)
+# define ASMJIT_ASSERT(exp)                                          \
+  do {                                                               \
+    if (ASMJIT_LIKELY(exp))                                          \
+      break;                                                         \
+    ::asmjit::DebugUtils::assertionFailed(__FILE__, __LINE__, #exp); \
+  } while (0)
+# define ASMJIT_NOT_REACHED()                                        \
+  do {                                                               \
+    ::asmjit::DebugUtils::assertionFailed(__FILE__, __LINE__,        \
+      "ASMJIT_NOT_REACHED has been reached");                        \
+    ASMJIT_ASSUME(0);                                                \
+  } while (0)
+#else
+# define ASMJIT_ASSERT(exp) ASMJIT_NOP
+# define ASMJIT_NOT_REACHED() ASMJIT_ASSUME(0)
+#endif // DEBUG
+
+//! \internal
+//!
+//! Used by AsmJit to propagate a possible `Error` produced by `...` to the caller.
+#define ASMJIT_PROPAGATE(...)               \
+  do {                                      \
+    ::asmjit::Error _err = __VA_ARGS__;     \
+    if (ASMJIT_UNLIKELY(_err))              \
+      return _err;                          \
+  } while (0)
+
+} // DebugUtils namespace
 
 // ============================================================================
 // [asmjit::Init / NoInit]
@@ -120,58 +330,12 @@ struct _NoInit {};
 static const _NoInit NoInit = {};
 #endif // !ASMJIT_DOCGEN
 
-// ============================================================================
-// [asmjit::Assert]
-// ============================================================================
-
-//! \addtogroup asmjit_base_general
-//! \{
-
-//! Called in debug build on assertion failure.
-//!
-//! \param exp Expression that failed.
-//! \param file Source file name where it happened.
-//! \param line Line in the source file.
-//!
-//! If you have problems with assertions put a breakpoint at assertionFailed()
-//! function (asmjit/base/globals.cpp) and check the call stack to locate the
-//! failing code.
-ASMJIT_API void assertionFailed(const char* exp, const char* file, int line);
-
-#if defined(ASMJIT_DEBUG)
-#define ASMJIT_ASSERT(_Exp_) \
-  do { \
-    if (!(_Exp_)) ::asmjit::assertionFailed(#_Exp_, __FILE__, __LINE__); \
-  } while (0)
-#else
-#define ASMJIT_ASSERT(_Exp_) ASMJIT_NOP()
-#endif // DEBUG
-
 //! \}
 
 } // asmjit namespace
 
-// ============================================================================
-// [asmjit_cast<>]
-// ============================================================================
-
-//! \addtogroup asmjit_base_util
-//! \{
-
-//! Cast used to cast pointer to function. It's like reinterpret_cast<>,
-//! but uses internally C style cast to work with MinGW.
-//!
-//! If you are using single compiler and `reinterpret_cast<>` works for you,
-//! there is no reason to use `asmjit_cast<>`. If you are writing
-//! cross-platform software with various compiler support, consider using
-//! `asmjit_cast<>` instead of `reinterpret_cast<>`.
-template<typename T, typename Z>
-static ASMJIT_INLINE T asmjit_cast(Z* p) { return (T)p; }
-
-//! \}
-
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"
 
 // [Guard]
 #endif // _ASMJIT_BASE_GLOBALS_H

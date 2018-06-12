@@ -216,7 +216,7 @@ NTSTATUS NtLdr::AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr )
         _process.remote().AddReturnWithEvent( *a );
         a->GenEpilogue();
 
-        auto status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+        auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
         if (!NT_SUCCESS( status ))
             return status;
 
@@ -270,7 +270,7 @@ bool NtLdr::InsertInvertedFunctionTable( NtLdrEntry& mod )
         _process.remote().AddReturnWithEvent( *a );
         a->GenEpilogue();
 
-        _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+        _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
         memory.Read( LdrpInvertedFunctionTable, sizeof( table ), &table );
 
         for (DWORD i = 0; i < table.Count; i++)
@@ -371,7 +371,7 @@ NTSTATUS NtLdr::UnloadTLS( const NtLdrEntry& mod, bool noThread /*= false*/ )
     a->GenEpilogue();
 
     _process.remote().CreateRPCEnvironment( noThread ? Worker_UseExisting : Worker_CreateNew, true );
-    _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
 
     return STATUS_SUCCESS;
 }
@@ -573,7 +573,7 @@ void NtLdr::InsertTreeNode( ptr_t nodePtr, const NtLdrEntry& mod )
     _process.remote().AddReturnWithEvent( *a, mod.type );
     a->GenEpilogue();
 
-    _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
 }
 
 /// <summary>
@@ -692,7 +692,7 @@ call_result_t<ptr_t> NtLdr::AllocateInHeap( eModType mt, size_t size )
         a->GenEpilogue();
 
         uint64_t result = 0;
-        status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+        status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
         if (NT_SUCCESS( status ))
             return result;
     }
@@ -1001,7 +1001,7 @@ ptr_t NtLdr::UnlinkTreeNode( const ModuleData& mod, ptr_t ldrEntry, bool noThrea
     a->GenEpilogue();
 
     _process.remote().CreateRPCEnvironment( noThread ? Worker_UseExisting : Worker_CreateNew, true );
-    _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+    _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
 
     return ldrEntry;
 }

@@ -6,7 +6,7 @@ namespace blackbone
 {
 
 AsmHelper64::AsmHelper64( )
-    : IAsmHelper( asmjit::kArchX64 )
+    : IAsmHelper( asmjit::ArchInfo::kTypeX64 )
     ,_stackEnabled( true )
 {
 }
@@ -28,14 +28,14 @@ void AsmHelper64::GenPrologue( bool switchMode /*= false*/ )
         SwitchTo64();
 
         // Align stack
-        _assembler.and_( _assembler.zsp, 0xFFFFFFFFFFFFFFF0 );
+        _assembler.and_( _assembler.zsp(), 0xFFFFFFFFFFFFFFF0 );
     }
     else
     {
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 1 * sizeof( uint64_t ) ), asmjit::host::rcx );
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 2 * sizeof( uint64_t ) ), asmjit::host::rdx );
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 3 * sizeof( uint64_t ) ), asmjit::host::r8 );
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, 4 * sizeof( uint64_t ) ), asmjit::host::r9 );
+        _assembler.mov( asmjit::x86::qword_ptr( asmjit::x86::rsp, 1 * sizeof( uint64_t ) ), asmjit::x86::rcx );
+        _assembler.mov( asmjit::x86::qword_ptr( asmjit::x86::rsp, 2 * sizeof( uint64_t ) ), asmjit::x86::rdx );
+        _assembler.mov( asmjit::x86::qword_ptr( asmjit::x86::rsp, 3 * sizeof( uint64_t ) ), asmjit::x86::r8 );
+        _assembler.mov( asmjit::x86::qword_ptr( asmjit::x86::rsp, 4 * sizeof( uint64_t ) ), asmjit::x86::r9 );
     }
 }
 
@@ -54,10 +54,10 @@ void AsmHelper64::GenEpilogue( bool switchMode /*= false*/, int retSize /*= 0*/ 
     }
     else
     {
-        _assembler.mov( asmjit::host::rcx, asmjit::host::qword_ptr( asmjit::host::rsp, 1 * sizeof( uint64_t ) ) );
-        _assembler.mov( asmjit::host::rdx, asmjit::host::qword_ptr( asmjit::host::rsp, 2 * sizeof( uint64_t ) ) );
-        _assembler.mov( asmjit::host::r8,  asmjit::host::qword_ptr( asmjit::host::rsp, 3 * sizeof( uint64_t ) ) );
-        _assembler.mov( asmjit::host::r9,  asmjit::host::qword_ptr( asmjit::host::rsp, 4 * sizeof( uint64_t ) ) );
+        _assembler.mov( asmjit::x86::rcx, asmjit::x86::qword_ptr( asmjit::x86::rsp, 1 * sizeof( uint64_t ) ) );
+        _assembler.mov( asmjit::x86::rdx, asmjit::x86::qword_ptr( asmjit::x86::rsp, 2 * sizeof( uint64_t ) ) );
+        _assembler.mov( asmjit::x86::r8,  asmjit::x86::qword_ptr( asmjit::x86::rsp, 3 * sizeof( uint64_t ) ) );
+        _assembler.mov( asmjit::x86::r9,  asmjit::x86::qword_ptr( asmjit::x86::rsp, 4 * sizeof( uint64_t ) ) );
     }
 
     _assembler.ret();
@@ -81,7 +81,7 @@ void AsmHelper64::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVaria
     rsp_dif = Align( rsp_dif, 0x10 );
 
     if (_stackEnabled)
-        _assembler.sub( asmjit::host::rsp, rsp_dif + 8 );
+        _assembler.sub( asmjit::x86::rsp, rsp_dif + 8 );
 
     // Set args
     for (int32_t i = 0; i < static_cast<int32_t>(args.size()); i++)
@@ -89,8 +89,8 @@ void AsmHelper64::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVaria
 
     if (pFN.type == AsmVariant::imm)
     {
-        _assembler.mov( asmjit::host::rax, pFN.imm_val64 );
-        _assembler.call( asmjit::host::rax );
+        _assembler.mov( asmjit::x86::rax, pFN.imm_val64 );
+        _assembler.call( asmjit::x86::rax );
     }
     else if (pFN.type == AsmVariant::reg)
     {
@@ -100,7 +100,7 @@ void AsmHelper64::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVaria
         assert("Invalid function pointer type" && false );
 
     if (_stackEnabled)
-        _assembler.add( asmjit::host::rsp, rsp_dif + 8 );
+        _assembler.add( asmjit::x86::rsp, rsp_dif + 8 );
 }
 
 /// <summary>
@@ -112,14 +112,14 @@ void AsmHelper64::ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr
 {
     if (resultPtr != 0)
     {
-        _assembler.mov( asmjit::host::rdx, resultPtr );
-        _assembler.mov( asmjit::host::dword_ptr( asmjit::host::rdx ), asmjit::host::rax );
+        _assembler.mov( asmjit::x86::rdx, resultPtr );
+        _assembler.mov( asmjit::x86::dword_ptr( asmjit::x86::rdx ), asmjit::x86::rax );
     }
 
-    _assembler.mov( asmjit::host::rdx, asmjit::host::rax );
-    _assembler.mov( asmjit::host::rcx, 0 );
-    _assembler.mov( asmjit::host::rax, pExitThread );
-    _assembler.call( asmjit::host::rax );
+    _assembler.mov( asmjit::x86::rdx, asmjit::x86::rax );
+    _assembler.mov( asmjit::x86::rcx, 0 );
+    _assembler.mov( asmjit::x86::rax, pExitThread );
+    _assembler.call( asmjit::x86::rax );
 }
 
 /// <summary>
@@ -138,25 +138,28 @@ void AsmHelper64::SaveRetValAndSignalEvent(
     eReturnType rtype /*= rt_int32*/ 
     )
 {
-    _assembler.mov( asmjit::host::rcx, ResultPtr );
+    _assembler.mov( asmjit::x86::rcx, ResultPtr );
 
     // FPU value has been already saved
     if (rtype == rt_int64 || rtype == rt_int32)
-        _assembler.mov( asmjit::host::dword_ptr( asmjit::host::rcx ), asmjit::host::rax );
+        _assembler.mov( asmjit::x86::dword_ptr( asmjit::x86::rcx ), asmjit::x86::rax );
 
     // Save last NT status
-    _assembler.mov( asmjit::host::rdx, asmjit::host::dword_ptr_abs( 0x30 ).setSegment( asmjit::host::gs ) );    // TEB ptr
-    _assembler.add( asmjit::host::rdx, 0x598 + 0x197 * sizeof( uint64_t ) );
-    _assembler.mov( asmjit::host::rdx, asmjit::host::dword_ptr( asmjit::host::rdx ) );
-    _assembler.mov( asmjit::host::rax, lastStatusPtr );
-    _assembler.mov( asmjit::host::dword_ptr( asmjit::host::rax ), asmjit::host::rdx );
+    auto gsPtr = asmjit::x86::dword_ptr_abs( 0x30 );
+    gsPtr.setSegment( asmjit::x86::gs );
+
+    _assembler.mov( asmjit::x86::rdx, gsPtr );    // TEB ptr
+    _assembler.add( asmjit::x86::rdx, 0x598 + 0x197 * sizeof( uint64_t ) );
+    _assembler.mov( asmjit::x86::rdx, asmjit::x86::dword_ptr( asmjit::x86::rdx ) );
+    _assembler.mov( asmjit::x86::rax, lastStatusPtr );
+    _assembler.mov( asmjit::x86::dword_ptr( asmjit::x86::rax ), asmjit::x86::rdx );
 
     // NtSetEvent(hEvent, NULL)
-    _assembler.mov( asmjit::host::rax, EventPtr );
-    _assembler.mov( asmjit::host::rcx, asmjit::host::dword_ptr( asmjit::host::rax ) );
-    _assembler.mov( asmjit::host::rdx, 0 );
-    _assembler.mov( asmjit::host::rax, pSetEvent );
-    _assembler.call( asmjit::host::rax );
+    _assembler.mov( asmjit::x86::rax, EventPtr );
+    _assembler.mov( asmjit::x86::rcx, asmjit::x86::dword_ptr( asmjit::x86::rax ) );
+    _assembler.mov( asmjit::x86::rdx, 0 );
+    _assembler.mov( asmjit::x86::rax, pSetEvent );
+    _assembler.call( asmjit::x86::rax );
 }
 
 
@@ -202,8 +205,8 @@ void AsmHelper64::PushArg( const AsmVariant& arg, int32_t index )
         break;
 
     case AsmVariant::mem_ptr:
-        _assembler.lea( asmjit::host::rax, arg.mem_val );
-        PushArgp( asmjit::host::rax, index );
+        _assembler.lea( asmjit::x86::rax, arg.mem_val );
+        PushArgp( asmjit::x86::rax, index );
         break;
 
     case AsmVariant::mem:
@@ -229,8 +232,8 @@ void AsmHelper64::PushArg( const AsmVariant& arg, int32_t index )
 template<typename _Type>
 void AsmHelper64::PushArgp( const _Type& arg, int32_t index, bool fpu /*= false*/ )
 {
-    static const asmjit::GpReg regs[] = { asmjit::host::rcx, asmjit::host::rdx, asmjit::host::r8, asmjit::host::r9 };
-    static const asmjit::XmmReg xregs[] = { asmjit::host::xmm0, asmjit::host::xmm1, asmjit::host::xmm2, asmjit::host::xmm3 };
+    static const asmjit::X86Gp regs[] = { asmjit::x86::rcx, asmjit::x86::rdx, asmjit::x86::r8, asmjit::x86::r9 };
+    static const asmjit::X86Xmm xregs[] = { asmjit::x86::xmm0, asmjit::x86::xmm1, asmjit::x86::xmm2, asmjit::x86::xmm3 };
 
     // Pass via register
     if (index < 4)
@@ -238,8 +241,8 @@ void AsmHelper64::PushArgp( const _Type& arg, int32_t index, bool fpu /*= false*
         // Use XMM register
         if (fpu)
         {
-            _assembler.mov( asmjit::host::rax, arg );
-            _assembler.movq( xregs[index], asmjit::host::rax );
+            _assembler.mov( asmjit::x86::rax, arg );
+            _assembler.movq( xregs[index], asmjit::x86::rax );
         }
         else
             _assembler.mov( regs[index], arg );
@@ -247,8 +250,8 @@ void AsmHelper64::PushArgp( const _Type& arg, int32_t index, bool fpu /*= false*
     // Pass on stack
     else
     {
-        _assembler.mov( asmjit::host::rax, arg );
-        _assembler.mov( asmjit::host::qword_ptr( asmjit::host::rsp, index * sizeof( uint64_t ) ), asmjit::host::rax );
+        _assembler.mov( asmjit::x86::rax, arg );
+        _assembler.mov( asmjit::x86::qword_ptr( asmjit::x86::rsp, index * sizeof( uint64_t ) ), asmjit::x86::rax );
     }
 }
 

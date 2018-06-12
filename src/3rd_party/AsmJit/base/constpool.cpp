@@ -7,12 +7,14 @@
 // [Export]
 #define ASMJIT_EXPORTS
 
-// [Dependencies - AsmJit]
+// [Dependencies]
 #include "../base/constpool.h"
-#include "../base/intutil.h"
+#include "../base/utils.h"
+
+#include <algorithm>
 
 // [Api-Begin]
-#include "../apibegin.h"
+#include "../asmjit_apibegin.h"
 
 namespace asmjit {
 
@@ -21,17 +23,17 @@ namespace asmjit {
 // get, insert and traverse.
 
 // ============================================================================
-// [asmjit::ConstPoolTree - Ops]
+// [asmjit::ConstPool::Tree - Ops]
 // ============================================================================
 
 //! \internal
 //!
 //! Remove left horizontal links.
-static ASMJIT_INLINE ConstPoolNode* ConstPoolTree_skewNode(ConstPoolNode* node) {
-  ConstPoolNode* link = node->_link[0];
+static ASMJIT_INLINE ConstPool::Node* ConstPoolTree_skewNode(ConstPool::Node* node) noexcept {
+  ConstPool::Node* link = node->_link[0];
   uint32_t level = node->_level;
 
-  if (level != 0 && link != NULL && link->_level == level) {
+  if (level != 0 && link && link->_level == level) {
     node->_link[0] = link->_link[1];
     link->_link[1] = node;
 
@@ -44,11 +46,11 @@ static ASMJIT_INLINE ConstPoolNode* ConstPoolTree_skewNode(ConstPoolNode* node) 
 //! \internal
 //!
 //! Remove consecutive horizontal links.
-static ASMJIT_INLINE ConstPoolNode* ConstPoolTree_splitNode(ConstPoolNode* node) {
-  ConstPoolNode* link = node->_link[1];
+static ASMJIT_INLINE ConstPool::Node* ConstPoolTree_splitNode(ConstPool::Node* node) noexcept {
+  ConstPool::Node* link = node->_link[1];
   uint32_t level = node->_level;
 
-  if (level != 0 && link != NULL && link->_link[1] != NULL && link->_link[1]->_level == level) {
+  if (level != 0 && link && link->_link[1] && link->_link[1]->_level == level) {
     node->_link[1] = link->_link[0];
     link->_link[0] = node;
 
@@ -59,31 +61,31 @@ static ASMJIT_INLINE ConstPoolNode* ConstPoolTree_splitNode(ConstPoolNode* node)
   return node;
 }
 
-ConstPoolNode* ConstPoolTree::get(const void* data) {
-  ConstPoolNode* node = _root;
+ConstPool::Node* ConstPool::Tree::get(const void* data) noexcept {
+  ConstPool::Node* node = _root;
   size_t dataSize = _dataSize;
 
-  while (node != NULL) {
+  while (node) {
     int c = ::memcmp(node->getData(), data, dataSize);
     if (c == 0)
       return node;
     node = node->_link[c < 0];
   }
 
-  return NULL;
+  return nullptr;
 }
 
-void ConstPoolTree::put(ConstPoolNode* newNode) {
+void ConstPool::Tree::put(ConstPool::Node* newNode) noexcept {
   size_t dataSize = _dataSize;
-
   _length++;
-  if (_root == NULL) {
+
+  if (!_root) {
     _root = newNode;
     return;
   }
 
-  ConstPoolNode* node = _root;
-  ConstPoolNode* stack[kHeightLimit];
+  ConstPool::Node* node = _root;
+  ConstPool::Node* stack[kHeightLimit];
 
   unsigned int top = 0;
   unsigned int dir;
@@ -93,9 +95,8 @@ void ConstPoolTree::put(ConstPoolNode* newNode) {
     stack[top++] = node;
     dir = ::memcmp(node->getData(), newNode->getData(), dataSize) < 0;
 
-    ConstPoolNode* link = node->_link[dir];
-    if (link == NULL)
-      break;
+    ConstPool::Node* link = node->_link[dir];
+    if (!link) break;
 
     node = link;
   }
@@ -126,34 +127,25 @@ void ConstPoolTree::put(ConstPoolNode* newNode) {
 // [asmjit::ConstPool - Construction / Destruction]
 // ============================================================================
 
-ConstPool::ConstPool(Zone* zone) {
-  _zone = zone;
-
-  size_t dataSize = 1;
-  for (size_t i = 0; i < ASMJIT_ARRAY_SIZE(_tree); i++) {
-    _tree[i].setDataSize(dataSize);
-    _gaps[i] = NULL;
-    dataSize <<= 1;
-  }
-
-  _gapPool = NULL;
-  _size = 0;
-  _alignment = 0;
-}
-
-ConstPool::~ConstPool() {}
+ConstPool::ConstPool(Zone* zone) noexcept { reset(zone); }
+ConstPool::~ConstPool() noexcept {}
 
 // ============================================================================
 // [asmjit::ConstPool - Reset]
 // ============================================================================
 
-void ConstPool::reset() {
+void ConstPool::reset(Zone* zone) noexcept {
+  _zone = zone;
+
+  size_t dataSize = 1;
   for (size_t i = 0; i < ASMJIT_ARRAY_SIZE(_tree); i++) {
     _tree[i].reset();
-    _gaps[i] = NULL;
+    _tree[i].setDataSize(dataSize);
+    _gaps[i] = nullptr;
+    dataSize <<= 1;
   }
 
-  _gapPool = NULL;
+  _gapPool = nullptr;
   _size = 0;
   _alignment = 0;
 }
@@ -162,40 +154,39 @@ void ConstPool::reset() {
 // [asmjit::ConstPool - Ops]
 // ============================================================================
 
-static ASMJIT_INLINE ConstPoolGap* ConstPool_allocGap(ConstPool* self) {
-  ConstPoolGap* gap = self->_gapPool;
-  if (gap == NULL)
-    return self->_zone->allocT<ConstPoolGap>();
+static ASMJIT_INLINE ConstPool::Gap* ConstPool_allocGap(ConstPool* self) noexcept {
+  ConstPool::Gap* gap = self->_gapPool;
+  if (!gap) return self->_zone->allocT<ConstPool::Gap>();
 
   self->_gapPool = gap->_next;
   return gap;
 }
 
-static ASMJIT_INLINE void ConstPool_freeGap(ConstPool* self,  ConstPoolGap* gap) {
+static ASMJIT_INLINE void ConstPool_freeGap(ConstPool* self,  ConstPool::Gap* gap) noexcept {
   gap->_next = self->_gapPool;
   self->_gapPool = gap;
 }
 
-static void ConstPool_addGap(ConstPool* self, size_t offset, size_t length) {
+static void ConstPool_addGap(ConstPool* self, size_t offset, size_t length) noexcept {
   ASMJIT_ASSERT(length > 0);
 
   while (length > 0) {
     size_t gapIndex;
     size_t gapLength;
 
-    if (length >= 16 && IntUtil::isAligned<size_t>(offset, 16)) {
       gapIndex = ConstPool::kIndex16;
+    if (length >= 16 && Utils::isAligned<size_t>(offset, 16)) {
       gapLength = 16;
     }
-    else if (length >= 8 && IntUtil::isAligned<size_t>(offset, 8)) {
+    else if (length >= 8 && Utils::isAligned<size_t>(offset, 8)) {
       gapIndex = ConstPool::kIndex8;
       gapLength = 8;
     }
-    else if (length >= 4 && IntUtil::isAligned<size_t>(offset, 4)) {
+    else if (length >= 4 && Utils::isAligned<size_t>(offset, 4)) {
       gapIndex = ConstPool::kIndex4;
       gapLength = 4;
     }
-    else if (length >= 2 && IntUtil::isAligned<size_t>(offset, 2)) {
+    else if (length >= 2 && Utils::isAligned<size_t>(offset, 2)) {
       gapIndex = ConstPool::kIndex2;
       gapLength = 2;
     }
@@ -207,9 +198,8 @@ static void ConstPool_addGap(ConstPool* self, size_t offset, size_t length) {
     // We don't have to check for errors here, if this failed nothing really
     // happened (just the gap won't be visible) and it will fail again at
     // place where checking will cause kErrorNoHeapMemory.
-    ConstPoolGap* gap = ConstPool_allocGap(self);
-    if (gap == NULL)
-      return;
+    ConstPool::Gap* gap = ConstPool_allocGap(self);
+    if (!gap) return;
 
     gap->_next = self->_gaps[gapIndex];
     self->_gaps[gapIndex] = gap;
@@ -222,7 +212,7 @@ static void ConstPool_addGap(ConstPool* self, size_t offset, size_t length) {
   }
 }
 
-Error ConstPool::add(const void* data, size_t size, size_t& dstOffset) {
+Error ConstPool::add(const void* data, size_t size, size_t& dstOffset) noexcept {
   size_t treeIndex;
 
   if (size == 32)
@@ -238,10 +228,10 @@ Error ConstPool::add(const void* data, size_t size, size_t& dstOffset) {
   else if (size == 1)
     treeIndex = kIndex1;
   else
-    return kErrorInvalidArgument;
+    return DebugUtils::errored(kErrorInvalidArgument);
 
-  ConstPoolNode* node = _tree[treeIndex].get(data);
-  if (node != NULL) {
+  ConstPool::Node* node = _tree[treeIndex].get(data);
+  if (node) {
     dstOffset = node->_offset;
     return kErrorOk;
   }
@@ -252,10 +242,10 @@ Error ConstPool::add(const void* data, size_t size, size_t& dstOffset) {
   size_t gapIndex = treeIndex;
 
   while (gapIndex != kIndexCount - 1) {
-    ConstPoolGap* gap = _gaps[treeIndex];
+    ConstPool::Gap* gap = _gaps[treeIndex];
 
     // Check if there is a gap.
-    if (gap != NULL) {
+    if (gap) {
       size_t gapOffset = gap->_offset;
       size_t gapLength = gap->_length;
 
@@ -264,7 +254,7 @@ Error ConstPool::add(const void* data, size_t size, size_t& dstOffset) {
       ConstPool_freeGap(this, gap);
 
       offset = gapOffset;
-      ASMJIT_ASSERT(IntUtil::isAligned<size_t>(offset, size));
+      ASMJIT_ASSERT(Utils::isAligned<size_t>(offset, size));
 
       gapLength -= size;
       if (gapLength > 0)
@@ -277,11 +267,11 @@ Error ConstPool::add(const void* data, size_t size, size_t& dstOffset) {
   if (offset == ~static_cast<size_t>(0)) {
     // Get how many bytes have to be skipped so the address is aligned accordingly
     // to the 'size'.
-    size_t deltaTo = IntUtil::deltaTo<size_t>(_size, size);
+    size_t diff = Utils::alignDiff<size_t>(_size, size);
 
-    if (deltaTo != 0) {
-      ConstPool_addGap(this, _size, deltaTo);
-      _size += deltaTo;
+    if (diff != 0) {
+      ConstPool_addGap(this, _size, diff);
+      _size += diff;
     }
 
     offset = _size;
@@ -289,12 +279,11 @@ Error ConstPool::add(const void* data, size_t size, size_t& dstOffset) {
   }
 
   // Add the initial node to the right index.
-  node = ConstPoolTree::_newNode(_zone, data, size, offset, false);
-  if (node == NULL)
-    return kErrorNoHeapMemory;
+  node = ConstPool::Tree::_newNode(_zone, data, size, offset, false);
+  if (!node) return DebugUtils::errored(kErrorNoHeapMemory);
 
   _tree[treeIndex].put(node);
-  _alignment = IntUtil::iMax<size_t>(_alignment, size);
+  _alignment = std::max<size_t>(_alignment, size);
 
   dstOffset = offset;
 
@@ -312,11 +301,9 @@ Error ConstPool::add(const void* data, size_t size, size_t& dstOffset) {
     const uint8_t* pData = static_cast<const uint8_t*>(data);
     for (size_t i = 0; i < pCount; i++, pData += size) {
       node = _tree[treeIndex].get(pData);
+      if (node) continue;
 
-      if (node != NULL)
-        continue;
-
-      node = ConstPoolTree::_newNode(_zone, pData, size, offset + (i * size), true);
+      node = ConstPool::Tree::_newNode(_zone, pData, size, offset + (i * size), true);
       _tree[treeIndex].put(node);
     }
   }
@@ -329,11 +316,11 @@ Error ConstPool::add(const void* data, size_t size, size_t& dstOffset) {
 // ============================================================================
 
 struct ConstPoolFill {
-  ASMJIT_INLINE ConstPoolFill(uint8_t* dst, size_t dataSize) :
+  ASMJIT_INLINE ConstPoolFill(uint8_t* dst, size_t dataSize) noexcept :
     _dst(dst),
     _dataSize(dataSize) {}
 
-  ASMJIT_INLINE void visit(const ConstPoolNode* node) {
+  ASMJIT_INLINE void visit(const ConstPool::Node* node) noexcept {
     if (!node->_shared)
       ::memcpy(_dst + node->_offset, node->getData(), _dataSize);
   }
@@ -342,7 +329,7 @@ struct ConstPoolFill {
   size_t _dataSize;
 };
 
-void ConstPool::fill(void* dst) {
+void ConstPool::fill(void* dst) const noexcept {
   // Clears possible gaps, asmjit should never emit garbage to the output.
   ::memset(dst, 0, _size);
 
@@ -359,7 +346,7 @@ void ConstPool::fill(void* dst) {
 
 #if defined(ASMJIT_TEST)
 UNIT(base_constpool) {
-  Zone zone(32384 - kZoneOverhead);
+  Zone zone(32384 - Zone::kZoneOverhead);
   ConstPool pool(&zone);
 
   uint32_t i;
@@ -372,23 +359,23 @@ UNIT(base_constpool) {
     uint64_t c = ASMJIT_UINT64_C(0x0101010101010101);
 
     EXPECT(pool.add(&c, 8, prevOffset) == kErrorOk,
-      "pool.add() - Returned error.");
+      "pool.add() - Returned error");
     EXPECT(prevOffset == 0,
-      "pool.add() - First constant should have zero offset.");
+      "pool.add() - First constant should have zero offset");
 
     for (i = 1; i < kCount; i++) {
       c++;
       EXPECT(pool.add(&c, 8, curOffset) == kErrorOk,
-        "pool.add() - Returned error.");
+        "pool.add() - Returned error");
       EXPECT(prevOffset + 8 == curOffset,
-        "pool.add() - Returned incorrect curOffset.");
+        "pool.add() - Returned incorrect curOffset");
       EXPECT(pool.getSize() == (i + 1) * 8,
-        "pool.getSize() - Reported incorrect size.");
+        "pool.getSize() - Reported incorrect size");
       prevOffset = curOffset;
     }
 
     EXPECT(pool.getAlignment() == 8,
-      "pool.getAlignment() - Expected 8-byte alignment.");
+      "pool.getAlignment() - Expected 8-byte alignment");
   }
 
   INFO("Retrieving %u constants from the pool.", kCount);
@@ -398,74 +385,75 @@ UNIT(base_constpool) {
     for (i = 0; i < kCount; i++) {
       size_t offset;
       EXPECT(pool.add(&c, 8, offset) == kErrorOk,
-        "pool.add() - Returned error.");
+        "pool.add() - Returned error");
       EXPECT(offset == i * 8,
-        "pool.add() - Should have reused constant.");
+        "pool.add() - Should have reused constant");
       c++;
     }
   }
 
-  INFO("Checking if the constants were split into 4-byte patterns.");
+  INFO("Checking if the constants were split into 4-byte patterns");
   {
     uint32_t c = 0x01010101;
     for (i = 0; i < kCount; i++) {
       size_t offset;
       EXPECT(pool.add(&c, 4, offset) == kErrorOk,
-        "pool.add() - Returned error.");
+        "pool.add() - Returned error");
       EXPECT(offset == i * 8,
-        "pool.add() - Should reuse existing constant.");
+        "pool.add() - Should reuse existing constant");
       c++;
     }
   }
 
-  INFO("Adding 2 byte constant to misalign the current offset.");
+  INFO("Adding 2 byte constant to misalign the current offset");
   {
     uint16_t c = 0xFFFF;
     size_t offset;
 
     EXPECT(pool.add(&c, 2, offset) == kErrorOk,
-      "pool.add() - Returned error.");
+      "pool.add() - Returned error");
     EXPECT(offset == kCount * 8,
-      "pool.add() - Didn't return expected position.");
+      "pool.add() - Didn't return expected position");
     EXPECT(pool.getAlignment() == 8,
-      "pool.getAlignment() - Expected 8-byte alignment.");
+      "pool.getAlignment() - Expected 8-byte alignment");
   }
 
-  INFO("Adding 8 byte constant to check if pool gets aligned again.");
+  INFO("Adding 8 byte constant to check if pool gets aligned again");
   {
     uint64_t c = ASMJIT_UINT64_C(0xFFFFFFFFFFFFFFFF);
     size_t offset;
 
     EXPECT(pool.add(&c, 8, offset) == kErrorOk,
-      "pool.add() - Returned error.");
+      "pool.add() - Returned error");
     EXPECT(offset == kCount * 8 + 8,
-      "pool.add() - Didn't return aligned offset.");
+      "pool.add() - Didn't return aligned offset");
   }
 
-  INFO("Adding 2 byte constant to verify the gap is filled.");
+  INFO("Adding 2 byte constant to verify the gap is filled");
   {
     uint16_t c = 0xFFFE;
     size_t offset;
 
     EXPECT(pool.add(&c, 2, offset) == kErrorOk,
-      "pool.add() - Returned error.");
+      "pool.add() - Returned error");
     EXPECT(offset == kCount * 8 + 2,
-      "pool.add() - Didn't fill the gap.");
+      "pool.add() - Didn't fill the gap");
     EXPECT(pool.getAlignment() == 8,
-      "pool.getAlignment() - Expected 8-byte alignment.");
+      "pool.getAlignment() - Expected 8-byte alignment");
   }
 
-  INFO("Checking reset functionality.");
+  INFO("Checking reset functionality");
   {
-    pool.reset();
+    pool.reset(&zone);
+    zone.reset();
 
     EXPECT(pool.getSize() == 0,
-      "pool.getSize() - Expected pool size to be zero.");
+      "pool.getSize() - Expected pool size to be zero");
     EXPECT(pool.getAlignment() == 0,
-      "pool.getSize() - Expected pool alignment to be zero.");
+      "pool.getSize() - Expected pool alignment to be zero");
   }
 
-  INFO("Checking pool alignment when combined constants are added.");
+  INFO("Checking pool alignment when combined constants are added");
   {
     uint8_t bytes[32] = { 0 };
     size_t offset;
@@ -473,46 +461,46 @@ UNIT(base_constpool) {
     pool.add(bytes, 1, offset);
 
     EXPECT(pool.getSize() == 1,
-      "pool.getSize() - Expected pool size to be 1 byte.");
+      "pool.getSize() - Expected pool size to be 1 byte");
     EXPECT(pool.getAlignment() == 1,
-      "pool.getSize() - Expected pool alignment to be 1 byte.");
+      "pool.getSize() - Expected pool alignment to be 1 byte");
     EXPECT(offset == 0,
-      "pool.getSize() - Expected offset returned to be zero.");
+      "pool.getSize() - Expected offset returned to be zero");
 
     pool.add(bytes, 2, offset);
 
     EXPECT(pool.getSize() == 4,
-      "pool.getSize() - Expected pool size to be 4 bytes.");
+      "pool.getSize() - Expected pool size to be 4 bytes");
     EXPECT(pool.getAlignment() == 2,
-      "pool.getSize() - Expected pool alignment to be 2 bytes.");
+      "pool.getSize() - Expected pool alignment to be 2 bytes");
     EXPECT(offset == 2,
-      "pool.getSize() - Expected offset returned to be 2.");
+      "pool.getSize() - Expected offset returned to be 2");
 
     pool.add(bytes, 4, offset);
 
     EXPECT(pool.getSize() == 8,
-      "pool.getSize() - Expected pool size to be 8 bytes.");
+      "pool.getSize() - Expected pool size to be 8 bytes");
     EXPECT(pool.getAlignment() == 4,
-      "pool.getSize() - Expected pool alignment to be 4 bytes.");
+      "pool.getSize() - Expected pool alignment to be 4 bytes");
     EXPECT(offset == 4,
-      "pool.getSize() - Expected offset returned to be 4.");
+      "pool.getSize() - Expected offset returned to be 4");
 
     pool.add(bytes, 4, offset);
 
     EXPECT(pool.getSize() == 8,
-      "pool.getSize() - Expected pool size to be 8 bytes.");
+      "pool.getSize() - Expected pool size to be 8 bytes");
     EXPECT(pool.getAlignment() == 4,
-      "pool.getSize() - Expected pool alignment to be 4 bytes.");
+      "pool.getSize() - Expected pool alignment to be 4 bytes");
     EXPECT(offset == 4,
-      "pool.getSize() - Expected offset returned to be 8.");
+      "pool.getSize() - Expected offset returned to be 8");
 
     pool.add(bytes, 32, offset);
     EXPECT(pool.getSize() == 64,
-      "pool.getSize() - Expected pool size to be 64 bytes.");
+      "pool.getSize() - Expected pool size to be 64 bytes");
     EXPECT(pool.getAlignment() == 32,
-      "pool.getSize() - Expected pool alignment to be 32 bytes.");
+      "pool.getSize() - Expected pool alignment to be 32 bytes");
     EXPECT(offset == 32,
-      "pool.getSize() - Expected offset returned to be 32.");
+      "pool.getSize() - Expected offset returned to be 32");
   }
 }
 #endif // ASMJIT_TEST
@@ -520,4 +508,4 @@ UNIT(base_constpool) {
 } // asmjit namespace
 
 // [Api-End]
-#include "../apiend.h"
+#include "../asmjit_apiend.h"

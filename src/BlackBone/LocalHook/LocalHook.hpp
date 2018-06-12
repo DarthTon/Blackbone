@@ -112,6 +112,7 @@ public:
 				DWORD flOld = 0;
 				if (!VirtualProtect(this->_original, this->_origSize, PAGE_EXECUTE_READWRITE, &flOld))
 					return false;
+
 				memcpy(this->_original, this->_origCode, this->_origSize);
 				VirtualProtect(this->_original, this->_origSize, flOld, &flOld);
 			}
@@ -153,32 +154,37 @@ private:
         // Construct jump to thunk
         //
 #ifdef USE64
-        (*jmpToThunk)->mov( asmjit::host::rax, (uint64_t)this->_buf );
-        (*jmpToThunk)->jmp( asmjit::host::rax );
+        (*jmpToThunk)->mov( asmjit::x86::rax, reinterpret_cast<uint64_t>(this->_buf) );
+        (*jmpToThunk)->jmp( asmjit::x86::rax );
 
-        this->_origSize = (*jmpToThunk)->getCodeSize();
+        this->_origSize = jmpToThunk->getCodeSize();
 #else
-        (*jmpToThunk)->jmp( (asmjit::Ptr)this->_buf );
-        this->_origSize = (*jmpToThunk)->getCodeSize();
+        (*jmpToThunk)->jmp( reinterpret_cast<uintptr_t>(this->_buf) );
+        this->_origSize = jmpToThunk->getCodeSize();
 #endif
         
-        DetourBase::CopyOldCode( (uint8_t*)this->_original );
+        DetourBase::CopyOldCode( reinterpret_cast<uint8_t*>(this->_original) );
 
         // Construct jump to hook handler
 #ifdef USE64
         // mov gs:[0x28], this
-        (*jmpToHook)->mov( asmjit::host::rax, (uint64_t)this );
-        (*jmpToHook)->mov( asmjit::host::qword_ptr_abs( 0x28 ).setSegment( asmjit::host::gs ), asmjit::host::rax );
+        auto gsPtr = asmjit::x86::qword_ptr_abs( 0x28 );
+        gsPtr.setSegment( asmjit::x86::gs );
+
+        (*jmpToHook)->mov( asmjit::x86::rax, reinterpret_cast<uint64_t>(this) );
+        (*jmpToHook)->mov( gsPtr, asmjit::x86::rax );
 #else
         // mov fs:[0x14], this
-        (*jmpToHook)->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ) , (uint32_t)this );
+        auto fsPtr = asmjit::x86::dword_ptr_abs( 0x14 );
+        fsPtr.setSegment( asmjit::x86::fs );
+
+        (*jmpToHook)->mov( fsPtr, reinterpret_cast<uint32_t>(this) );
 #endif // USE64
 
-        (*jmpToHook)->jmp( (asmjit::Ptr)&HookHandler<Fn, C>::Handler );
-        (*jmpToHook)->relocCode( this->_buf );
+        (*jmpToHook)->jmp( reinterpret_cast<uintptr_t>(&HookHandler<Fn, C>::Handler) );
+        jmpToHook->relocate( this->_buf );
 
-        (*jmpToThunk)->setBaseAddress( (uintptr_t)this->_original );
-        auto codeSize = (*jmpToThunk)->relocCode( this->_newCode );
+        auto codeSize = jmpToThunk->relocate( this->_newCode, reinterpret_cast<uintptr_t>(this->_original) );
 
         DWORD flOld = 0;
         if (!VirtualProtect( this->_original, codeSize, PAGE_EXECUTE_READWRITE, &flOld ))
@@ -208,7 +214,7 @@ private:
         if (!this->_vecHandler)
             return false;
 
-        this->_breakpoints.insert( std::make_pair( this->_original, (DetourBase*)this ) );
+        this->_breakpoints.insert( std::make_pair( this->_original, static_cast<DetourBase*>(this) ) );
 
         // Save original code
         memcpy( this->_origCode, this->_original, this->_origSize );
@@ -217,6 +223,7 @@ private:
         DWORD flOld = 0;
         if (!VirtualProtect(this->_original, this->_origSize, PAGE_EXECUTE_READWRITE, &flOld))
 			return false;
+
         memcpy( this->_original, this->_newCode, this->_origSize );
         VirtualProtect( this->_original, this->_origSize, flOld, &flOld );
 
@@ -239,7 +246,7 @@ private:
         if (!this->_vecHandler)
             return false;
 
-        this->_breakpoints.insert( std::make_pair( this->_original, (DetourBase*)this ) );
+        this->_breakpoints.insert( std::make_pair( this->_original, static_cast<DetourBase*>(this) ) );
 
         // Add breakpoint to every thread
         for (auto& thd : thisProc.threads().getAll())

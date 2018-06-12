@@ -48,8 +48,11 @@ namespace blackbone
     class IAsmHelper
     {
     public:
-        BLACKBONE_API IAsmHelper( uint32_t arch = asmjit::kArchHost ) 
-            : _assembler( &_runtime, arch ) { }
+        BLACKBONE_API IAsmHelper( uint32_t arch = asmjit::ArchInfo::kTypeHost )
+        { 
+            _code.init( asmjit::CodeInfo( arch ) );
+            _code.attach( &_assembler );
+        }
 
         virtual ~IAsmHelper() { }
 
@@ -68,8 +71,8 @@ namespace blackbone
             asmjit::Label l = _assembler.newLabel();
 
             _assembler.call( l ); _assembler.bind( l );
-            _assembler.mov( asmjit::host::dword_ptr( asmjit::host::esp, 4 ), 0x23 );
-            _assembler.add( asmjit::host::dword_ptr( asmjit::host::esp ), 0xD );
+            _assembler.mov( asmjit::x86::dword_ptr( asmjit::x86::esp, 4 ), 0x23 );
+            _assembler.add( asmjit::x86::dword_ptr( asmjit::x86::esp ), 0xD );
             _assembler.db( 0xCB );    // retf
         }
 
@@ -82,13 +85,28 @@ namespace blackbone
 
             _assembler.push( 0x33 );
             _assembler.call( l );  _assembler.bind( l );
-            //_assembler.add( asmjit::host::dword_ptr( asmjit::host::esp ), 5 );
+            //_assembler.add( asmjit::x86::dword_ptr( asmjit::x86::esp ), 5 );
             _assembler.dd( '\x83\x04\x24\x05' );
             _assembler.db( 0xCB );    // retf
         }
 
-        BLACKBONE_API inline asmjit::X86Assembler* assembler() { return &_assembler; }
-        BLACKBONE_API inline asmjit::X86Assembler* operator ->() { return &_assembler; }
+        template<typename T = void*>
+        T make()
+        {
+            T ptr{ };
+            _runtime.add( &ptr, &_code );
+            return ptr;
+        }
+
+        BLACKBONE_API size_t relocate( void* dst, uint64_t baseAddress = -1 )
+        {    
+            return _code.relocate( dst, baseAddress );
+        }
+
+        BLACKBONE_API size_t getCodeSize() { return _code.getCodeSize(); }
+
+        BLACKBONE_API asmjit::X86Assembler* assembler() { return &_assembler; }
+        BLACKBONE_API asmjit::X86Assembler* operator ->() { return &_assembler; }
 
     private:
         IAsmHelper( const IAsmHelper& ) = delete;
@@ -96,6 +114,7 @@ namespace blackbone
 
     protected:
         asmjit::JitRuntime _runtime;
+        asmjit::CodeHolder _code;
         asmjit::X86Assembler _assembler;
     };
 }

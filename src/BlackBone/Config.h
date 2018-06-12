@@ -1,4 +1,5 @@
 #pragma once
+#define NOMINMAX
 
 // Lib/Dll switch
 #if !defined(BLACKBONE_EXPORTS) && !defined(BLACKBONE_IMPORTS) && !defined(BLACKBONE_STATIC)
