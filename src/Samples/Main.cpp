@@ -26,19 +26,15 @@ int main( int /*argc*/, char* /*argv[]*/ )
         auto& core = explorer.core();
 
         // Get bitness info about this and target processes
-        auto barrier = explorer.barrier();
-        UNREFERENCED_PARAMETER( barrier );
+        [[maybe_unused]] auto barrier = explorer.barrier();
 
         // Get process PID and handle
-        auto pid = core.pid();
-        auto handle = core.handle();
-        UNREFERENCED_PARAMETER( pid );
-        UNREFERENCED_PARAMETER( handle );
+        [[maybe_unused]] auto pid = core.pid();
+        [[maybe_unused]] auto handle = core.handle();
 
         // Get PEB
         PEB_T peb = { };
-        auto peb_ptr = core.peb( &peb );
-        UNREFERENCED_PARAMETER( peb_ptr );
+        [[maybe_unused]] auto peb_ptr = core.peb( &peb );
 
         // Get all process handles
         if (auto handles = explorer.EnumHandles(); handles)
@@ -66,8 +62,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
         auto mainMod = modules.GetMainModule();
 
         // Get module base address
-        auto base = mainMod->baseAddress;
-        UNREFERENCED_PARAMETER( base );
+        [[maybe_unused]] auto base = mainMod->baseAddress;
 
         // Get export symbol from module found by name
         auto LoadLibraryWPtr = modules.GetExport( L"kernel32.dll", "LoadLibraryW" );
@@ -121,8 +116,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
             block->Write( 0x10, 12.0 );
 
             // Read from memory block
-            auto dval = block->Read<double>( 0x10, 0.0 );
-            UNREFERENCED_PARAMETER( dval );
+            [[maybe_unused]] auto dval = block->Read<double>( 0x10, 0.0 );
         }
 
         // Enumerate regions
@@ -163,8 +157,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
         a.GenEpilogue();
 
         auto func = reinterpret_cast<uintptr_t( __fastcall* )(uintptr_t, uintptr_t)>(a->make());
-        uintptr_t r = func( 10, 5 );
-        UNREFERENCED_PARAMETER( r );
+        [[maybe_unused]] uintptr_t r = func( 10, 5 );
     }
 
     // Remote code execution
@@ -176,8 +169,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
         if (GetModuleHandleWPtr)
         {
             // Direct execution in the new thread without stub
-            DWORD mod = remote.ExecDirect( GetModuleHandleWPtr->procAddress, 0 );
-            UNREFERENCED_PARAMETER( mod );
+            [[maybe_unused]] DWORD mod = remote.ExecDirect( GetModuleHandleWPtr->procAddress, 0 );
         }
 
         // Execute in the new thread using stub
