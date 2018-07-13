@@ -11,7 +11,7 @@
 
 namespace blackbone
 {
-template<typename R, typename... Args>
+template<eCalligConvention Conv, typename R, typename... Args>
 class RemoteFunctionBase
 {
 public:
@@ -52,10 +52,9 @@ public:
     };
 
 public:
-    RemoteFunctionBase( Process& proc, ptr_t ptr, eCalligConvention conv )
+    RemoteFunctionBase( Process& proc, ptr_t ptr )
         : _process( proc )
         , _ptr( ptr )
-        , _conv( conv )
     {
         static_assert(
             (... && !std::is_reference_v<Args>),
@@ -92,7 +91,7 @@ public:
         else if constexpr (!std::is_reference_v<ReturnType> && sizeof( ReturnType ) > sizeof( uint64_t ))
             retType = rt_struct;
 
-        _process.remote().PrepareCallAssembly( *a, _ptr, args.arguments, _conv, retType );
+        _process.remote().PrepareCallAssembly( *a, _ptr, args.arguments, Conv, retType );
 
         // Choose execution thread
         if (!contextThread)
@@ -120,88 +119,109 @@ public:
         return call_result_t<ReturnType>( result, STATUS_SUCCESS );
     }
 
+    call_result_t<ReturnType> Call( const Args&... args )
+    {
+        CallArguments a( args... );
+        return Call( a, nullptr );
+    }
+
+    call_result_t<ReturnType> Call( const std::tuple<Args...>& args, ThreadPtr contextThread = nullptr ) 
+    { 
+        CallArguments a( args, std::index_sequence_for<Args...>() ); 
+        return Call( a, contextThread ); 
+    } 
+        
+    call_result_t<ReturnType> Call( const std::initializer_list<AsmVariant>& args, ThreadPtr contextThread = nullptr ) 
+    { 
+        CallArguments a( args ); 
+        return Call( a, contextThread ); 
+    } 
+        
+    call_result_t<ReturnType> operator()( const Args&... args ) 
+    { 
+        CallArguments a( args... ); 
+        return Call( a ); 
+    } 
+        
+    auto MakeArguments( const Args&... args ) 
+    { 
+        return CallArguments( args... ); 
+    } 
+        
+    auto MakeArguments( const std::initializer_list<AsmVariant>& args ) 
+    { 
+        return CallArguments( args ); 
+    } 
+        
+    auto MakeArguments( const std::tuple<Args...>& args ) 
+    { 
+        return CallArguments( args, std::index_sequence_for<Args...>() ); 
+    }      
+
     bool valid() const { return _ptr != 0; }
     explicit operator bool() const { return valid(); }
 
 private:
     Process& _process;
     ptr_t _ptr = 0;
-    eCalligConvention _conv = cc_cdecl;
 };
 
 // Remote function pointer
 template<typename Fn>
 class RemoteFunction;
 
-#define DECLPFN(CALL_OPT, CALL_DEF) \
-template<typename R, typename... Args> \
-class RemoteFunction < R( CALL_OPT*)(Args...) > : public RemoteFunctionBase<R, Args...> \
-{ \
-public: \
-    RemoteFunction( Process& proc, ptr_t ptr ) \
-        : RemoteFunctionBase( proc, ptr, CALL_DEF ) { } \
-\
-    RemoteFunction( Process& proc, R( *ptr )(Args...) ) \
-        : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr), CALL_DEF ) { } \
-\
-    call_result_t<ReturnType> Call( const Args&... args ) \
-    { \
-        CallArguments a( args... ); \
-        return RemoteFunctionBase::Call( a ); \
-    } \
-\
-    call_result_t<ReturnType> Call( const std::tuple<Args...>& args, ThreadPtr contextThread = nullptr ) \
-    { \
-        CallArguments a( args, std::index_sequence_for<Args...>() ); \
-        return RemoteFunctionBase::Call( a, contextThread ); \
-    } \
-\
-    call_result_t<ReturnType> Call( const std::initializer_list<AsmVariant>& args, ThreadPtr contextThread = nullptr ) \
-    { \
-        CallArguments a( args ); \
-        return RemoteFunctionBase::Call( a, contextThread ); \
-    } \
-\
-    call_result_t<ReturnType> Call( CallArguments& args, ThreadPtr contextThread = nullptr ) \
-    { \
-        return RemoteFunctionBase::Call( args, contextThread ); \
-    } \
-\
-    call_result_t<ReturnType> operator()( const Args&... args ) \
-    { \
-        CallArguments a( args... ); \
-        return RemoteFunctionBase::Call( a ); \
-    } \
-\
-    auto MakeArguments( const Args&... args ) \
-    { \
-        return RemoteFunctionBase::CallArguments( args... ); \
-    } \
-\
-    auto MakeArguments( const std::initializer_list<AsmVariant>& args ) \
-    { \
-        return RemoteFunctionBase::CallArguments( args ); \
-    } \
-\
-    auto MakeArguments( const std::tuple<Args...>& args  ) \
-    { \
-        return RemoteFunctionBase::CallArguments( args, std::index_sequence_for<Args...>() ); \
-    } \
-\
-    bool valid() const { return RemoteFunctionBase::valid(); } \
-    explicit operator bool() { return RemoteFunctionBase::valid(); } \
-};
-
 //
 // Calling convention specialization
 //
-DECLPFN( __cdecl, cc_cdecl );
+template<typename R, typename... Args> \
+class RemoteFunction <R( __cdecl* )(Args...)> : public RemoteFunctionBase<cc_cdecl, R, Args...>
+{
+public:
+    using RemoteFunctionBase::RemoteFunctionBase;
+
+    RemoteFunction( Process& proc, R( __cdecl* ptr )(Args...) )
+        : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr) ) 
+    { 
+    }
+};
 
 // Under AMD64 these will be same declarations as __cdecl, so compilation will fail.
 #ifdef USE32
-DECLPFN( __stdcall,  cc_stdcall  );
-DECLPFN( __thiscall, cc_thiscall );
-DECLPFN( __fastcall, cc_fastcall );
+template<typename R, typename... Args>
+class RemoteFunction <R( __stdcall* )(Args...)> : public RemoteFunctionBase<cc_stdcall, R, Args...>
+{
+public:
+    using RemoteFunctionBase::RemoteFunctionBase;
+
+    RemoteFunction( Process& proc, R( __stdcall* ptr )(Args...) )
+        : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr) )
+    { 
+    }
+};
+
+template<typename R, typename... Args>
+class RemoteFunction <R( __thiscall* )(Args...)> : public RemoteFunctionBase<cc_thiscall, R, Args...>
+{
+public:
+    using RemoteFunctionBase::RemoteFunctionBase;
+
+    RemoteFunction( Process& proc, R( __thiscall* ptr )(Args...) )
+        : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr) ) 
+    { 
+    }
+};
+
+template<typename R, typename... Args>
+class RemoteFunction <R( __fastcall* )(Args...)> : public RemoteFunctionBase<cc_fastcall, R, Args...>
+{
+public:
+    using RemoteFunctionBase::RemoteFunctionBase;
+
+    RemoteFunction( Process& proc, R( __fastcall* ptr )(Args...) )
+        : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr) ) 
+    { 
+    }
+};
 #endif
 
 /// <summary>
