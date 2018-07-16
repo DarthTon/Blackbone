@@ -46,19 +46,24 @@ namespace syscall
         return syscall<NTSTATUS>( index, std::forward<Args>( args )... );
     }
 
-    inline int get_index( const char* func )
+    inline int get_index( const wchar_t* modName, const char* func )
     {
 #ifdef USE32
-        // Doesn't work for x86 ntdll
+        // Doesn't work for x86
         return -1;
 #else
-    const auto pfn = reinterpret_cast<const uint8_t*>(GetProcAddress(
-        GetModuleHandleW( L"ntdll.dll" ),
-        func
+        const auto pfn = reinterpret_cast<const uint8_t*>(GetProcAddress(
+            GetModuleHandleW( modName ),
+            func
         ));
 
-    return pfn ? *reinterpret_cast<const int*>(pfn + 4) : -1;
+        return pfn ? *reinterpret_cast<const int*>(pfn + 4) : -1;
 #endif
+    }
+
+    inline int get_index( const char* func )
+    {
+        return get_index( L"ntdll.dll", func );
     }
 
 #pragma warning(pop)

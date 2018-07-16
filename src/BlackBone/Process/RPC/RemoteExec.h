@@ -5,7 +5,6 @@
 #include "../Threads/Threads.h"
 #include "../MemBlock.h"
 
-
 // User data offsets
 #define INTRET_OFFSET   0x00
 #define RET_OFFSET      0x08
@@ -123,7 +122,7 @@ public:
     /// Save value in rax to user buffer
     /// </summary>
     /// <param name="a">Target assembly helper</param>
-    BLACKBONE_API inline void SaveCallResult( IAsmHelper& a, uint32_t retOffset = RET_OFFSET )
+    BLACKBONE_API void SaveCallResult( IAsmHelper& a, uint32_t retOffset = RET_OFFSET )
     {
         a->mov( a->zdx, _userData.ptr() + retOffset );
         a->mov( asmjit::host::dword_ptr( a->zdx ), a->zax );
@@ -135,7 +134,7 @@ public:
     /// <param name="result">Retrieved result</param>
     /// <returns>true on success</returns>
     template<typename T>
-    inline NTSTATUS GetCallResult( T& result )
+    NTSTATUS GetCallResult( T& result )
     {
         if constexpr (sizeof( T ) > sizeof( uint64_t ))
         {
@@ -152,7 +151,7 @@ public:
     /// Retrieve last NTSTATUS code
     /// </summary>
     /// <returns></returns>
-    BLACKBONE_API inline NTSTATUS GetLastStatus()
+    BLACKBONE_API NTSTATUS GetLastStatus()
     {
         return _userData.Read<NTSTATUS>( ERR_OFFSET, STATUS_NOT_FOUND );
     }
@@ -166,19 +165,19 @@ public:
     /// Get worker thread
     /// </summary>
     /// <returns></returns>
-    BLACKBONE_API inline ThreadPtr getWorker() { return _workerThread; }
+    BLACKBONE_API ThreadPtr getWorker() { return _workerThread; }
 
     /// <summary>
     /// Get execution thread
     /// </summary>
     /// <returns></returns>
-    BLACKBONE_API inline ThreadPtr getExecThread() { return _hijackThread ? _hijackThread : _workerThread; }
+    BLACKBONE_API ThreadPtr getExecThread() { return _hijackThread ? _hijackThread : _workerThread; }
 
     /// <summary>
     /// Ge memory routines
     /// </summary>
     /// <returns></returns>
-    BLACKBONE_API inline class ProcessMemory& memory() { return _memory; }
+    BLACKBONE_API class ProcessMemory& memory() { return _memory; }
 
     /// <summary>
     /// Reset instance

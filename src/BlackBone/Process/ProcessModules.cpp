@@ -15,7 +15,7 @@
 #include <metahost.h>
 #endif
 
-#include <VersionHelpers.h>
+#include <3rd_party/VersionApi.h>
 
 namespace blackbone
 {
@@ -207,27 +207,39 @@ ProcessModules::mapModules ProcessModules::GetManualModules()
 /// <returns>Export info. If failed procAddress field is 0</returns>
 call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, const char* name_ord, const wchar_t* baseModule /*= L""*/ )
 {
+    return GetExport( *hMod, name_ord, baseModule );
+}
+
+/// <summary>
+/// Get export address. Forwarded exports will be automatically resolved if forward module is present
+/// </summary>
+/// <param name="hMod">Module to search in</param>
+/// <param name="name_ord">Function name or ordinal</param>
+/// <param name="baseModule">Import module name. Only used to resolve ApiSchema during manual map.</param>
+/// <returns>Export info. If failed procAddress field is 0</returns>
+BLACKBONE_API call_result_t<exportData> ProcessModules::GetExport( const ModuleData& hMod, const char* name_ord, const wchar_t* baseModule /*= L"0"*/ )
+{
     exportData data;
 
-    /// Invalid module
-    if (hMod == nullptr || hMod->baseAddress == 0)
+    // Invalid module
+    if (hMod.baseAddress == 0)
         return STATUS_INVALID_PARAMETER_1;
-    
+
     std::unique_ptr<IMAGE_EXPORT_DIRECTORY, decltype(&free)> expData( nullptr, &free );
 
     IMAGE_DOS_HEADER hdrDos = { 0 };
-    uint8_t hdrNt32[sizeof(IMAGE_NT_HEADERS64)] = { 0 };
+    uint8_t hdrNt32[sizeof( IMAGE_NT_HEADERS64 )] = { 0 };
     auto phdrNt32 = reinterpret_cast<PIMAGE_NT_HEADERS32>(hdrNt32);
     auto phdrNt64 = reinterpret_cast<PIMAGE_NT_HEADERS64>(hdrNt32);
     DWORD expSize = 0;
     uintptr_t expBase = 0;
 
-    _memory.Read( hMod->baseAddress, sizeof(hdrDos), &hdrDos );
+    _memory.Read( hMod.baseAddress, sizeof( hdrDos ), &hdrDos );
 
     if (hdrDos.e_magic != IMAGE_DOS_SIGNATURE)
         return STATUS_INVALID_IMAGE_NOT_MZ;
 
-    _memory.Read( hMod->baseAddress + hdrDos.e_lfanew, sizeof(IMAGE_NT_HEADERS64), &hdrNt32 );
+    _memory.Read( hMod.baseAddress + hdrDos.e_lfanew, sizeof( IMAGE_NT_HEADERS64 ), &hdrNt32 );
 
     if (phdrNt32->Signature != IMAGE_NT_SIGNATURE)
         return STATUS_INVALID_IMAGE_FORMAT;
@@ -248,20 +260,20 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, 
         expData.reset( reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(malloc( expSize )) );
         IMAGE_EXPORT_DIRECTORY* pExpData = expData.get();
 
-        _memory.Read( hMod->baseAddress + expBase, expSize, pExpData );
+        _memory.Read( hMod.baseAddress + expBase, expSize, pExpData );
 
         // Fix invalid directory size
         if (expSize <= sizeof( IMAGE_EXPORT_DIRECTORY ))
         {
             // New size should take care of max number of present names (max name length is assumed to be 255 chars)
             expSize = static_cast<DWORD>(
-                pExpData->AddressOfNameOrdinals - expBase 
+                pExpData->AddressOfNameOrdinals - expBase
                 + max( pExpData->NumberOfFunctions, pExpData->NumberOfNames ) * 255
                 );
 
             expData.reset( reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(malloc( expSize )) );
             pExpData = expData.get();
-            _memory.Read( hMod->baseAddress + expBase, expSize, pExpData );
+            _memory.Read( hMod.baseAddress + expBase, expSize, pExpData );
         }
 
         WORD* pAddressOfOrds = reinterpret_cast<WORD*>(
@@ -293,17 +305,17 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, 
                 return STATUS_NOT_FOUND;
 
             if ((reinterpret_cast<uintptr_t>(name_ord) <= 0xFFFF && (WORD)((uintptr_t)name_ord) == (OrdIndex + pExpData->Base)) ||
-                 (reinterpret_cast<uintptr_t>(name_ord) > 0xFFFF && strcmp( pName, name_ord ) == 0))
+                (reinterpret_cast<uintptr_t>(name_ord) > 0xFFFF && strcmp( pName, name_ord ) == 0))
             {
-                data.procAddress = pAddressOfFuncs[OrdIndex] + hMod->baseAddress;
+                data.procAddress = pAddressOfFuncs[OrdIndex] + hMod.baseAddress;
 
                 // Check forwarded export
-                if (data.procAddress >= hMod->baseAddress + expBase && 
-                    data.procAddress <= hMod->baseAddress + expBase + expSize)
+                if (data.procAddress >= hMod.baseAddress + expBase &&
+                    data.procAddress <= hMod.baseAddress + expBase + expSize)
                 {
                     char forwardStr[255] = { 0 };
 
-                    _memory.Read( data.procAddress, sizeof(forwardStr), forwardStr );
+                    _memory.Read( data.procAddress, sizeof( forwardStr ), forwardStr );
 
                     std::string chainExp( forwardStr );
 

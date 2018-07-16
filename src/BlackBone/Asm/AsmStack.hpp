@@ -2,7 +2,7 @@
 
 #pragma warning(push)
 #pragma warning(disable : 4100)
-#include "../../../contrib/AsmJit/AsmJit.h"
+#include "../../3rd_party/AsmJit/AsmJit.h"
 #pragma warning(pop)
 
 #include "../Include/Macro.h"
@@ -17,12 +17,8 @@ class AsmStackAllocator
 public:
     BLACKBONE_API AsmStackAllocator( asmjit::X86Assembler* pAsm, int32_t baseval = 0x28 )
         : _pAsm( pAsm )
-        , disp_ofst( sizeof( uint64_t ) )
+        , disp_ofst( pAsm->getArch() == asmjit::kArch::kArchX64 ? baseval : sizeof( uint64_t ) )
     {
-        if (pAsm->getArch() == asmjit::kArch::kArchX64)
-            disp_ofst = baseval;
-        else
-            baseval = 0;
     }
 
     /// <summary>
@@ -32,11 +28,13 @@ public:
     /// <returns>Variable memory object</returns>
     BLACKBONE_API asmjit::Mem AllocVar( int32_t size )
     {
+        bool x64 = _pAsm->getArch() == asmjit::kArch::kArchX64;
+
         // Align on word length
-        size = static_cast<int32_t>(Align( size, sizeof( uint64_t ) ));
+        size = static_cast<int32_t>(Align( size, x64 ? sizeof( uint64_t ) : sizeof( uint32_t ) ));
 
         asmjit::Mem val;
-        if (_pAsm->getArch() == asmjit::kArch::kArchX64)
+        if (x64)
             val = asmjit::Mem( _pAsm->zsp, disp_ofst, size );
         else
             val = asmjit::Mem( _pAsm->zbp, -disp_ofst - size, size );

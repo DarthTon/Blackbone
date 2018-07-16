@@ -3,6 +3,7 @@ version: 1.0.{build}
 branches:
   only:
     - master
+    - testing
 
 image: Visual Studio 2017
 clone_folder: c:\projects\blackbone
@@ -20,6 +21,12 @@ configuration:
 build:
   parallel: true
   project: BlackBone.sln 
+  
+build_script:
+  MSBuild.exe BlackBone.sln /p:CI=true /logger:"C:\Program Files\AppVeyor\BuildAgent\Appveyor.MSBuildLogger.dll"
+  
+test_script:
+  - ps: vstest.console /logger:Appveyor "build/$env:PLATFORM/$env:CONFIGURATION/BlackboneTest.dll"
 
 skip_commits:
   message: /Driver/

@@ -44,10 +44,8 @@ void AsmHelper64::GenPrologue( bool switchMode /*= false*/ )
 /// </summary>
 /// <param name="switchMode">true if execution must be swithed to x86 mode</param>
 /// <param name="retSize">Stack change value</param>
-void AsmHelper64::GenEpilogue( bool switchMode /*= false*/, int retSize /*= 0*/ )
+void AsmHelper64::GenEpilogue( bool switchMode /*= false*/, int /*retSize = 0*/ )
 {
-    UNREFERENCED_PARAMETER( retSize );
-
     if (switchMode)
     {
         SwitchTo86();
@@ -189,7 +187,8 @@ void AsmHelper64::PushArg( const AsmVariant& arg, int32_t index )
 
     case AsmVariant::dataPtr:
     case AsmVariant::dataStruct:
-        PushArgp( arg.new_imm_val, index );
+        // Use new_imm_val when available. It's populated by remote call engine.
+        PushArgp( arg.new_imm_val != 0 ? arg.new_imm_val : arg.imm_val64, index );
         break;
 
     case AsmVariant::imm_double:        

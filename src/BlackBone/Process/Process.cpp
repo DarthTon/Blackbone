@@ -84,14 +84,14 @@ NTSTATUS Process::CreateAndAttach(
 {
     Detach();
 
-    STARTUPINFOW si = { 0 };
-    PROCESS_INFORMATION pi = { 0 };
+    STARTUPINFOW si = { };
+    PROCESS_INFORMATION pi = { };
     if (!pStartup)
         pStartup = &si;
 
     if (!CreateProcessW(
         path.c_str(), const_cast<LPWSTR>(cmdLine.c_str()), 
-        NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, 
+        nullptr, nullptr, FALSE, CREATE_SUSPENDED, nullptr,
         currentDir, pStartup, &pi
         ))
     {

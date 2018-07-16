@@ -1,12 +1,16 @@
-#include "Tests.h"
-#include "../../contrib/VersionHelpers.h"
+#include <BlackBone/Process/Process.h>
+#include <3rd_party/VersionApi.h>
+
+#include <iostream>
+#include <set>
+using namespace blackbone;
 
 std::set<std::wstring> nativeMods, modList;
 
 /*
     Try to map calc.exe into current process
 */
-void TestMMap()
+void MapCalcFromFile()
 {
     Process thisProc;
     thisProc.Attach( GetCurrentProcessId() );
@@ -61,7 +65,7 @@ void TestMMap()
 /*
     Try to map cmd.exe into current process from buffer
 */
-void TestMMapFromMem()
+void MapCmdFromMem()
 {
     Process thisProc;
     thisProc.Attach( GetCurrentProcessId() );

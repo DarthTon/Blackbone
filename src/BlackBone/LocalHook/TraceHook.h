@@ -68,14 +68,13 @@ struct HookContext
 
 class TraceHook
 {
-
 public:
     using mapContext = std::map<uintptr_t, HookContext>;
     using vecStackFrames = std::vector <std::pair<uintptr_t, uintptr_t>>;
 
 public:
     ~TraceHook();
-    static TraceHook& Instance();
+    BLACKBONE_API static TraceHook& Instance();
 
     /// <summary>
     /// Setup hook

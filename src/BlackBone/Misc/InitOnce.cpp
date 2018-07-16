@@ -2,7 +2,7 @@
 #include "../Include/Winheaders.h"
 #include "../Include/Macro.h"
 #include "../Include/HandleGuard.h"
-#include "../../../contrib/VersionHelpers.h"
+#include <3rd_party/VersionApi.h>
 
 #include "DynImport.h"
 #include "../Symbols/SymbolLoader.h"
