@@ -90,6 +90,7 @@ void AsmHelper32::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVaria
         assert( pFN.imm_val64 <= std::numeric_limits<uint32_t>::max() );
         _assembler.mov( asmjit::host::eax, pFN.imm_val );
         _assembler.call( asmjit::host::eax );
+        _assembler.pop(asmjit::host::eax);
     }
     // Already in register
     else if (pFN.type == AsmVariant::reg)
@@ -134,7 +135,7 @@ void AsmHelper32::ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr
 
     // NtTerminateThread( NULL, eax );
     _assembler.push( asmjit::host::eax );
-    _assembler.push( 0 );
+    _assembler.mov( asmjit::host::eax, 0 );
     _assembler.mov( asmjit::host::eax, pExitThread );
     _assembler.call( asmjit::host::eax );
     
