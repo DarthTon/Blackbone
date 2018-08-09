@@ -260,7 +260,8 @@ BLACKBONE_API call_result_t<exportData> ProcessModules::GetExport( const ModuleD
         expData.reset( reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(malloc( expSize )) );
         IMAGE_EXPORT_DIRECTORY* pExpData = expData.get();
 
-        _memory.Read( hMod.baseAddress + expBase, expSize, pExpData );
+        if( auto status = _memory.Read( hMod.baseAddress + expBase, expSize, pExpData ); !NT_SUCCESS( status ) )
+            return status;
 
         // Fix invalid directory size
         if (expSize <= sizeof( IMAGE_EXPORT_DIRECTORY ))
@@ -273,7 +274,8 @@ BLACKBONE_API call_result_t<exportData> ProcessModules::GetExport( const ModuleD
 
             expData.reset( reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(malloc( expSize )) );
             pExpData = expData.get();
-            _memory.Read( hMod.baseAddress + expBase, expSize, pExpData );
+            if (auto status = _memory.Read( hMod.baseAddress + expBase, expSize, pExpData ); !NT_SUCCESS( status ))
+                return status;
         }
 
         WORD* pAddressOfOrds = reinterpret_cast<WORD*>(
