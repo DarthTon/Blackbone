@@ -450,98 +450,46 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
 /// <returns>Status code</returns>
 NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
 {         
-    NTSTATUS status = STATUS_SUCCESS;
+    if (_hWaitEvent)
+        return STATUS_SUCCESS;
 
-    if(_hWaitEvent == NULL)
-    {
-        auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
+    auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
 
-        wchar_t pEventName[128] = { 0 };
-        uint64_t result = NULL;
-        size_t len = sizeof(pEventName);
-        OBJECT_ATTRIBUTES obAttr = { 0 };
-        UNICODE_STRING ustr = { 0 };
+    wchar_t pEventName[128] = { };
+    size_t len = sizeof( pEventName );
+    OBJECT_ATTRIBUTES obAttr = { };
+    UNICODE_STRING ustr = { };
 
-        // Event name
-        swprintf_s( pEventName, ARRAYSIZE( pEventName ), L"\\BaseNamedObjects\\_MMapEvent_0x%x_0x%x", threadID, GetTickCount() );
+    // Event name
+    swprintf_s( pEventName, ARRAYSIZE( pEventName ), L"\\BaseNamedObjects\\_MMapEvent_0x%x_0x%x", threadID, GetTickCount() );
 
-        wchar_t* szStringSecurityDis = L"S:(ML;;NW;;;LW)D:(A;;GA;;;S-1-15-2-1)(A;;GA;;;WD)";
-        PSECURITY_DESCRIPTOR pDescriptor = nullptr;
-        ConvertStringSecurityDescriptorToSecurityDescriptorW( szStringSecurityDis, SDDL_REVISION_1, &pDescriptor, NULL );
+    wchar_t* szStringSecurityDis = L"S:(ML;;NW;;;LW)D:(A;;GA;;;S-1-15-2-1)(A;;GA;;;WD)";
+    PSECURITY_DESCRIPTOR pDescriptor = nullptr;
+    ConvertStringSecurityDescriptorToSecurityDescriptorW( szStringSecurityDis, SDDL_REVISION_1, &pDescriptor, NULL );
+    auto guard = std::unique_ptr<void, decltype(&LocalFree)>( pDescriptor, &LocalFree );
 
-        // Prepare Arguments
-        ustr.Length = static_cast<USHORT>(wcslen( pEventName ) * sizeof(wchar_t));
-        ustr.MaximumLength = static_cast<USHORT>(len);
-        ustr.Buffer = pEventName;
+    // Prepare Arguments
+    ustr.Length = static_cast<USHORT>(wcslen( pEventName ) * sizeof(wchar_t));
+    ustr.MaximumLength = static_cast<USHORT>(len);
+    ustr.Buffer = pEventName;
 
-        obAttr.ObjectName = &ustr;
-        obAttr.Length = sizeof(obAttr);
-        obAttr.SecurityDescriptor = pDescriptor;
+    obAttr.ObjectName = &ustr;
+    obAttr.Length = sizeof(obAttr);
+    obAttr.SecurityDescriptor = pDescriptor;
 
-        auto pOpenEvent = _mods.GetNtdllExport( "NtOpenEvent", mt_default, Sections );
-        if (!pOpenEvent)
-            return pOpenEvent.status;
+    auto pOpenEvent = _mods.GetNtdllExport( "NtOpenEvent", mt_default, Sections );
+    if (!pOpenEvent)
+        return pOpenEvent.status;
 
-        status = SAFE_NATIVE_CALL( NtCreateEvent, &_hWaitEvent, EVENT_ALL_ACCESS, &obAttr, 0, static_cast<BOOLEAN>(FALSE) );
-        if(pDescriptor)
-            LocalFree( pDescriptor );
+    auto status = SAFE_NATIVE_CALL( NtCreateEvent, &_hWaitEvent, EVENT_ALL_ACCESS, &obAttr, 0, static_cast<BOOLEAN>(FALSE) );
+    if (!NT_SUCCESS( status ))
+        return status;
 
-        if (!NT_SUCCESS( status ))
-            return status;
+    HANDLE hRemoteHandle = nullptr;
+    if (!DuplicateHandle( GetCurrentProcess(), _hWaitEvent, _process.core().handle(), &hRemoteHandle, 0, FALSE, DUPLICATE_SAME_ACCESS ))
+        return LastNtStatus();
 
-        wchar_t* pEvent = pEventName; //for MSVC 14 - 2015
-        auto fillAttributes = [this, len, pEvent]( auto& obAttr, auto& ustr )
-        {
-            ustr.Buffer = static_cast<decltype(ustr.Buffer)>(this->_userData.ptr() + ARGS_OFFSET + sizeof( obAttr ) + sizeof( ustr ));
-            ustr.Length = static_cast<USHORT>(wcslen( pEvent ) * sizeof( wchar_t ));
-            ustr.MaximumLength = static_cast<USHORT>(len);
-
-            obAttr.Length = sizeof( obAttr );
-            obAttr.ObjectName = static_cast<decltype(obAttr.ObjectName)>(this->_userData.ptr() + ARGS_OFFSET + sizeof( obAttr ));
-
-            NTSTATUS status  = this->_userData.Write( ARGS_OFFSET, obAttr );
-            status |= this->_userData.Write( ARGS_OFFSET + sizeof( obAttr ), ustr );
-            status |= this->_userData.Write( ARGS_OFFSET + sizeof( obAttr ) + sizeof( ustr ), len, pEvent );
-            return status;
-        };
-
-        if (_process.core().isWow64())
-        {
-            _OBJECT_ATTRIBUTES32 obAttr32 = { 0 };
-            _UNICODE_STRING32 ustr32 = { 0 };
-            status = fillAttributes( obAttr32, ustr32 );
-        }
-        else
-        {
-            _OBJECT_ATTRIBUTES64 obAttr64 = { 0 };
-            _UNICODE_STRING64 ustr64 = { 0 };
-            status = fillAttributes( obAttr64, ustr64 );
-        }
-
-        if (!NT_SUCCESS( status ))
-            return status;
-
-        a->GenCall( pOpenEvent->procAddress, {
-            _userData.ptr() + EVENT_OFFSET, 
-            EVENT_MODIFY_STATE | SYNCHRONIZE,
-            _userData.ptr() + ARGS_OFFSET 
-        } );
-
-        // Save status
-        (*a)->mov( (*a)->zdx, _userData.ptr() + ERR_OFFSET );
-        (*a)->mov( asmjit::host::dword_ptr( (*a)->zdx ), asmjit::host::eax );
-        (*a)->ret();
-
-        if(_hijackThread)
-            status = ExecInAnyThread( (*a)->make(), (*a)->getCodeSize(), result, _hijackThread );
-        else
-            status = ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), result, NoSwitch );
-
-        if (NT_SUCCESS( status ))
-            status = static_cast<NTSTATUS>(result);
-    }
-
-    return status;
+    return _userData.Write( EVENT_OFFSET, sizeof( int32_t ), &hRemoteHandle );
 }
 
 /// <summary>

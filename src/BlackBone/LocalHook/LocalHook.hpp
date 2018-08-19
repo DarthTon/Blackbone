@@ -51,7 +51,7 @@ public:
         this->_callOriginal = this->_original = ptr;
         this->_callback = hkPtr;
 
-        if (!AllocateBuffer( reinterpret_cast<uint8_t*>(ptr) ))
+        if (!DetourBase::AllocateBuffer( reinterpret_cast<uint8_t*>(ptr) ))
             return false;
 
         switch (this->_type)

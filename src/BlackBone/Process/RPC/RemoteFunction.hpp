@@ -70,8 +70,7 @@ public:
         auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
 
         // Ensure RPC environment exists
-        auto mode = contextThread == _process.remote().getWorker() ? Worker_CreateNew : Worker_None;
-        status = _process.remote().CreateRPCEnvironment( mode, contextThread != nullptr );
+        status = _process.remote().CreateRPCEnvironment( Worker_None, contextThread != nullptr );
         if (!NT_SUCCESS( status ))
             return call_result_t<ReturnType>( result, status );
 
