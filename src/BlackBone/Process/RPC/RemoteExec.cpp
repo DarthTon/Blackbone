@@ -85,7 +85,9 @@ NTSTATUS RemoteExec::ExecInNewThread(
     }
 
     a->GenCall( _userCode.ptr(), { } );
-    a->ExitThreadWithStatus( pExitThread->procAddress, _userData.ptr() + INTRET_OFFSET );
+    (*a)->mov( (*a)->zdx, _userData.ptr() + INTRET_OFFSET );
+    (*a)->mov( (*a)->zdx, (*a)->zax );
+    a->GenEpilogue( switchMode, 4 );
     
     // Execute code in newly created thread
     if (!NT_SUCCESS( status = _userCode.Write( size, (*a)->getCodeSize(), (*a)->make() ) ))

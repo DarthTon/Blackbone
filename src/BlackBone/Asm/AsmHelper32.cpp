@@ -123,7 +123,7 @@ void AsmHelper32::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVaria
 /// Save eax value and terminate current thread
 /// </summary>
 /// <param name="pExitThread">NtTerminateThread address</param>
-/// <param name="resultPtr">Memry where eax value will be saved</param>
+/// <param name="resultPtr">Memory where eax value will be saved</param>
 void AsmHelper32::ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr )
 {
     if (resultPtr != 0)
