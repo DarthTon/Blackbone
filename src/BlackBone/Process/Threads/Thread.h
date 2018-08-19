@@ -108,19 +108,19 @@ public:
     /// Get thread ID
     /// </summary>
     /// <returns>Thread ID</returns>
-    BLACKBONE_API inline DWORD id() const { return _id; }
+    BLACKBONE_API DWORD id() const { return _id; }
 
     /// <summary>
     /// Get thread handle
     /// </summary>
     /// <returns>Thread hande</returns>
-    BLACKBONE_API inline HANDLE handle() const { return _handle; }
+    BLACKBONE_API HANDLE handle() const { return _handle; }
 
     /// <summary>
     /// Check if thread exists
     /// </summary>
     /// <returns>true if thread exists</returns>
-    BLACKBONE_API inline bool valid() const { return (_handle && ExitCode() == STILL_ACTIVE); }
+    BLACKBONE_API bool valid() const { return (_handle && ExitCode() == STILL_ACTIVE); }
 
     /// <summary>
     /// Get WOW64 TEB
@@ -140,19 +140,19 @@ public:
     /// Get TEB
     /// </summary>
     /// <returns>TEB pointer</returns>
-    BLACKBONE_API inline ptr_t teb() const { return teb( (TEB_T*)nullptr ); }
+    BLACKBONE_API ptr_t teb() const { return teb( (TEB_T*)nullptr ); }
 
     /// <summary>
     /// Get thread creation time
     /// </summary>
     /// <returns>Thread creation time</returns>
-    BLACKBONE_API uint64_t startTime();
+    BLACKBONE_API uint64_t startTime() const;
 
     /// <summary>
     /// Get total execution time(user mode and kernel mode)
     /// </summary>
     /// <returns>Total execution time</returns>
-    BLACKBONE_API uint64_t execTime();
+    BLACKBONE_API uint64_t execTime() const;
 
     /// <summary>
     /// Suspend thread

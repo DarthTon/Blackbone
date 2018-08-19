@@ -204,7 +204,7 @@ void RemoteHook::Restore( const HookData &hook, uint64_t ptr )
         }   
         else
         {
-            auto& threads = _memory.process()->threads().getAll();
+            auto threads = _memory.process()->threads().getAll();
             for (auto& thread : threads)
                 thread->RemoveHWBP( ptr );
         }

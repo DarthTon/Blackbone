@@ -326,9 +326,9 @@ DWORD Thread::ExitCode() const
 /// Get thread creation time
 /// </summary>
 /// <returns>Thread creation time</returns>
-uint64_t Thread::startTime()
+uint64_t Thread::startTime() const
 {
-    FILETIME times[4] = { { 0 } };
+    FILETIME times[4] = { };
 
     if (GetThreadTimes( _handle, &times[0], &times[1], &times[2], &times[3] ))
         return (static_cast<uint64_t>(times[0].dwHighDateTime) << 32) | times[0].dwLowDateTime;
@@ -340,9 +340,9 @@ uint64_t Thread::startTime()
 /// Get total execution time(user mode and kernel mode)
 /// </summary>
 /// <returns>Total execution time</returns>
-uint64_t Thread::execTime()
+uint64_t Thread::execTime() const
 {
-    FILETIME times[4] = { { 0 } };
+    FILETIME times[4] = { };
 
     if (GetThreadTimes( _handle, &times[0], &times[1], &times[2], &times[3] ))
         return ((static_cast<uint64_t>(times[2].dwHighDateTime) << 32) | times[2].dwLowDateTime) 
