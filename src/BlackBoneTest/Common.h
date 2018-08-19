@@ -77,7 +77,7 @@ inline std::wstring GetTestHelperHost()
 #ifdef USE64
     return GetTestHelperHost64();
 #else
-    return GetTestHelperHost32()";
+    return GetTestHelperHost32();
 #endif
 }
 
