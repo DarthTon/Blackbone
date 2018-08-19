@@ -71,6 +71,7 @@ namespace Testing
             Process proc;
             NTSTATUS status = proc.CreateAndAttach( hostPath );
             AssertEx::NtSuccess( status );
+            proc.EnsureInit();
 
             auto image = proc.mmap().MapImage( dllPath, ManualImports, &MapCallback );
             AssertEx::IsTrue( image.success() );
@@ -96,6 +97,7 @@ namespace Testing
             Process proc;
             NTSTATUS status = proc.CreateAndAttach( hostPath );
             AssertEx::NtSuccess( status );
+            proc.EnsureInit();
 
             auto image = proc.mmap().MapImage( size, buf.get(), false, ManualImports, &MapCallback );
             AssertEx::IsTrue( image.success() );

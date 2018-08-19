@@ -217,7 +217,7 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleDataPtr& hMod, 
 /// <param name="name_ord">Function name or ordinal</param>
 /// <param name="baseModule">Import module name. Only used to resolve ApiSchema during manual map.</param>
 /// <returns>Export info. If failed procAddress field is 0</returns>
-BLACKBONE_API call_result_t<exportData> ProcessModules::GetExport( const ModuleData& hMod, const char* name_ord, const wchar_t* baseModule /*= L"0"*/ )
+call_result_t<exportData> ProcessModules::GetExport( const ModuleData& hMod, const char* name_ord, const wchar_t* baseModule /*= L"0"*/ )
 {
     exportData data;
 
