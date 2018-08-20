@@ -58,10 +58,6 @@ NTSTATUS RemoteExec::ExecInNewThread(
         break;
     }
 
-    auto pExitThread = _mods.GetNtdllExport( "NtTerminateThread", switchMode ? mt_mod64 : mt_default );
-    if (!pExitThread)
-        return pExitThread.status;
-
     auto a = switchMode ? AsmFactory::GetAssembler( AsmFactory::asm64 ) 
                         : AsmFactory::GetAssembler( _process.core().isWow64() );
 
