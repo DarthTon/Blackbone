@@ -1,6 +1,7 @@
 #include "NativeSubsystem.h"
 #include "../Misc/Utils.h"
 #include "../Misc/DynImport.h"
+#include "../Misc/Trace.hpp"
 #include "../Include/Macro.h"
 
 #include <type_traits>
@@ -443,11 +444,11 @@ template<typename T>
 std::vector<ModuleDataPtr> Native::EnumModulesT()
 {
     NTSTATUS status = STATUS_SUCCESS;
-    _PEB_T<T> peb = { 0 };
-    _PEB_LDR_DATA2_T<T> ldr = { 0 };
+    _PEB_T<T> peb = { };
+    _PEB_LDR_DATA2_T<T> ldr = { };
     std::vector<ModuleDataPtr> result;
 
-    if (getPEB( &peb ) != 0 && ReadProcessMemoryT( peb.Ldr, &ldr, sizeof(ldr), 0 ) == STATUS_SUCCESS)
+    if (getPEB( &peb ) != 0 && ReadProcessMemoryT( peb.Ldr, &ldr, sizeof( ldr ), 0 ) == STATUS_SUCCESS)
     {
         for (T head = ldr.InLoadOrderModuleList.Flink;
             NT_SUCCESS( status ) && head != (peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2_T<T>, InLoadOrderModuleList ));
@@ -457,7 +458,7 @@ std::vector<ModuleDataPtr> Native::EnumModulesT()
             wchar_t localPath[512] = { 0 };
             _LDR_DATA_TABLE_ENTRY_BASE_T<T> localdata = { { 0 } };
 
-            ReadProcessMemoryT( head, &localdata, sizeof(localdata), 0 );
+            ReadProcessMemoryT( head, &localdata, sizeof( localdata ), 0 );
             ReadProcessMemoryT( localdata.FullDllName.Buffer, localPath, localdata.FullDllName.Length );
 
             data.baseAddress = localdata.DllBase;
@@ -470,6 +471,10 @@ std::vector<ModuleDataPtr> Native::EnumModulesT()
 
             result.emplace_back( std::make_shared<const ModuleData>( data ) );
         }
+    }
+    else
+    {
+        BLACKBONE_TRACE( L"NativeModules: Failed to get PEB/LDR address. Not yet initialized" );
     }
 
     return result;

@@ -55,6 +55,7 @@ NTSTATUS SymbolLoader::Load( SymbolData& result )
     HRESULT hr = sym32.Init( ntdll32.path(), ntdll32.imageBase() );
     if (!_x86OS && SUCCEEDED( hr ))
     {
+        FsRedirector fsr( _wow64Process );
         hr = sym64.Init( ntdll64.path(), ntdll64.imageBase() );
     }
 

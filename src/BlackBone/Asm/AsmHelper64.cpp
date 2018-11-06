@@ -105,7 +105,7 @@ void AsmHelper64::GenCall( const AsmFunctionPtr& pFN, const std::vector<AsmVaria
 /// Save rax value and terminate current thread
 /// </summary>
 /// <param name="pExitThread">NtTerminateThread address</param>
-/// <param name="resultPtr">Memry where rax value will be saved</param>
+/// <param name="resultPtr">Memory where rax value will be saved</param>
 void AsmHelper64::ExitThreadWithStatus( uint64_t pExitThread, uint64_t resultPtr )
 {
     if (resultPtr != 0)

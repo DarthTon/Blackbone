@@ -43,30 +43,22 @@ call_result_t<ThreadPtr> ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg,
     if (!NT_SUCCESS( status ))
         return status;
 
-    CSLock lg( _lock );
-    _threads.emplace_back( std::make_shared<Thread>( hThd, &_core ) );
-    return _threads.back();
+    return std::make_shared<Thread>( hThd, &_core );
 }
 
 /// <summary>
 /// Gets all process threads
 /// </summary>
-/// <param name="dontUpdate">Return already existing thread list</param>
 /// <returns>Threads collection</returns>
-std::vector<ThreadPtr>& ProcessThreads::getAll( bool dontUpdate /*= false*/ )
+std::vector<ThreadPtr> ProcessThreads::getAll() const
 {
-    if (!_threads.empty() && dontUpdate)
-        return _threads;
-
+    std::vector<ThreadPtr> result;
     auto hThreadSnapshot = SnapHandle( CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 ) );
     if (!hThreadSnapshot)
-        return _threads;
+        return result;
    
-
     THREADENTRY32 tEntry = { 0 };
     tEntry.dwSize = sizeof( THREADENTRY32 );
-
-    _threads.clear();
 
     // Iterate threads
     for (BOOL success = Thread32First( hThreadSnapshot, &tEntry );
@@ -76,75 +68,75 @@ std::vector<ThreadPtr>& ProcessThreads::getAll( bool dontUpdate /*= false*/ )
         if (tEntry.th32OwnerProcessID != _core.pid())
             continue;
 
-        CSLock lg( _lock );
-        _threads.emplace_back( std::make_shared<Thread>( tEntry.th32ThreadID, &_core ) );
+        result.emplace_back( std::make_shared<Thread>( tEntry.th32ThreadID, &_core ) );
     }
 
-    return _threads;
+    return result;
 }
 
 /// <summary>
 /// Get main process thread
 /// </summary>
 /// <returns>Pointer to thread object, nullptr if failed</returns>
-ThreadPtr ProcessThreads::getMain()
+ThreadPtr ProcessThreads::getMain() const
 {
     uint64_t mintime = MAXULONG64_2;
-    ThreadPtr pMain;
+    auto threads = getAll();
+    ThreadPtr result = !threads.empty() ? threads.front() : threads.front();
 
-    for (auto& thread : getAll())
+    for (const auto& thread : threads)
     {
         uint64_t time = thread->startTime();
-
         if (time < mintime)
         {
             mintime = time;
-            pMain = thread;
+            result = thread;
         }
     }
 
-    return pMain ? pMain : (!_threads.empty() ? _threads.front() : nullptr);
+    return result;
 }
 
 /// <summary>
 /// Get least executed thread
 /// </summary>
 /// <returns>Pointer to thread object, nullptr if failed</returns>
-ThreadPtr ProcessThreads::getLeastExecuted()
+ThreadPtr ProcessThreads::getLeastExecuted() const
 {
     uint64_t mintime = MAXULONG64_2;
-    ThreadPtr pThread;
+    auto threads = getAll();
+    ThreadPtr result = !threads.empty() ? threads.front() : threads.front();
 
-    for (auto& thread : getAll())
+    for (const auto& thread : threads)
     {
         uint64_t time = thread->execTime();
-
         if (time < mintime)
         {
             mintime = time;
-            pThread = thread;
+            result = thread;
         }
     }
 
-    return pThread;
+    return result;
 }
 
 /// <summary>
 /// Get most executed thread
 /// </summary>
 /// <returns>Pointer to thread object, nullptr if failed</returns>
-ThreadPtr ProcessThreads::getMostExecuted()
+ThreadPtr ProcessThreads::getMostExecuted() const
 {
     uint64_t maxtime = 0;
-    ThreadPtr result;
+    auto threads = getAll();
+    ThreadPtr result = !threads.empty() ? threads.front() : threads.front();
 
-    for (auto& thread : getAll( true ))
+    for (const auto& thread : threads)
     {
         if (thread->id() == GetCurrentThreadId())
             continue;
 
         uint64_t time = thread->execTime();
-        if (thread->id() != GetCurrentThreadId() /*&& !thread->Suspended()*/ && time >= maxtime)
+        if (thread->id() != GetCurrentThreadId() && time >= maxtime)
         {
             maxtime = time;
             result = thread;
@@ -158,15 +150,16 @@ ThreadPtr ProcessThreads::getMostExecuted()
 /// Get random thread
 /// </summary>
 /// <returns>Pointer to thread object, nullptr if failed</returns>
-ThreadPtr ProcessThreads::getRandom()
+ThreadPtr ProcessThreads::getRandom() const
 {
-    if (getAll().empty())
+    auto threads = getAll();
+    if (threads.empty())
         return nullptr;
 
     static std::random_device rd;
-    std::uniform_int_distribution<size_t> dist( 0, _threads.size() - 1 );
+    std::uniform_int_distribution<size_t> dist( 0, threads.size() - 1 );
 
-    return _threads[dist(rd)];
+    return threads[dist(rd)];
 }
 
 /// <summary>
@@ -174,14 +167,12 @@ ThreadPtr ProcessThreads::getRandom()
 /// </summary>
 /// <param name="id">Thread ID</param>
 /// <returns>Pointer to thread object, nullptr if failed</returns>
-ThreadPtr ProcessThreads::get( DWORD id )
+ThreadPtr ProcessThreads::get( DWORD id ) const
 {
-    getAll();
-    auto iter = std::find_if( _threads.begin(), _threads.end(), [id]( const ThreadPtr& thread ) { return thread->id() == id; } );
-    if (iter != _threads.end())
-        return *iter;
+    auto threads = getAll();
+    auto iter = std::find_if( threads.begin(), threads.end(), [id]( const auto& thread ) { return thread->id() == id; } );
 
-    return nullptr;
+    return iter != threads.end() ? *iter : nullptr;
 }
 
 }

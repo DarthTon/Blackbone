@@ -97,7 +97,7 @@ HRESULT PDBHelper::CoCreateDiaDataSource()
         if (!hMod)
         {
             const auto err = GetLastError();
-            BLACKBONE_TRACE( "PDB: Failed to load msdia140.dll, error 0x08%x", err );
+            BLACKBONE_TRACE( "PDB: Failed to load msdia140.dll, error 0x%08x", err );
             return HRESULT_FROM_WIN32( err );
         }
 
@@ -116,7 +116,7 @@ HRESULT PDBHelper::CoCreateDiaDataSource()
 
     if (FAILED( hr ))
     {
-        BLACKBONE_TRACE( "PDB: %s failed with HRESULT 0x08%x", __FUNCTION__, hr );
+        BLACKBONE_TRACE( "PDB: %s failed with HRESULT 0x%08x", __FUNCTION__, hr );
     }
 
     return hr;

@@ -111,6 +111,7 @@ protected:
     size_t   _origSize = 0;             // Original code size
     uint8_t* _buf = nullptr;            // Trampoline buffer
     uint8_t* _origCode = nullptr;       // Original function bytes
+    uint8_t* _origThunk = nullptr;      // Original bytes adjusted for relocation
     uint8_t* _newCode = nullptr;        // Trampoline bytes
     
     HookType::e _type = HookType::Inline;

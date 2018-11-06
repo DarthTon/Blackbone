@@ -360,7 +360,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 {
                     pData->ver              = WINVER_10_RS1;
                     pData->KExecOpt         = 0x1BF;
-                    pData->Protection       = 0x6C2;
+                    pData->Protection       = 0x6CA;
                     pData->EProcessFlags2   = 0x300;
                     pData->ObjTable         = 0x418;
                     pData->VadRoot          = 0x620;

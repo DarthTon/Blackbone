@@ -130,7 +130,6 @@ NTSTATUS Process::Detach()
     _modules.reset();
     _remote.reset();
     _mmap.reset();
-    _threads.reset();
     _hooks.reset();
     _core.Close();
 

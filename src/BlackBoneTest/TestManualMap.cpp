@@ -45,28 +45,33 @@ namespace Testing
             return LoadData( MT_Default, Ldr_None );
         };
 
-        void ValidateDllLoad( const DllLoadData& data )
+        TEST_METHOD( FromFile32 )
         {
-            AssertEx::IsTrue( data.initialized );
-            AssertEx::IsFalse( data.deinitialized );
-            AssertEx::IsTrue( data.static_initialized );
-            AssertEx::IsTrue( data.static_thread_initialized );
-            AssertEx::IsTrue( data.static_func_initialized );
-            AssertEx::IsFalse( data.seh_internal );
-            AssertEx::IsTrue( data.seh_external );
-            AssertEx::IsFalse( data.ceh_internal );
-            AssertEx::IsTrue( data.ceh_external );
-            AssertEx::IsFalse( data.ceh_uncaught );
+            MapFromFile( GetTestHelperHost32(), GetTestHelperDll32() );
         }
 
-        TEST_METHOD( FromFile )
+        TEST_METHOD( FromFile64 )
         {
-            auto hostPath = GetTestHelperHost();
-            auto dllPath = GetTestHelperDll();
+            MapFromFile( GetTestHelperHost64(), GetTestHelperDll64() );
+        }
+ 
+        TEST_METHOD( FromMemory32 )
+        {
+            MapFromMemory( GetTestHelperHost32(), GetTestHelperDll32() );
+        }
 
+        TEST_METHOD( FromMemory64 )
+        {
+            MapFromMemory( GetTestHelperHost64(), GetTestHelperDll64() );
+        }
+
+    private:
+        void MapFromFile( const std::wstring& hostPath, const std::wstring& dllPath )
+        {
             Process proc;
             NTSTATUS status = proc.CreateAndAttach( hostPath );
             AssertEx::NtSuccess( status );
+            proc.EnsureInit();
 
             auto image = proc.mmap().MapImage( dllPath, ManualImports, &MapCallback );
             AssertEx::IsTrue( image.success() );
@@ -84,33 +89,15 @@ namespace Testing
             ValidateDllLoad( g_loadData.result() );
         }
 
-        std::pair<std::unique_ptr<uint8_t[]>, uint32_t> GetFileData( const std::wstring& path )
+        void MapFromMemory( const std::wstring& hostPath, const std::wstring& dllPath )
         {
-            auto hFile = FileHandle( CreateFileW( path.c_str(), FILE_GENERIC_READ, 0x7, nullptr, OPEN_EXISTING, 0, nullptr ) );
-            if (hFile)
-            {
-                uint32_t size = GetFileSize( hFile, nullptr );
-                auto buf = std::make_unique<uint8_t[]>( size );
-
-                DWORD bytes = 0;
-                if (ReadFile( hFile, buf.get(), size, &bytes, nullptr ))
-                    return std::make_pair( std::move( buf ), size );
-            }
-
-            return std::pair<std::unique_ptr<uint8_t[]>, uint32_t>();
-        }
-
-        TEST_METHOD( FromMemory )
-        {
-            auto hostPath = GetTestHelperHost();
-            auto dllPath = GetTestHelperDll();
-
             auto[buf, size] = GetFileData( dllPath );
             AssertEx::IsNotZero( size );
 
             Process proc;
             NTSTATUS status = proc.CreateAndAttach( hostPath );
             AssertEx::NtSuccess( status );
+            proc.EnsureInit();
 
             auto image = proc.mmap().MapImage( size, buf.get(), false, ManualImports, &MapCallback );
             AssertEx::IsTrue( image.success() );
@@ -126,6 +113,36 @@ namespace Testing
             proc.Terminate();
 
             ValidateDllLoad( g_loadData.result() );
+        }
+
+        void ValidateDllLoad( const DllLoadData& data )
+        {
+            AssertEx::IsTrue( data.initialized );
+            AssertEx::IsFalse( data.deinitialized );
+            AssertEx::IsTrue( data.static_initialized );
+            AssertEx::IsTrue( data.static_thread_initialized );
+            AssertEx::IsTrue( data.static_func_initialized );
+            AssertEx::IsFalse( data.seh_internal );
+            AssertEx::IsTrue( data.seh_external );
+            AssertEx::IsFalse( data.ceh_internal );
+            AssertEx::IsTrue( data.ceh_external );
+            AssertEx::IsFalse( data.ceh_uncaught );
+        }
+
+        std::pair<std::unique_ptr<uint8_t[]>, uint32_t> GetFileData( const std::wstring& path )
+        {
+            auto hFile = FileHandle( CreateFileW( path.c_str(), FILE_GENERIC_READ, 0x7, nullptr, OPEN_EXISTING, 0, nullptr ) );
+            if (hFile)
+            {
+                uint32_t size = GetFileSize( hFile, nullptr );
+                auto buf = std::make_unique<uint8_t[]>( size );
+
+                DWORD bytes = 0;
+                if (ReadFile( hFile, buf.get(), size, &bytes, nullptr ))
+                    return std::make_pair( std::move( buf ), size );
+            }
+
+            return std::pair<std::unique_ptr<uint8_t[]>, uint32_t>();
         }
 
     private:

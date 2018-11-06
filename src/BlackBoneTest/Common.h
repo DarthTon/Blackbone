@@ -62,20 +62,40 @@ inline std::wstring GetTestHelperDir()
     return path + L"\\Testing";
 }
 
+inline std::wstring GetTestHelperHost32()
+{
+    return GetTestHelperDir() + L"\\TestHelper32.exe";
+}
+
+inline std::wstring GetTestHelperHost64()
+{
+    return GetTestHelperDir() + L"\\TestHelper64.exe";
+}
+
 inline std::wstring GetTestHelperHost()
 {
 #ifdef USE64
-    return GetTestHelperDir() + L"\\TestHelper64.exe";
+    return GetTestHelperHost64();
 #else
-    return GetTestHelperDir() + L"\\TestHelper32.exe";
+    return GetTestHelperHost32();
 #endif
+}
+
+inline std::wstring GetTestHelperDll32()
+{
+    return GetTestHelperDir() + L"\\TestDll32.dll";
+}
+
+inline std::wstring GetTestHelperDll64()
+{
+    return GetTestHelperDir() + L"\\TestDll64.dll";
 }
 
 inline std::wstring GetTestHelperDll()
 {
 #ifdef USE64
-    return GetTestHelperDir() + L"\\TestDll64.dll";
+    return GetTestHelperDll64();
 #else
-    return GetTestHelperDir() + L"\\TestDll32.dll";
+    return GetTestHelperDll32();
 #endif
 }
