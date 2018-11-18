@@ -25,6 +25,7 @@ enum eBuildThreshold
     Build_RS2 = 15063,
     Build_RS3 = 16299,
     Build_RS4 = 17134,
+    Build_RS5 = 17763,
     Build_RS_MAX = 99999,
 };
 
@@ -40,6 +41,7 @@ enum eVerShort
     Win10_RS2,      // Windows 10 Creators update
     Win10_RS3,      // Windows 10 Fall Creators update
     Win10_RS4,      // Windows 10 Spring Creators update
+    Win10_RS5,      // Windows 10 October 2018 update
 };
 
 struct WinVersion
@@ -101,7 +103,9 @@ BLACKBONE_API inline void InitVersion()
         switch (fullver)
         {
         case _WIN32_WINNT_WIN10:
-            if (g_WinVer.native.dwBuildNumber >= Build_RS4)
+            if (g_WinVer.native.dwBuildNumber >= Build_RS5)
+                g_WinVer.ver = Win10_RS5;
+            else if (g_WinVer.native.dwBuildNumber >= Build_RS4)
                 g_WinVer.ver = Win10_RS4;
             else if (g_WinVer.native.dwBuildNumber >= Build_RS3)
                 g_WinVer.ver = Win10_RS3;
@@ -242,25 +246,31 @@ IsWindows10OrGreater()
 VERSIONHELPERAPI
 IsWindows10RS1OrGreater()
 {
-    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, 14393 );
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_RS1 );
 }
 
 VERSIONHELPERAPI
 IsWindows10RS2OrGreater()
 {
-    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, 15063 );
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_RS2 );
 }
 
 VERSIONHELPERAPI
 IsWindows10RS3OrGreater()
 {
-    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, 16299 );
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_RS3 );
 }
 
 VERSIONHELPERAPI
 IsWindows10RS4OrGreater()
 {
-    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, 17134 );
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_RS4 );
+}
+
+VERSIONHELPERAPI
+IsWindows10RS5OrGreater()
+{
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_RS5 );
 }
 
 VERSIONHELPERAPI

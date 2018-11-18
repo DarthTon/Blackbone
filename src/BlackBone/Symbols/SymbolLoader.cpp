@@ -78,7 +78,7 @@ NTSTATUS SymbolLoader::Load( SymbolData& result )
     }
    
     // Fill missing symbols from patterns
-    return ScanSymbolPatterns( ntdll32, ntdll64, result );;
+    return ScanSymbolPatterns( ntdll32, ntdll64, result );
 }
 
 }
