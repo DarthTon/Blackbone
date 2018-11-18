@@ -432,6 +432,25 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     status = BBLocatePageTables( pData );
                     break;
                 }
+                else if (verInfo.dwBuildNumber == 17763)
+                {
+                    pData->ver              = WINVER_10_RS5;
+                    pData->KExecOpt         = 0x1BF;
+                    pData->Protection       = 0x6CA;
+                    pData->EProcessFlags2   = 0x820;    // MitigationFlags offset
+                    pData->ObjTable         = 0x418;
+                    pData->VadRoot          = 0x628;
+                    pData->NtCreateThdIndex = 0xBC;
+                    pData->NtTermThdIndex   = 0x53;
+                    pData->PrevMode         = 0x232;
+                    pData->ExitStatus       = 0x700;
+                    pData->MiAllocPage      = 0;
+                    if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x83\xC7\x18\x48\x8B\x17", 0xCC, 7, (PVOID)&pData->ExRemoveTable ) ))
+                        pData->ExRemoveTable -= 0x34;
+
+                    status = BBLocatePageTables( pData );
+                    break;
+                }
                 else
                 {
                     return STATUS_NOT_SUPPORTED;
@@ -485,12 +504,18 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
 
     if (pData->ver >= WINVER_10_RS4)
     {
+        const int index = pData->ver - WINVER_10_RS4;
+        TABLE_OFFSETS offsets[] = {
+            { 0x32D, 0x6A9 },
+            { 0x82E, 0x1C82 },
+        };
+
         UNICODE_STRING uName = RTL_CONSTANT_STRING( L"ExFreePoolWithTag" );
         PUCHAR pExFreePoolWithTag = MmGetSystemRoutineAddress( &uName );
         if (pExFreePoolWithTag)
         {
-            pData->DYN_PDE_BASE = *(PULONG_PTR)(pExFreePoolWithTag + 0x32D + 2);
-            pData->DYN_PTE_BASE = *(PULONG_PTR)(pExFreePoolWithTag + 0x6A9 + 2);
+            pData->DYN_PDE_BASE = *(PULONG_PTR)(pExFreePoolWithTag + offsets[index].PDE + 2);
+            pData->DYN_PTE_BASE = *(PULONG_PTR)(pExFreePoolWithTag + offsets[index].PTE + 2);
 
             DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
             return STATUS_SUCCESS;
@@ -503,9 +528,7 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
         {
             { 0, 0, 0, 0 },             // No updates
             { 0x49, 0x56, 0x52, 0x5F }, // WINVER_10_RS1
-            { 0x43, 0x50, 0x4B, 0x58 }, // WINVER_10_RS2
-            { 0x41, 0x4E, 0x4B, 0x58 }, // WINVER_10_RS3
-            { 0x41, 0x4E, 0x4B, 0x58 }  // WINVER_10_RS4
+            { 0x43, 0x50, 0x4B, 0x58 }  // WINVER_10_RS2
         };
 
         const ULONG patchThreshold[] =
@@ -513,8 +536,7 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
             0,      // No updates
             2007,   // WINVER_10_RS1
             850,    // WINVER_10_RS2
-            192,    // WINVER_10_RS3
-            0       // WINVER_10_RS4
+            192     // WINVER_10_RS3
         };
 
         UNICODE_STRING uName = RTL_CONSTANT_STRING( L"MmGetPhysicalAddress" );

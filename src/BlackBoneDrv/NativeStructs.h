@@ -116,6 +116,8 @@ typedef struct _MITIGATION_FLAGS
     unsigned int AuditLoaderIntegrityContinuity : 1;
     unsigned int EnableModuleTamperingProtection : 1;
     unsigned int EnableModuleTamperingProtectionNoInherit : 1;
+    unsigned int RestrictIndirectBranchPrediction;
+    unsigned int IsolateSecurityDomain;
 } MITIGATION_FLAGS, *PMITIGATION_FLAGS;
 
 typedef union _EXHANDLE

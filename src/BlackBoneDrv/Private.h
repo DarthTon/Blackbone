@@ -145,6 +145,7 @@ typedef enum _WinVer
     WINVER_10_RS2 = 0x0A02, // Creators update
     WINVER_10_RS3 = 0x0A03, // Fall creators update
     WINVER_10_RS4 = 0x0A04, // Spring creators update
+    WINVER_10_RS5 = 0x0A05, // October 2018 update
 } WinVer;
 
 extern PLIST_ENTRY PsLoadedModuleList;
