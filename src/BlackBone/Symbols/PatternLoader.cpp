@@ -96,7 +96,7 @@ void OSFillPatterns( std::unordered_map<ptr_t*, OffsetData>& patterns, SymbolDat
         // 33 F6 85 C0 79 03 - RS5+
         // 8B C1 8D 4D AC/BC 51 - RS3-RS4
         const auto pattern = IsWindows10RS4OrGreater() ? "\x8b\xc1\x8d\x4d\xac\x51" : "\x8b\xc1\x8d\x4d\xbc\x51";
-        const auto data = IsWindows10RS4OrGreater() ? OffsetData{ "\x33\xf6\x85\xc0\x79\x03", false, 0x2C } : OffsetData{ pattern, false, 0x18 };
+        const auto data = IsWindows10RS5OrGreater() ? OffsetData{ "\x33\xf6\x85\xc0\x79\x03", false, 0x2C } : OffsetData{ pattern, false, 0x18 };
         patterns.emplace( &result.LdrpHandleTlsData32, data );
 
         // LdrProtectMrdata
