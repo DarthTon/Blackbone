@@ -267,7 +267,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
 #elif defined (_WIN10_)
-        if (ver_short < WINVER_10 || WINVER_10_RS4 < ver_short)
+        if (ver_short < WINVER_10 || WINVER_10_RS5 < ver_short)
             return STATUS_NOT_SUPPORTED;
 #endif
 
