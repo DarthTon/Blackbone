@@ -6,6 +6,10 @@
 
 #include <map>
 
+#if _MSC_VER >= 1920
+    #include <string>
+#endif
+
 #pragma warning(push)
 #pragma warning(disable : 4091)
 #include "cor.h"
