@@ -4,8 +4,6 @@
 // [License]
 // Zlib - See LICENSE.md file in the package.
 
-// [Export]
-#define ASMJIT_EXPORTS
 
 // [Dependencies - AsmJit]
 #include "../base/globals.h"

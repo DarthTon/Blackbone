@@ -4,8 +4,7 @@
 // [License]
 // Zlib - See LICENSE.md file in the package.
 
-// [Export]
-#define ASMJIT_EXPORTS
+
 #define ASMJIT_EXPORTS_X86OPERAND_REGS
 
 // [Guard]
