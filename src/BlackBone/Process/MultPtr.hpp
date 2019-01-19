@@ -90,6 +90,10 @@ template<typename T>
 class multi_ptr_ex : public multi_ptr<T>
 {
 public:
+    using multi_ptr<T>::type;
+    using multi_ptr<T>::type_ptr;
+    using multi_ptr<T>::vecOffsets;
+
     /// <summary>
     /// Initializes a new instance of the <see cref="multi_ptr_ex"/> class.
     /// </summary>
@@ -133,18 +137,18 @@ private:
     /// <returns>Pointer value or 0 if chain is invalid</returns>
     uintptr_t get_ptr()
     {
-        uintptr_t ptr = _base;
+        uintptr_t ptr = this->_base;
         if (!NT_SUCCESS( _proc->memory().Read( ptr, ptr ) ))
             return 0;
 
-        if (!_offsets.empty())
+        if (!this->_offsets.empty())
         {
-            for (intptr_t i = 0; i < static_cast<intptr_t>(_offsets.size()) - 1; i++)
-                if (!NT_SUCCESS( _proc->memory().Read( ptr + _offsets[i], ptr ) ))
+            for (intptr_t i = 0; i < static_cast<intptr_t>(this->_offsets.size()) - 1; i++)
+                if (!NT_SUCCESS( _proc->memory().Read( ptr + this->_offsets[i], ptr ) ))
                     return 0;
 
-            ptr += _offsets.back();
-            if (type_is_ptr)
+            ptr += this->_offsets.back();
+            if (this->type_is_ptr)
                 if (!NT_SUCCESS( _proc->memory().Read( ptr, ptr ) ))
                     return 0;
         }

@@ -176,7 +176,7 @@ template<typename R, typename... Args> \
 class RemoteFunction <R( __cdecl* )(Args...)> : public RemoteFunctionBase<cc_cdecl, R, Args...>
 {
 public:
-    using RemoteFunctionBase::RemoteFunctionBase;
+    using RemoteFunctionBase<cc_cdecl, R, Args...>::RemoteFunctionBase;
 
     RemoteFunction( Process& proc, R( __cdecl* ptr )(Args...) )
         : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr) ) 
@@ -190,7 +190,7 @@ template<typename R, typename... Args>
 class RemoteFunction <R( __stdcall* )(Args...)> : public RemoteFunctionBase<cc_stdcall, R, Args...>
 {
 public:
-    using RemoteFunctionBase::RemoteFunctionBase;
+    using RemoteFunctionBase<cc_stdcall, R, Args...>::RemoteFunctionBase;
 
     RemoteFunction( Process& proc, R( __stdcall* ptr )(Args...) )
         : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr) )
@@ -202,7 +202,7 @@ template<typename R, typename... Args>
 class RemoteFunction <R( __thiscall* )(Args...)> : public RemoteFunctionBase<cc_thiscall, R, Args...>
 {
 public:
-    using RemoteFunctionBase::RemoteFunctionBase;
+    using RemoteFunctionBase<cc_thiscall, R, Args...>::RemoteFunctionBase;
 
     RemoteFunction( Process& proc, R( __thiscall* ptr )(Args...) )
         : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr) ) 
@@ -214,7 +214,7 @@ template<typename R, typename... Args>
 class RemoteFunction <R( __fastcall* )(Args...)> : public RemoteFunctionBase<cc_fastcall, R, Args...>
 {
 public:
-    using RemoteFunctionBase::RemoteFunctionBase;
+    using RemoteFunctionBase<cc_fastcall, R, Args...>::RemoteFunctionBase;
 
     RemoteFunction( Process& proc, R( __fastcall* ptr )(Args...) )
         : RemoteFunctionBase( proc, reinterpret_cast<ptr_t>(ptr) ) 
