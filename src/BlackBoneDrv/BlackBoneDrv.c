@@ -35,7 +35,9 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registr
     status = BBInitDynamicData( &dynData );
     if (!NT_SUCCESS( status ))
     {
-        DPRINT( "BlackBone: %s: Unsupported OS version. Aborting\n", __FUNCTION__ );
+        if (status == STATUS_NOT_SUPPORTED)
+            DPRINT( "BlackBone: %s: Unsupported OS version. Aborting\n", __FUNCTION__ );
+
         return status;
     }
 
@@ -504,10 +506,11 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
 
     if (pData->ver >= WINVER_10_RS4)
     {
-        const int index = pData->ver - WINVER_10_RS4;
+        const int index = pData->ver - WINVER_10_RS4 + (pData->ver >= WINVER_10_RS4 && pData->buildNo >= 195 ? 1 : 0);
         TABLE_OFFSETS offsets[] = {
             { 0x32D, 0x6A9 },
             { 0x82E, 0x1C82 },
+            { 0x10A9, 0x1158 },
         };
 
         UNICODE_STRING uName = RTL_CONSTANT_STRING( L"ExFreePoolWithTag" );
@@ -518,6 +521,12 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
             pData->DYN_PTE_BASE = *(PULONG_PTR)(pExFreePoolWithTag + offsets[index].PTE + 2);
 
             DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
+            if (pData->DYN_PDE_BASE < MI_SYSTEM_RANGE_START || pData->DYN_PTE_BASE < MI_SYSTEM_RANGE_START)
+            {
+                DPRINT( "BlackBone: Invalid PDE/PTE base, aborting\n" );
+                return STATUS_UNSUCCESSFUL;
+            }
+
             return STATUS_SUCCESS;
         }
     }
