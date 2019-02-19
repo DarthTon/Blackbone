@@ -61,7 +61,7 @@ BLACKBONE_API inline uint32_t GetRevision()
 {
     HKEY hKey = NULL;
 
-    if (RegOpenKeyEx( HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0, KEY_QUERY_VALUE, &hKey ) == 0)
+    if (RegOpenKeyExW( HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0, KEY_QUERY_VALUE, &hKey ) == 0)
     {
         wchar_t data[MAX_PATH] = {};
         DWORD dataSize = sizeof( data );
