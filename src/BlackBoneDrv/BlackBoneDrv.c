@@ -537,7 +537,8 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
         {
             { 0, 0, 0, 0 },             // No updates
             { 0x49, 0x56, 0x52, 0x5F }, // WINVER_10_RS1
-            { 0x43, 0x50, 0x4B, 0x58 }  // WINVER_10_RS2
+            { 0x43, 0x50, 0x4B, 0x58 }, // WINVER_10_RS2
+            { 0x41, 0x4E, 0x4B, 0x58 }  // WINVER_10_RS3
         };
 
         const ULONG patchThreshold[] =
@@ -561,6 +562,12 @@ NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
             pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + offsets[index].selector[melt].PTE + 2);
 
             DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
+            if (pData->DYN_PDE_BASE < MI_SYSTEM_RANGE_START || pData->DYN_PTE_BASE < MI_SYSTEM_RANGE_START)
+            {
+                DPRINT( "BlackBone: Invalid PDE/PTE base, aborting\n" );
+                return STATUS_UNSUCCESSFUL;
+            }
+
             return STATUS_SUCCESS;
         }
     }
