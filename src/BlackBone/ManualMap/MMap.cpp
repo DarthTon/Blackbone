@@ -83,18 +83,21 @@ call_result_t<ModuleDataPtr> MMap::MapImage(
 /// <param name="context">User-supplied callback context</param>
 /// <returns>Mapped image info</returns>
 call_result_t<ModuleDataPtr> MMap::MapImageInternal(
-    const std::wstring& path,
-    void* buffer, size_t size,
-    bool asImage /*= false*/,
-    eLoadFlags flags /*= NoFlags*/,
-    MapCallback mapCallback /*= nullptr*/,
-    void* context /*= nullptr*/,
-    CustomArgs_t* pCustomArgs /*= nullptr*/
-    )
+	const std::wstring& path,
+	void* buffer, size_t size,
+	bool asImage /*= false*/,
+	eLoadFlags flags /*= NoFlags*/,
+	MapCallback mapCallback /*= nullptr*/,
+	void* context /*= nullptr*/,
+	CustomArgs_t* pCustomArgs /*= nullptr*/
+)
 {
-    // Already loaded
-    if (auto hMod = _process.modules().GetModule( path ))
-        return hMod;
+	if (!(flags & ForceRemap))
+	{
+		// Already loaded
+		if (auto hMod = _process.modules().GetModule(path))
+			return hMod;
+	}
 
     // Prepare target process
     auto mode = (flags & NoThreads) ? Worker_UseExisting : Worker_CreateNew;
@@ -293,12 +296,15 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
         return status;
     }
 
-    // Check if already loaded
-    if (auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType() ))
-    {
-        pImage->peImage.Release();
-        return hMod;
-    }
+    // Check if already loaded, but only if doesn't explicitly excluded
+	if (!(flags & ForceRemap))
+	{
+		if (auto hMod = _process.modules().GetModule(path, LdrList, pImage->peImage.mType()))
+		{
+			pImage->peImage.Release();
+			return hMod;
+		}
+	}
 
     // Check architecture
     if (pImage->peImage.mType() == mt_mod32 && !_process.core().isWow64())
@@ -402,8 +408,14 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     }
 
     auto mt = ldrEntry.type;
-    auto pMod = _process.modules().AddManualModule( static_cast<ModuleData&>(ldrEntry) );
-    {
+	ModuleDataPtr pMod;
+
+	if (!(flags & ForceRemap))
+		pMod = _process.modules().AddManualModule(static_cast<ModuleData&>(ldrEntry));
+	else
+		pMod = std::make_shared<const ModuleData>(ldrEntry);
+
+	{
         // Handle x64 system32 dlls for wow64 process
         bool fsRedirect = !(flags & IsDependency) && mt == mt_mod64 && _process.barrier().sourceWow64;
 

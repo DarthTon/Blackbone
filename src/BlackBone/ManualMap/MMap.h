@@ -100,6 +100,7 @@ enum eLoadFlags
     MapInHighMem    = 0x20,     // Try to map image in address space beyond 4GB limit
     RebaseProcess   = 0x40,     // If target image is an .exe file, process base address will be replaced with mapped module value
     NoThreads       = 0x80,     // Don't create new threads, use hijacking
+	ForceRemap		= 0x100,	// Force remapping module even if it's already loaded
 
     NoExceptions    = 0x01000,   // Do not create custom exception handler
     PartialExcept   = 0x02000,   // Only create Inverted function table, without VEH
