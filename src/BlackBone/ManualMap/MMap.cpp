@@ -92,9 +92,12 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
     CustomArgs_t* pCustomArgs /*= nullptr*/
     )
 {
-    // Already loaded
-    if (auto hMod = _process.modules().GetModule( path ))
-        return hMod;
+    if (!(flags & ForceRemap))
+    {
+        // Already loaded
+        if (auto hMod = _process.modules().GetModule(path))
+            return hMod;
+    }
 
     // Prepare target process
     auto mode = (flags & NoThreads) ? Worker_UseExisting : Worker_CreateNew;
@@ -293,11 +296,14 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
         return status;
     }
 
-    // Check if already loaded
-    if (auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType() ))
+    // Check if already loaded, but only if doesn't explicitly excluded
+    if (!(flags & ForceRemap))
     {
-        pImage->peImage.Release();
-        return hMod;
+        if (auto hMod = _process.modules().GetModule( path, LdrList, pImage->peImage.mType() ))
+        {
+            pImage->peImage.Release();
+            return hMod;
+        }
     }
 
     // Check architecture
@@ -402,8 +408,14 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     }
 
     auto mt = ldrEntry.type;
-    auto pMod = _process.modules().AddManualModule( static_cast<ModuleData&>(ldrEntry) );
-    {
+	ModuleDataPtr pMod;
+
+    if (flags & ForceRemap)
+        pMod = std::make_shared<const ModuleData>( _process.modules().Canonicalize( ldrEntry, true ) );
+    else
+        pMod = _process.modules().AddManualModule( ldrEntry );
+
+	{
         // Handle x64 system32 dlls for wow64 process
         bool fsRedirect = !(flags & IsDependency) && mt == mt_mod64 && _process.barrier().sourceWow64;
 

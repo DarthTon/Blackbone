@@ -581,14 +581,32 @@ bool ProcessModules::ValidateModule( module_t base )
 /// </summary>
 /// <param name="mod">Module data</param>
 /// <returns>Module info</returns>
-ModuleDataPtr ProcessModules::AddManualModule( ModuleData mod )
+ModuleDataPtr ProcessModules::AddManualModule( const ModuleData& mod )
 {
-    mod.fullPath = Utils::ToLower( std::move( mod.fullPath ) );
-    mod.name = Utils::ToLower( std::move( mod.name ) );
-    mod.manual = true;
+    auto canonicalized = Canonicalize( mod, true );
+    auto key = std::make_pair( canonicalized.name, canonicalized.type );
+    return _modules.emplace( key, std::make_shared<const ModuleData>( canonicalized ) ).first->second;
+}
 
-    auto key = std::make_pair( mod.name, mod.type );
-    return _modules.emplace( key, std::make_shared<const ModuleData>( mod ) ).first->second;
+/// <summary>
+/// Canonicalize paths and set module type to manual if requested
+/// </summary>
+/// <param name="mod">Module data</param>
+/// <param name="manual">Value to set ModuleData::manual to</param>
+/// <returns>Module data</returns>
+ModuleData ProcessModules::Canonicalize( const ModuleData& mod, bool manual )
+{
+    ModuleData result = {};
+
+    result.baseAddress = mod.baseAddress;
+    result.ldrPtr = mod.ldrPtr;
+    result.size = mod.size;
+    result.type = mod.type;
+    result.fullPath = Utils::ToLower( mod.fullPath );
+    result.name = Utils::ToLower( mod.name );
+    result.manual = manual;
+
+    return result;
 }
 
 /// <summary>
