@@ -498,11 +498,14 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, T
     }
 
     // Retry with LoadLibrary if possible
-    if (!NT_SUCCESS( status ) && pLoadLibrary && sameArch)
-        status = _proc.remote().ExecDirect( pLoadLibrary->procAddress, modName->ptr() + ustrSize );
-
-    if (!NT_SUCCESS( status ))
-        return status;
+    if (!NT_SUCCESS(status) && pLoadLibrary && sameArch)
+    {
+        auto result = _proc.remote().ExecDirect( pLoadLibrary->procAddress, modName->ptr() + ustrSize );
+        if (result == 0)
+        {
+            return status;
+        }
+    }
 
     return GetModule( path, LdrList, img.mType() );
 }
