@@ -131,6 +131,13 @@ NTSTATUS BBLoadLocalImage( IN PUNICODE_STRING path, OUT PVOID* pBase );
 NTSTATUS BBCreateWorkerThread( IN PMMAP_CONTEXT pContext );
 
 /// <summary>
+/// Find suitable thread to be used as worker for user-mode calls
+/// </summary>
+/// <param name="pContext">Map context</param>
+/// <returns>Status code</returns>
+NTSTATUS BBFindWokerThread( IN PMMAP_CONTEXT pContext );
+
+/// <summary>
 /// Call arbitrary function
 /// </summary>
 /// <param name="newThread">Perform call in a separate thread</param>
@@ -233,8 +240,9 @@ NTSTATUS BBMapUserImage(
 
     DPRINT( "BlackBone: %s: Mapping image '%wZ' with flags 0x%X\n", __FUNCTION__, path, flags );
 
-    // Create worker
-    status = BBCreateWorkerThread( &context );
+    // Create or find worker thread
+    context.noThreads = (flags & KNoThreads) != 0;
+    status = context.noThreads ? BBFindWokerThread( &context ) : BBCreateWorkerThread( &context );
     if (NT_SUCCESS( status ))
     {
         SIZE_T mapSize = 0x2000;
@@ -754,7 +762,7 @@ NTSTATUS BBResolveImageRefs(
                 pContext->userMem->status = STATUS_SUCCESS;
 
                 // Calling LdrLoadDll in worker thread breaks further APC delivery, so use new thread
-                BBCallRoutine( TRUE, pContext, pContext->pLoadImage, 4, NULL, NULL, &pContext->userMem->ustr, &pContext->userMem->ptr );
+                BBCallRoutine( !pContext->noThreads, pContext, pContext->pLoadImage, 4, NULL, NULL, &pContext->userMem->ustr, &pContext->userMem->ptr );
                 pModule.address = pContext->userMem->ptr;
                 if (!pModule.address)
                     status = pContext->userMem->status;
@@ -1683,6 +1691,16 @@ NTSTATUS BBCreateWorkerThread( IN PMMAP_CONTEXT pContext )
 }
 
 /// <summary>
+/// Find suitable thread to be used as worker for user-mode calls
+/// </summary>
+/// <param name="pContext">Map context</param>
+/// <returns>Status code</returns>
+NTSTATUS BBFindWokerThread( IN PMMAP_CONTEXT pContext )
+{
+    return BBLookupProcessThread( pContext->pProcess, &pContext->pWorker );
+}
+
+/// <summary>
 /// Call arbitrary function
 /// </summary>
 /// <param name="newThread">Perform call in a separate thread</param>
@@ -1710,7 +1728,7 @@ NTSTATUS BBCallRoutine( IN BOOLEAN newThread, IN PMMAP_CONTEXT pContext, IN PVOI
     else
     {
         KeResetEvent( pContext->pSync );
-        status = BBQueueUserApc( pContext->pWorker, pContext->userMem->code, NULL, NULL, NULL, FALSE );
+        status = BBQueueUserApc( pContext->pWorker, pContext->userMem->code, NULL, NULL, NULL, pContext->noThreads );
         if (NT_SUCCESS( status ))
         {
             LARGE_INTEGER timeout = { 0 };

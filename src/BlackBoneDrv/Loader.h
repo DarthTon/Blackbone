@@ -88,6 +88,7 @@ typedef struct _MMAP_CONTEXT
     PVOID pSetEvent;        // ZwSetEvent address
     PVOID pLoadImage;       // LdrLoadDll address
     BOOLEAN tlsInitialized; // Static TLS was initialized
+    BOOLEAN noThreads;      // No threads should be created
 } MMAP_CONTEXT, *PMMAP_CONTEXT;
 
 /// <summary>

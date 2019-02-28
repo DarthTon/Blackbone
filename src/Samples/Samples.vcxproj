@@ -63,7 +63,6 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -77,14 +76,12 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug(XP)|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -98,7 +95,6 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -106,7 +102,6 @@
     <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release(XP)|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -122,7 +117,6 @@
     <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -130,7 +124,6 @@
     <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release(XP)|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
@@ -146,7 +139,6 @@
     <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
-    <SpectreMitigation>false</SpectreMitigation>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -279,7 +271,6 @@
       <Profile>false</Profile>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win32\Dll\BeaEngineCheetah.dll" "$(TargetDir)BeaEngineCheetah.dll"</Command>
@@ -307,11 +298,9 @@
       </FunctionOrder>
       <Profile>false</Profile>
       <DataExecutionPrevention>true</DataExecutionPrevention>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win32\Dll\BeaEngineCheetah.dll" "$(TargetDir)BeaEngineCheetah.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|Win32'">
@@ -336,7 +325,6 @@
       </FunctionOrder>
       <Profile>false</Profile>
       <DataExecutionPrevention>true</DataExecutionPrevention>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win32\Dll\BeaEngineCheetah.dll" "$(TargetDir)BeaEngineCheetah.dll"</Command>
@@ -362,7 +350,6 @@
       <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <UACExecutionLevel>RequireAdministrator</UACExecutionLevel>
     </Link>
@@ -389,12 +376,10 @@
       <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
       <DataExecutionPrevention>false</DataExecutionPrevention>
     </Link>
     <PostBuildEvent>
-      <Command>
-      </Command>
+      <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win64\Dll\BeaEngineCheetah64.dll" "$(TargetDir)BeaEngineCheetah64.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug(DLL)|x64'">
@@ -416,7 +401,6 @@
       <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
       <DataExecutionPrevention>false</DataExecutionPrevention>
     </Link>
     <PostBuildEvent>
@@ -449,7 +433,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win32\Dll\BeaEngineCheetah.dll" "$(TargetDir)BeaEngineCheetah.dll"</Command>
@@ -480,10 +463,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\..\contrib\BeaEngine\Win32\Dll\BeaEngineCheetah.dll" "$(TargetDir)BeaEngineCheetah.dll"</Command>
+      <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win32\Dll\BeaEngineCheetah.dll" "$(TargetDir)BeaEngineCheetah.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(DLL)|Win32'">
@@ -511,7 +493,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win32\Dll\BeaEngineCheetah.dll" "$(TargetDir)BeaEngineCheetah.dll"</Command>
@@ -539,7 +520,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win64\Dll\BeaEngineCheetah64.dll" "$(TargetDir)BeaEngineCheetah64.dll"</Command>
@@ -567,10 +547,9 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>copy /Y "$(ProjectDir)..\..\contrib\BeaEngine\Win64\Dll\BeaEngineCheetah64.dll" "$(TargetDir)BeaEngineCheetah64.dll"</Command>
+      <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win64\Dll\BeaEngineCheetah64.dll" "$(TargetDir)BeaEngineCheetah64.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release(DLL)|x64'">
@@ -595,7 +574,6 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalDependencies>mscoree.lib;dbghelp.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Profile>false</Profile>
-      <AdditionalLibraryDirectories>$(VCInstallDir)UnitTest\lib</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Command>copy /Y "$(ProjectDir)..\3rd_party\BeaEngine\Win64\Dll\BeaEngineCheetah64.dll" "$(TargetDir)BeaEngineCheetah64.dll"</Command>

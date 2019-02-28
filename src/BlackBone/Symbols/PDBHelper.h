@@ -1,6 +1,6 @@
 #pragma once
 #include "../include/Types.h"
-#include <dia2.h>
+#include <3rd_party/DIA/dia2.h>
 #include <Objbase.h>
 #include <atlcomcli.h>
 #include <string>
