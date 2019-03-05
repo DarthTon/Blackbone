@@ -17,6 +17,7 @@ extern DYNAMIC_DATA dynData;
 PVOID g_KernelBase = NULL;
 ULONG g_KernelSize = 0;
 PSYSTEM_SERVICE_DESCRIPTOR_TABLE g_SSDT = NULL;
+PKDDEBUGGER_DATA64 g_KdBlock = NULL;
 
 MMPTE ValidKernelPte =
 {
@@ -27,6 +28,25 @@ MMPTE ValidKernelPte =
     MM_PTE_ACCESS_MASK
 };
 
+/// <summary>
+/// Initialize debugger block g_KdBlock
+/// </summary>
+VOID InitializeDebuggerBlock()
+{   
+    CONTEXT context = { 0 };
+    context.ContextFlags = CONTEXT_FULL;
+    RtlCaptureContext( &context );
+
+    PDUMP_HEADER pHeader = ExAllocatePool( NonPagedPool, DUMP_BLOCK_SIZE );
+    if (pHeader)
+    {
+        KeCapturePersistentThreadState( &context, NULL, 0, 0, 0, 0, 0, pHeader );
+        g_KdBlock = pHeader->KdDebuggerDataBlock;
+        ExFreePool( pHeader );
+    }
+
+    DPRINT( "BlackBone: %s: g_KdBlock = 0x%p\n", __FUNCTION__, g_KdBlock );
+}
 
 /// <summary>
 /// Lookup handle in the process handle table

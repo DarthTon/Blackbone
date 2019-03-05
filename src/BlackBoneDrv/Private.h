@@ -85,6 +85,15 @@
 #define PTE_BASE    0xFFFFF68000000000UI64
 #endif
 
+
+#ifndef _WIN64
+#define DUMP_BLOCK_SIZE 0x20000
+#else
+#define DUMP_BLOCK_SIZE 0x40000
+#endif
+
+#define PHYSICAL_ADDRESS_BITS 40
+
 #define ObpDecodeGrantedAccess( Access ) \
     ((Access)& ~ObpAccessProtectCloseBit)
 
@@ -257,6 +266,24 @@ RtlAvlRemoveNode(
     );
 
 #endif
+
+ULONG
+NTAPI
+KeCapturePersistentThreadState(
+    IN PCONTEXT Context,
+    IN PKTHREAD Thread,
+    IN ULONG BugCheckCode,
+    IN ULONG BugCheckParameter1,
+    IN ULONG BugCheckParameter2,
+    IN ULONG BugCheckParameter3,
+    IN ULONG BugCheckParameter4,
+    OUT PVOID VirtualAddress
+);
+
+/// <summary>
+/// Initialize debugger block g_KdBlock
+/// </summary>
+VOID InitializeDebuggerBlock();
 
 /// <summary>
 /// Lookup handle in the process handle table
