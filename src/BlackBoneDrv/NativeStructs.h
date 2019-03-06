@@ -962,4 +962,4 @@ C_ASSERT( FIELD_OFFSET( DUMP_HEADER, BugCheckParameter3 ) == 0x50 );
 C_ASSERT( FIELD_OFFSET( DUMP_HEADER, BugCheckParameter4 ) == 0x58 );
 C_ASSERT( FIELD_OFFSET( DUMP_HEADER, KdDebuggerDataBlock ) == 0x80 );
 
-extern PKDDEBUGGER_DATA64 g_KdBlock;
+extern KDDEBUGGER_DATA64 g_KdBlock;

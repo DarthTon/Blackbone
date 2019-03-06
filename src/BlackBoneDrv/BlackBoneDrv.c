@@ -453,16 +453,22 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (pData->ExRemoveTable != 0)
             pData->correctBuild = TRUE;
 
-        DPRINT( "BlackBone: Dynamic search status: SSDT - %s, ExRemoveTable - %s\n",
+        DPRINT( 
+            "BlackBone: Dynamic search status: SSDT - %s, ExRemoveTable - %s\n",
             GetSSDTBase() != NULL ? "SUCCESS" : "FAIL",
             pData->ExRemoveTable != 0 ? "SUCCESS" : "FAIL" 
             );
 
         if (pData->ver >= WINVER_10_RS1)
         {
+            DPRINT( 
+                "BlackBone: %s: g_KdBlock->KernBase: %p, GetKernelBase() = 0x%p \n", 
+                __FUNCTION__, g_KdBlock.KernBase, GetKernelBase( NULL ) 
+                );
+
             ULONGLONG mask = (1ll << (PHYSICAL_ADDRESS_BITS - 1)) - 1;
-            dynData.DYN_PTE_BASE = (ULONG_PTR)g_KdBlock->PteBase;
-            dynData.DYN_PDE_BASE = (ULONG_PTR)((g_KdBlock->PteBase & ~mask) | ((g_KdBlock->PteBase >> 9) & mask));
+            dynData.DYN_PTE_BASE = (ULONG_PTR)g_KdBlock.PteBase;
+            dynData.DYN_PDE_BASE = (ULONG_PTR)((g_KdBlock.PteBase & ~mask) | ((g_KdBlock.PteBase >> 9) & mask));
         }
 
         DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );

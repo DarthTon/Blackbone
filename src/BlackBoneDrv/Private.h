@@ -85,6 +85,11 @@
 #define PTE_BASE    0xFFFFF68000000000UI64
 #endif
 
+#ifndef _WIN64
+#define KDDEBUGGER_DATA_OFFSET 0x1068
+#else
+#define KDDEBUGGER_DATA_OFFSET 0x2080
+#endif
 
 #ifndef _WIN64
 #define DUMP_BLOCK_SIZE 0x20000
