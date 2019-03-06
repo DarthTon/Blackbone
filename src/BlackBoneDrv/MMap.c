@@ -502,6 +502,7 @@ NTSTATUS BBFindOrMapModule(
             ALLOCATE_FREE_MEMORY request = { 0 };
             ALLOCATE_FREE_MEMORY_RESULT mapResult = { 0 };
 
+            request.pid = (ULONG)(ULONG_PTR)PsGetProcessId( pProcess );
             request.allocate = TRUE;
             request.physical = TRUE;
             request.protection = PAGE_EXECUTE_READWRITE;
@@ -649,8 +650,22 @@ NTSTATUS BBFindOrMapModule(
         // Delete remote image
         if (pLocalImage->baseAddress)
         {
-            SIZE_T tmpSize = 0;
-            ZwFreeVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, &tmpSize, MEM_RELEASE );
+            if (flags & KHideVAD)
+            {
+                ALLOCATE_FREE_MEMORY request = { 0 };
+                ALLOCATE_FREE_MEMORY_RESULT mapResult = { 0 };
+
+                request.pid = (ULONG)(ULONG_PTR)PsGetProcessId( pProcess );
+                request.allocate = FALSE;
+                request.physical = TRUE;
+
+                BBAllocateFreePhysical( pProcess, &request, &mapResult );
+            } 
+            else
+            {
+                SIZE_T tmpSize = 0;
+                ZwFreeVirtualMemory( ZwCurrentProcess(), &pLocalImage->baseAddress, &tmpSize, MEM_RELEASE );
+            }
         }
 
         RtlFreeUnicodeString( &pLocalImage->fullPath );
