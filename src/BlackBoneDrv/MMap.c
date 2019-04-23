@@ -181,7 +181,7 @@ PVOID BBImageManifest( IN PVOID pImageBase, OUT PULONG_PTR pSize, OUT PLONG pID 
 /// <param name="MappedAsImage">Image is mapped using image memory layout</param>
 /// <param name="imageBase">Image base</param>
 /// <returns>Translated address</returns>
-PVOID BBRvaToVa( IN ULONG rva, IN BOOLEAN MappedAsImage, IN IN PVOID imageBase );
+PVOID BBRvaToVa( IN ULONG rva, IN BOOLEAN MappedAsImage, IN PVOID imageBase );
 
 #pragma alloc_text(PAGE, BBMapUserImage)
 #pragma alloc_text(PAGE, BBFindOrMapModule)
