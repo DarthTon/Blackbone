@@ -87,8 +87,8 @@ ULONG GenSync32( IN PUCHAR pBuf, IN PNTSTATUS pStatus, IN PVOID pSetEvent, IN HA
 
 ULONG GenPrologue64( IN PUCHAR pBuf );
 ULONG GenEpilogue64( IN PUCHAR pBuf, IN INT retSize );
-ULONG GenCall64( IN PUCHAR pBuf, IN PVOID pFn, INT argc, ... );
-ULONG GenCall64V( IN PUCHAR pBuf, IN PVOID pFn, INT argc, va_list vl );
+ULONG GenCall64( IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, ... );
+ULONG GenCall64V( IN PUCHAR pBuf, IN PVOID pFn, IN INT argc, IN va_list vl );
 ULONG GenSync64( IN PUCHAR pBuf, IN PNTSTATUS pStatus, IN PVOID pSetEvent, IN HANDLE hEvent );
 
 
