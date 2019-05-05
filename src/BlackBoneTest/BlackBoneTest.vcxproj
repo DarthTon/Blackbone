@@ -318,6 +318,7 @@
     <ClCompile Include="TestAsmJit.cpp" />
     <ClCompile Include="TestAsmVariant.cpp" />
     <ClCompile Include="TestDriver.cpp" />
+    <ClCompile Include="TestGuard.cpp" />
     <ClCompile Include="TestLocalHook.cpp" />
     <ClCompile Include="TestManualMap.cpp" />
     <ClCompile Include="TestMultiPtr.cpp" />
