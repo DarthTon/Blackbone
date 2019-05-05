@@ -11,16 +11,6 @@ void MapCmdFromMem();
 
 int main( int /*argc*/, char* /*argv[]*/ )
 {
-    Process pc;
-    pc.Attach( GetCurrentProcess() );
-
-    bool prot = pc.core().isProtected();
-
-    Driver().EnsureLoaded();
-    Driver().ProtectProcess( GetCurrentProcessId(), PolicyOpt::Policy_Enable );
-
-    bool prot2 = pc.core().isProtected();
-
     // List all process PIDs matching name
     auto pids = Process::EnumByName( L"explorer.exe" );
 
