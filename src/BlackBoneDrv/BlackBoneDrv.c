@@ -30,7 +30,7 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registr
     UNREFERENCED_PARAMETER( RegistryPath );
 
     // Get OS Dependant offsets
-    InitializeDebuggerBlock( &g_KdBlock );
+    InitializeDebuggerBlock();
     status = BBInitDynamicData( &dynData );
     if (!NT_SUCCESS( status ))
     {
@@ -44,6 +44,7 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registr
     status = BBInitLdrData( (PKLDR_DATA_TABLE_ENTRY)DriverObject->DriverSection );
     if (!NT_SUCCESS( status ))
         return status;
+
     //
     // Globals init
     //
