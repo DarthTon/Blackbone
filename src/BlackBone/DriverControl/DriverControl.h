@@ -312,7 +312,7 @@ private:
     /// <returns>Status code</returns>
     LSTATUS PrepareDriverRegEntry( const std::wstring& svcName, const std::wstring& path );
 private:
-    Handle _hDriver;
+    FileHandle _hDriver;
     NTSTATUS _loadStatus = STATUS_NOT_FOUND;
 };
 

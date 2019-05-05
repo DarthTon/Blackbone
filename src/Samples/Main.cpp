@@ -11,6 +11,16 @@ void MapCmdFromMem();
 
 int main( int /*argc*/, char* /*argv[]*/ )
 {
+    Process pc;
+    pc.Attach( GetCurrentProcess() );
+
+    bool prot = pc.core().isProtected();
+
+    Driver().EnsureLoaded();
+    Driver().ProtectProcess( GetCurrentProcessId(), PolicyOpt::Policy_Enable );
+
+    bool prot2 = pc.core().isProtected();
+
     // List all process PIDs matching name
     auto pids = Process::EnumByName( L"explorer.exe" );
 
@@ -44,7 +54,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
     }
 
     // Start new suspended process and attach immediately
-    Process notepad;
+    Process notepad; 
     notepad.CreateAndAttach( L"C:\\windows\\system32\\notepad.exe", true );
     {
         // do stuff...
@@ -93,7 +103,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
         memory.Read( mainMod->baseAddress, sizeof( dosHeader ), &dosHeader );
 
         // Method 3
-        auto [status, dosHeader2] = memory.Read<IMAGE_DOS_HEADER>( mainMod->baseAddress );
+        auto[status, dosHeader2] = memory.Read<IMAGE_DOS_HEADER>( mainMod->baseAddress );
 
         // Change memory protection
         if (NT_SUCCESS( memory.Protect( mainMod->baseAddress, sizeof( dosHeader ), PAGE_READWRITE ) ))
@@ -110,7 +120,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
         }
 
         // Allocate memory
-        if (auto [status2, block] = memory.Allocate( 0x1000, PAGE_EXECUTE_READWRITE ); NT_SUCCESS( status2 ))
+        if (auto[status2, block] = memory.Allocate( 0x1000, PAGE_EXECUTE_READWRITE ); NT_SUCCESS( status2 ))
         {
             // Write into memory block
             block->Write( 0x10, 12.0 );
@@ -164,7 +174,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
     {
         auto& remote = notepad.remote();
         remote.CreateRPCEnvironment( Worker_None, true );
-
+        
         auto GetModuleHandleWPtr = notepad.modules().GetExport( L"kernel32.dll", "GetModuleHandleW" );
         if (GetModuleHandleWPtr)
         {
@@ -256,7 +266,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
             GetCurrentProcess(),
             GetModuleHandle( nullptr ),
             buf,
-            sizeof( buf ),
+            sizeof(buf),
             &bytes
         );
 

@@ -195,7 +195,7 @@ namespace Testing
             AssertEx::AreEqual( static_cast<DWORD>(sizeof( writeBuf )), bytes );
 
             // Check locally
-            auto hFile = Handle( CreateFileW( filePath, GENERIC_READ, 0x7, nullptr, OPEN_EXISTING, FILE_DELETE_ON_CLOSE, nullptr ) );
+            FileHandle hFile = FileHandle( CreateFileW( filePath, GENERIC_READ, 0x7, nullptr, OPEN_EXISTING, FILE_DELETE_ON_CLOSE, nullptr ) );
             AssertEx::IsTrue( hFile );
 
             uint8_t readBuf[sizeof( writeBuf )] = { };
