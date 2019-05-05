@@ -53,7 +53,7 @@ call_result_t<ThreadPtr> ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg,
 std::vector<ThreadPtr> ProcessThreads::getAll() const
 {
     std::vector<ThreadPtr> result;
-    auto hThreadSnapshot = SnapHandle( CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 ) );
+    auto hThreadSnapshot = Handle( CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 ) );
     if (!hThreadSnapshot)
         return result;
    

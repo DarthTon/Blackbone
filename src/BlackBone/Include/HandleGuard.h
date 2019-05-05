@@ -7,7 +7,7 @@ namespace blackbone
 /// <summary>
 /// Strong exception guarantee
 /// </summary>
-template<typename handle_t, auto close_fn, handle_t zero_handle>
+template<typename handle_t, auto close_fn>
 class HandleGuard
 {
 public:
@@ -24,7 +24,7 @@ public:
 
     ~HandleGuard()
     {
-        if (_handle != zero_handle)
+        if (valid())
             close_fn( _handle );
     }
 
@@ -53,7 +53,7 @@ public:
         if (handle == _handle)
             return;
 
-        if (_handle != zero_handle)
+        if (valid())
             close_fn( _handle );
 
         _handle = handle;
@@ -66,25 +66,24 @@ public:
         return tmp;
     }
 
-    inline handle_t get() const noexcept { return _handle; }
+    handle_t get() const noexcept { return _handle; }
+    bool valid() const noexcept { return reinterpret_cast<intptr_t>(_handle) > reinterpret_cast<intptr_t>(zero_handle); }
 
-    inline operator handle_t() const noexcept { return _handle; }
-    inline explicit operator bool() const noexcept { return _handle != zero_handle; }
+    operator handle_t() const noexcept { return _handle; }
+    explicit operator bool() const noexcept { return valid(); }
 
-    inline handle_t* operator &() noexcept { return &_handle; }
+    handle_t* operator &() noexcept { return &_handle; }
 
-    inline bool operator ==( const HandleGuard& rhs ) const noexcept { return _handle == rhs._handle; }
-    inline bool operator <( const HandleGuard& rhs ) const noexcept { return _handle < rhs._handle; }
+    bool operator ==( const HandleGuard& rhs ) const noexcept { return _handle == rhs._handle; }
+    bool operator <( const HandleGuard& rhs ) const noexcept { return _handle < rhs._handle; }
 
 private:
+    static constexpr handle_t zero_handle = handle_t( 0 );
     handle_t _handle;
 };
 
-using Handle        = HandleGuard<HANDLE, &CloseHandle, nullptr>;
-using FileHandle    = HandleGuard<HANDLE, &CloseHandle, INVALID_HANDLE_VALUE>;
-using ACtxHandle    = HandleGuard<HANDLE, &ReleaseActCtx, INVALID_HANDLE_VALUE>;
-using FileMapHandle = HandleGuard<void*,  &UnmapViewOfFile, nullptr>;
-using SnapHandle    = FileHandle;
-using RegHandle     = HandleGuard<HKEY,   &RegCloseKey, nullptr>;
+using Handle        = HandleGuard<HANDLE, &CloseHandle>;
+using ACtxHandle    = HandleGuard<HANDLE, &ReleaseActCtx>;
+using RegHandle     = HandleGuard<HKEY,   &RegCloseKey>;
 
 }

@@ -6,9 +6,7 @@
 
 extern "C" void* syscall_stub();
 
-namespace blackbone
-{
-namespace syscall
+namespace blackbone::syscall
 {
     template<typename T>
     using to_int64 = std::conditional_t<sizeof( T ) < sizeof( int64_t ), int64_t, T>;
@@ -67,5 +65,4 @@ namespace syscall
     }
 
 #pragma warning(pop)
-}
 }

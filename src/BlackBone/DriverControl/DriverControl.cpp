@@ -793,12 +793,12 @@ NTSTATUS DriverControl::UnloadDriver( const std::wstring& svcName )
 /// <returns>Status code</returns>
 LSTATUS DriverControl::PrepareDriverRegEntry( const std::wstring& svcName, const std::wstring& path )
 {
-    HKEY key1, key2;
+    RegHandle key1, key2;
     DWORD dwType = 1;
     LSTATUS status = 0;
     WCHAR wszLocalPath[MAX_PATH] = { 0 };
 
-    swprintf_s( wszLocalPath, ARRAYSIZE( wszLocalPath ), L"\\??\\%s", path.c_str() );
+    swprintf_s( wszLocalPath, std::size( wszLocalPath ), L"\\??\\%s", path.c_str() );
 
     status = RegOpenKeyW( HKEY_LOCAL_MACHINE, L"system\\CurrentControlSet\\Services", &key1 );
     if (status)
@@ -806,10 +806,7 @@ LSTATUS DriverControl::PrepareDriverRegEntry( const std::wstring& svcName, const
 
     status = RegCreateKeyW( key1, svcName.c_str(), &key2 );
     if (status)
-    {
-        RegCloseKey( key1 );
         return status;
-    }
 
     status = RegSetValueExW(
         key2, L"ImagePath", 0, REG_SZ, 
@@ -818,24 +815,9 @@ LSTATUS DriverControl::PrepareDriverRegEntry( const std::wstring& svcName, const
         );
 
     if (status)
-    {
-        RegCloseKey( key2 );
-        RegCloseKey( key1 );
         return status;
-    }
 
-    status = RegSetValueExW( key2, L"Type", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&dwType), sizeof( dwType ) );
-    if (status)
-    {
-        RegCloseKey( key2 );
-        RegCloseKey( key1 );
-        return status;
-    }
-
-    RegCloseKey( key2 );
-    RegCloseKey( key1 );
-
-    return status;
+    return RegSetValueExW( key2, L"Type", 0, REG_DWORD, reinterpret_cast<const BYTE*>(&dwType), sizeof( dwType ) );
 }
 
 
