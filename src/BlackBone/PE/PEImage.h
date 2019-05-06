@@ -310,7 +310,7 @@ private:
     void* GetManifest( uint32_t& size, int32_t& manifestID );
 
 private:
-    FileHandle  _hFile;                         // Target file HANDLE
+    Handle      _hFile;                         // Target file HANDLE
     Handle      _hMapping;                      // Memory mapping object
     void*       _pFileBase = nullptr;           // Mapping base
     bool        _isPlainData = false;           // File mapped as plain data file
@@ -324,7 +324,7 @@ private:
     uint32_t    _imgSize = 0;                   // Image size
     uint32_t    _epRVA = 0;                     // Entry point RVA
     uint32_t    _hdrSize = 0;                   // Size of headers
-    ACtxHandle   _hctx;                          // Activation context
+    ACtxHandle  _hctx;                          // Activation context
     int32_t     _manifestIdx = 0;               // Manifest resource ID
     uint32_t    _subsystem = 0;                 // Image subsystem
     int32_t     _ILFlagOffset = 0;              // Offset of pure IL flag

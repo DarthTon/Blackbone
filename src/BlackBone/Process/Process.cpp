@@ -323,7 +323,7 @@ call_result_t<std::vector<HandleInfo>> Process::EnumHandles()
 std::vector<DWORD> Process::EnumByName( const std::wstring& name )
 {
     std::vector<DWORD> found;
-    auto hProcSnap = SnapHandle( CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 ) );
+    auto hProcSnap = Handle( CreateToolhelp32Snapshot( TH32CS_SNAPPROCESS, 0 ) );
     if (!hProcSnap)
         return found;
 

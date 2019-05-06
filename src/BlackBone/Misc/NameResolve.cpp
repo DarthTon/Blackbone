@@ -167,7 +167,7 @@ NTSTATUS NameResolve::ResolvePath(
     // Perform search accordingly to Windows Image loader search order 
     // 1. KnownDlls
     //
-    HKEY hKey = NULL;
+    RegHandle hKey;
     LRESULT res = 0;
     res = RegOpenKeyW( HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Session Manager\\KnownDLLs", &hKey );
 
@@ -197,14 +197,10 @@ NTSTATUS NameResolve::ResolvePath(
                 if (res == ERROR_SUCCESS)
                 {
                     path = std::wstring( sys_path ) + L"\\" + value_data;
-
-                    RegCloseKey( hKey );
                     return STATUS_SUCCESS;
                 }
             }
         }
-
-        RegCloseKey( hKey );
     }
 
 
@@ -359,7 +355,7 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, Process& proc, HANDL
 /// <returns>Process executable directory</returns>
 std::wstring NameResolve::GetProcessDirectory( DWORD pid )
 {
-    SnapHandle snapshot;
+    Handle snapshot;
     MODULEENTRY32W mod = { sizeof(MODULEENTRY32W), 0 };
     std::wstring path = L"";
 
