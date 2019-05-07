@@ -268,7 +268,7 @@ private:
     class ProcessCore* _core;       // Core routines
 
     DWORD _id = 0;                  // Thread ID
-    Handle _handle;                 // Thread handle
+    ProcessHandle _handle;          // Thread handle
 };
 
 using ThreadPtr = std::shared_ptr<Thread>;

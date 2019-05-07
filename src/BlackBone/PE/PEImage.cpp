@@ -498,7 +498,7 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
             return STATUS_SXS_CANT_GEN_ACTCTX;
      
         auto hTmpFile = Handle( CreateFileW( tempPath, FILE_GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, 0, NULL ) );
-        if (hTmpFile != INVALID_HANDLE_VALUE)
+        if (hTmpFile)
         {
             DWORD bytes = 0;
             WriteFile( hTmpFile, pManifest, manifestSize, &bytes, NULL );
@@ -521,8 +521,7 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
    
     // Create ACTX
     _hctx = CreateActCtxW( &act );
-
-    if (_hctx != INVALID_HANDLE_VALUE)
+    if (_hctx)
         return STATUS_SUCCESS;
 
     // Return success if current process is protected

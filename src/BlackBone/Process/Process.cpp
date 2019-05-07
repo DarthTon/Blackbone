@@ -224,7 +224,7 @@ call_result_t<std::vector<HandleInfo>> Process::EnumHandles()
     for (ULONG i = 0; i < handleInfo->HandleCount; i++)
     {
         HandleInfo info;
-        Handle hLocal;
+        ProcessHandle hLocal;
         OBJECT_TYPE_INFORMATION_T* pTypeInfo = nullptr;
         PVOID pNameInfo = nullptr;
         UNICODE_STRING objectName = { 0 };
