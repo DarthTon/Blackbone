@@ -5,6 +5,15 @@ namespace blackbone
 {
 
 template<typename T>
+struct non_zero
+{
+    static bool call( T handle ) noexcept
+    {
+        return intptr_t( handle ) != 0;
+    }
+};
+
+template<typename T>
 struct non_negative
 {
     static bool call( T handle ) noexcept
@@ -119,5 +128,6 @@ using Handle        = HandleGuard<HANDLE, &CloseHandle>;
 using ProcessHandle = HandleGuard<HANDLE, &CloseHandle, with_pseudo<non_negative>::type>;
 using ACtxHandle    = HandleGuard<HANDLE, &ReleaseActCtx>;
 using RegHandle     = HandleGuard<HKEY, &RegCloseKey>;
+using Mapping       = HandleGuard<void*, & UnmapViewOfFile, non_zero>;
 
 }

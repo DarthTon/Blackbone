@@ -95,6 +95,8 @@ public:
     BLACKBONE_API PEImage( void );
     BLACKBONE_API ~PEImage( void );
 
+    BLACKBONE_API PEImage( PEImage&& other ) = default;
+
     /// <summary>
     /// Load image from file
     /// </summary>
@@ -312,7 +314,7 @@ private:
 private:
     Handle      _hFile;                         // Target file HANDLE
     Handle      _hMapping;                      // Memory mapping object
-    void*       _pFileBase = nullptr;           // Mapping base
+    Mapping     _pFileBase;                     // Mapping base
     bool        _isPlainData = false;           // File mapped as plain data file
     bool        _is64 = false;                  // Image is 64 bit
     bool        _isExe = false;                 // Image is an .exe file

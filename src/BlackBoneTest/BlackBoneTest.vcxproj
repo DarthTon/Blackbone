@@ -315,6 +315,7 @@
     <ClInclude Include="Common.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="TestSymbols.cpp" />
     <ClCompile Include="TestAsmJit.cpp" />
     <ClCompile Include="TestAsmVariant.cpp" />
     <ClCompile Include="TestDriver.cpp" />

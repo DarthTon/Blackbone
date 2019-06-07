@@ -26,6 +26,7 @@ enum eBuildThreshold
     Build_RS3 = 16299,
     Build_RS4 = 17134,
     Build_RS5 = 17763,
+    Build_RS6 = 18362,
     Build_RS_MAX = 99999,
 };
 
@@ -42,6 +43,7 @@ enum eVerShort
     Win10_RS3,      // Windows 10 Fall Creators update
     Win10_RS4,      // Windows 10 Spring Creators update
     Win10_RS5,      // Windows 10 October 2018 update
+    Win10_RS6,      // Windows 10 May 2019 update
 };
 
 struct WinVersion
@@ -103,7 +105,9 @@ BLACKBONE_API inline void InitVersion()
         switch (fullver)
         {
         case _WIN32_WINNT_WIN10:
-            if (g_WinVer.native.dwBuildNumber >= Build_RS5)
+            if (g_WinVer.native.dwBuildNumber >= Build_RS6)
+                g_WinVer.ver = Win10_RS6;
+            else if (g_WinVer.native.dwBuildNumber >= Build_RS5)
                 g_WinVer.ver = Win10_RS5;
             else if (g_WinVer.native.dwBuildNumber >= Build_RS4)
                 g_WinVer.ver = Win10_RS4;
@@ -271,6 +275,12 @@ VERSIONHELPERAPI
 IsWindows10RS5OrGreater()
 {
     return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_RS5 );
+}
+
+VERSIONHELPERAPI
+IsWindows10RS6OrGreater()
+{
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_RS6 );
 }
 
 VERSIONHELPERAPI
