@@ -1,9 +1,5 @@
 #include "Common.h"
 
-namespace Microsoft::VisualStudio::CppUnitTestFramework {
-    template<> inline std::wstring ToString<__int64>( const __int64& t ) { RETURN_WIDE_STRING( t ); }
-}
-
 namespace Testing
 {
     TEST_CLASS( AsmJIT )

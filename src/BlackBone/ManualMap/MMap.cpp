@@ -1411,7 +1411,7 @@ NTSTATUS MMap::ProbeRemoteSxS( std::wstring& path )
     auto memPtr = memBuf->ptr();
     auto fillStr = [&]( auto&& OriginalName )
     {
-        std::remove_reference<decltype(OriginalName)>::type DllName1 = { 0 };
+        std::remove_reference_t<decltype(OriginalName)> DllName1 = { 0 };
 
         OriginalName.Length = static_cast<uint16_t>(path.length() * sizeof( wchar_t ));
         OriginalName.MaximumLength = OriginalName.Length;
