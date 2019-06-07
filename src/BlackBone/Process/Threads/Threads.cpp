@@ -82,7 +82,7 @@ ThreadPtr ProcessThreads::getMain() const
 {
     uint64_t mintime = MAXULONG64_2;
     auto threads = getAll();
-    ThreadPtr result = !threads.empty() ? threads.front() : threads.front();
+    ThreadPtr result = !threads.empty() ? threads.front() : nullptr;
 
     for (const auto& thread : threads)
     {
@@ -105,7 +105,7 @@ ThreadPtr ProcessThreads::getLeastExecuted() const
 {
     uint64_t mintime = MAXULONG64_2;
     auto threads = getAll();
-    ThreadPtr result = !threads.empty() ? threads.front() : threads.front();
+    ThreadPtr result = !threads.empty() ? threads.front() : nullptr;
 
     for (const auto& thread : threads)
     {
@@ -128,7 +128,7 @@ ThreadPtr ProcessThreads::getMostExecuted() const
 {
     uint64_t maxtime = 0;
     auto threads = getAll();
-    ThreadPtr result = !threads.empty() ? threads.front() : threads.front();
+    ThreadPtr result = !threads.empty() ? threads.front() : nullptr;
 
     for (const auto& thread : threads)
     {
