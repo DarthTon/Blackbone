@@ -4,7 +4,7 @@ branches:
   only:
     - master
 
-image: Visual Studio 2015
+image: Visual Studio 2019
 clone_folder: c:\projects\blackboneDrv
 
 platform: 

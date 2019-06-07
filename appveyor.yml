@@ -5,7 +5,7 @@ branches:
     - master
     - testing
 
-image: Visual Studio 2019 Preview
+image: Visual Studio 2019
 clone_folder: c:\projects\blackbone
 
 platform: 
