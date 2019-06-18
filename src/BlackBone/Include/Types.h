@@ -81,4 +81,24 @@ struct ModuleData
 
 using ModuleDataPtr = std::shared_ptr<const ModuleData>;
 
+inline void VirtualFreeWrapper( void* ptr )
+{
+    VirtualFree( ptr, 0, MEM_RELEASE );
+}
+
+template<typename T = void>
+using raw_ptr = std::unique_ptr<T, decltype(&VirtualFreeWrapper)>;
+
+template<typename T = void>
+raw_ptr<T> make_raw_ptr( void* ptr )
+{
+    return raw_ptr<T>( static_cast<T*>(ptr), &VirtualFreeWrapper );
+}
+
+template<typename T = void>
+raw_ptr<T> make_raw_ptr( size_t size, DWORD protection = PAGE_READWRITE )
+{
+    return make_raw_ptr<T>( VirtualAlloc( nullptr, size, MEM_COMMIT, protection ) );
+}
+
 }

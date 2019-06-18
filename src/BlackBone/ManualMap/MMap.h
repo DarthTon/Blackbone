@@ -168,8 +168,7 @@ using vecImageCtx = std::vector<ImageContextPtr>;
 class MMap
 {
 public:
-    BLACKBONE_API MMap( class Process& proc );
-    BLACKBONE_API ~MMap( void );
+    BLACKBONE_API MMap( class Process* proc );
 
     /// <summary>
     /// Manually map PE image into underlying target process
@@ -179,7 +178,7 @@ public:
     /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
     /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info </returns>
-    BLACKBONE_API call_result_t<ModuleDataPtr> MapImage(
+    BLACKBONE_API ModuleDataPtr MapImage(
         const std::wstring& path,
         eLoadFlags flags = NoFlags,
         MapCallback mapCallback = nullptr,
@@ -197,7 +196,7 @@ public:
     /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
     /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info</returns>
-    BLACKBONE_API call_result_t<ModuleDataPtr> MapImage(
+    BLACKBONE_API ModuleDataPtr MapImage(
         size_t size, void* buffer,
         bool asImage = false,
         eLoadFlags flags = NoFlags,
@@ -209,19 +208,17 @@ public:
     /// <summary>
     /// Unmap all manually mapped modules
     /// </summary>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS UnmapAllModules();
+    BLACKBONE_API void UnmapAllModules();
 
     /// <summary>
     /// Remove any traces from remote process
     /// </summary>
-    /// <returns></returns>
     BLACKBONE_API void Cleanup();
 
     /// <summary>
     /// Reset local data
     /// </summary>
-    BLACKBONE_API inline void reset() { _images.clear(); _pAContext.Reset(); _usedBlocks.clear(); }
+    BLACKBONE_API void reset() { _images.clear(); _pAContext.reset(); _usedBlocks.clear(); }
 private:
     /// <summary>
     /// Manually map PE image into underlying target process
@@ -234,13 +231,13 @@ private:
     /// <param name="mapCallback">Mapping callback. Triggers for each mapped module</param>
     /// <param name="context">User-supplied callback context</param>
     /// <returns>Mapped image info</returns>
-    call_result_t<ModuleDataPtr> MapImageInternal(
+    ModuleDataPtr MapImageInternal(
         const std::wstring& path,
         void* buffer, size_t size,
         bool asImage = false,
         eLoadFlags flags = NoFlags,
         MapCallback ldrCallback = nullptr,
-        void* ldrContext = nullptr,
+        void* context = nullptr,
         CustomArgs_t* pCustomArgs_t = nullptr
         );
  
@@ -258,11 +255,7 @@ private:
     /// <param name="path">Image path</param>
     /// <param name="flags">Mapping flags</param>
     /// <returns>Module info</returns>
-    call_result_t<ModuleDataPtr> FindOrMapModule(
-        const std::wstring& path,
-        void* buffer, size_t size, bool asImage,
-        eLoadFlags flags = NoFlags
-        );
+    ModuleDataPtr FindOrMapModule( const std::wstring& path, void* buffer, size_t size, bool asImage, eLoadFlags flags = NoFlags );
 
     /// <summary>
     /// Run module initializers(TLS and entry point).
@@ -275,64 +268,56 @@ private:
     /// DLL_THREAD_DETTACH
     /// </param>
     /// <returns>DllMain result</returns>
-    call_result_t<uint64_t> RunModuleInitializers( ImageContextPtr pImage, DWORD dwReason, CustomArgs_t* pCustomArgs_t = nullptr );
+    uint64_t RunModuleInitializers( ImageContextPtr pImage, DWORD dwReason, CustomArgs_t* pCustomArgs_t = nullptr );
 
     /// <summary>
     /// Copies image into target process
     /// </summary>
     /// <param name="pImage">Image data</param>
-    /// <returns>Status code</returns>
-    NTSTATUS CopyImage( ImageContextPtr pImage );
+    void CopyImage( ImageContextPtr pImage );
 
     /// <summary>
     /// Adjust image memory protection
     /// </summary>
     /// <param name="pImage">image data</param>
-    /// <returns>Status code</returns>
-    NTSTATUS ProtectImageMemory( ImageContextPtr pImage );
+    void ProtectImageMemory( ImageContextPtr pImage );
 
     /// <summary>
     ///  Fix relocations if image wasn't loaded at base address
     /// </summary>
     /// <param name="pImage">image data</param>
-    /// <returns>true on success</returns>
-    NTSTATUS RelocateImage( ImageContextPtr pImage );
+    void RelocateImage( ImageContextPtr pImage );
 
     /// <summary>
     /// Resolves image import or delayed image import
     /// </summary>
     /// <param name="pImage">Image data</param>
     /// <param name="useDelayed">Resolve delayed import instead</param>
-    /// <returns>Status code</returns>
-    NTSTATUS ResolveImport( ImageContextPtr pImage, bool useDelayed = false );
-
-    /// <summary>
-    /// Resolve static TLS storage
-    /// </summary>
-    /// <param name="pImage">image data</param>
-    /// <returns>Status code</returns>
-    NTSTATUS InitStaticTLS( ImageContextPtr pImage );
+    void ResolveImport( ImageContextPtr pImage, bool useDelayed = false );
 
     /// <summary>
     /// Set custom exception handler to bypass SafeSEH under DEP 
     /// </summary>
     /// <param name="pImage">image data</param>
-    /// <returns>Status code</returns>
-    NTSTATUS EnableExceptions( ImageContextPtr pImage );
+    void EnableExceptions( ImageContextPtr pImage );
 
     /// <summary>
     /// Remove custom exception handler
     /// </summary>
     /// <param name="pImage">image data</param>
-    /// <returns>true on success</returns>
-    NTSTATUS DisableExceptions( ImageContextPtr pImage );
+    void DisableExceptions( ImageContextPtr pImage );
+
+    /// <summary>
+    /// Resolve static TLS storage
+    /// </summary>
+    /// <param name="pImage">image data</param>
+    void InitStaticTLS( ImageContextPtr pImage );
 
     /// <summary>
     /// Calculate and set security cookie
     /// </summary>
     /// <param name="pImage">image data</param>
-    /// <returns>Status code</returns>
-    NTSTATUS InitializeCookie( ImageContextPtr pImage );
+    void InitializeCookie( ImageContextPtr pImage );
 
     /// <summary>
     /// Return existing or load missing dependency
@@ -340,7 +325,7 @@ private:
     /// <param name="pImage">Currently mapped image data</param>
     /// <param name="path">Dependency path</param>
     /// <returns></returns>
-    call_result_t<ModuleDataPtr> FindOrMapDependency( ImageContextPtr pImage, std::wstring& path );
+    ModuleDataPtr FindOrMapDependency( ImageContextPtr pImage, std::wstring& path );
 
     /// <summary>
     /// Create activation context
@@ -352,22 +337,19 @@ private:
     /// <param name="path">Manifest container path</param>
     /// <param name="id">Manifest resource id</param>
     /// <param name="asImage">if true - 'path' points to a valid PE file, otherwise - 'path' points to separate manifest file</param>
-    /// <returns>true on success</returns>
-    NTSTATUS CreateActx( const pe::PEImage& image );
+    void CreateActx( const pe::PEImage& image );
 
     /// <summary>
     /// Do SxS path probing in the target process
     /// </summary>
     /// <param name="path">Path to probe</param>
-    /// <returns>Status code</returns>
-    NTSTATUS ProbeRemoteSxS( std::wstring& path );
+    void ProbeRemoteSxS( std::wstring& path );
 
     /// <summary>
     /// Hide memory VAD node
     /// </summary>
     /// <param name="imageMem">Image to purge</param>
-    /// <returns>Status code</returns>
-    NTSTATUS ConcealVad( const MemBlock& imageMem );
+    void ConcealVad( ImageContextPtr pImage );
 
     /// <summary>
     /// Allocates memory region beyond 4GB limit
@@ -385,7 +367,7 @@ private:
     DWORD GetSectionProt( DWORD characteristics );
 
 private:
-    class Process&  _process;               // Target process manager
+    class Process*  _process;               // Target process manager
     MExcept         _expMgr;                // Exception handler manager
     vecImageCtx     _images;                // Mapped images
     MemBlock        _pAContext;             // SxS activation context memory address

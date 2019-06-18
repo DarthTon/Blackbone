@@ -10,10 +10,10 @@
 namespace blackbone
 {
 
-Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
+Native::Native( HANDLE hProcess, bool x86OS /*= false*/ ) noexcept
     : _hProcess( hProcess )
 {
-    SYSTEM_INFO info = { { 0 } };
+    SYSTEM_INFO info = { };
     GetNativeSystemInfo( &info );
     _pageSize = info.dwPageSize;
 
@@ -48,13 +48,7 @@ Native::Native( HANDLE hProcess, bool x86OS /*= false*/ )
             _wowBarrier.type = wow_64_32;
             _wowBarrier.mismatch = true;
         }
-    } 
-}
-
-/*
-*/
-Native::~Native()
-{
+    }
 }
 
 /// <summary>
@@ -65,7 +59,7 @@ Native::~Native()
 /// <param name="flAllocationType">Allocation type</param>
 /// <param name="flProtect">Memory protection</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect )
+NTSTATUS Native::VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect ) noexcept
 {
     lpAddress = reinterpret_cast<ptr_t>(VirtualAllocEx( _hProcess, reinterpret_cast<LPVOID>(lpAddress), dwSize, flAllocationType, flProtect ));
     return lpAddress != 0 ? STATUS_SUCCESS : LastNtStatus();
@@ -79,7 +73,7 @@ NTSTATUS Native::VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAlloc
 /// <param name="dwSize">Region size</param>
 /// <param name="dwFreeType">Memory release type.</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType )
+NTSTATUS Native::VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType ) noexcept
 {
     auto r = VirtualFreeEx( _hProcess, reinterpret_cast<LPVOID>(lpAddress), dwSize, dwFreeType );
     return r != 0 ? STATUS_SUCCESS : LastNtStatus();
@@ -91,13 +85,13 @@ NTSTATUS Native::VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeTyp
 /// <param name="lpAddress">Address to query</param>
 /// <param name="lpBuffer">Retrieved memory info</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 lpBuffer )
+NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 lpBuffer ) noexcept
 {
     auto r = VirtualQueryEx(
         _hProcess, reinterpret_cast<LPCVOID>(lpAddress),
         reinterpret_cast<PMEMORY_BASIC_INFORMATION>(lpBuffer),
         sizeof( MEMORY_BASIC_INFORMATION )
-        );
+    );
 
     return r != 0 ? STATUS_SUCCESS : LastNtStatus();
 }
@@ -108,14 +102,15 @@ NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 l
 /// <param name="lpAddress">Address to query</param>
 /// <param name="lpBuffer">Retrieved memory info</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, MEMORY_INFORMATION_CLASS infoClass, LPVOID lpBuffer, size_t bufSize )
+NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, MEMORY_INFORMATION_CLASS infoClass, LPVOID lpBuffer, size_t bufSize ) noexcept
 {
     SIZE_T retLen = 0;
 
+    SetLastNtStatus( STATUS_SUCCESS );
     return SAFE_NATIVE_CALL(
         NtQueryVirtualMemory, _hProcess, reinterpret_cast<LPVOID>(lpAddress),
         infoClass, lpBuffer, bufSize, &retLen
-        );
+    );
 }
 
 /// <summary>
@@ -126,7 +121,7 @@ NTSTATUS Native::VirtualQueryExT( ptr_t lpAddress, MEMORY_INFORMATION_CLASS info
 /// <param name="flProtect">New protection.</param>
 /// <param name="flOld">Old protection</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::VirtualProtectExT( ptr_t lpAddress, DWORD64 dwSize, DWORD flProtect, DWORD* flOld )
+NTSTATUS Native::VirtualProtectExT( ptr_t lpAddress, DWORD64 dwSize, DWORD flProtect, DWORD* flOld ) noexcept
 {
     DWORD junk = 0;
     if (!flOld)
@@ -143,9 +138,9 @@ NTSTATUS Native::VirtualProtectExT( ptr_t lpAddress, DWORD64 dwSize, DWORD flPro
 /// <param name="lpBaseAddress">Memory address</param>
 /// <param name="lpBuffer">Output buffer</param>
 /// <param name="nSize">Number of bytes to read</param>
-/// <param name="lpBytes">Mumber of bytes read</param>
+/// <param name="lpBytes">Number of bytes read</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::ReadProcessMemoryT( ptr_t lpBaseAddress, LPVOID lpBuffer, size_t nSize, DWORD64 *lpBytes /*= nullptr */ )
+NTSTATUS Native::ReadProcessMemoryT( ptr_t lpBaseAddress, LPVOID lpBuffer, size_t nSize, DWORD64 *lpBytes /*= nullptr */ ) noexcept
 {
     auto r = ReadProcessMemory( _hProcess, reinterpret_cast<LPVOID>(lpBaseAddress), lpBuffer, nSize, reinterpret_cast<SIZE_T*>(lpBytes) );
     return r != 0 ? STATUS_SUCCESS : LastNtStatus();
@@ -157,9 +152,9 @@ NTSTATUS Native::ReadProcessMemoryT( ptr_t lpBaseAddress, LPVOID lpBuffer, size_
 /// <param name="lpBaseAddress">Memory address</param>
 /// <param name="lpBuffer">Buffer to write</param>
 /// <param name="nSize">Number of bytes to read</param>
-/// <param name="lpBytes">Mumber of bytes read</param>
+/// <param name="lpBytes">Number of bytes read</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer, size_t nSize, DWORD64 *lpBytes /*= nullptr */ )
+NTSTATUS Native::WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer, size_t nSize, DWORD64 *lpBytes /*= nullptr */ ) noexcept
 {
     auto r = WriteProcessMemory( _hProcess, reinterpret_cast<LPVOID>(lpBaseAddress), lpBuffer, nSize, reinterpret_cast<SIZE_T*>(lpBytes) );
     return r != 0 ? STATUS_SUCCESS : LastNtStatus();
@@ -172,7 +167,7 @@ NTSTATUS Native::WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer, siz
 /// <param name="lpBuffer">Output buffer</param>
 /// <param name="bufSize">Buffer size</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize )
+NTSTATUS Native::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize ) noexcept
 {
     ULONG length = 0;
     return SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, infoClass, lpBuffer, bufSize, &length );
@@ -185,7 +180,7 @@ NTSTATUS Native::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer,
 /// <param name="lpBuffer">Input buffer</param>
 /// <param name="bufSize">Buffer size</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize )
+NTSTATUS Native::SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize ) noexcept
 {
     return SAFE_NATIVE_CALL( NtSetInformationProcess, _hProcess, infoClass, lpBuffer, bufSize );
 }
@@ -199,9 +194,9 @@ NTSTATUS Native::SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, u
 /// <param name="flags">Creation flags</param>
 /// <param name="access">Access override</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access /*= THREAD_ALL_ACCESS*/ )
+NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access /*= THREAD_ALL_ACCESS*/ ) noexcept
 {
-    NTSTATUS status = 0; 
+    NTSTATUS status = 0;
     auto pCreateThread = GET_IMPORT( NtCreateThreadEx );
 
     if (pCreateThread)
@@ -211,7 +206,7 @@ NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, C
             _hProcess, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
             reinterpret_cast<LPVOID>(arg), static_cast<DWORD>(flags),
             0, 0x1000, 0x100000, NULL
-            );
+        );
 
         if (!NT_SUCCESS( status ))
             hThread = NULL;
@@ -223,10 +218,10 @@ NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, C
         if (flags & CreateSuspended)
             win32Flags = CREATE_SUSPENDED;
 
-        hThread = CreateRemoteThread( 
+        hThread = CreateRemoteThread(
             _hProcess, NULL, 0, reinterpret_cast<PTHREAD_START_ROUTINE>(entry),
             reinterpret_cast<LPVOID>(arg), win32Flags, NULL
-            );
+        );
 
         status = hThread != NULL ? STATUS_SUCCESS : LastNtStatus();
     }
@@ -240,7 +235,7 @@ NTSTATUS Native::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, C
 /// <param name="hThread">Thread handle.</param>
 /// <param name="ctx">Thread context</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT64& ctx )
+NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT64& ctx ) noexcept
 {
     auto r = GetThreadContext(hThread, reinterpret_cast<PCONTEXT>(&ctx));
     return r != 0 ? STATUS_SUCCESS : LastNtStatus();
@@ -252,16 +247,16 @@ NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT64& ctx )
 /// <param name="hThread">Thread handle.</param>
 /// <param name="ctx">Thread context</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
+NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx ) noexcept
 {
     // Target process is x64. WOW64 CONTEXT is not available.
     if (_wowBarrier.targetWow64 == false)
     {
-        return 0;
+        return STATUS_NOT_SUPPORTED;
     }
     else
     {
-        auto r = SAFE_CALL(Wow64GetThreadContext, hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx));
+        auto r = SAFE_CALL( Wow64GetThreadContext, hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx) );
         return r != 0 ? STATUS_SUCCESS : LastNtStatus();
     }
 }
@@ -272,7 +267,7 @@ NTSTATUS Native::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
 /// <param name="hThread">Thread handle.</param>
 /// <param name="ctx">Thread context</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx )
+NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx ) noexcept
 {
     auto r = SetThreadContext(hThread, reinterpret_cast<PCONTEXT>(&ctx));
     return r != 0 ? STATUS_SUCCESS : LastNtStatus();
@@ -284,16 +279,17 @@ NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx )
 /// <param name="hThread">Thread handle.</param>
 /// <param name="ctx">Thread context</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
+NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx ) noexcept
 {
     // Target process is x64. 32bit CONTEXT is not available.
     if (_wowBarrier.targetWow64 == false)
     {
-        return 0;
+
+        return STATUS_NOT_SUPPORTED;
     }
     else
     {
-        auto r = SAFE_CALL(Wow64SetThreadContext, hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx));
+        auto r = SAFE_CALL( Wow64SetThreadContext, hThread, reinterpret_cast<PWOW64_CONTEXT>(&ctx) );
         return r != 0 ? STATUS_SUCCESS : LastNtStatus();
     }
 }
@@ -305,7 +301,7 @@ NTSTATUS Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
 /// <param name="func">APC function</param>
 /// <param name="arg">APC argument</param>
 /// <returns>Status code</returns>
-NTSTATUS Native::QueueApcT( HANDLE hThread, ptr_t func, ptr_t arg )
+NTSTATUS Native::QueueApcT( HANDLE hThread, ptr_t func, ptr_t arg ) noexcept
 {
     if (_wowBarrier.type == wow_64_32)
     {
@@ -321,21 +317,23 @@ NTSTATUS Native::QueueApcT( HANDLE hThread, ptr_t func, ptr_t arg )
 /// </summary>
 /// <param name="ppeb">Retrieved PEB</param>
 /// <returns>PEB pointer</returns>
-ptr_t Native::getPEB( _PEB32* ppeb )
+ptr_t Native::getPEB( _PEB32* ppeb ) noexcept
 {
     // Target process is x64. PEB32 is not available.
     if (_wowBarrier.targetWow64 == false)
     {
+        SetLastNtStatus( STATUS_NOT_SUPPORTED );
         return 0;
     }
-    else
-    {
-        ptr_t ptr = 0;
-        if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, ProcessWow64Information, &ptr, (ULONG)sizeof( ptr ), nullptr ) ) && ppeb)
-            ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(ptr), ppeb, sizeof(*ppeb), NULL );
 
-        return ptr;
+    ptr_t ptr = 0;
+    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, ProcessWow64Information, &ptr, ULONG( sizeof( ptr ) ), nullptr ) ))
+    {
+        if (!ppeb || ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(ptr), ppeb, sizeof( _PEB32 ), nullptr ))
+            return ptr;
     }
+
+    return 0;
 }
 
 /// <summary>
@@ -343,15 +341,19 @@ ptr_t Native::getPEB( _PEB32* ppeb )
 /// </summary>
 /// <param name="ppeb">Retrieved PEB</param>
 /// <returns>PEB pointer</returns>
-ptr_t Native::getPEB( _PEB64* ppeb )
+ptr_t Native::getPEB( _PEB64* ppeb ) noexcept
 {
-    PROCESS_BASIC_INFORMATION pbi = { 0 };
+    PROCESS_BASIC_INFORMATION pbi = { };
     ULONG bytes = 0;
 
-    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, ProcessBasicInformation, &pbi, (ULONG)sizeof( pbi ), &bytes ) ) && ppeb)
-        ReadProcessMemory( _hProcess, pbi.PebBaseAddress, ppeb, sizeof(*ppeb), NULL );
+    SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, ProcessBasicInformation, &pbi, ULONG( sizeof( pbi ) ), &bytes );
+    if (bytes > 0)
+    {
+        if (!ppeb || ReadProcessMemory( _hProcess, pbi.PebBaseAddress, ppeb, sizeof( _PEB32 ), nullptr ))
+            return reinterpret_cast<ptr_t>(pbi.PebBaseAddress);
+    }
 
-    return reinterpret_cast<ptr_t>(pbi.PebBaseAddress);
+    return 0;
 }
 
 /// <summary>
@@ -359,25 +361,27 @@ ptr_t Native::getPEB( _PEB64* ppeb )
 /// </summary>
 /// <param name="ppeb">Retrieved TEB</param>
 /// <returns>TEB pointer</returns>
-ptr_t Native::getTEB( HANDLE hThread, _TEB32* pteb )
+ptr_t Native::getTEB( HANDLE hThread, _TEB32* pteb ) noexcept
 {
     // Target process is x64. TEB32 is not available.
     if (_wowBarrier.targetWow64 == false)
     {
+        SetLastNtStatus( STATUS_NOT_SUPPORTED );
         return 0;
     }
+
     // Retrieving TEB32 from x64 process.
-    else
+    _THREAD_BASIC_INFORMATION_T<DWORD64> tbi = { };
+    ULONG bytes = 0;
+
+    SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, ULONG( sizeof( tbi ) ), &bytes );
+    if (bytes > 0)
     {
-        _THREAD_BASIC_INFORMATION_T<DWORD64> tbi = { 0 };
-        ULONG bytes = 0;
-
-        if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ) && pteb)
-            ReadProcessMemory( _hProcess, (const uint8_t*)tbi.TebBaseAddress + 0x2000, pteb, sizeof(*pteb), NULL );
-
-        return tbi.TebBaseAddress + 0x2000;
+        if (!pteb || ReadProcessMemory( _hProcess, (const uint8_t*)tbi.TebBaseAddress + 0x2000, pteb, sizeof( _TEB32 ), nullptr ))
+            return tbi.TebBaseAddress + 0x2000;
     }
 
+    return 0;
 }
 
 /// <summary>
@@ -385,15 +389,19 @@ ptr_t Native::getTEB( HANDLE hThread, _TEB32* pteb )
 /// </summary>
 /// <param name="ppeb">Retrieved TEB</param>
 /// <returns>TEB pointer</returns>
-ptr_t Native::getTEB( HANDLE hThread, _TEB64* pteb )
+ptr_t Native::getTEB( HANDLE hThread, _TEB64* pteb ) noexcept
 {
-    _THREAD_BASIC_INFORMATION_T<DWORD64> tbi = { 0 };
+    _THREAD_BASIC_INFORMATION_T<DWORD64> tbi = { };
     ULONG bytes = 0;
 
-    if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ) && pteb)
-        ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof(*pteb), NULL );
+    SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, ULONG( sizeof( tbi ) ), &bytes );
+    if (bytes > 0)
+    {
+        if (!pteb || ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof( _TEB64 ), nullptr ))
+            return tbi.TebBaseAddress;
+    }
 
-    return tbi.TebBaseAddress;
+    return 0;
 }
 
 /// <summary>
@@ -401,9 +409,9 @@ ptr_t Native::getTEB( HANDLE hThread, _TEB64* pteb )
 /// </summary>
 /// <param name="includeFree">If true - non-allocated regions will be included in list</param>
 /// <returns>Found regions</returns>
-std::vector<MEMORY_BASIC_INFORMATION64> Native::EnumRegions( bool includeFree /*= false*/ )
+std::vector<MEMORY_BASIC_INFORMATION64> Native::EnumRegions( bool includeFree /*= false*/ ) noexcept
 {
-    MEMORY_BASIC_INFORMATION64 mbi = { 0 };
+    MEMORY_BASIC_INFORMATION64 mbi = { };
     std::vector<MEMORY_BASIC_INFORMATION64> results;
 
     for (ptr_t memptr = minAddr(); memptr < maxAddr(); memptr = mbi.BaseAddress + mbi.RegionSize)
@@ -429,22 +437,22 @@ std::vector<MEMORY_BASIC_INFORMATION64> Native::EnumRegions( bool includeFree /*
 /// <param name="result">Found modules</param>
 /// <returns>Module count</returns>
 template<typename T>
-std::vector<ModuleDataPtr> Native::EnumModulesT()
+std::vector<ModuleDataPtr> Native::EnumModulesT() noexcept
 {
     NTSTATUS status = STATUS_SUCCESS;
     _PEB_T<T> peb = { };
     _PEB_LDR_DATA2_T<T> ldr = { };
     std::vector<ModuleDataPtr> result;
 
-    if (getPEB( &peb ) != 0 && ReadProcessMemoryT( peb.Ldr, &ldr, sizeof( ldr ), 0 ) == STATUS_SUCCESS)
+    if (getPEB( &peb ) != 0 && ReadProcessMemoryT( peb.Ldr, &ldr, sizeof( ldr ) ) == STATUS_SUCCESS)
     {
         for (T head = ldr.InLoadOrderModuleList.Flink;
             NT_SUCCESS( status ) && head != (peb.Ldr + FIELD_OFFSET( _PEB_LDR_DATA2_T<T>, InLoadOrderModuleList ));
             status = ReadProcessMemoryT( static_cast<ptr_t>(head), &head, sizeof( head ) ))
         {
             ModuleData data;
-            wchar_t localPath[512] = { 0 };
-            _LDR_DATA_TABLE_ENTRY_BASE_T<T> localdata = { { 0 } };
+            wchar_t localPath[512] = { };
+            _LDR_DATA_TABLE_ENTRY_BASE_T<T> localdata = { };
 
             ReadProcessMemoryT( head, &localdata, sizeof( localdata ), 0 );
             ReadProcessMemoryT( localdata.FullDllName.Buffer, localPath, localdata.FullDllName.Length );
@@ -473,9 +481,9 @@ std::vector<ModuleDataPtr> Native::EnumModulesT()
 /// </summary>
 /// <param name="result">Found modules</param>
 /// <returns>Sections count</returns>
-std::vector<ModuleDataPtr> Native::EnumSections()
+std::vector<ModuleDataPtr> Native::EnumSections() noexcept
 {
-    MEMORY_BASIC_INFORMATION64 mbi = { 0 };
+    MEMORY_BASIC_INFORMATION64 mbi = { };
     ptr_t lastBase = 0;
     std::vector<ModuleDataPtr> result;
 
@@ -492,10 +500,10 @@ std::vector<ModuleDataPtr> Native::EnumSections()
         if (mbi.State != MEM_COMMIT || mbi.Type != SEC_IMAGE || lastBase == mbi.AllocationBase)
             continue;
 
-        uint8_t buf[0x1000] = { 0 };
+        uint8_t buf[0x1000] = { };
         _UNICODE_STRING_T<uint64_t>* ustr = (decltype(ustr))(buf + 0x800);
 
-        status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof(buf) / 2 );
+        status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof( buf ) / 2 );
 
         // Get additional 
         if (NT_SUCCESS( status ))
@@ -516,7 +524,7 @@ std::vector<ModuleDataPtr> Native::EnumSections()
             if (phdrDos->e_magic != IMAGE_DOS_SIGNATURE || phdrNt32->Signature != IMAGE_NT_SIGNATURE)
             {
                 // Iterate until region end
-                MEMORY_BASIC_INFORMATION64 mbi2 = { 0 };
+                MEMORY_BASIC_INFORMATION64 mbi2 = { };
                 for (ptr_t memptr2 = mbi.AllocationBase; memptr2 < maxAddr(); memptr2 = mbi2.BaseAddress + mbi2.RegionSize)
                     if (!NT_SUCCESS( VirtualQueryExT( memptr2, &mbi2 ) ) || mbi2.Type != SEC_IMAGE)
                     {
@@ -526,7 +534,7 @@ std::vector<ModuleDataPtr> Native::EnumSections()
 
                 data.type = mt_unknown;
             }
-            else if( phdrNt32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC )
+            else if (phdrNt32->OptionalHeader.Magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC)
             {
                 data.size = phdrNt32->OptionalHeader.SizeOfImage;
                 data.type = mt_mod32;
@@ -536,7 +544,7 @@ std::vector<ModuleDataPtr> Native::EnumSections()
                 data.size = phdrNt64->OptionalHeader.SizeOfImage;
                 data.type = mt_mod64;
             }
-            else 
+            else
                 continue;
 
             // Hack for x86 OS
@@ -567,9 +575,9 @@ std::vector<ModuleDataPtr> Native::EnumSections()
 /// </summary>
 /// <param name="result">Found modules</param>
 /// <returns>Sections count</returns>
-std::vector<ModuleDataPtr> Native::EnumPEHeaders()
+std::vector<ModuleDataPtr> Native::EnumPEHeaders() noexcept
 {
-    MEMORY_BASIC_INFORMATION64 mbi = { 0 };
+    MEMORY_BASIC_INFORMATION64 mbi = { };
     uint8_t buf[0x1000];
     ptr_t lastBase = 0;
     std::vector<ModuleDataPtr> result;
@@ -624,7 +632,7 @@ std::vector<ModuleDataPtr> Native::EnumPEHeaders()
 
         // Try to get section name
         _UNICODE_STRING_T<DWORD64>* ustr = (decltype(ustr))buf;
-        status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof(buf) );
+        status = VirtualQueryExT( mbi.AllocationBase, MemorySectionName, ustr, sizeof( buf ) );
 
         if (status == STATUS_SUCCESS)
         {
@@ -641,7 +649,7 @@ std::vector<ModuleDataPtr> Native::EnumPEHeaders()
         }
         else
         {
-            wchar_t name[64] = { 0 };
+            wchar_t name[64] = { };
             wsprintfW( name, L"Unknown_0x%I64x", data.baseAddress );
 
             data.fullPath = name;
@@ -662,7 +670,7 @@ std::vector<ModuleDataPtr> Native::EnumPEHeaders()
 /// <param name="result">Found modules</param>
 /// <param name="mtype">Module type: x86 or x64</param>
 /// <returns>Module count</returns>
-std::vector<ModuleDataPtr> Native::EnumModules( eModSeachType search/*= LdrList*/, eModType mtype /*= mt_default */ )
+std::vector<ModuleDataPtr> Native::EnumModules( eModSeachType search/*= LdrList*/, eModType mtype /*= mt_default */ ) noexcept
 {
     if (search == LdrList)
     {
@@ -672,11 +680,11 @@ std::vector<ModuleDataPtr> Native::EnumModules( eModSeachType search/*= LdrList*
 
         return CALL_64_86( mtype == mt_mod64, EnumModulesT );
     }
-    else if(search == Sections)
+    else if (search == Sections)
     {
         return EnumSections();
     }
-    else if(search == PEHeaders)
+    else if (search == PEHeaders)
     {
         return EnumPEHeaders();
     }

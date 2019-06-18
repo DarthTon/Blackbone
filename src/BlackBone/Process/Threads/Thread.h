@@ -3,12 +3,14 @@
 #include "../../Config.h"
 #include "../../Include/Winheaders.h"
 #include "../../Include/NativeStructures.h"
-#include "../../Include/CallResult.h"
 #include "../../Include/HandleGuard.h"
 #include "../../Include/Types.h"
 #include "../../Misc/Utils.h"
 
 #include <memory>
+#include <utility>
+#include "BlackBone/Include/Exception.h"
+#include "BlackBone/Include/Macro.h"
 
 namespace blackbone
 {
@@ -79,12 +81,12 @@ struct regDR7
     uint32_t rw3  : 2;
     uint32_t len3 : 2;
 
-    inline void setLocal( int idx, int val ) { idx == 0 ? l0   = val : (idx == 1 ? l1   = val : (idx == 2 ? l2   = val : l3   = val)); }
-    inline void setRW   ( int idx, int val ) { idx == 0 ? rw0  = val : (idx == 1 ? rw1  = val : (idx == 2 ? rw2  = val : rw3  = val)); }
-    inline void setLen  ( int idx, int val ) { idx == 0 ? len0 = val : (idx == 1 ? len1 = val : (idx == 2 ? len2 = val : len3 = val)); }
+    void setLocal( int idx, int val ) { idx == 0 ? l0   = val : (idx == 1 ? l1   = val : (idx == 2 ? l2   = val : l3   = val)); }
+    void setRW   ( int idx, int val ) { idx == 0 ? rw0  = val : (idx == 1 ? rw1  = val : (idx == 2 ? rw2  = val : rw3  = val)); }
+    void setLen  ( int idx, int val ) { idx == 0 ? len0 = val : (idx == 1 ? len1 = val : (idx == 2 ? len2 = val : len3 = val)); }
 
-    inline bool empty() const { return (l0 | l1 | l2 | l3) ? false : true; }
-    inline int  getFreeIndex() const { return !l0 ? 0 : (!l1 ? 1 : (!l2 ? 2 : (!l3 ? 3 : -1))); }
+    bool empty() const { return (l0 | l1 | l2 | l3) ? false : true; }
+    int  getFreeIndex() const { return !l0 ? 0 : (!l1 ? 1 : (!l2 ? 2 : (!l3 ? 3 : -1))); }
 };
 
 
@@ -113,7 +115,7 @@ public:
     /// <summary>
     /// Get thread handle
     /// </summary>
-    /// <returns>Thread hande</returns>
+    /// <returns>Thread handle</returns>
     BLACKBONE_API HANDLE handle() const { return _handle; }
 
     /// <summary>
@@ -128,6 +130,7 @@ public:
     /// <param name="pteb">Process TEB</param>
     /// <returns>TEB pointer</returns>
     BLACKBONE_API ptr_t teb( _TEB32* pteb ) const;
+    BLACKBONE_API ptr_t teb32( _TEB32* pteb = nullptr ) const { return teb( pteb ); }
    
     /// <summary>
     /// Get Native TEB
@@ -135,12 +138,13 @@ public:
     /// <param name="pteb">Process TEB</param>
     /// <returns>TEB pointer</returns>
     BLACKBONE_API ptr_t teb( _TEB64* pteb ) const;
+    BLACKBONE_API ptr_t teb64( _TEB64* pteb = nullptr ) const { return teb( pteb ); }
 
     /// <summary>
     /// Get TEB
     /// </summary>
     /// <returns>TEB pointer</returns>
-    BLACKBONE_API ptr_t teb() const { return teb( (TEB_T*)nullptr ); }
+    BLACKBONE_API ptr_t teb() const { return teb( static_cast<TEB_T*>(nullptr) ); }
 
     /// <summary>
     /// Get thread creation time
@@ -232,8 +236,8 @@ public:
     /// <param name="addr">Breakpoint address</param>
     /// <param name="type">Breakpoint type(read/write/execute)</param>
     /// <param name="length">Number of bytes to include into breakpoint</param>
-    /// <returns>Index of used breakpoint; -1 if failed</returns>
-    BLACKBONE_API call_result_t<int> AddHWBP( ptr_t addr, HWBPType type, HWBPLength length );
+    /// <returns>Index of used breakpoint</returns>
+    BLACKBONE_API int AddHWBP( ptr_t addr, HWBPType type, HWBPLength length );
 
     /// <summary>
     /// Remove existing hardware breakpoint
@@ -254,7 +258,7 @@ public:
     /// </summary>
     BLACKBONE_API void Close();
 
-    BLACKBONE_API inline bool operator ==( const Thread& other ) { return (_id == other._id); }
+    BLACKBONE_API bool operator ==( const Thread& other ) const { return _id == other._id; }
 
 private:
     /// <summary>
@@ -272,5 +276,30 @@ private:
 };
 
 using ThreadPtr = std::shared_ptr<Thread>;
+
+class SuspendedThread
+{
+public:
+    SuspendedThread( ThreadPtr thread )
+        : _thread( std::move(thread) )
+    {
+        if (!_thread->Suspend())
+            THROW_WITH_STATUS_AND_LOG( LastNtStatus(), "failed to suspend thread %d", thread->id() );
+    }
+
+    SuspendedThread(const SuspendedThread&) = delete;
+    SuspendedThread(SuspendedThread&&) = default;
+
+    ~SuspendedThread()
+    {
+        _thread->Resume();
+    }
+
+    SuspendedThread& operator =(const SuspendedThread&) = delete;
+    SuspendedThread& operator =(SuspendedThread&&) = default;
+
+private:
+    ThreadPtr _thread;
+};
 
 }

@@ -11,9 +11,7 @@ namespace blackbone
 {
 
 class NameResolve
-{
-    using mapApiSchema = std::unordered_map<std::wstring, std::vector<std::wstring>>;
-   
+{   
 public:
     enum eResolveFlag
     {
@@ -26,6 +24,10 @@ public:
 
 public:
     BLACKBONE_API ~NameResolve() = default;
+
+    // Ensure singleton
+    NameResolve( const NameResolve& ) = delete;
+    NameResolve& operator =( const NameResolve& ) = delete;
 
     BLACKBONE_API static NameResolve& Instance();
 
@@ -63,18 +65,15 @@ public:
     /// <returns></returns>
     BLACKBONE_API NTSTATUS ProbeSxSRedirect( std::wstring& path, class Process& proc, HANDLE actx = INVALID_HANDLE_VALUE );
 
-private:
-    // Ensure singleton
-    NameResolve() = default;
-    NameResolve( const NameResolve& ) = delete;
-    NameResolve& operator =( const NameResolve& ) = delete;
-
     /// <summary>
     /// Gets the process executable directory
     /// </summary>
     /// <param name="pid">Process ID</param>
     /// <returns>Process executable directory</returns>
     std::wstring GetProcessDirectory( DWORD pid );
+
+private:
+    NameResolve() = default;
 
     /// <summary>
     /// OS dependent api set initialization
@@ -84,6 +83,8 @@ private:
     bool InitializeP();
 
 private:
+    using mapApiSchema = std::unordered_map<std::wstring, std::vector<std::wstring>>;
+
     mapApiSchema _apiSchema;    // Api schema table
 };
 

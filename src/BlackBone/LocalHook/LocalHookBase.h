@@ -85,7 +85,7 @@ protected:
     /// <summary>
     /// Copy original function bytes
     /// </summary>
-    /// <param name="Ptr">Origianl function address</param>
+    /// <param name="Ptr">Original function address</param>
     BLACKBONE_API void CopyOldCode( uint8_t* Ptr );
 
     /// <summary>

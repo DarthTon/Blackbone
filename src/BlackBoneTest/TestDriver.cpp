@@ -16,7 +16,7 @@ namespace Testing
     public:
         TEST_METHOD_INITIALIZE( ClassInitialize )
         {
-            AssertEx::NtSuccess( _explorer.Attach( L"explorer.exe" ) );
+            _explorer.Attach( L"explorer.exe" );
             NTSTATUS status = Driver().EnsureLoaded();
             if (!NT_SUCCESS( status ))
             {
@@ -46,8 +46,7 @@ namespace Testing
         {
             CHECK_AND_SKIP;
 
-            Process thisProc;
-            AssertEx::NtSuccess( thisProc.Attach( GetCurrentProcessId() ) );
+            Process thisProc( GetCurrentProcessId() );
 
             // Make current process protected
             AssertEx::NtSuccess( Driver().ProtectProcess( GetCurrentProcessId(), Policy_Enable ) );

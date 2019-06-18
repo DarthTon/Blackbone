@@ -61,7 +61,7 @@ bool blackbone::NameResolve::InitializeP()
         PApiSetEntry pDescriptor = pSetMap->entry(i);
 
         std::vector<std::wstring> vhosts;
-        wchar_t dllName[MAX_PATH] = { 0 };
+        wchar_t dllName[MAX_PATH] = { };
 
         auto nameSize = pSetMap->apiName( pDescriptor, dllName );
         std::transform( dllName, dllName + nameSize / sizeof( wchar_t ), dllName, ::towlower );
@@ -106,7 +106,7 @@ NTSTATUS NameResolve::ResolvePath(
     )
 {
     NTSTATUS status = STATUS_SUCCESS;
-    wchar_t tmpPath[4096] = { 0 };
+    wchar_t tmpPath[4096] = { };
     std::wstring completePath;
 
     path = Utils::ToLower( std::move( path ) );
@@ -139,7 +139,7 @@ NTSTATUS NameResolve::ResolvePath(
         }
         else if (flags & EnsureFullPath)
         {
-            wchar_t sys_path[255] = { 0 };
+            wchar_t sys_path[255] = { };
             GetSystemDirectoryW( sys_path, 255 );
 
             path = std::wstring( sys_path ) + L"\\" + path;
@@ -175,8 +175,8 @@ NTSTATUS NameResolve::ResolvePath(
     {
         for (int i = 0; i < 0x1000 && res == ERROR_SUCCESS; i++)
         {
-            wchar_t value_name[255] = { 0 };
-            wchar_t value_data[255] = { 0 };
+            wchar_t value_name[255] = { };
+            wchar_t value_data[255] = { };
 
             DWORD dwSize = 255;
             DWORD dwType = 0;
@@ -185,7 +185,7 @@ NTSTATUS NameResolve::ResolvePath(
 
             if (_wcsicmp( value_data, filename.c_str() ) == 0)
             {
-                wchar_t sys_path[255] = { 0 };
+                wchar_t sys_path[255] = { };
                 dwSize = 255;
 
                 // In Win10 DllDirectory value got screwed, so less reliable method is used
@@ -300,9 +300,9 @@ NTSTATUS NameResolve::ResolvePath(
 /// <returns></returns>
 NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, Process& proc, HANDLE actx /*= INVALID_HANDLE_VALUE*/ )
 {
-    UNICODE_STRING OriginalName = { 0 };
-    UNICODE_STRING DllName1 = { 0 };
-    UNICODE_STRING DllName2 = { 0 };
+    UNICODE_STRING OriginalName = { };
+    UNICODE_STRING DllName1 = { };
+    UNICODE_STRING DllName2 = { };
     PUNICODE_STRING pPath = nullptr;
     ULONG_PTR cookie = 0;
     wchar_t wBuf[255];

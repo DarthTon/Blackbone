@@ -186,6 +186,7 @@ void AsmHelper64::PushArg( const AsmVariant& arg, int32_t index )
         break;
 
     case AsmVariant::dataPtr:
+    case AsmVariant::dataPtrConst:
     case AsmVariant::dataStruct:
         // Use new_imm_val when available. It's populated by remote call engine.
         PushArgp( arg.new_imm_val != 0 ? arg.new_imm_val : arg.imm_val64, index );

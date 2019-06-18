@@ -201,6 +201,7 @@ void AsmHelper32::PushArg( const AsmVariant& arg, eArgType regidx /*= AT_stack*/
         break;
 
     case AsmVariant::dataPtr:
+    case AsmVariant::dataPtrConst:
         PushArgp( arg.new_imm_val != 0 ? arg.new_imm_val : arg.imm_val, regidx );
         break;
 

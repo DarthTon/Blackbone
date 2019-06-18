@@ -90,9 +90,9 @@ bool ImageNET::Parse( mapMethodRVA* methods /*= nullptr*/ )
     HCORENUM  hceTypeDefs    = 0;
     mdToken   tExtends       = 0;
     HCORENUM  hceMethods     = 0;
-    mdTypeRef rTypeDefs[10]  = { 0 };
-    WCHAR     wcName[1024]   = { 0 };
-    mdToken   rTokens[10]    = { 0 };
+    mdTypeRef rTypeDefs[10]  = { };
+    WCHAR     wcName[1024]   = { };
+    mdToken   rTokens[10]    = { };
 
     while (SUCCEEDED( _pMetaImport->EnumTypeDefs( &hceTypeDefs, rTypeDefs, ARRAYSIZE( rTypeDefs ), &dwcTypeDefs ) )
         && dwcTypeDefs > 0)
@@ -107,7 +107,7 @@ bool ImageNET::Parse( mapMethodRVA* methods /*= nullptr*/ )
                 && dwcTokens > 0)
             {
                 DWORD            dwCodeRVA, dwAttr;
-                WCHAR            wmName[1024] = { 0 };
+                WCHAR            wmName[1024] = { };
                 PCCOR_SIGNATURE  pbySigBlob = nullptr;
 
                 for (UINT j = 0; j < dwcTokens; j++)
@@ -155,7 +155,7 @@ std::wstring ImageNET::GetImageRuntimeVer( const wchar_t* ImagePath )
     // Legacy runtime. Get exact required version
     if(!clrCreate)
     {
-        wchar_t ver[64] = { 0 };
+        wchar_t ver[64] = { };
         DWORD bytes = 0;
 
         auto clrGetVer = reinterpret_cast<fnGetRequestedRuntimeVersion>(

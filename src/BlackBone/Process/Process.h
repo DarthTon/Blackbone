@@ -11,7 +11,6 @@
 #include "../ManualMap/MMap.h"
 
 #include "../Include/NativeStructures.h"
-#include "../Include/CallResult.h"
 #include "../Misc/InitOnce.h"
 
 #include <string>
@@ -39,7 +38,7 @@ struct ProcessInfo
     std::wstring imageName;
     std::vector<ThreadInfo> threads;
 
-    bool operator < (const ProcessInfo& other)
+    bool operator < ( const ProcessInfo& other )
     {
         return this->pid < other.pid;
     }
@@ -68,7 +67,7 @@ struct HandleInfo
     std::wstring name;
 
     // Object-specific info
-    std::shared_ptr<SectionInfo> section;
+    SectionInfo section;
 };
 
 #define DEFAULT_ACCESS_P  PROCESS_QUERY_INFORMATION | \
@@ -80,34 +79,48 @@ struct HandleInfo
                           PROCESS_TERMINATE         | \
                           PROCESS_SUSPEND_RESUME    | \
                           PROCESS_DUP_HANDLE
+
 class Process
 {
 public:
     BLACKBONE_API Process();
-    BLACKBONE_API ~Process(void);
+    BLACKBONE_API explicit Process( DWORD pid, DWORD access = DEFAULT_ACCESS_P );
+    BLACKBONE_API explicit Process( const wchar_t* name, DWORD access = DEFAULT_ACCESS_P );
+    BLACKBONE_API explicit Process( HANDLE hProc );
+    BLACKBONE_API Process(
+        const std::wstring& path,
+        bool suspended,
+        bool forceInit,
+        const std::wstring& cmdLine,
+        const wchar_t* currentDir,
+        STARTUPINFOW* pStartup
+    );
+
+    Process( const Process& ) = delete;
+    Process& operator =( const Process& ) = delete;
+
+    Process( Process&& ) = default;
+    Process& operator =( Process&& ) = default;
 
     /// <summary>
     /// Attach to existing process
     /// </summary>
     /// <param name="pid">Process ID</param>
     /// <param name="access">Access mask</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS Attach( DWORD pid, DWORD access = DEFAULT_ACCESS_P );
+    BLACKBONE_API void Attach( DWORD pid, DWORD access = DEFAULT_ACCESS_P );
 
     /// <summary>
     /// Attach to existing process
     /// </summary>
     /// <param name="name">Process name</param>
     /// <param name="access">Access mask</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS Attach( const wchar_t* name, DWORD access = DEFAULT_ACCESS_P );
+    BLACKBONE_API void Attach( const wchar_t* name, DWORD access = DEFAULT_ACCESS_P );
 
     /// <summary>
     /// Attach to existing process
     /// </summary>
     /// <param name="pid">Process handle</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS Attach( HANDLE hProc );
+    BLACKBONE_API void Attach( HANDLE hProc );
 
     /// <summary>
     /// Create new process and attach to it
@@ -118,21 +131,34 @@ public:
     /// <param name="cmdLine">Process command line</param>
     /// <param name="currentDir">Startup directory</param>
     /// <param name="pStartup">Additional startup params</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS CreateAndAttach(
+    BLACKBONE_API void CreateAndAttach(
         const std::wstring& path,
         bool suspended = false,
         bool forceInit = true,
         const std::wstring& cmdLine = L"",
         const wchar_t* currentDir = nullptr,
         STARTUPINFOW* pStartup = nullptr
-        );
+    );
+
+    // Syntax sugar for CreateAndAttach
+    BLACKBONE_API static Process CreateNew(
+        const std::wstring& path,
+        bool suspended = false,
+        bool forceInit = true,
+        const std::wstring& cmdLine = L"",
+        const wchar_t* currentDir = nullptr,
+        STARTUPINFOW* pStartup = nullptr
+    );
+
+    /// <summary>
+    /// Attach to current process
+    /// </summary>
+    BLACKBONE_API static Process CurrentProcess();
 
     /// <summary>
     /// Detach form current process, if any
     /// </summary>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS Detach();
+    BLACKBONE_API void Detach();
 
     /// <summary>
     /// Ensure LdrInitializeProcess gets called
@@ -156,7 +182,7 @@ public:
     /// Get process ID
     /// </summary>
     /// <returns>Process ID</returns>
-    BLACKBONE_API inline DWORD pid() const { return _core.pid(); }
+    BLACKBONE_API DWORD pid() const { return _core.pid(); }
 
     /// <summary>
     /// Checks if process still exists
@@ -168,35 +194,34 @@ public:
     /// Terminate process
     /// </summary>
     /// <param name="code">Exit code</param>
-    /// <returns>Stratus code</returns>
+    /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS Terminate( uint32_t code = 0 );
 
     /// <summary>
     /// Enumerate all open handles
     /// </summary>
-    /// <returns>Found handles or status code</returns>
-    BLACKBONE_API call_result_t<std::vector<HandleInfo>> EnumHandles();
+    /// <returns>Found handles</returns>
+    BLACKBONE_API std::vector<HandleInfo> EnumHandles();
 
     /// <summary>
     /// Search for process by executable name
     /// </summary>
     /// <param name="name">Process name. If empty - function will retrieve all existing processes</param>
-    /// <param name="found">Found processses</param>
+    /// <returns">Found processes</returns>
     BLACKBONE_API static std::vector<DWORD> EnumByName( const std::wstring& name );
 
     /// <summary>
     /// Search for process by executable name or by process ID
     /// </summary>
-    /// <param name="pid">Target process ID. rocess name. If empty - function will retrieve all existing processes</param>
+    /// <param name="pid">Target process ID. If empty - function will retrieve all existing processes</param>
     /// <param name="name">Process executable name. If empty - function will retrieve all existing processes</param>
-    /// <param name="found">Found processses</param>
-    /// <param name="includeThreads">If set to true, function will retrieve info ablout process threads</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API static call_result_t<std::vector<ProcessInfo>> EnumByNameOrPID(
+    /// <param name="includeThreads">If set to true, function will retrieve info about process threads</param>
+    /// <returns">Found processes</returns>
+    BLACKBONE_API static std::vector<ProcessInfo> EnumByNameOrPID(
         uint32_t pid,
-        const std::wstring& name, 
+        const std::wstring& name,
         bool includeThreads = false
-        );
+    );
 
     //
     // Subroutines
@@ -213,10 +238,6 @@ public:
 
     // Sugar
     BLACKBONE_API const Wow64Barrier& barrier() const { return _core._native->GetWow64Barrier(); }
-
-private:
-    Process(const Process&) = delete;
-    Process& operator =(const Process&) = delete;
 
 private:
     ProcessCore     _core;          // Core routines and native subsystem

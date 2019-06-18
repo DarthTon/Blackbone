@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../../Include/CallResult.h"
 #include "../../Asm/IAsmHelper.h"
 #include "../Process.h"
 
@@ -63,20 +62,15 @@ public:
             );
     }
 
-    call_result_t<ReturnType> Call( CallArguments& args, ThreadPtr contextThread = nullptr )
+    ReturnType Call( CallArguments& args, ThreadPtr contextThread = nullptr )
     {
-        ReturnType result = {};
-        uint64_t tmpResult = 0;
-        NTSTATUS status = STATUS_SUCCESS;
         auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
 
         if (!contextThread)
             contextThread = _boundThread;
 
         // Ensure RPC environment exists
-        status = _process.remote().CreateRPCEnvironment( Worker_None, contextThread != nullptr );
-        if (!NT_SUCCESS( status ))
-            return call_result_t<ReturnType>( result, status );
+        _process.remote().CreateRPCEnvironment( Worker_None, contextThread != nullptr );
 
         // FPU check
         constexpr bool isFloat = std::is_same_v<ReturnType, float>;
@@ -98,60 +92,53 @@ public:
 
         // Choose execution thread
         if (!contextThread)
-        {
-            status = _process.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), tmpResult );
-        }
+            _process.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize() );
         else if (contextThread == _process.remote().getWorker())
-        {
-            status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), tmpResult );
-        }
+            _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize() );
         else
-        {
-            status = _process.remote().ExecInAnyThread( (*a)->make(), (*a)->getCodeSize(), tmpResult, contextThread );
-        }
+            _process.remote().ExecInAnyThread( (*a)->make(), (*a)->getCodeSize(), contextThread );
 
         // Get function return value
-        if (!NT_SUCCESS( status ) || !NT_SUCCESS( status = _process.remote().GetCallResult( result ) ))
-            return call_result_t<ReturnType>( result, status );
+        auto result = _process.remote().GetCallResult<ReturnType>();
 
         // Update arguments
-        for (auto& arg : args.arguments)
-            if (arg.type == AsmVariant::dataPtr)
+        for (const auto& arg : args.arguments)
+            if (arg.type == AsmVariant::dataPtr && arg.imm_val != 0)
                 _process.memory().Read( arg.new_imm_val, arg.size, reinterpret_cast<void*>(arg.imm_val) );
 
-        return call_result_t<ReturnType>( result, STATUS_SUCCESS );
+        return result;
     }
 
-    call_result_t<ReturnType> Call( const Args&... args )
+    ReturnType Call( const Args&... args )
     {
         CallArguments a( args... );
         return Call( a, nullptr );
     }
 
-    call_result_t<ReturnType> Call( const std::tuple<Args...>& args, ThreadPtr contextThread = nullptr ) 
+    ReturnType Call( const std::tuple<Args...>& args, ThreadPtr contextThread = nullptr ) 
     { 
         CallArguments a( args, std::index_sequence_for<Args...>() ); 
         return Call( a, contextThread ); 
     } 
 
-    call_result_t<ReturnType> Call( const std::initializer_list<AsmVariant>& args, ThreadPtr contextThread = nullptr ) 
+    ReturnType Call( const std::initializer_list<AsmVariant>& args, ThreadPtr contextThread = nullptr ) 
     { 
         CallArguments a( args ); 
         return Call( a, contextThread ); 
     } 
 
-    call_result_t<ReturnType> operator()( const Args&... args ) 
+    ReturnType operator()( const Args&... args ) 
     { 
         CallArguments a( args... ); 
         return Call( a ); 
     } 
 
-    auto MakeArguments( const Args&... args ) 
+    auto MakeArguments( const Args&... args )
     { 
         return CallArguments( args... ); 
     } 
         
-    auto MakeArguments( const std::initializer_list<AsmVariant>& args ) 
+    auto MakeArguments( const std::initializer_list<AsmVariant>& args )
     { 
         return CallArguments( args ); 
     } 
@@ -233,6 +220,7 @@ public:
 /// <summary>
 /// Get remote function object
 /// </summary>
+/// <param name="process">Target process for execution</param>
 /// <param name="ptr">Function address in the remote process</param>
 /// <returns>Function object</returns>
 template<typename T>
@@ -244,6 +232,7 @@ RemoteFunction<T> MakeRemoteFunction( Process& process, ptr_t ptr, ThreadPtr bou
 /// <summary>
 /// Get remote function object
 /// </summary>
+/// <param name="process">Target process for execution</param>
 /// <param name="ptr">Function address in the remote process</param>
 /// <returns>Function object</returns>
 template<typename T>
@@ -255,6 +244,7 @@ RemoteFunction<T> MakeRemoteFunction( Process& process, T ptr, ThreadPtr boundTh
 /// <summary>
 /// Get remote function object
 /// </summary>
+/// <param name="process">Target process for execution</param>
 /// <param name="modName">Remote module name</param>
 /// <param name="name_ord">Function name or ordinal</param>
 /// <returns>Function object</returns>
@@ -262,7 +252,7 @@ template<typename T>
 RemoteFunction<T> MakeRemoteFunction( Process& process, const std::wstring& modName, const char* name_ord, ThreadPtr boundThread = nullptr )
 {
     auto ptr = process.modules().GetExport( modName, name_ord );
-    return RemoteFunction<T>( process, ptr ? ptr->procAddress : 0, boundThread );
+    return RemoteFunction<T>( process, ptr.procAddress, boundThread );
 }
 
 }

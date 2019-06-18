@@ -14,9 +14,12 @@ namespace blackbone
 
 inline void DoTraceV( const char* fmt, va_list va_args )
 {
-    char buf[2048], userbuf[1024];
-    vsprintf_s( userbuf, fmt, va_args );
-    sprintf_s( buf, "BlackBone: %s\r\n", userbuf );
+    constexpr size_t buf_size = 1024 * 1024;
+    static auto buf = static_cast<char*>(VirtualAlloc( nullptr, buf_size, MEM_COMMIT, PAGE_READWRITE ));
+    static auto userbuf = static_cast<char*>(VirtualAlloc( nullptr, buf_size, MEM_COMMIT, PAGE_READWRITE ));
+
+    vsprintf_s( userbuf, buf_size, fmt, va_args );
+    sprintf_s( buf, buf_size, "BlackBone: %s\r\n", userbuf );
     OutputDebugStringA( buf );
 
 #ifdef CONSOLE_TRACE
@@ -26,9 +29,12 @@ inline void DoTraceV( const char* fmt, va_list va_args )
 
 inline void DoTraceV( const wchar_t* fmt, va_list va_args )
 {
-    wchar_t buf[2048], userbuf[1024];
-    vswprintf_s( userbuf, fmt, va_args );
-    swprintf_s( buf, L"BlackBone: %ls\r\n", userbuf );
+    constexpr size_t buf_size = 1024 * 1024;
+    static auto buf = static_cast<wchar_t*>(VirtualAlloc( nullptr, buf_size, MEM_COMMIT, PAGE_READWRITE ));
+    static auto userbuf = static_cast<wchar_t*>(VirtualAlloc( nullptr, buf_size, MEM_COMMIT, PAGE_READWRITE ));
+
+    vswprintf_s( userbuf, buf_size / sizeof( wchar_t ), fmt, va_args );
+    swprintf_s( buf, buf_size / sizeof( wchar_t ), L"BlackBone: %ls\r\n", userbuf );
     OutputDebugStringW( buf );
 
 #ifdef CONSOLE_TRACE

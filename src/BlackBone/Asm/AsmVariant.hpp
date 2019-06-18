@@ -36,6 +36,7 @@ struct AsmVariant
         imm_double,     // double or long double
         imm_float,      // float
         dataPtr,        // pointer to local data (e.g. string or pointer to structure)
+        dataPtrConst,   // pointer to constant local data
         dataStruct,     // structure passed by value
         structRet,      // pointer to space into which return value is copied (used when returning structures by value)
         mem,            // stack variable
@@ -102,6 +103,10 @@ struct AsmVariant
             set( dataStruct, argSize, reinterpret_cast<uint64_t>(buf.data()) );
             memcpy( buf.data(), &arg, argSize );
         }
+
+        // Mark as constant to prevent reading data back
+        if (type == dataPtr && std::is_const_v<std::remove_pointer_t<RAW_T>>)
+            type = dataPtrConst;
     }
 
     // Custom size pointer

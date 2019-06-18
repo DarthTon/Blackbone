@@ -206,23 +206,15 @@ uint8_t MExcept::_handler64[] =
 /// <param name="proc">Target process</param>
 /// <param name="mod">Target module</param>
 /// <param name="partial">Partial exception support</param>
-/// <returns>Error code</returns>
-NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
+void MExcept::CreateVEH( Process* proc, ModuleData& mod, bool partial )
 {    
-    uint64_t result = 0;
-    auto& mods = proc.modules();
+    auto& mods = proc->modules();
 
     if (mod.type == mt_mod64)
     {
         // Add module to module table
         if (!_pModTable.valid())
-        {
-            auto mem = proc.memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
-            if (!mem)
-                return mem.status;
-
-            _pModTable = std::move( mem.result() );
-        }
+            _pModTable = proc->memory().Allocate( 0x1000, PAGE_READWRITE, 0, false );
 
         ModuleTable table = { };
         _pModTable.Read ( 0, table );
@@ -237,14 +229,10 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
 
     // No handler required
     if (partial)
-        return STATUS_SUCCESS;
+        return;
 
     // VEH codecave
-    auto mem = proc.memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0, false );
-    if (!mem)
-        return mem.status;
-
-    _pVEHCode = std::move( mem.result() );
+    _pVEHCode = proc->memory().Allocate( 0x2000, PAGE_EXECUTE_READWRITE, 0 );
 
     BLACKBONE_TRACE( "ManualMap: Vectored hander: 0x%p", _pVEHCode.ptr() );
 
@@ -281,44 +269,30 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
         memcpy( newHandler, _handler32, handlerSize );
 
         auto pDecode = mods.GetNtdllExport( "RtlDecodeSystemPointer", mod.type, Sections );
-        if (!pDecode)
-            return pDecode.status;
 
         replaceStub( newHandler, handlerSize, 0xDEADDA7A, static_cast<uint32_t>(g_symbols.LdrpInvertedFunctionTable32) );
-        replaceStub( newHandler, handlerSize, 0xDEADC0DE, static_cast<uint32_t>(pDecode->procAddress) );
+        replaceStub( newHandler, handlerSize, 0xDEADC0DE, static_cast<uint32_t>(pDecode.procAddress) );
         replaceStub( newHandler, handlerSize, 0xDEADC0D2, static_cast<uint32_t>(g_symbols.LdrProtectMrdata) );
     }
 
     // Write handler data into target process
-    if (!NT_SUCCESS( _pVEHCode.Write( 0, handlerSize, newHandler ) ))
-    {
-        _pVEHCode.Free();
-        return LastNtStatus();
-    }
+    _pVEHCode.Write( 0, handlerSize, newHandler );
 
     // AddVectoredExceptionHandler(0, pHandler);
     auto pAddHandler = mods.GetNtdllExport( "RtlAddVectoredExceptionHandler", mod.type, Sections );
-    if (!pAddHandler)
-        return pAddHandler.status;
-
     auto a = AsmFactory::GetAssembler( mod.type );
 
     a->GenPrologue();
-    a->GenCall( pAddHandler->procAddress, { 0, _pVEHCode.ptr() } );
-    proc.remote().AddReturnWithEvent( *a, mod.type );
+    a->GenCall( pAddHandler.procAddress, { 0, _pVEHCode.ptr() } );
+    proc->remote().AddReturnWithEvent( *a, mod.type );
     a->GenEpilogue();
 
-    NTSTATUS status = proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
-    if (result != 0)
-    {
-        _hVEH = result;
-        return STATUS_SUCCESS;
-    }
-    else
-    {
-        status = proc.remote().GetLastStatus();
-        return status;
-    }
+    auto result = proc->remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize() );
+    if (result == 0)
+        THROW_WITH_STATUS_AND_LOG( proc->remote().GetLastStatus(), "RtlAddVectoredExceptionHandler failed" );
+
+    _pVEHCode.Release();
+    _hVEH = result;
 }
 
 /// <summary>
@@ -327,36 +301,28 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
 /// <param name="proc">Target process</param>
 /// <param name="partial">Partial exception support</param>
 /// <param name="mt">Module type</param>
-/// <returns>Status code</returns>
-NTSTATUS MExcept::RemoveVEH( Process& proc, bool partial, eModType mt )
+void MExcept::RemoveVEH( Process* proc, bool partial, eModType mt )
 {  
     auto a = AsmFactory::GetAssembler( mt );
-    uint64_t result = 0;
-
-    auto& mods = proc.modules();
+    auto& mods = proc->modules();
     auto pRemoveHandler = mods.GetNtdllExport( "RtlRemoveVectoredExceptionHandler", mt );
-    if (!pRemoveHandler)
-        return pRemoveHandler.status;
 
     a->GenPrologue();
 
     // RemoveVectoredExceptionHandler(pHandler);
-    a->GenCall( pRemoveHandler->procAddress, { _hVEH } );
+    a->GenCall( pRemoveHandler.procAddress, { _hVEH } );
 
-    proc.remote().AddReturnWithEvent( *a );
+    proc->remote().AddReturnWithEvent( *a );
     a->GenEpilogue();
 
     // Destroy table and handler
     if (!partial)
     {
-        proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+        proc->remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize() );
+        _pModTable.Free();
         _pVEHCode.Free();
         _hVEH = 0;
-
-        _pModTable.Free();
     }        
-
-    return STATUS_SUCCESS;
 }
 
 }

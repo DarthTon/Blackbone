@@ -50,16 +50,19 @@ void MapCalcFromFile()
     std::wcout << L"Manual image mapping test" << std::endl;
     std::wcout << L"Trying to map C:\\windows\\system32\\calc.exe into current process" << std::endl;
 
-    auto image = thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", ManualImports | RebaseProcess, callback );
-    if (!image)
+    try
     {
-        std::wcout << L"Mapping failed with error 0x" << std::hex << image.status
-                   << L". " << Utils::GetErrorDescription( image.status ) << std::endl << std::endl;
-    }
-    else
+        auto image = thisProc.mmap().MapImage( L"C:\\windows\\system32\\calc.exe", ManualImports | RebaseProcess, callback );
         std::wcout << L"Successfully mapped, unmapping\n";
-
-    thisProc.mmap().UnmapAllModules();
+        thisProc.mmap().UnmapAllModules();
+    }
+    catch (const nt_exception& ex)
+    {
+        std::cout << "Exception: " << ex.what() << std::endl;
+#if _DEBUG
+        std::cout << "Stack trace: " << std::endl << ex.stack_trace();
+#endif
+    }   
 }
 
 /*
@@ -67,36 +70,32 @@ void MapCalcFromFile()
 */
 void MapCmdFromMem()
 {
-    Process thisProc;
-    thisProc.Attach( GetCurrentProcessId() );
-
-    void* buf = nullptr;
-    auto size = 0;
+    auto thisProc = Process::CurrentProcess();
 
     std::wcout << L"Manual image mapping from buffer test" << std::endl;
     std::wcout << L"Trying to map C:\\windows\\system32\\cmd.exe into current process" << std::endl;
 
     // Get image context
-    HANDLE hFile = CreateFileW( L"C:\\windows\\system32\\cmd.exe", FILE_GENERIC_READ, 0x7, 0, OPEN_EXISTING, 0, 0 );
-    if (hFile != INVALID_HANDLE_VALUE)
-    {
-        DWORD bytes = 0;
-        size = GetFileSize( hFile, NULL );
-        buf = VirtualAlloc( NULL, size, MEM_COMMIT, PAGE_READWRITE );
-        ReadFile( hFile, buf, size, &bytes, NULL );
-        CloseHandle( hFile );
-    }
+    auto hFile = Handle( CreateFileW( L"C:\\windows\\system32\\cmd.exe", FILE_GENERIC_READ, 0x7, 0, OPEN_EXISTING, 0, 0 ) );
+    if (!hFile)
+        THROW_AND_LOG( "failed to read 'C:\\windows\\system32\\cmd.exe'" );
+       
+    DWORD bytes = 0;
+    auto size = GetFileSize( hFile, nullptr );
+    auto buf = make_raw_ptr( size );
+    ReadFile( hFile, buf.get(), size, &bytes, nullptr );
 
-    auto image = thisProc.mmap().MapImage( size, buf, false, CreateLdrRef | RebaseProcess | NoDelayLoad );
-    if (!image)
+    try
     {
-        std::wcout << L"Mapping failed with error 0x" << std::hex << image.status
-                   << L". " << Utils::GetErrorDescription( image.status ) << std::endl << std::endl;
-    }
-    else
+        auto image = thisProc.mmap().MapImage( size, buf.get(), false, CreateLdrRef | RebaseProcess | NoDelayLoad );
         std::wcout << L"Successfully mapped, unmapping\n";
-
-    VirtualFree( buf, 0, MEM_RELEASE );
-
-    thisProc.mmap().UnmapAllModules();
+        thisProc.mmap().UnmapAllModules();
+    }
+    catch (const nt_exception& ex)
+    {
+        std::cout << "Exception: " << ex.what() << std::endl;
+#if _DEBUG
+        std::cout << "Stack trace: " << std::endl << ex.stack_trace();
+#endif
+    }
 }

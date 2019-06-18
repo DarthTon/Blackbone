@@ -470,10 +470,10 @@ int PEImage::GetTLSCallbacks( module_t targetBase, std::vector<ptr_t>& result ) 
 /// <returns>Status code</returns>
 NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
 {
-    wchar_t tempPath[256] = { 0 };
+    wchar_t tempPath[256] = { };
     uint32_t manifestSize = 0;
 
-    ACTCTXW act = { 0 };
+    ACTCTXW act = { };
     act.cbSize = sizeof( act );
 
     // No manifest found, skip
@@ -486,7 +486,7 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
     //
     if (filepath == nullptr)
     {
-        wchar_t tempDir[256] = { 0 };
+        wchar_t tempDir[256] = { };
 
         GetTempPathW( ARRAYSIZE( tempDir ), tempDir );
         if (GetTempFileNameW( tempDir, L"ImageManifest", 0, tempPath ) == 0)
@@ -533,7 +533,7 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
 /// Get manifest from image data
 /// </summary>
 /// <param name="size">Manifest size</param>
-/// <param name="manifestID">Mmanifest ID</param>
+/// <param name="manifestID">Manifest ID</param>
 /// <returns>Manifest data</returns>
 void* PEImage::GetManifest( uint32_t& size, int32_t& manifestID )
 {

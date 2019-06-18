@@ -211,6 +211,9 @@
     <ClCompile Include="Symbols\SymbolData.cpp">
       <Filter>Symbols</Filter>
     </ClCompile>
+    <ClCompile Include="Include\ScopeExit.h">
+      <Filter>Include</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Config.h" />
@@ -457,9 +460,6 @@
     <ClInclude Include="..\3rd_party\rewolf-wow64ext\src\wow64ext.h">
       <Filter>Subsystem</Filter>
     </ClInclude>
-    <ClInclude Include="Include\CallResult.h">
-      <Filter>Include</Filter>
-    </ClInclude>
     <ClInclude Include="Asm\IAsmHelper.h">
       <Filter>AsmJit\Helpers</Filter>
     </ClInclude>
@@ -486,6 +486,12 @@
     </ClInclude>
     <ClInclude Include="Syscalls\Syscall.h">
       <Filter>Syscalls</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Exception.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Misc\StackTrace.h">
+      <Filter>Misc</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

@@ -83,7 +83,7 @@ extern "C" DWORD64 __cdecl X64Call(DWORD64 func, int argC, ...)
     reg64 _rdx = { (argC > 0) ? argC--, va_arg(args, DWORD64) : 0 };
     reg64 _r8 = { (argC > 0) ? argC--, va_arg(args, DWORD64) : 0 };
     reg64 _r9 = { (argC > 0) ? argC--, va_arg(args, DWORD64) : 0 };
-    reg64 _rax = { 0 };
+    reg64 _rax = { };
 
     reg64 restArgs = { (DWORD64)&va_arg(args, DWORD64) };
     
@@ -423,7 +423,7 @@ extern "C" DWORD64 __cdecl GetProcAddress64(DWORD64 hModule, const char* funcNam
             return 0;
     }
 
-    _UNICODE_STRING_T<DWORD64> fName = { 0 };
+    _UNICODE_STRING_T<DWORD64> fName = { };
     fName.Buffer = (DWORD64)funcName;
     fName.Length = (WORD)strlen(funcName);
     fName.MaximumLength = fName.Length + 1;

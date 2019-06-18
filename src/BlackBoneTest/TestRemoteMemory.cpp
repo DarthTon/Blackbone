@@ -12,8 +12,6 @@ namespace Testing
     public:
         TEST_METHOD( Everything )
         {
-            Process proc;
-
             NTSTATUS status = Driver().EnsureLoaded();
             if (!NT_SUCCESS( status ))
             {
@@ -21,7 +19,7 @@ namespace Testing
                 return;
             }
 
-            AssertEx::NtSuccess( proc.Attach( L"explorer.exe" ) );
+            Process proc( L"explorer.exe" );
             AssertEx::NtSuccess( proc.memory().Map( false ) );
 
             // Translate main module base address

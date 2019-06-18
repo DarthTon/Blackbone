@@ -81,7 +81,7 @@ GeneratedFiles*/
 *.opendb
 *.db
 *.sqlite
-/.vs
+*.vs
 *.db-shm
 *.db-wal
 *.json

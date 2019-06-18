@@ -293,14 +293,14 @@ bool TraceHook::CheckBranching( const HookContext& ctx, uintptr_t ip, uintptr_t 
     // Stack pointer changed
     if (ip - ctx.lastIP >= 8 && sp != ctx.lastSP)
     {
-        DISASM info = { 0 };
+        DISASM info = { };
         info.EIP = ctx.lastIP;
 
     #ifdef USE64
         info.Archi = 64;
     #endif  
 
-        // FIXME: Alternateve for MinGW
+        // FIXME: Alternative for MinGW
 #ifdef COMPILER_MSVC
         // Double-check call instruction using disasm
         if (Disasm( &info ) > 0 && info.Instruction.BranchType == CallType)
@@ -406,8 +406,8 @@ size_t TraceHook::StackBacktrace( uintptr_t ip, uintptr_t sp, vecStackFrames& re
     // Walk stack
     for (uintptr_t stackPtr = sp; stackPtr < stack_base && results.size() <= depth; stackPtr += sizeof(void*))
     {
-        uintptr_t stack_val = *(uintptr_t*)stackPtr;
-        MEMORY_BASIC_INFORMATION meminfo = { 0 };
+        uintptr_t stack_val = *reinterpret_cast<uintptr_t*>(stackPtr);
+        MEMORY_BASIC_INFORMATION meminfo = { };
 
         // Decode value
         uintptr_t original = stack_val & HIGHEST_BIT_UNSET;
@@ -433,7 +433,7 @@ size_t TraceHook::StackBacktrace( uintptr_t ip, uintptr_t sp, vecStackFrames& re
         // Detect 'call' instruction
         for (uintptr_t j = 1; j < 8; j++)
         {
-            DISASM info = { 0 };
+            DISASM info = { };
             info.EIP = original - j;
 
         #ifdef USE64

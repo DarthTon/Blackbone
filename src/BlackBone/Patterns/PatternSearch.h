@@ -13,17 +13,17 @@ namespace blackbone
 class PatternSearch
 {
 public:
-	/// <summary>
-	/// Callback to handle a matching address for the Search*WithHandler() methods.
-	/// If the handler returns true, the search is stopped, else the search continues.
-	/// </summary>
-	typedef std::function<bool (ptr_t)> MatchHandler;
+    /// <summary>
+    /// Callback to handle a matching address for the Search*WithHandler() methods.
+    /// If the handler returns true, the search is stopped, else the search continues.
+    /// </summary>
+    typedef std::function<bool (ptr_t)> MatchHandler;
 
 public:
-	// logAlignment can be used to speed-up the search in some cases. For example, if you know that the start of the pattern
-	// is always 8-byte-aligned, you can pass logAlignment=3 (2^3 = 8) to skip searching at all addresses that aren't multiples
-	// of 8. Note that for smaller alignments and depending on the exact pattern, this may not always be faster (it may even be
-	// a tiny bit slower), so profile it if you care about performance.
+    // logAlignment can be used to speed-up the search in some cases. For example, if you know that the start of the pattern
+    // is always 8-byte-aligned, you can pass logAlignment=3 (2^3 = 8) to skip searching at all addresses that aren't multiples
+    // of 8. Note that for smaller alignments and depending on the exact pattern, this may not always be faster (it may even be
+    // a tiny bit slower), so profile it if you care about performance.
     BLACKBONE_API PatternSearch( const std::vector<uint8_t>& pattern, size_t logAlignment = 0 );
     BLACKBONE_API PatternSearch( const std::initializer_list<uint8_t>&& pattern, size_t logAlignment = 0 );
     BLACKBONE_API PatternSearch( const std::string& pattern, size_t logAlignment = 0 );
@@ -46,7 +46,7 @@ public:
         uint8_t wildcard,
         void* scanStart,
         size_t scanSize,
-		MatchHandler handler,
+        MatchHandler handler,
         ptr_t value_offset = 0
         ) const;
 
@@ -62,7 +62,7 @@ public:
     BLACKBONE_API bool SearchWithHandler(
         void* scanStart,
         size_t scanSize,
-		MatchHandler handler,
+        MatchHandler handler,
         ptr_t value_offset = 0
         ) const;
 
@@ -135,7 +135,7 @@ public:
         size_t scanSize, 
         std::vector<ptr_t>& out, 
         ptr_t value_offset = 0,
-		size_t maxMatches = SIZE_MAX
+        size_t maxMatches = SIZE_MAX
         ) const;
 
     /// <summary>
@@ -153,7 +153,7 @@ public:
         size_t scanSize, 
         std::vector<ptr_t>& out, 
         ptr_t value_offset = 0,
-		size_t maxMatches = SIZE_MAX
+        size_t maxMatches = SIZE_MAX
         ) const;
 
     /// <summary>
@@ -172,7 +172,7 @@ public:
         ptr_t scanStart,
         size_t scanSize, 
         std::vector<ptr_t>& out,
-		size_t maxMatches = SIZE_MAX
+        size_t maxMatches = SIZE_MAX
         ) const;
 
     /// <summary>
@@ -189,7 +189,7 @@ public:
         ptr_t scanStart, 
         size_t scanSize, 
         std::vector<ptr_t>& out,
-		size_t maxMatches = SIZE_MAX
+        size_t maxMatches = SIZE_MAX
         ) const;
 
     /// <summary>
@@ -206,14 +206,14 @@ public:
         bool useWildcard, 
         uint8_t wildcard, 
         std::vector<ptr_t>& out,
-		size_t maxMatches = SIZE_MAX
+        size_t maxMatches = SIZE_MAX
         ) const;
 
 private:
     static inline bool collectAllMatchHandler(ptr_t addr, std::vector<ptr_t>& out, size_t maxMatches)
     {
-    	out.emplace_back(addr);
-		return out.size() >= maxMatches;
+        out.emplace_back(addr);
+        return out.size() >= maxMatches;
     }
 
 private:

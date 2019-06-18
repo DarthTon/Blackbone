@@ -69,7 +69,7 @@ protected:
         __except (GetExceptionCode() == EXCEPTION_ACCESS_VIOLATION)
         {
             BLACKBONE_TRACE(
-                "Invalid pointer derefrence: base 0x%p, offset 0x%08x, target address 0x%p",
+                "Invalid pointer dereference: base 0x%p, offset 0x%08x, target address 0x%p",
                 _base, (i > 0 ? _offsets[i] : -1), ptr
             );
 
@@ -104,13 +104,13 @@ public:
     /// Commit changed object into process
     /// </summary>
     /// <returns>Status code</returns>
-    NTSTATUS commit()
+    void commit()
     {
         auto ptr = get_ptr();
         if (ptr == 0)
-            return STATUS_ACCESS_VIOLATION;
+            THROW_AND_LOG( "invalid address" );
 
-        return _proc->memory().Write( ptr, sizeof( _data ), &_data );
+        _proc->memory().Write( ptr, _data );
     }
 
 private:
@@ -124,7 +124,8 @@ private:
         if (ptr == 0)
             return nullptr;
 
-        return NT_SUCCESS( _proc->memory().Read( ptr, sizeof( _data ), &_data ) ) ? &_data : nullptr;
+        _data = _proc->memory().Read<multi_ptr<T>::type>( ptr );
+        return &_data;
     }
     
     /// <summary>
@@ -133,28 +134,23 @@ private:
     /// <returns>Pointer value or 0 if chain is invalid</returns>
     uintptr_t get_ptr()
     {
-        uintptr_t ptr = multi_ptr<T>::_base;
-        if (!NT_SUCCESS( _proc->memory().Read( ptr, ptr ) ))
-            return 0;
+        auto ptr = _proc->memory().Read<uintptr_t>( multi_ptr<T>::_base );
 
         if (!multi_ptr<T>::_offsets.empty())
         {
             for (intptr_t i = 0; i < static_cast<intptr_t>(multi_ptr<T>::_offsets.size()) - 1; i++)
-                if (!NT_SUCCESS( _proc->memory().Read( ptr + multi_ptr<T>::_offsets[i], ptr ) ))
-                    return 0;
+                _proc->memory().Read( ptr + multi_ptr<T>::_offsets[i], ptr );
 
             ptr += multi_ptr<T>::_offsets.back();
-            if (multi_ptr<T>::type_is_ptr)
-                if (!NT_SUCCESS( _proc->memory().Read( ptr, ptr ) ))
-                    return 0;
+            if constexpr (multi_ptr<T>::type_is_ptr)
+                _proc->memory().Read( ptr, ptr );
         }
 
         return ptr;
     }
 
-
 private:
     Process* _proc = nullptr;       // Target process
-    multi_ptr<T>::type _data;     // Local object copy
+    multi_ptr<T>::type _data;       // Local object copy
 };
 }

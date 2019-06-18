@@ -2,6 +2,7 @@
 #include "../ProcessCore.h"
 #include "../../Misc/DynImport.h"
 #include "../../Include/Macro.h"
+#include "../../Include/Exception.h"
 
 namespace blackbone
 {
@@ -30,9 +31,13 @@ Thread::~Thread()
 /// </summary>
 /// <param name="pteb">Process TEB</param>
 /// <returns>TEB pointer</returns>
-blackbone::ptr_t Thread::teb( _TEB32* pteb ) const
+ptr_t Thread::teb( _TEB32* pteb ) const
 {
-    return _core->native()->getTEB( _handle, pteb );
+    ptr_t ptr = _core->native()->getTEB( _handle, pteb );
+    if (!ptr)
+        THROW_WITH_STATUS_AND_LOG( LastNtStatus(), "failed to get TEB32 address" );
+
+    return ptr;
 }
 
 /// <summary>
@@ -40,9 +45,13 @@ blackbone::ptr_t Thread::teb( _TEB32* pteb ) const
 /// </summary>
 /// <param name="pteb">Process TEB</param>
 /// <returns>TEB pointer</returns>
-blackbone::ptr_t Thread::teb( _TEB64* pteb ) const
+ptr_t Thread::teb( _TEB64* pteb ) const
 {
-    return _core->native()->getTEB( _handle, pteb );
+    ptr_t ptr = _core->native()->getTEB( _handle, pteb );
+    if (!ptr)
+        THROW_WITH_STATUS_AND_LOG( LastNtStatus(), "failed to get TEB64 address" );
+
+    return ptr;
 }
 
 /// <summary>
@@ -59,8 +68,8 @@ bool Thread::Suspend()
     const auto& barrier = _core->native()->GetWow64Barrier();
     if (barrier.type == wow_64_32 && !barrier.x86OS)
         return (SAFE_CALL(Wow64SuspendThread, _handle ) != -1);
-    else
-        return (SuspendThread( _handle ) != -1);
+    
+    return (SuspendThread( _handle ) != -1);
 }
 
 /// <summary>
@@ -205,18 +214,18 @@ bool Thread::Join( int timeout /*= INFINITE*/ )
 /// <param name="addr">Breakpoint address</param>
 /// <param name="type">Breakpoint type(read/write/execute)</param>
 /// <param name="length">Number of bytes to include into breakpoint</param>
-/// <returns>Index of used breakpoint; -1 if failed</returns>
-call_result_t<int> Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
+/// <returns>Index of used breakpoint</returns>
+int Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length )
 {
-    _CONTEXT64 context64 = { 0 };
-    _CONTEXT32 context32 = { 0 };
+    _CONTEXT64 context64 = { };
+    _CONTEXT32 context32 = { };
     bool use64 = !_core->native()->GetWow64Barrier().x86OS;
 
     // CONTEXT_DEBUG_REGISTERS can be operated without thread suspension
     auto status = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
     auto pDR7 = use64 ? reinterpret_cast<regDR7*>(&context64.Dr7) : reinterpret_cast<regDR7*>(&context32.Dr7);
     if (!NT_SUCCESS( status ))
-        return status;
+        THROW_WITH_STATUS_AND_LOG( status, "failed to get thread context" );
 
     // Check if HWBP is already present
     for (int i = 0; i < 4; i++)
@@ -231,7 +240,7 @@ call_result_t<int> Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length
 
     // If all 4 registers are occupied - error
     if (freeIdx < 0)
-        return STATUS_NO_MORE_ENTRIES;
+        THROW_AND_LOG( "no free HWBP slots" );
 
     // Enable corresponding HWBP and local BP flag
 
@@ -244,7 +253,10 @@ call_result_t<int> Thread::AddHWBP( ptr_t addr, HWBPType type, HWBPLength length
 
     // Write values to registers
     status = use64 ? SetContext( context64, true ) : SetContext( context32, true );
-    return call_result_t<int>( freeIdx, status );
+    if (!NT_SUCCESS( status ))
+        THROW_WITH_STATUS_AND_LOG(status, "failed to set thread context with HWBP");
+
+    return freeIdx;
 }
 
 /// <summary>
@@ -257,8 +269,8 @@ NTSTATUS Thread::RemoveHWBP( int idx )
     if (idx < 0 || idx > 4)
         return false;
    
-    _CONTEXT64 context64 = { 0 };
-    _CONTEXT32 context32 = { 0 };
+    _CONTEXT64 context64 = { };
+    _CONTEXT32 context32 = { };
     bool use64 = !_core->native()->GetWow64Barrier().x86OS;
     auto status = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
     auto pDR7 = use64 ? reinterpret_cast<regDR7*>(&context64.Dr7) : reinterpret_cast<regDR7*>(&context32.Dr7);
@@ -281,13 +293,13 @@ NTSTATUS Thread::RemoveHWBP( int idx )
 /// <returns>true on success</returns>
 NTSTATUS Thread::RemoveHWBP( ptr_t ptr )
 {
-    _CONTEXT64 context64 = { 0 };
-    _CONTEXT32 context32 = { 0 };
+    _CONTEXT64 context64 = { };
+    _CONTEXT32 context32 = { };
     bool use64 = !_core->native()->GetWow64Barrier().x86OS;
     auto status = use64 ? GetContext( context64, CONTEXT64_DEBUG_REGISTERS, true ) : GetContext( context32, CONTEXT_DEBUG_REGISTERS, true );
     auto pDR7 = use64 ? reinterpret_cast<regDR7*>(&context64.Dr7) : reinterpret_cast<regDR7*>(&context32.Dr7);
     if (!NT_SUCCESS( status ))
-        return false;
+        return status;
 
     // Search for breakpoint
     for (int i = 0; i < 4; i++)
@@ -374,7 +386,7 @@ DWORD Thread::GetThreadIdT( HANDLE hThread )
     // XP version
     else
     {
-        _THREAD_BASIC_INFORMATION_T<DWORD> tbi = { 0 };
+        _THREAD_BASIC_INFORMATION_T<DWORD> tbi = { };
         ULONG bytes = 0;
         
         if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ))
@@ -383,6 +395,5 @@ DWORD Thread::GetThreadIdT( HANDLE hThread )
         return 0;
     }
 }
-
 
 }

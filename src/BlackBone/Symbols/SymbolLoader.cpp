@@ -29,8 +29,7 @@ SymbolLoader::SymbolLoader()
 /// Load symbol addresses from PDB or and pattern scans
 /// </summary>
 /// <param name="result">Found symbols</param>
-/// <returns>Status code</returns>
-NTSTATUS SymbolLoader::Load( SymbolData& result )
+void SymbolLoader::Load( SymbolData& result )
 {
     auto [ntdll32, ntdll64] = LoadImages();
 
@@ -38,7 +37,7 @@ NTSTATUS SymbolLoader::Load( SymbolData& result )
     LoadFromSymbols( ntdll32, ntdll64, result );
    
     // Fill missing symbols from patterns
-    return LoadFromPatterns( ntdll32, ntdll64, result );
+    LoadFromPatterns( ntdll32, ntdll64, result );
 }
 
 /// <summary>
@@ -86,10 +85,9 @@ NTSTATUS SymbolLoader::LoadFromSymbols( const pe::PEImage& ntdll32, const pe::PE
 /// <param name="ntdll32">Loaded x86 ntdll image</param>
 /// <param name="ntdll64">Loaded x64 ntdll image</param>
 /// <param name="result">Found symbols</param>
-/// <returns>Status code</returns>
-NTSTATUS SymbolLoader::LoadFromPatterns( const pe::PEImage& ntdll32, const pe::PEImage& ntdll64, SymbolData& result )
+void SymbolLoader::LoadFromPatterns( const pe::PEImage& ntdll32, const pe::PEImage& ntdll64, SymbolData& result )
 {
-    return ScanSymbolPatterns( ntdll32, ntdll64, result );
+    ScanSymbolPatterns( ntdll32, ntdll64, result );
 }
 
 /// <summary>
@@ -100,7 +98,7 @@ std::pair<pe::PEImage, pe::PEImage> SymbolLoader::LoadImages()
 {
     pe::PEImage ntdll32, ntdll64;
 
-    wchar_t buf[MAX_PATH] = { 0 };
+    wchar_t buf[MAX_PATH] = { };
     GetWindowsDirectoryW( buf, MAX_PATH );
     std::wstring windir( buf );
 

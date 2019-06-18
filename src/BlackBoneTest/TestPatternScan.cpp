@@ -7,13 +7,13 @@ namespace Testing
     public:
         TEST_METHOD_INITIALIZE( ClassInitialize )
         {
-            AssertEx::NtSuccess( _proc.Attach( L"explorer.exe" ) );
+            _proc.Attach( L"explorer.exe" );
         }
 
         // Scan all allocated process memory
         TEST_METHOD( Simple )
         {
-            PatternSearch ps1( "\x48\x89\xD0" );
+            PatternSearch ps1( "\x48\x89" );
 
             std::vector<ptr_t> results;
             ps1.SearchRemoteWhole( _proc, false, 0, results );

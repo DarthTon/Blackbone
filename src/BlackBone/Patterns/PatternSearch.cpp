@@ -48,7 +48,7 @@ bool PatternSearch::SearchWithHandler(
     uint8_t wildcard,
         void* scanStart,
         size_t scanSize,
-		MatchHandler handler,
+        MatchHandler handler,
         ptr_t value_offset /*= 0*/
     ) const
 {
@@ -70,11 +70,11 @@ bool PatternSearch::SearchWithHandler(
             break;
 
         if (value_offset != 0)
-        	running = !handler( REBASE( res, scanStart, value_offset ) );
+            running = !handler( REBASE( res, scanStart, value_offset ) );
             //out.emplace_back( REBASE( res, scanStart, value_offset ) );
         else
             //out.emplace_back( reinterpret_cast<ptr_t>(res) );
-        	running = !handler( reinterpret_cast<ptr_t>(res) );
+            running = !handler( reinterpret_cast<ptr_t>(res) );
 
         cstart = res + _pattern.size();
     }
@@ -92,13 +92,13 @@ bool PatternSearch::SearchWithHandler(
 /// <param name="value_offset">Value that will be added to resulting addresses</param>
 /// <returns>Number of found addresses</returns>
 bool PatternSearch::SearchWithHandler(
-	void* scanStart,
-	size_t scanSize,
-	MatchHandler handler,
-	ptr_t value_offset /*= 0*/
-	) const
+    void* scanStart,
+    size_t scanSize,
+    MatchHandler handler,
+    ptr_t value_offset /*= 0*/
+    ) const
 {
-	size_t bad_char_skip[UCHAR_MAX + 1];
+    size_t bad_char_skip[UCHAR_MAX + 1];
 
     const uint8_t* haystack = reinterpret_cast<const uint8_t*>(scanStart);
     const uint8_t* haystackEnd = haystack + scanSize - _pattern.size();
@@ -106,8 +106,8 @@ bool PatternSearch::SearchWithHandler(
     uintptr_t       nlen     = _pattern.size();
     uintptr_t       scan     = 0;
     uintptr_t       last     = nlen - 1;
-    size_t alignMask		 = 0xFFFFFFFFFFFFFFFFL << logAlignment;
-    size_t alignOffs		 = (1 << logAlignment) - 1;
+    size_t alignMask         = 0xFFFFFFFFFFFFFFFFL << logAlignment;
+    size_t alignOffs         = (1 << logAlignment) - 1;
 
     //
     // Preprocess
@@ -131,10 +131,10 @@ bool PatternSearch::SearchWithHandler(
             {
                 if (value_offset != 0)
                     //out.emplace_back( REBASE( haystack, scanStart, value_offset ) );
-                	running = !handler( REBASE( haystack, scanStart, value_offset ) );
+                    running = !handler( REBASE( haystack, scanStart, value_offset ) );
                 else
                     //out.emplace_back( reinterpret_cast<ptr_t>(haystack) );
-                	running = !handler( reinterpret_cast<ptr_t>(haystack) );
+                    running = !handler( reinterpret_cast<ptr_t>(haystack) );
 
                 break;
             }
@@ -143,7 +143,7 @@ bool PatternSearch::SearchWithHandler(
         haystack += bad_char_skip[haystack[last]];
 
         if (logAlignment != 0) {
-        	haystack = (const uint8_t*) (size_t(haystack+alignOffs) & alignMask);
+            haystack = (const uint8_t*) (size_t(haystack+alignOffs) & alignMask);
         }
     }
 
@@ -167,16 +167,12 @@ bool PatternSearch::SearchRemoteWithHandler(
     MatchHandler handler
     ) const
 {
-    uint8_t *pBuffer = reinterpret_cast<uint8_t*>(VirtualAlloc( NULL, scanSize, MEM_COMMIT, PAGE_READWRITE ));
+    auto pBuffer = make_raw_ptr( scanSize );
+    if (!pBuffer)
+        THROW_WITH_STATUS_AND_LOG( LastNtStatus(), "failed to allocate local buffer" );
 
-    bool stopped = false;
-    if (pBuffer && remote.memory().Read( scanStart, scanSize, pBuffer ) == STATUS_SUCCESS)
-    	stopped = SearchWithHandler( wildcard, pBuffer, scanSize, handler, scanStart );
-
-    if (pBuffer)
-        VirtualFree( pBuffer, 0, MEM_RELEASE );
-
-    return stopped;
+    remote.memory().Read( scanStart, scanSize, pBuffer.get() );
+    return SearchWithHandler( wildcard, pBuffer.get(), scanSize, handler, scanStart );
 }
 
 /// <summary>
@@ -194,16 +190,12 @@ bool PatternSearch::SearchRemoteWithHandler(
     MatchHandler handler
     ) const
 {
-    uint8_t *pBuffer = reinterpret_cast<uint8_t*>(VirtualAlloc( NULL, scanSize, MEM_COMMIT, PAGE_READWRITE ));
+    auto pBuffer = make_raw_ptr( scanSize );
+    if (!pBuffer)
+        THROW_WITH_STATUS_AND_LOG( LastNtStatus(), "failed to allocate local buffer" );
 
-    bool stopped = false;
-    if (pBuffer && remote.memory().Read( scanStart, scanSize, pBuffer ) == STATUS_SUCCESS)
-    	stopped = SearchWithHandler( pBuffer, scanSize, handler, scanStart );
-
-    if (pBuffer)
-        VirtualFree( pBuffer, 0, MEM_RELEASE );
-
-    return stopped;
+    remote.memory().Read( scanStart, scanSize, pBuffer.get() );
+    return SearchWithHandler( pBuffer.get(), scanSize, handler, scanStart );
 }
 
 /// <summary>
@@ -221,9 +213,9 @@ bool PatternSearch::SearchRemoteWholeWithHandler(
     MatchHandler handler
     ) const
 {
-    MEMORY_BASIC_INFORMATION64 mbi = { 0 };
+    MEMORY_BASIC_INFORMATION64 mbi = { };
     size_t  bufsize = 1 * 1024 * 1024;  // 1 MB
-    uint8_t *buf = reinterpret_cast<uint8_t*>(VirtualAlloc( 0, bufsize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE ));
+    auto buf = make_raw_ptr( bufsize );
 
     auto native = remote.core().native();
 
@@ -234,7 +226,7 @@ bool PatternSearch::SearchRemoteWholeWithHandler(
 
         if (status == STATUS_INVALID_PARAMETER || status == STATUS_ACCESS_DENIED)
             break;
-        else if (status != STATUS_SUCCESS)
+        if (status != STATUS_SUCCESS)
             continue;
 
         // Filter regions
@@ -245,24 +237,21 @@ bool PatternSearch::SearchRemoteWholeWithHandler(
         if (mbi.RegionSize > bufsize)
         {
             bufsize = static_cast<size_t>(mbi.RegionSize);
-            VirtualFree( buf, 0, MEM_RELEASE );
-            buf = reinterpret_cast<uint8_t*>(VirtualAlloc( 0, bufsize, MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE ));
+            VirtualFree( buf.get(), 0, MEM_RELEASE );
+            buf = make_raw_ptr( bufsize );
         }
 
-        if (remote.memory().Read( memptr, static_cast<size_t>(mbi.RegionSize), buf ) != STATUS_SUCCESS)
+        if (!NT_SUCCESS( remote.memory().ReadNoThrow( memptr, static_cast<size_t>(mbi.RegionSize), buf.get() ) ))
             continue;
 
         if (useWildcard)
-        	running = !SearchWithHandler( wildcard, buf, static_cast<size_t>(mbi.RegionSize), handler, memptr );
+            running = !SearchWithHandler( wildcard, buf.get(), static_cast<size_t>(mbi.RegionSize), handler, memptr );
         else
-        	running = !SearchWithHandler( buf, static_cast<size_t>(mbi.RegionSize), handler, memptr );
+            running = !SearchWithHandler( buf.get(), static_cast<size_t>(mbi.RegionSize), handler, memptr );
     }
-
-    VirtualFree( buf, 0, MEM_RELEASE );
 
     return !running;
 }
-
 
 
 
@@ -282,16 +271,16 @@ size_t PatternSearch::Search(
     size_t scanSize,
     std::vector<ptr_t>& out,
     ptr_t value_offset /*= 0*/,
-	size_t maxMatches /*= SIZE_MAX*/
+    size_t maxMatches /*= SIZE_MAX*/
     ) const
 {
-	if (out.size() >= maxMatches)
-		return out.size();
+    if (out.size() >= maxMatches)
+        return out.size();
 
-	auto handler = std::bind(PatternSearch::collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
-	SearchWithHandler(wildcard, scanStart, scanSize, handler, value_offset);
+    auto handler = std::bind(collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
+    SearchWithHandler(wildcard, scanStart, scanSize, handler, value_offset);
 
-	return out.size();
+    return out.size();
 }
 
 /// <summary>
@@ -308,16 +297,16 @@ size_t PatternSearch::Search(
     size_t scanSize, 
     std::vector<ptr_t>& out,
     ptr_t value_offset /*= 0*/,
-	size_t maxMatches /*= SIZE_MAX*/
+    size_t maxMatches /*= SIZE_MAX*/
     ) const
 {
-	if (out.size() >= maxMatches)
-		return out.size();
+    if (out.size() >= maxMatches)
+        return out.size();
 
-	auto handler = std::bind(PatternSearch::collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
-	SearchWithHandler(scanStart, scanSize, handler, value_offset);
+    auto handler = std::bind(PatternSearch::collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
+    SearchWithHandler(scanStart, scanSize, handler, value_offset);
 
-	return out.size();
+    return out.size();
 }
 
 /// <summary>
@@ -335,16 +324,16 @@ size_t PatternSearch::SearchRemote(
     ptr_t scanStart, 
     size_t scanSize, 
     std::vector<ptr_t>& out,
-	size_t maxMatches /*= SIZE_MAX*/
+    size_t maxMatches /*= SIZE_MAX*/
     ) const
 {
-	if (out.size() >= maxMatches)
-		return out.size();
+    if (out.size() >= maxMatches)
+        return out.size();
 
-	auto handler = std::bind(PatternSearch::collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
-	SearchRemoteWithHandler(remote, wildcard, scanStart, scanSize, handler);
+    auto handler = std::bind(PatternSearch::collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
+    SearchRemoteWithHandler(remote, wildcard, scanStart, scanSize, handler);
 
-	return out.size();
+    return out.size();
 }
 
 /// <summary>
@@ -360,16 +349,16 @@ size_t PatternSearch::SearchRemote(
     ptr_t scanStart, 
     size_t scanSize, 
     std::vector<ptr_t>& out,
-	size_t maxMatches /*= SIZE_MAX*/
+    size_t maxMatches /*= SIZE_MAX*/
     ) const
 {
-	if (out.size() >= maxMatches)
-		return out.size();
+    if (out.size() >= maxMatches)
+        return out.size();
 
-	auto handler = std::bind(PatternSearch::collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
-	SearchRemoteWithHandler(remote, scanStart, scanSize, handler);
+    auto handler = std::bind(PatternSearch::collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
+    SearchRemoteWithHandler(remote, scanStart, scanSize, handler);
 
-	return out.size();
+    return out.size();
 }
 
 /// <summary>
@@ -385,18 +374,18 @@ size_t PatternSearch::SearchRemoteWhole(
     bool useWildcard, 
     uint8_t wildcard, 
     std::vector<ptr_t>& out,
-	size_t maxMatches /*= SIZE_MAX*/
+    size_t maxMatches /*= SIZE_MAX*/
     ) const
 {
-	out.clear();
+    out.clear();
 
-	if (out.size() >= maxMatches)
-		return out.size();
+    if (out.size() >= maxMatches)
+        return out.size();
 
-	auto handler = std::bind(PatternSearch::collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
-	SearchRemoteWholeWithHandler(remote, useWildcard, wildcard, handler);
+    auto handler = std::bind(PatternSearch::collectAllMatchHandler, std::placeholders::_1, std::ref(out), maxMatches);
+    SearchRemoteWholeWithHandler(remote, useWildcard, wildcard, handler);
 
-	return out.size();
+    return out.size();
 }
 
 

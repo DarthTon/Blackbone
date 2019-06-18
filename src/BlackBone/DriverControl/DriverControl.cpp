@@ -124,7 +124,7 @@ NTSTATUS DriverControl::Unload()
 /// <returns>Status code </returns>
 NTSTATUS DriverControl::MapMemory( DWORD pid, const std::wstring& pipeName, bool mapSections, MapMemoryResult& result )
 {
-    MAP_MEMORY data = { 0 };
+    MAP_MEMORY data = { };
     DWORD bytes = 0;
     ULONG sizeRequired = 0;
     data.pid = pid;
@@ -169,8 +169,8 @@ NTSTATUS DriverControl::MapMemory( DWORD pid, const std::wstring& pipeName, bool
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::MapMemoryRegion( DWORD pid, ptr_t base, uint32_t size, MapMemoryRegionResult& result )
 {
-    MAP_MEMORY_REGION data = { 0 };
-    MAP_MEMORY_REGION_RESULT mapResult = { 0 };
+    MAP_MEMORY_REGION data = { };
+    MAP_MEMORY_REGION_RESULT mapResult = { };
     DWORD bytes = 0;
 
     // Not loaded
@@ -227,7 +227,7 @@ NTSTATUS DriverControl::UnmapMemory( DWORD pid )
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::UnmapMemoryRegion( DWORD pid, ptr_t base, uint32_t size )
 {
-    UNMAP_MEMORY_REGION data = { 0 };
+    UNMAP_MEMORY_REGION data = { };
     DWORD bytes = 0;
 
     data.pid = pid;
@@ -304,7 +304,7 @@ NTSTATUS DriverControl::ProtectProcess(
 NTSTATUS DriverControl::PromoteHandle( DWORD pid, HANDLE handle, DWORD access )
 {
     DWORD bytes = 0;
-    HANDLE_GRANT_ACCESS grantAccess = { 0 };
+    HANDLE_GRANT_ACCESS grantAccess = { };
 
     grantAccess.pid = pid;
     grantAccess.handle = (ULONGLONG)handle;
@@ -323,7 +323,7 @@ NTSTATUS DriverControl::PromoteHandle( DWORD pid, HANDLE handle, DWORD access )
 /// <summary>
 /// Allocate virtual memory
 /// </summary>
-/// <param name="pid">Tarhet PID</param>
+/// <param name="pid">Target PID</param>
 /// <param name="base">Desired base. If 0 address is chosed by the system</param>
 /// <param name="size">Region size</param>
 /// <param name="type">Allocation type - MEM_RESERVE/MEM_COMMIT</param>
@@ -332,8 +332,8 @@ NTSTATUS DriverControl::PromoteHandle( DWORD pid, HANDLE handle, DWORD access )
 NTSTATUS DriverControl::AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD type, DWORD protection, bool physical /*= false*/ )
 {
     DWORD bytes = 0;
-    ALLOCATE_FREE_MEMORY allocMem = { 0 };
-    ALLOCATE_FREE_MEMORY_RESULT result = { 0 };
+    ALLOCATE_FREE_MEMORY allocMem = { };
+    ALLOCATE_FREE_MEMORY_RESULT result = { };
 
     allocMem.pid = pid;
     allocMem.base = base;
@@ -366,7 +366,7 @@ NTSTATUS DriverControl::AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD 
 /// <summary>
 /// Free virtual memory
 /// </summary>
-/// <param name="pid">Tarhet PID</param>
+/// <param name="pid">Target PID</param>
 /// <param name="base">Desired base. If 0 address is chosed by the system</param>
 /// <param name="size">Region size</param>
 /// <param name="type">Free type - MEM_RELEASE/MEM_DECOMMIT</param>
@@ -374,8 +374,8 @@ NTSTATUS DriverControl::AllocateMem( DWORD pid, ptr_t& base, ptr_t& size, DWORD 
 NTSTATUS DriverControl::FreeMem( DWORD pid, ptr_t base, ptr_t size, DWORD type )
 {
     DWORD bytes = 0;
-    ALLOCATE_FREE_MEMORY freeMem = { 0 };
-    ALLOCATE_FREE_MEMORY_RESULT result = { 0 };
+    ALLOCATE_FREE_MEMORY freeMem = { };
+    ALLOCATE_FREE_MEMORY_RESULT result = { };
 
     freeMem.pid = pid;
     freeMem.base = base;
@@ -411,7 +411,7 @@ NTSTATUS DriverControl::FreeMem( DWORD pid, ptr_t base, ptr_t size, DWORD type )
 NTSTATUS DriverControl::ReadMem( DWORD pid, ptr_t base, ptr_t size, PVOID buffer )
 {
     DWORD bytes = 0;
-    COPY_MEMORY copyMem = { 0 };
+    COPY_MEMORY copyMem = { };
 
     copyMem.pid = pid;
     copyMem.targetPtr = base;
@@ -440,7 +440,7 @@ NTSTATUS DriverControl::ReadMem( DWORD pid, ptr_t base, ptr_t size, PVOID buffer
 NTSTATUS DriverControl::WriteMem( DWORD pid, ptr_t base, ptr_t size, PVOID buffer )
 {
     DWORD bytes = 0;
-    COPY_MEMORY copyMem = { 0 };
+    COPY_MEMORY copyMem = { };
 
     copyMem.pid = pid;
     copyMem.targetPtr = base;
@@ -462,14 +462,14 @@ NTSTATUS DriverControl::WriteMem( DWORD pid, ptr_t base, ptr_t size, PVOID buffe
 /// Change memory protection
 /// </summary>
 /// <param name="pid">Target PID.</param>
-/// <param name="base">Regiod base address</param>
+/// <param name="base">Region base address</param>
 /// <param name="size">Region size</param>
 /// <param name="protection">New protection</param>
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::ProtectMem( DWORD pid, ptr_t base, ptr_t size, DWORD protection )
 {
     DWORD bytes = 0;
-    PROTECT_MEMORY protectMem = { 0 };
+    PROTECT_MEMORY protectMem = { };
 
     protectMem.pid = pid;
     protectMem.base = base;
@@ -550,7 +550,7 @@ NTSTATUS DriverControl::MmapDll(
 {
     DWORD bytes = 0;
     INJECT_DLL data = { IT_MMap };
-    UNICODE_STRING ustr = { 0 };
+    UNICODE_STRING ustr = { };
 
     // Convert path to native format
     SAFE_NATIVE_CALL( RtlDosPathNameToNtPathName_U, path.c_str(), &ustr, nullptr, nullptr );
@@ -622,13 +622,13 @@ NTSTATUS DriverControl::MmapDll(
 /// <summary>
 /// Manually map another system driver into system space
 /// </summary>
-/// <param name="path">Fully quialified path to the drver</param>
+/// <param name="path">Fully qualified path to the driver</param>
 /// <returns>Status code</returns>
 NTSTATUS DriverControl::MMapDriver( const std::wstring& path )
 {
     DWORD bytes = 0;
-    MMAP_DRIVER data = { { 0 } };
-    UNICODE_STRING ustr = { 0 };
+    MMAP_DRIVER data = { };
+    UNICODE_STRING ustr = { };
 
     // Not loaded
     if (_hDriver == INVALID_HANDLE_VALUE)
@@ -656,7 +656,7 @@ NTSTATUS DriverControl::MMapDriver( const std::wstring& path )
 NTSTATUS DriverControl::ConcealVAD( DWORD pid, ptr_t base, uint32_t size )
 {
     DWORD bytes = 0;
-    HIDE_VAD hideVAD = { 0 };
+    HIDE_VAD hideVAD = { };
 
     hideVAD.base = base;
     hideVAD.size = size;
@@ -707,7 +707,7 @@ NTSTATUS DriverControl::EnumMemoryRegions( DWORD pid, std::vector<MEMORY_BASIC_I
     }
 
     DWORD bytes = 0;
-    ENUM_REGIONS data = { 0 };
+    ENUM_REGIONS data = { };
     DWORD size = sizeof( ENUM_REGIONS_RESULT );
     auto result = reinterpret_cast<PENUM_REGIONS_RESULT>(malloc( size ));
 
@@ -773,7 +773,7 @@ NTSTATUS DriverControl::LoadDriver( const std::wstring& svcName, const std::wstr
 /// <returns>Status</returns>
 NTSTATUS DriverControl::UnloadDriver( const std::wstring& svcName )
 {
-    UNICODE_STRING Ustr = { 0 };
+    UNICODE_STRING Ustr = { };
 
     std::wstring regPath = L"\\registry\\machine\\SYSTEM\\CurrentControlSet\\Services\\" + svcName;
     SAFE_CALL( RtlInitUnicodeString, &Ustr, regPath.c_str() );
@@ -796,7 +796,7 @@ LSTATUS DriverControl::PrepareDriverRegEntry( const std::wstring& svcName, const
     RegHandle svcRoot, svcKey;
     DWORD dwType = 1;
     LSTATUS status = 0;
-    WCHAR wszLocalPath[MAX_PATH] = { 0 };
+    WCHAR wszLocalPath[MAX_PATH] = { };
 
     swprintf_s( wszLocalPath, ARRAYSIZE( wszLocalPath ), L"\\??\\%s", path.c_str() );
 

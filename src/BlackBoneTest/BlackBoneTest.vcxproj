@@ -315,6 +315,8 @@
     <ClInclude Include="Common.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="TestPebTeb.cpp" />
+    <ClCompile Include="TestScopeExit.cpp" />
     <ClCompile Include="TestModules.cpp" />
     <ClCompile Include="TestSymbols.cpp" />
     <ClCompile Include="TestAsmJit.cpp" />
