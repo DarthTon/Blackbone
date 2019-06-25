@@ -1,9 +1,5 @@
 #include "Common.h"
 
-namespace Microsoft::VisualStudio::CppUnitTestFramework {
-    template<> inline std::wstring ToString<__int64>( const __int64& t ) { RETURN_WIDE_STRING( t ); }
-}
-
 namespace Testing
 {
     TEST_CLASS( AsmJIT )
@@ -78,7 +74,7 @@ namespace Testing
             AssertEx::IsTrue( b );
 
             // Check locally
-            FileHandle hFile = FileHandle( CreateFileW( filePath, GENERIC_READ, 0x7, nullptr, OPEN_EXISTING, FILE_DELETE_ON_CLOSE, nullptr ) );
+            auto hFile = Handle( CreateFileW( filePath, GENERIC_READ, 0x7, nullptr, OPEN_EXISTING, FILE_DELETE_ON_CLOSE, nullptr ) );
             AssertEx::IsTrue( hFile );
 
             uint8_t readBuf[sizeof( writeBuf )] = { };

@@ -37,6 +37,12 @@
     <ClCompile Include="TestMultiPtr.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="TestGuard.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="TestSymbols.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h" />

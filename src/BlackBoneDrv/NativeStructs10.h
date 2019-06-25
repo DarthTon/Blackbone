@@ -136,34 +136,6 @@ typedef struct _MMVAD // Size=128
     union ___unnamed2048 u4; // Size=8 Offset=120
     struct _FILE_OBJECT * FileObject; // Size=8 Offset=128
 } MMVAD, *PMMVAD;
-
-typedef struct _POOL_HEADER // Size=16
-{
-    union
-    {
-        struct
-        {
-            unsigned short PreviousSize : 8; // Size=2 Offset=0 BitOffset=0 BitCount=8
-            unsigned short PoolIndex : 8; // Size=2 Offset=0 BitOffset=8 BitCount=8
-        };
-        unsigned long Ulong1; // Size=4 Offset=0
-    };
-    struct
-    {
-        unsigned short BlockSize : 8; // Size=2 Offset=2 BitOffset=0 BitCount=8
-        unsigned short PoolType : 8; // Size=2 Offset=2 BitOffset=8 BitCount=8
-    };
-    unsigned long PoolTag; // Size=4 Offset=4
-    union
-    {
-        struct _EPROCESS * ProcessBilled; // Size=8 Offset=8
-        struct
-        {
-            unsigned short AllocatorBackTraceIndex; // Size=2 Offset=8
-            unsigned short PoolTagHash; // Size=2 Offset=10
-        };
-    };
-} POOL_HEADER, *PPOOL_HEADER;
 #pragma pack(pop)
 
 typedef struct _HANDLE_TABLE

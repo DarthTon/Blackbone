@@ -73,7 +73,12 @@ void OSFillPatterns( std::unordered_map<ptr_t*, OffsetData>& patterns, SymbolDat
     {
         // LdrpHandleTlsData
         // 74 33 44 8D 43 09
-        auto offset = IsWindows10RS4OrGreater() ? 0x44 : 0x43;
+        auto offset = 0x43;
+        if(IsWindows10RS6OrGreater())
+            offset = 0x46;
+        else if (IsWindows10RS4OrGreater())
+            offset = 0x44;
+
         patterns.emplace( &result.LdrpHandleTlsData64, OffsetData{ "\x74\x33\x44\x8d\x43\x09", true, offset } );
 
         // RtlInsertInvertedFunctionTable
@@ -95,9 +100,19 @@ void OSFillPatterns( std::unordered_map<ptr_t*, OffsetData>& patterns, SymbolDat
         // LdrpHandleTlsData
         // 33 F6 85 C0 79 03 - RS5+
         // 8B C1 8D 4D AC/BC 51 - RS3-RS4
-        const auto pattern = IsWindows10RS4OrGreater() ? "\x8b\xc1\x8d\x4d\xac\x51" : "\x8b\xc1\x8d\x4d\xbc\x51";
-        const auto data = IsWindows10RS5OrGreater() ? OffsetData{ "\x33\xf6\x85\xc0\x79\x03", false, 0x2C } : OffsetData{ pattern, false, 0x18 };
-        patterns.emplace( &result.LdrpHandleTlsData32, data );
+        auto pattern = "\x8b\xc1\x8d\x4d\xbc\x51";
+        if (IsWindows10RS5OrGreater())
+            pattern = "\x33\xf6\x85\xc0\x79\x03";
+        else if (IsWindows10RS4OrGreater())
+            pattern = "\x8b\xc1\x8d\x4d\xac\x51";
+
+        offset = 0x18;
+        if (IsWindows10RS6OrGreater())
+            offset = 0x2E;
+        else if (IsWindows10RS5OrGreater())
+            offset = 0x2C;
+
+        patterns.emplace( &result.LdrpHandleTlsData32, OffsetData{ pattern, false, offset } );
 
         // LdrProtectMrdata
         // 75 24 85 F6 75 08

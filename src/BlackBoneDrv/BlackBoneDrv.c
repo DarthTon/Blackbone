@@ -11,14 +11,12 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING registr
 NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData );
 NTSTATUS BBGetBuildNO( OUT PULONG pBuildNo );
 NTSTATUS BBScanSection( IN PCCHAR section, IN PCUCHAR pattern, IN UCHAR wildcard, IN ULONG_PTR len, OUT PVOID* ppFound );
-NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData );
 VOID     BBUnload( IN PDRIVER_OBJECT DriverObject );
 
 #pragma alloc_text(INIT, DriverEntry)
 #pragma alloc_text(INIT, BBInitDynamicData)
 #pragma alloc_text(INIT, BBGetBuildNO)
 #pragma alloc_text(INIT, BBScanSection)
-#pragma alloc_text(INIT, BBLocatePageTables)
 
 /*
 */
@@ -32,10 +30,13 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registr
     UNREFERENCED_PARAMETER( RegistryPath );
 
     // Get OS Dependant offsets
+    InitializeDebuggerBlock();
     status = BBInitDynamicData( &dynData );
     if (!NT_SUCCESS( status ))
     {
-        DPRINT( "BlackBone: %s: Unsupported OS version. Aborting\n", __FUNCTION__ );
+        if (status == STATUS_NOT_SUPPORTED)
+            DPRINT( "BlackBone: %s: Unsupported OS version. Aborting\n", __FUNCTION__ );
+
         return status;
     }
 
@@ -43,6 +44,7 @@ NTSTATUS DriverEntry( IN PDRIVER_OBJECT DriverObject, IN PUNICODE_STRING Registr
     status = BBInitLdrData( (PKLDR_DATA_TABLE_ENTRY)DriverObject->DriverSection );
     if (!NT_SUCCESS( status ))
         return status;
+
     //
     // Globals init
     //
@@ -267,7 +269,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
 #elif defined (_WIN10_)
-        if (ver_short < WINVER_10 || WINVER_10_RS5 < ver_short)
+        if (ver_short < WINVER_10 || WINVER_10_RS6 < ver_short)
             return STATUS_NOT_SUPPORTED;
 #endif
 
@@ -360,7 +362,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                 {
                     pData->ver              = WINVER_10_RS1;
                     pData->KExecOpt         = 0x1BF;
-                    pData->Protection       = 0x6CA;
+                    pData->Protection       = pData->buildNo >= 447 ? 0x6CA : 0x6C2;
                     pData->EProcessFlags2   = 0x300;
                     pData->ObjTable         = 0x418;
                     pData->VadRoot          = 0x620;
@@ -371,8 +373,6 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->MiAllocPage      = 0;
                     if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x8D\x7D\x18\x48\x8B", 0xCC, 6, (PVOID)&pData->ExRemoveTable ) ))
                         pData->ExRemoveTable -= 0x60;
-
-                    status = BBLocatePageTables( pData );
                     break;
                 }
                 else if (verInfo.dwBuildNumber == 15063)
@@ -390,8 +390,6 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->MiAllocPage      = 0;
                     if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x8B\x47\x20\x48\x83\xC7\x18", 0xCC, 8, (PVOID)&pData->ExRemoveTable ) ))
                         pData->ExRemoveTable -= 0x34;
-
-                    status = BBLocatePageTables( pData );
                     break;
                 }
                 else if (verInfo.dwBuildNumber == 16299)
@@ -409,8 +407,6 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->MiAllocPage      = 0;
                     if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x83\xC7\x18\x48\x8B\x17", 0xCC, 7, (PVOID)&pData->ExRemoveTable ) ))
                         pData->ExRemoveTable -= 0x34;
-
-                    status = BBLocatePageTables( pData );
                     break;
                 }
                 else if (verInfo.dwBuildNumber == 17134)
@@ -428,8 +424,6 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->MiAllocPage      = 0;
                     if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x83\xC7\x18\x48\x8B\x17", 0xCC, 7, (PVOID)&pData->ExRemoveTable ) ))
                         pData->ExRemoveTable -= 0x34;
-
-                    status = BBLocatePageTables( pData );
                     break;
                 }
                 else if (verInfo.dwBuildNumber == 17763)
@@ -447,8 +441,23 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                     pData->MiAllocPage      = 0;
                     if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x83\xC7\x18\x48\x8B\x17", 0xCC, 7, (PVOID)&pData->ExRemoveTable ) ))
                         pData->ExRemoveTable -= 0x34;
-
-                    status = BBLocatePageTables( pData );
+                    break;
+                }
+                else if (verInfo.dwBuildNumber == 18362)
+                {
+                    pData->ver              = WINVER_10_RS6;
+                    pData->KExecOpt         = 0x1C3;
+                    pData->Protection       = 0x6FA;
+                    pData->EProcessFlags2   = 0x850;    // MitigationFlags offset
+                    pData->ObjTable         = 0x418;
+                    pData->VadRoot          = 0x658;
+                    pData->NtCreateThdIndex = 0xBD;
+                    pData->NtTermThdIndex   = 0x53;
+                    pData->PrevMode         = 0x232;
+                    pData->ExitStatus       = 0x710;
+                    pData->MiAllocPage      = 0;
+                    if (NT_SUCCESS( BBScanSection( "PAGE", (PCUCHAR)"\x48\x83\xC7\x18\x48\x8B\x17", 0xCC, 7, (PVOID)&pData->ExRemoveTable ) ))
+                        pData->ExRemoveTable -= 0x34;
                     break;
                 }
                 else
@@ -462,100 +471,33 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (pData->ExRemoveTable != 0)
             pData->correctBuild = TRUE;
 
-        DPRINT(
+        DPRINT( 
             "BlackBone: Dynamic search status: SSDT - %s, ExRemoveTable - %s\n",
-            GetSSDTBase() != NULL ? "SUCCESS" : "FAIL", 
+            GetSSDTBase() != NULL ? "SUCCESS" : "FAIL",
             pData->ExRemoveTable != 0 ? "SUCCESS" : "FAIL" 
             );
+
+        if (pData->ver >= WINVER_10_RS1)
+        {
+            DPRINT( 
+                "BlackBone: %s: g_KdBlock->KernBase: %p, GetKernelBase() = 0x%p \n", 
+                __FUNCTION__, g_KdBlock.KernBase, GetKernelBase( NULL ) 
+                );
+
+            ULONGLONG mask = (1ll << (PHYSICAL_ADDRESS_BITS - 1)) - 1;
+            dynData.DYN_PTE_BASE = (ULONG_PTR)g_KdBlock.PteBase;
+            dynData.DYN_PDE_BASE = (ULONG_PTR)((g_KdBlock.PteBase & ~mask) | ((g_KdBlock.PteBase >> 9) & mask));
+        }
+
+        DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
+        if (pData->DYN_PDE_BASE < MI_SYSTEM_RANGE_START || pData->DYN_PTE_BASE < MI_SYSTEM_RANGE_START)
+        {
+            DPRINT( "BlackBone: Invalid PDE/PTE base, aborting\n" );
+            return STATUS_UNSUCCESSFUL;
+        }
         
         return (pData->VadRoot != 0 ? status : STATUS_INVALID_KERNEL_INFO_VERSION);
     }
 
     return status;
-}
-
-/// <summary>
-/// PDE/PTE dynamic code offsets
-/// </summary>
-typedef struct _TABLE_OFFSETS
-{
-    int PDE;
-    int PTE;
-} TABLE_OFFSETS, *PTABLE_OFFSETS;
-
-/// <summary>
-/// Pre/Post 'meltdown' patch offsets
-/// </summary>
-typedef struct _TABLE_OFFSETS_MELT
-{
-    // selector[0] - offsets for builds before 'meltdown' patch
-    // selector[1] - offsets for builds after  'meltdown' patch
-    TABLE_OFFSETS selector[2];  
-} TABLE_OFFSETS_MELT, *PTABLE_OFFSETS_MELT;
-
-/// <summary>
-/// Get relocated PTE and PDE bases
-/// </summary>
-/// <param name="pData">Dynamic data</param>
-/// <returns>Status code</returns>
-NTSTATUS BBLocatePageTables( IN OUT PDYNAMIC_DATA pData )
-{
-    ASSERT( pData->ver >= WINVER_10_RS1 );
-
-    if (pData->ver >= WINVER_10_RS4)
-    {
-        const int index = pData->ver - WINVER_10_RS4;
-        TABLE_OFFSETS offsets[] = {
-            { 0x32D, 0x6A9 },
-            { 0x82E, 0x1C82 },
-        };
-
-        UNICODE_STRING uName = RTL_CONSTANT_STRING( L"ExFreePoolWithTag" );
-        PUCHAR pExFreePoolWithTag = MmGetSystemRoutineAddress( &uName );
-        if (pExFreePoolWithTag)
-        {
-            pData->DYN_PDE_BASE = *(PULONG_PTR)(pExFreePoolWithTag + offsets[index].PDE + 2);
-            pData->DYN_PTE_BASE = *(PULONG_PTR)(pExFreePoolWithTag + offsets[index].PTE + 2);
-
-            DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
-            return STATUS_SUCCESS;
-        }
-    }
-    else
-    {
-        const int index = pData->ver & 0xFF;
-        const TABLE_OFFSETS_MELT offsets[] =
-        {
-            { 0, 0, 0, 0 },             // No updates
-            { 0x49, 0x56, 0x52, 0x5F }, // WINVER_10_RS1
-            { 0x43, 0x50, 0x4B, 0x58 }  // WINVER_10_RS2
-        };
-
-        const ULONG patchThreshold[] =
-        {
-            0,      // No updates
-            2007,   // WINVER_10_RS1
-            850,    // WINVER_10_RS2
-            192     // WINVER_10_RS3
-        };
-
-        UNICODE_STRING uName = RTL_CONSTANT_STRING( L"MmGetPhysicalAddress" );
-        PUCHAR pMmGetPhysicalAddress = MmGetSystemRoutineAddress( &uName );
-        if (pMmGetPhysicalAddress)
-        {
-            PUCHAR pMiGetPhysicalAddress = *(PLONG)(pMmGetPhysicalAddress + 0xE + 1) + pMmGetPhysicalAddress + 0xE + 5;
-
-            // Meltdown fix check
-            const int melt = (pData->buildNo >= patchThreshold[index]) ? 1 : 0;
-
-            pData->DYN_PDE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + offsets[index].selector[melt].PDE + 2);
-            pData->DYN_PTE_BASE = *(PULONG_PTR)(pMiGetPhysicalAddress + offsets[index].selector[melt].PTE + 2);
-
-            DPRINT( "BlackBone: PDE_BASE: %p, PTE_BASE: %p\n", pData->DYN_PDE_BASE, pData->DYN_PTE_BASE );
-            return STATUS_SUCCESS;
-        }
-    }
-
-    DPRINT( "BlackBone: PDE_BASE/PTE_BASE not found \n" );
-    return STATUS_NOT_FOUND;
 }

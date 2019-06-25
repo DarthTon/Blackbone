@@ -49,6 +49,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
     {
         // do stuff...
         notepad.Resume();
+        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
     }
 
     // Process modules manipulation

@@ -282,7 +282,7 @@ public:
     /// Check if driver is loaded
     /// </summary>
     /// <returns></returns>
-    BLACKBONE_API inline bool loaded() const { return _hDriver != INVALID_HANDLE_VALUE; }
+    BLACKBONE_API inline bool loaded() const { return _hDriver.valid(); }
     BLACKBONE_API inline NTSTATUS status() const { return _loadStatus; }
 
 private:
@@ -312,7 +312,7 @@ private:
     /// <returns>Status code</returns>
     LSTATUS PrepareDriverRegEntry( const std::wstring& svcName, const std::wstring& path );
 private:
-    FileHandle _hDriver;
+    Handle _hDriver;
     NTSTATUS _loadStatus = STATUS_NOT_FOUND;
 };
 
