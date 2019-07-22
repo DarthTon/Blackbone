@@ -173,4 +173,4 @@ typedef struct _HANDLE_TABLE
 
 #pragma warning(default : 4214 4201)
 
-#define GET_VAD_ROOT(Table) &Table->BalancedRoot
+#define GET_VAD_ROOT(Table) Table->BalancedRoot.RightChild
