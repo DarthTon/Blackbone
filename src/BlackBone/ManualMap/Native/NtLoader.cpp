@@ -16,10 +16,6 @@ NtLdr::NtLdr( Process& proc )
 {
 }
 
-NtLdr::~NtLdr(void)
-{
-}
-
 /// <summary>
 /// Initialize some loader stuff
 /// </summary>
@@ -648,7 +644,7 @@ void NtLdr::InsertTailList( ptr_t ListHead, ptr_t Entry )
 /// <summary>
 /// Hash image name
 /// </summary>
-/// <param name="str">Iamge name</param>
+/// <param name="str">Image name</param>
 /// <returns>Hash</returns>
 ULONG NtLdr::HashString( const std::wstring& str )
 {
@@ -658,7 +654,7 @@ ULONG NtLdr::HashString( const std::wstring& str )
     {
         UNICODE_STRING ustr;
         SAFE_CALL( RtlInitUnicodeString, &ustr, str.c_str() );
-        SAFE_NATIVE_CALL( RtlHashUnicodeString, &ustr, (BOOLEAN)TRUE, 0, &hash );
+        SAFE_NATIVE_CALL( RtlHashUnicodeString, &ustr, BOOLEAN(TRUE), 0, &hash );
     }
     else
     {

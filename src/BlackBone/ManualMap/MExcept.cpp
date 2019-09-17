@@ -224,7 +224,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
             _pModTable = std::move( mem.result() );
         }
 
-        ModuleTable table;
+        ModuleTable table = { };
         _pModTable.Read ( 0, table );
 
         // Add new entry to the table
@@ -326,7 +326,7 @@ NTSTATUS MExcept::CreateVEH( Process& proc, ModuleData& mod, bool partial )
 /// </summary>
 /// <param name="proc">Target process</param>
 /// <param name="partial">Partial exception support</param>
-/// <param name="mt">Mosule type</param>
+/// <param name="mt">Module type</param>
 /// <returns>Status code</returns>
 NTSTATUS MExcept::RemoveVEH( Process& proc, bool partial, eModType mt )
 {  
