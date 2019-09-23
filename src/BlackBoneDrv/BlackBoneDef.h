@@ -456,6 +456,7 @@ typedef enum _MmapFlags
     KWipeHeader      = 0x04,    // Wipe image PE headers
     KHideVAD         = 0x10,    // Make image appear as PAGE_NOACESS region
     KRebaseProcess   = 0x40,    // If target image is an .exe file, process base address will be replaced with mapped module value
+    KNoThreads       = 0x80,    // Don't create new threads, use hijacking
 
     KNoExceptions    = 0x01000, // Do not create custom exception handler
     KNoSxS           = 0x08000, // Do not apply SxS activation context

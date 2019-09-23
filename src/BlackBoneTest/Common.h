@@ -10,6 +10,7 @@
 #include <BlackBone/Patterns/PatternSearch.h>
 #include <BlackBone/Asm/LDasm.h>
 #include <BlackBone/localHook/VTableHook.hpp>
+#include <BlackBone/Symbols/SymbolLoader.h>
 
 #include <iostream>
 #include <CppUnitTest.h>

@@ -1,0 +1,40 @@
+name: Main
+on: [push]
+
+jobs:
+  library:
+    name: Build and test library
+    strategy:
+      matrix:
+        platfom: [win32, x64]
+        #, Debug(DLL), Release(DLL)
+        configuration: [Debug, Release]
+    runs-on: windows-2019
+    steps:
+      - name: Checkout
+        if: contains(github.event.head_commit.message, 'driver') != true
+        uses: actions/checkout@v1
+      - name: Build
+        if: contains(github.event.head_commit.message, 'driver') != true
+        run: |
+          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && MSBuild.exe BlackBone.sln /p:CI=true /p:Platform="${{ matrix.platfom }}" /p:Configuration="${{ matrix.configuration }}"
+      - name: Test
+        if: contains(github.event.head_commit.message, 'driver') != true
+        run: |
+          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && vstest.console "build/${{ matrix.platfom }}/${{ matrix.configuration }}/BlackboneTest.dll"
+
+  driver:
+    name: Build driver
+    strategy:
+      matrix:
+        configuration: [Win10Debug, Win10Release, 'Win8.1 Debug', 'Win8.1 Release', 'Win8 Debug', 'Win8 Release', 'Win7 Debug', 'Win7 Release']
+    runs-on: windows-2019
+    steps:
+      - name: Checkout
+        if: contains(github.event.head_commit.message, 'driver')
+        uses: actions/checkout@v1
+      - name: Build
+        if: contains(github.event.head_commit.message, 'driver')
+        run: |
+          "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat" && MSBuild.exe src\BlackBoneDrv\BlackBoneDrv.sln /p:Platform="x64" /p:Configuration="${{ matrix.configuration }}"
+    

@@ -153,31 +153,6 @@ typedef struct _MMVAD_LONG // Size=144
     union ___unnamed1320 u4; // Size=8 Offset=136
 } MMVAD_LONG, *PMMVAD_LONG;
 
-typedef struct _POOL_HEADER // Size=16
-{
-    union
-    {
-        struct
-        {
-            unsigned long PreviousSize: 8; // Size=4 Offset=0 BitOffset=0 BitCount=8
-            unsigned long PoolIndex: 8; // Size=4 Offset=0 BitOffset=8 BitCount=8
-            unsigned long BlockSize: 8; // Size=4 Offset=0 BitOffset=16 BitCount=8
-            unsigned long PoolType: 8; // Size=4 Offset=0 BitOffset=24 BitCount=8
-        };
-        unsigned long Ulong1; // Size=4 Offset=0
-    };
-    unsigned long PoolTag; // Size=4 Offset=4
-    union
-    {
-        struct _EPROCESS * ProcessBilled; // Size=8 Offset=8
-        struct
-        {
-            unsigned short AllocatorBackTraceIndex; // Size=2 Offset=8
-            unsigned short PoolTagHash; // Size=2 Offset=10
-        };
-    };
-} POOL_HEADER, *PPOOL_HEADER;
-
 typedef struct _HANDLE_TABLE
 {
     ULONG_PTR TableCode;

@@ -53,7 +53,7 @@ call_result_t<ThreadPtr> ProcessThreads::CreateNew( ptr_t threadProc, ptr_t arg,
 std::vector<ThreadPtr> ProcessThreads::getAll() const
 {
     std::vector<ThreadPtr> result;
-    auto hThreadSnapshot = SnapHandle( CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 ) );
+    auto hThreadSnapshot = Handle( CreateToolhelp32Snapshot( TH32CS_SNAPTHREAD, 0 ) );
     if (!hThreadSnapshot)
         return result;
    
@@ -82,7 +82,7 @@ ThreadPtr ProcessThreads::getMain() const
 {
     uint64_t mintime = MAXULONG64_2;
     auto threads = getAll();
-    ThreadPtr result = !threads.empty() ? threads.front() : threads.front();
+    ThreadPtr result = !threads.empty() ? threads.front() : nullptr;
 
     for (const auto& thread : threads)
     {
@@ -105,7 +105,7 @@ ThreadPtr ProcessThreads::getLeastExecuted() const
 {
     uint64_t mintime = MAXULONG64_2;
     auto threads = getAll();
-    ThreadPtr result = !threads.empty() ? threads.front() : threads.front();
+    ThreadPtr result = !threads.empty() ? threads.front() : nullptr;
 
     for (const auto& thread : threads)
     {
@@ -128,7 +128,7 @@ ThreadPtr ProcessThreads::getMostExecuted() const
 {
     uint64_t maxtime = 0;
     auto threads = getAll();
-    ThreadPtr result = !threads.empty() ? threads.front() : threads.front();
+    ThreadPtr result = !threads.empty() ? threads.front() : nullptr;
 
     for (const auto& thread : threads)
     {

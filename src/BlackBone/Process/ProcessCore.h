@@ -109,10 +109,10 @@ private:
     void Close();
 
 private:
-    Handle    _hProcess;        // Process handle
-    DWORD     _pid = 0;         // Process ID
-    ptrNative _native;          // Api wrapper
-    bool      _dep = true;      // DEP state for process
+    ProcessHandle _hProcess;        // Process handle
+    DWORD         _pid = 0;         // Process ID
+    ptrNative     _native;          // Api wrapper
+    bool          _dep = true;      // DEP state for process
 };
 
 }

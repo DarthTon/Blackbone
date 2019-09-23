@@ -131,7 +131,7 @@ namespace Testing
 
         std::pair<std::unique_ptr<uint8_t[]>, uint32_t> GetFileData( const std::wstring& path )
         {
-            auto hFile = FileHandle( CreateFileW( path.c_str(), FILE_GENERIC_READ, 0x7, nullptr, OPEN_EXISTING, 0, nullptr ) );
+            auto hFile = Handle( CreateFileW( path.c_str(), FILE_GENERIC_READ, 0x7, nullptr, OPEN_EXISTING, 0, nullptr ) );
             if (hFile)
             {
                 uint32_t size = GetFileSize( hFile, nullptr );

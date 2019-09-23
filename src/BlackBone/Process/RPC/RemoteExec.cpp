@@ -82,7 +82,7 @@ NTSTATUS RemoteExec::ExecInNewThread(
 
     a->GenCall( _userCode.ptr(), { } );
     (*a)->mov( (*a)->zdx, _userData.ptr() + INTRET_OFFSET );
-    (*a)->mov( (*a)->zdx, (*a)->zax );
+    (*a)->mov( asmjit::host::dword_ptr( (*a)->zdx ), (*a)->zax );
     a->GenEpilogue( switchMode, 4 );
     
     // Execute code in newly created thread

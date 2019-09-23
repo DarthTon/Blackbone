@@ -83,9 +83,15 @@
 - User-mode dll injection and manual mapping
 - Manual mapping of drivers
 
-## License ##
+## Requirements
+
+- Visual Studio 2017 15.7 or higher
+- Windows SDK 10.0.17134 or higher
+- WDK 10.0.17134 or higher (driver only)
+- VC++ 2017 Libs for Spectre (x86 and x64)
+- Visual C++ ATL (x86/x64) with Spectre Mitigations
+
+## License
 Blackbone is licensed under the MIT License. Dependencies are under their respective licenses.
 
-[![Build status](https://ci.appveyor.com/api/projects/status/h3tr97727ngr7jko?svg=true)](https://ci.appveyor.com/project/DarthTon/blackbone)
-
-[![Build status](https://ci.appveyor.com/api/projects/status/5lu9aw84t00ibkdo?svg=true)](https://ci.appveyor.com/project/DarthTon/blackbone-q21rd)
+[![Build status](https://github.com/DarthTon/BlackBone/workflows/Main/badge.svg)]

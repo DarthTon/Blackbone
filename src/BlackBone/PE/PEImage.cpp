@@ -50,7 +50,7 @@ NTSTATUS PEImage::Load( const std::wstring& path, bool skipActx /*= false*/ )
         if (_hMapping)
         {
             _isPlainData = false;
-            _pFileBase = MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 );
+            _pFileBase = Mapping( MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 ) );
         }
         // Map as simple datafile
         else
@@ -59,7 +59,7 @@ NTSTATUS PEImage::Load( const std::wstring& path, bool skipActx /*= false*/ )
             _hMapping = CreateFileMappingW( _hFile, NULL, PAGE_READONLY, 0, 0, NULL );
 
             if (_hMapping)
-                _pFileBase = MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 );
+                _pFileBase = Mapping( MapViewOfFile( _hMapping, FILE_MAP_READ, 0, 0, 0 ) );
         }
 
         // Mapping failed
@@ -113,12 +113,7 @@ NTSTATUS PEImage::Reload()
 /// <param name="temporary">Preserve file paths for file reopening</param>
 void PEImage::Release( bool temporary /*= false*/ )
 {
-    if (_pFileBase)
-    {
-        UnmapViewOfFile( _pFileBase );
-        _pFileBase = nullptr;
-    }
-
+    _pFileBase.reset();
     _hMapping.reset();
     _hFile.reset();
     _hctx.reset();
@@ -156,7 +151,7 @@ NTSTATUS PEImage::Parse( void* pImageBase /*= nullptr*/ )
         return STATUS_INVALID_ADDRESS;
 
     // Get DOS header
-    pDosHdr = reinterpret_cast<const IMAGE_DOS_HEADER*>(_pFileBase);
+    pDosHdr = reinterpret_cast<const IMAGE_DOS_HEADER*>(_pFileBase.get());
 
     // File not a valid PE file
     if (pDosHdr->e_magic != IMAGE_DOS_SIGNATURE)
@@ -206,7 +201,7 @@ NTSTATUS PEImage::Parse( void* pImageBase /*= nullptr*/ )
     {
         _ILFlagOffset = static_cast<int32_t>(
             reinterpret_cast<uint8_t*>(pCorHdr)
-            - reinterpret_cast<uint8_t*>(_pFileBase)
+            - reinterpret_cast<uint8_t*>(_pFileBase.get())
             + static_cast<int32_t>(offsetof( IMAGE_COR20_HEADER, Flags )));
 
 #ifdef COMPILER_MSVC
@@ -322,7 +317,7 @@ mapImports& PEImage::GetImports( bool useDelayed /*= false*/ )
                     data.ptrRVA = pImportTbl->FirstThunk + IAT_Index;
                 // Save address to OrigianlFirstThunk
                 else
-                    data.ptrRVA = static_cast<uintptr_t>(AddressOfData) - reinterpret_cast<uintptr_t>(_pFileBase);
+                    data.ptrRVA = static_cast<uintptr_t>(AddressOfData) - reinterpret_cast<uintptr_t>(_pFileBase.get());
 
                 _imports[dllStr].emplace_back( data );
 
@@ -350,12 +345,12 @@ void PEImage::GetExports( vecExports& exports )
     if (pExport == 0)
         return;
 
-    DWORD *pAddressOfNames = reinterpret_cast<DWORD*>(pExport->AddressOfNames + reinterpret_cast<uintptr_t>(_pFileBase));
-    DWORD *pAddressOfFuncs = reinterpret_cast<DWORD*>(pExport->AddressOfFunctions + reinterpret_cast<uintptr_t>(_pFileBase));
-    WORD  *pAddressOfOrds  = reinterpret_cast<WORD*> (pExport->AddressOfNameOrdinals + reinterpret_cast<size_t>(_pFileBase));
+    DWORD *pAddressOfNames = reinterpret_cast<DWORD*>(pExport->AddressOfNames + reinterpret_cast<uintptr_t>(_pFileBase.get()));
+    DWORD *pAddressOfFuncs = reinterpret_cast<DWORD*>(pExport->AddressOfFunctions + reinterpret_cast<uintptr_t>(_pFileBase.get()));
+    WORD  *pAddressOfOrds  = reinterpret_cast<WORD*> (pExport->AddressOfNameOrdinals + reinterpret_cast<size_t>(_pFileBase.get()));
 
     for (DWORD i = 0; i < pExport->NumberOfNames; ++i)
-        exports.push_back( ExportData( reinterpret_cast<const char*>(_pFileBase)+pAddressOfNames[i], pAddressOfFuncs[pAddressOfOrds[i]] ) );
+        exports.push_back( ExportData( reinterpret_cast<const char*>(_pFileBase.get())+pAddressOfNames[i], pAddressOfFuncs[pAddressOfOrds[i]] ) );
 
     std::sort( exports.begin(), exports.end() );
     return Release( true );
@@ -414,7 +409,7 @@ uintptr_t PEImage::ResolveRVAToVA( uintptr_t Rva, AddressType type /*= VA*/ ) co
             {
                 if (Rva >= sec.VirtualAddress && Rva < sec.VirtualAddress + sec.Misc.VirtualSize)
                     if (type == VA)
-                        return reinterpret_cast<uintptr_t>(_pFileBase) + Rva - sec.VirtualAddress + sec.PointerToRawData;
+                        return reinterpret_cast<uintptr_t>(_pFileBase.get()) + Rva - sec.VirtualAddress + sec.PointerToRawData;
                     else
                         return Rva - sec.VirtualAddress + sec.PointerToRawData;
             }
@@ -422,7 +417,7 @@ uintptr_t PEImage::ResolveRVAToVA( uintptr_t Rva, AddressType type /*= VA*/ ) co
             return 0;
         }
         else
-            return (type == VA) ? (reinterpret_cast<uintptr_t>(_pFileBase) + Rva) : Rva;
+            return (type == VA) ? (reinterpret_cast<uintptr_t>(_pFileBase.get()) + Rva) : Rva;
 
     default:
         return 0;
@@ -449,7 +444,7 @@ int PEImage::GetTLSCallbacks( module_t targetBase, std::vector<ptr_t>& result ) 
         return 0;
 
     // Not at base
-    if (imageBase() != reinterpret_cast<module_t>(_pFileBase))
+    if (imageBase() != reinterpret_cast<module_t>(_pFileBase.get()))
         pCallback = reinterpret_cast<uint64_t*>(ResolveRVAToVA( static_cast<size_t>(offset - imageBase()) ));
     else
         pCallback = reinterpret_cast<uint64_t*>(offset);
@@ -497,8 +492,8 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
         if (GetTempFileNameW( tempDir, L"ImageManifest", 0, tempPath ) == 0)
             return STATUS_SXS_CANT_GEN_ACTCTX;
      
-        auto hTmpFile = FileHandle( CreateFileW( tempPath, FILE_GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, 0, NULL ) );
-        if (hTmpFile != INVALID_HANDLE_VALUE)
+        auto hTmpFile = Handle( CreateFileW( tempPath, FILE_GENERIC_WRITE, 0, NULL, OPEN_ALWAYS, 0, NULL ) );
+        if (hTmpFile)
         {
             DWORD bytes = 0;
             WriteFile( hTmpFile, pManifest, manifestSize, &bytes, NULL );
@@ -521,8 +516,7 @@ NTSTATUS PEImage::PrepareACTX( const wchar_t* filepath /*= nullptr*/ )
    
     // Create ACTX
     _hctx = CreateActCtxW( &act );
-
-    if (_hctx != INVALID_HANDLE_VALUE)
+    if (_hctx)
         return STATUS_SUCCESS;
 
     // Return success if current process is protected

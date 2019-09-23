@@ -79,10 +79,10 @@ LONG BBSafeSearchString( IN PUNICODE_STRING source, IN PUNICODE_STRING target, I
         return -1;
 
     USHORT diff = source->Length - target->Length;
-    for (USHORT i = 0; i < diff; i++)
+    for (USHORT i = 0; i <= (diff / sizeof( WCHAR )); i++)
     {
         if (RtlCompareUnicodeStrings(
-            source->Buffer + i / sizeof( WCHAR ),
+            source->Buffer + i,
             target->Length / sizeof( WCHAR ),
             target->Buffer,
             target->Length / sizeof( WCHAR ),
