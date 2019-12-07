@@ -37,7 +37,7 @@ VOID InitializeDebuggerBlock()
     context.ContextFlags = CONTEXT_FULL;
     RtlCaptureContext( &context );
     
-    PDUMP_HEADER dumpHeader = ExAllocatePool( NonPagedPool, DUMP_BLOCK_SIZE );
+    PDUMP_HEADER dumpHeader = ExAllocatePoolWithTag( NonPagedPool, DUMP_BLOCK_SIZE, BB_POOL_TAG );
     if (dumpHeader)
     {
         KeCapturePersistentThreadState( &context, NULL, 0, 0, 0, 0, 0, dumpHeader );

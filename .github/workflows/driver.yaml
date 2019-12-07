@@ -1,0 +1,22 @@
+name: Driver
+on:
+  pull_request:
+    paths:
+      - 'src/BlackBoneDrv/**'
+
+jobs:
+  driver:
+    name: Build driver
+    strategy:
+      matrix:
+        configuration: [Win10Release, 'Win8.1 Release', 'Win8 Release', 'Win7 Release']
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.0.0
+      - name: Build
+        shell: cmd
+        run: |
+          MSBuild.exe src\BlackBoneDrv\BlackBoneDrv.sln /p:Platform="x64" /p:Configuration="${{ matrix.configuration }}"

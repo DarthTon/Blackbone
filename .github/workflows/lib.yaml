@@ -1,0 +1,30 @@
+name: Library
+on: 
+  pull_request:
+    paths:
+    - 'src/**'
+    - '!src/BlackBoneDrv/**'
+
+jobs:
+  library:
+    name: Build and test library
+    strategy:
+      matrix:
+        platfom: [win32, x64]
+        configuration: [Release, Release(DLL)]
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v1
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.0.0
+      - name: Add VSTest to PATH
+        uses: darenm/Setup-VSTest@v1
+      - name: Build
+        shell: cmd
+        run: |
+          MSBuild.exe BlackBone.sln /p:CI=true /p:Platform="${{ matrix.platfom }}" /p:Configuration="${{ matrix.configuration }}"
+      - name: Test
+        shell: cmd
+        run: |
+          vstest.console.exe "build/${{ matrix.platfom }}/${{ matrix.configuration }}/BlackboneTest.dll"
