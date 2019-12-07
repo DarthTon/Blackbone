@@ -545,7 +545,6 @@ void* PEImage::GetManifest( uint32_t& size, int32_t& manifestID )
     // 3 levels of nodes
     const IMAGE_RESOURCE_DIRECTORY       *pDirNodePtr1 = nullptr;
     const IMAGE_RESOURCE_DIRECTORY       *pDirNodePtr2 = nullptr;
-    const IMAGE_RESOURCE_DIRECTORY       *pDirNodePtr3 = nullptr;
 
     // resource entry data
     const IMAGE_RESOURCE_DATA_ENTRY      *pDataNode = nullptr;
@@ -595,7 +594,6 @@ void* PEImage::GetManifest( uint32_t& size, int32_t& manifestID )
             // Check if this is a valid manifest resource
             if (pDirNode2->Id == 1 || pDirNode2->Id == 2 || pDirNode2->Id == 3)
             {
-                pDirNodePtr3 = reinterpret_cast<const IMAGE_RESOURCE_DIRECTORY*>(secBase + pDirNode2->OffsetToDirectory);
                 ofst_3 = pDirNode2->OffsetToDirectory + sizeof( IMAGE_RESOURCE_DIRECTORY );
                 pDirNode3 = reinterpret_cast<const IMAGE_RESOURCE_DIRECTORY_ENTRY*>(secBase + ofst_3);
                 pDataNode = reinterpret_cast<const IMAGE_RESOURCE_DATA_ENTRY*>(secBase + pDirNode3->OffsetToData);
