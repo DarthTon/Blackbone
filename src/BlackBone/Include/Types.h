@@ -34,8 +34,8 @@ struct Wow64Barrier
 // Module type
 enum eModType
 {
-    mt_mod32,       // 64 bit module
-    mt_mod64,       // 32 bit module
+    mt_mod32,       // 32 bit module
+    mt_mod64,       // 64 bit module
     mt_default,     // type is deduced from target process
     mt_unknown      // Failed to detect type
 };
