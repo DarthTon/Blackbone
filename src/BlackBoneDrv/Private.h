@@ -162,8 +162,9 @@ typedef enum _WinVer
     WINVER_10_RS3 = 0x0A03, // Fall creators update
     WINVER_10_RS4 = 0x0A04, // Spring creators update
     WINVER_10_RS5 = 0x0A05, // October 2018 update
-    WINVER_10_RS6 = 0x0A06, // May 2019 update 19H1
-    WINVER_10_RS7 = 0x0A07, // 19H2 update
+    WINVER_10_19H1 = 0x0A06, // May 2019 update 19H1
+    WINVER_10_19H2 = 0x0A07, // November 2019 update 19H2
+    WINVER_10_20H1 = 0x0A08, // April 2020 update 20H1
 } WinVer;
 
 extern PLIST_ENTRY PsLoadedModuleList;
@@ -184,7 +185,7 @@ typedef struct _DYNAMIC_DATA
     ULONG ObjTable;         // EPROCESS::ObjectTable
     ULONG VadRoot;          // EPROCESS::VadRoot
     ULONG NtProtectIndex;   // NtProtectVirtualMemory SSDT index
-    ULONG NtCreateThdIndex; // NtCreateThreadEx SSDT index
+    ULONG NtCreateThdExIndex; // NtCreateThreadEx SSDT index
     ULONG NtTermThdIndex;   // NtTerminateThread SSDT index
     ULONG PrevMode;         // KTHREAD::PreviousMode
     ULONG ExitStatus;       // ETHREAD::ExitStatus

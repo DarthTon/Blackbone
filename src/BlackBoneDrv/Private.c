@@ -528,7 +528,7 @@ ZwCreateThreadEx(
 {
     NTSTATUS status = STATUS_SUCCESS;
 
-    fnNtCreateThreadEx NtCreateThreadEx = (fnNtCreateThreadEx)(ULONG_PTR)GetSSDTEntry( dynData.NtCreateThdIndex );
+    fnNtCreateThreadEx NtCreateThreadEx = (fnNtCreateThreadEx)(ULONG_PTR)GetSSDTEntry( dynData.NtCreateThdExIndex );
     if (NtCreateThreadEx)
     {
         //
