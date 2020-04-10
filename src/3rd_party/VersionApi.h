@@ -26,7 +26,9 @@ enum eBuildThreshold
     Build_RS3 = 16299,
     Build_RS4 = 17134,
     Build_RS5 = 17763,
-    Build_RS6 = 18362,
+    Build_19H1 = 18362,
+    Build_19H2 = 18363,
+    Build_20H1 = 19041,
     Build_RS_MAX = 99999,
 };
 
@@ -43,7 +45,9 @@ enum eVerShort
     Win10_RS3,      // Windows 10 Fall Creators update
     Win10_RS4,      // Windows 10 Spring Creators update
     Win10_RS5,      // Windows 10 October 2018 update
-    Win10_RS6,      // Windows 10 May 2019 update
+    Win10_19H1,     // Windows 10 May 2019 update
+    Win10_19H2,     // Windows 10 November 2019 update
+    Win10_20H1,     // Windows 10 April 2020 update
 };
 
 struct WinVersion
@@ -105,8 +109,12 @@ BLACKBONE_API inline void InitVersion()
         switch (fullver)
         {
         case _WIN32_WINNT_WIN10:
-            if (g_WinVer.native.dwBuildNumber >= Build_RS6)
-                g_WinVer.ver = Win10_RS6;
+            if (g_WinVer.native.dwBuildNumber >= Build_20H1)
+                g_WinVer.ver = Win10_20H1;
+            else if (g_WinVer.native.dwBuildNumber >= Build_19H2)
+                g_WinVer.ver = Win10_19H2;
+            else if (g_WinVer.native.dwBuildNumber >= Build_19H1)
+                g_WinVer.ver = Win10_19H1;
             else if (g_WinVer.native.dwBuildNumber >= Build_RS5)
                 g_WinVer.ver = Win10_RS5;
             else if (g_WinVer.native.dwBuildNumber >= Build_RS4)
@@ -278,9 +286,21 @@ IsWindows10RS5OrGreater()
 }
 
 VERSIONHELPERAPI
-IsWindows10RS6OrGreater()
+IsWindows1019H1OrGreater()
 {
-    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_RS6 );
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_19H1 );
+}
+
+VERSIONHELPERAPI
+IsWindows1019H2OrGreater()
+{
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_19H2 );
+}
+
+VERSIONHELPERAPI
+IsWindows1020H1OrGreater()
+{
+    return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_20H1 );
 }
 
 VERSIONHELPERAPI
