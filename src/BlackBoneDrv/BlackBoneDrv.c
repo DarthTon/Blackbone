@@ -269,7 +269,7 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
         if (ver_short != WINVER_81)
             return STATUS_NOT_SUPPORTED;
 #elif defined (_WIN10_)
-        if (ver_short < WINVER_10 || WINVER_10_RS6 < ver_short)
+        if (ver_short < WINVER_10 || WINVER_10_RS7 < ver_short)
             return STATUS_NOT_SUPPORTED;
 #endif
 
@@ -443,9 +443,9 @@ NTSTATUS BBInitDynamicData( IN OUT PDYNAMIC_DATA pData )
                         pData->ExRemoveTable -= 0x34;
                     break;
                 }
-                else if (verInfo.dwBuildNumber == 18362)
+                else if (verInfo.dwBuildNumber == 18362 || verInfo.dwBuildNumber == 18363)
                 {
-                    pData->ver              = WINVER_10_RS6;
+                    pData->ver              = verInfo.dwBuildNumber == 18362 ? WINVER_10_RS6 : WINVER_10_RS7;
                     pData->KExecOpt         = 0x1C3;
                     pData->Protection       = 0x6FA;
                     pData->EProcessFlags2   = 0x850;    // MitigationFlags offset

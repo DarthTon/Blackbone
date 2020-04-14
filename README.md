@@ -94,6 +94,4 @@
 ## License
 Blackbone is licensed under the MIT License. Dependencies are under their respective licenses.
 
-[![Build status](https://ci.appveyor.com/api/projects/status/h3tr97727ngr7jko?svg=true)](https://ci.appveyor.com/project/DarthTon/blackbone)
-
-[![Build status](https://ci.appveyor.com/api/projects/status/5lu9aw84t00ibkdo?svg=true)](https://ci.appveyor.com/project/DarthTon/blackbone-q21rd)
+[![Build status](https://github.com/DarthTon/BlackBone/workflows/Main/badge.svg)]

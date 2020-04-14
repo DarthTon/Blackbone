@@ -1848,7 +1848,6 @@ PVOID BBImageManifest( IN PVOID pImageBase, OUT PULONG_PTR pSize, OUT PLONG pID 
     // 3 levels of nodes
     IMAGE_RESOURCE_DIRECTORY *pDirNodePtr1 = NULL;
     IMAGE_RESOURCE_DIRECTORY *pDirNodePtr2 = NULL;
-    IMAGE_RESOURCE_DIRECTORY *pDirNodePtr3 = NULL;
 
     // resource entry data
     IMAGE_RESOURCE_DATA_ENTRY  *pDataNode = NULL;
@@ -1898,7 +1897,6 @@ PVOID BBImageManifest( IN PVOID pImageBase, OUT PULONG_PTR pSize, OUT PLONG pID 
             // Check if this is a valid manifest resource
             if (pDirNode2->Id == 1 || pDirNode2->Id == 2 || pDirNode2->Id == 3)
             {
-                pDirNodePtr3 = (PIMAGE_RESOURCE_DIRECTORY)(secBase + pDirNode2->OffsetToDirectory);
                 ofst_3 = pDirNode2->OffsetToDirectory + sizeof( IMAGE_RESOURCE_DIRECTORY );
                 pDirNode3 = (PIMAGE_RESOURCE_DIRECTORY_ENTRY)(secBase + ofst_3);
                 pDataNode = (PIMAGE_RESOURCE_DATA_ENTRY)(secBase + pDirNode3->OffsetToData);
