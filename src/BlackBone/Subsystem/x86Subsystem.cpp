@@ -52,9 +52,8 @@ NTSTATUS x86Native::VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION6
 /// <returns>Status code</returns>
 NTSTATUS x86Native::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
 {
-    SetLastNtStatus( STATUS_SUCCESS );
-    GetThreadContext( hThread, reinterpret_cast<PCONTEXT>(&ctx) );
-    return LastNtStatus();
+    auto r = GetThreadContext(hThread, reinterpret_cast<PCONTEXT>(&ctx));
+    return r != 0 ? STATUS_SUCCESS : LastNtStatus();
 }
 
 /// <summary>
@@ -77,9 +76,8 @@ NTSTATUS x86Native::GetThreadContextT( HANDLE /*hThread*/, _CONTEXT64& /*ctx*/ )
 /// <returns>Status code</returns>
 NTSTATUS x86Native::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
 {
-    SetLastNtStatus( STATUS_SUCCESS );
-    SetThreadContext( hThread, reinterpret_cast<const CONTEXT*>(&ctx) );
-    return LastNtStatus();
+    auto r = SetThreadContext(hThread, reinterpret_cast<const CONTEXT*>(&ctx));
+    return r != 0 ? STATUS_SUCCESS : LastNtStatus();
 }
 
 /// <summary>
