@@ -185,9 +185,8 @@ NTSTATUS Thread::SetContext( _CONTEXT64& ctx, bool dontSuspend /*= false*/ )
 /// <returns>Status code</returns>
 NTSTATUS Thread::Terminate( DWORD code /*= 0*/ )
 {
-    SetLastNtStatus( STATUS_SUCCESS );
-    TerminateThread( _handle, code );
-    return LastNtStatus();
+    auto r = TerminateThread(_handle, code);
+    return r != 0 ? STATUS_SUCCESS : LastNtStatus();
 }
 
 /// <summary>
