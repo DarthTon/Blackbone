@@ -2,6 +2,7 @@
 #include "../Misc/DynImport.h"
 #include "../Include/Macro.h"
 #include <3rd_party/rewolf-wow64ext/src/wow64ext.h>
+#include "../Misc/Trace.hpp"
 
 namespace blackbone
 {
@@ -214,9 +215,8 @@ NTSTATUS NativeWow64::GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     }
     else
     {
-        SetLastNtStatus( STATUS_SUCCESS );
-        GetThreadContext( hThread, reinterpret_cast<PCONTEXT>(&ctx) );
-        return LastNtStatus();
+        auto r = GetThreadContext(hThread, reinterpret_cast<PCONTEXT>(&ctx));
+        return r != 0 ? STATUS_SUCCESS : LastNtStatus();
     }
 }
 
@@ -251,9 +251,8 @@ NTSTATUS NativeWow64::SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx )
     }
     else
     {
-        SetLastNtStatus( STATUS_SUCCESS );
-        SetThreadContext( hThread, reinterpret_cast<const CONTEXT*>(&ctx) );
-        return LastNtStatus();
+        auto r = SetThreadContext(hThread, reinterpret_cast<const CONTEXT*>(&ctx));
+        return r != 0 ? STATUS_SUCCESS : LastNtStatus();
     }
 }
 
