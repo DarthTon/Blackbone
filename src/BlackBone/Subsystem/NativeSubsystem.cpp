@@ -332,7 +332,7 @@ ptr_t Native::getPEB( _PEB32* ppeb )
     {
         ptr_t ptr = 0;
         if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, ProcessWow64Information, &ptr, (ULONG)sizeof( ptr ), nullptr ) ) && ppeb)
-            ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(ptr), ppeb, sizeof(_PEB32), NULL );
+            ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(ptr), ppeb, sizeof(*ppeb), NULL );
 
         return ptr;
     }
@@ -349,7 +349,7 @@ ptr_t Native::getPEB( _PEB64* ppeb )
     ULONG bytes = 0;
 
     if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, ProcessBasicInformation, &pbi, (ULONG)sizeof( pbi ), &bytes ) ) && ppeb)
-        ReadProcessMemory( _hProcess, pbi.PebBaseAddress, ppeb, sizeof(_PEB32), NULL );
+        ReadProcessMemory( _hProcess, pbi.PebBaseAddress, ppeb, sizeof(*ppeb), NULL );
 
     return reinterpret_cast<ptr_t>(pbi.PebBaseAddress);
 }
@@ -373,7 +373,7 @@ ptr_t Native::getTEB( HANDLE hThread, _TEB32* pteb )
         ULONG bytes = 0;
 
         if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ) && pteb)
-            ReadProcessMemory( _hProcess, (const uint8_t*)tbi.TebBaseAddress + 0x2000, pteb, sizeof(_TEB32), NULL );
+            ReadProcessMemory( _hProcess, (const uint8_t*)tbi.TebBaseAddress + 0x2000, pteb, sizeof(*pteb), NULL );
 
         return tbi.TebBaseAddress + 0x2000;
     }
@@ -391,7 +391,7 @@ ptr_t Native::getTEB( HANDLE hThread, _TEB64* pteb )
     ULONG bytes = 0;
 
     if (NT_SUCCESS( SAFE_NATIVE_CALL( NtQueryInformationThread, hThread, (THREADINFOCLASS)0, &tbi, (ULONG)sizeof( tbi ), &bytes ) ) && pteb)
-        ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof(_TEB64), NULL );
+        ReadProcessMemory( _hProcess, reinterpret_cast<LPCVOID>(tbi.TebBaseAddress), pteb, sizeof(*pteb), NULL );
 
     return tbi.TebBaseAddress;
 }
