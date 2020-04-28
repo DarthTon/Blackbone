@@ -221,6 +221,12 @@ public:
     /// </summary>
     /// <returns>Address value</returns>
     BLACKBONE_API inline ptr_t maxAddr() const { return 0x7FFFFFFEFFFF; }
+    
+    /// <summary>
+    /// Get highest possible valid address value
+    /// </summary>
+    /// <returns>Address value</returns>
+    BLACKBONE_API inline ptr_t maxAddr32() const { return 0x7FFFFFFF; }
                                                                         
     /// <summary>
     /// Get page size
