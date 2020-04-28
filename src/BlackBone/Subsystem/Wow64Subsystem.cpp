@@ -114,7 +114,7 @@ NTSTATUS NativeWow64::ReadProcessMemoryT( ptr_t lpBaseAddress, LPVOID lpBuffer, 
     if (lpBytes == nullptr)
         lpBytes = &junk;
     
-    if (_wowBarrier.targetWow64) {
+    if (_wowBarrier.targetWow64 && lpBaseAddress < NativeWow64::maxAddr32()) {
         SetLastNtStatus(STATUS_SUCCESS);
         ReadProcessMemory(_hProcess, reinterpret_cast<LPVOID>(lpBaseAddress), lpBuffer, nSize, reinterpret_cast<SIZE_T*>(lpBytes));
         return LastNtStatus();
@@ -137,7 +137,7 @@ NTSTATUS NativeWow64::WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer
     if (lpBytes == nullptr)
         lpBytes = &junk;
     
-    if (_wowBarrier.targetWow64) {
+    if (_wowBarrier.targetWow64 && lpBaseAddress < NativeWow64::maxAddr32()) {
         SetLastNtStatus(STATUS_SUCCESS);
         WriteProcessMemory(_hProcess, reinterpret_cast<LPVOID>(lpBaseAddress), lpBuffer, nSize, reinterpret_cast<SIZE_T*>(lpBytes));
         return LastNtStatus();
@@ -157,8 +157,8 @@ NTSTATUS NativeWow64::QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBu
 {
     ULONG length = 0;
     
-     if (_wowBarrier.targetWow64)
-         return SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, infoClass, lpBuffer, bufSize, &length );
+     //if (_wowBarrier.targetWow64)
+     //    return SAFE_NATIVE_CALL( NtQueryInformationProcess, _hProcess, infoClass, lpBuffer, bufSize, &length );
     
     return SAFE_NATIVE_CALL( NtWow64QueryInformationProcess64, _hProcess, infoClass, lpBuffer, bufSize, &length );
 }
