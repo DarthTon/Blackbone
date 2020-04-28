@@ -35,6 +35,12 @@ public:
     {
     }
 
+    // memory object
+    BLACKBONE_API inline ProcessMemory& memory()
+    { 
+        return _memory; 
+    }
+    
     // Native context
     BLACKBONE_API inline _CONTEXT64& native()
     { 
