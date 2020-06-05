@@ -11,6 +11,10 @@ void MapCmdFromMem();
 
 int main( int /*argc*/, char* /*argv[]*/ )
 {
+    blackbone::Process _process;
+    _ASSERT( NT_SUCCESS( _process.Attach( GetCurrentProcess() ) ) );
+    auto m = _process.modules().GetMainModule();
+
     // List all process PIDs matching name
     auto pids = Process::EnumByName( L"explorer.exe" );
 

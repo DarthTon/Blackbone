@@ -56,6 +56,10 @@ NTSTATUS ProcessCore::Open( HANDLE handle )
     _hProcess = handle;
     _pid = GetProcessId( _hProcess );
 
+    // Some routines in win10 do not support pseudo handle
+    if (IsWindows10OrGreater() && _pid == GetCurrentProcessId())
+        _hProcess = OpenProcess( PROCESS_ALL_ACCESS, FALSE, _pid );
+
     return Init();
 }
 
