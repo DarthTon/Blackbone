@@ -1,1974 +1,1042 @@
-// [AsmJit]
-// Complete x86/x64 JIT and Remote Assembler for C++.
+// AsmJit - Machine code generation for C++
 //
-// [License]
-// Zlib - See LICENSE.md file in the package.
+//  * Official AsmJit Home Page: https://asmjit.com
+//  * Official Github Repository: https://github.com/asmjit/asmjit
+//
+// Copyright (c) 2008-2020 The AsmJit Authors
+//
+// This software is provided 'as-is', without any express or implied
+// warranty. In no event will the authors be held liable for any damages
+// arising from the use of this software.
+//
+// Permission is granted to anyone to use this software for any purpose,
+// including commercial applications, and to alter it and redistribute it
+// freely, subject to the following restrictions:
+//
+// 1. The origin of this software must not be misrepresented; you must not
+//    claim that you wrote the original software. If you use this software
+//    in a product, an acknowledgment in the product documentation would be
+//    appreciated but is not required.
+// 2. Altered source versions must be plainly marked as such, and must not be
+//    misrepresented as being the original software.
+// 3. This notice may not be removed or altered from any source distribution.
 
-// [Guard]
-#ifndef _ASMJIT_X86_X86OPERAND_H
-#define _ASMJIT_X86_X86OPERAND_H
+#ifndef ASMJIT_X86_X86OPERAND_H_INCLUDED
+#define ASMJIT_X86_X86OPERAND_H_INCLUDED
 
-// [Dependencies - AsmJit]
-#include "../base/assembler.h"
-#include "../base/compiler.h"
-#include "../base/globals.h"
-#include "../base/intutil.h"
-#include "../base/operand.h"
-#include "../base/vectypes.h"
+#include "../core/arch.h"
+#include "../core/operand.h"
+#include "../core/type.h"
+#include "../x86/x86globals.h"
 
-// [Api-Begin]
-#include "../apibegin.h"
+ASMJIT_BEGIN_SUB_NAMESPACE(x86)
 
-//! \internal
-//!
-//! Internal macro to get an operand ID casting it to `Operand`. Basically
-//! allows to get an id of operand that has been just 'typedef'ed.
-#define ASMJIT_OP_ID(_Op_) reinterpret_cast<const Operand&>(_Op_).getId()
+#define ASMJIT_MEM_PTR(FUNC, SIZE)                                                    \
+  static constexpr Mem FUNC(const Gp& base, int32_t offset = 0) noexcept {            \
+    return Mem(base, offset, SIZE);                                                   \
+  }                                                                                   \
+  static constexpr Mem FUNC(const Gp& base, const Gp& index, uint32_t shift = 0, int32_t offset = 0) noexcept { \
+    return Mem(base, index, shift, offset, SIZE);                                     \
+  }                                                                                   \
+  static constexpr Mem FUNC(const Gp& base, const Vec& index, uint32_t shift = 0, int32_t offset = 0) noexcept { \
+    return Mem(base, index, shift, offset, SIZE);                                     \
+  }                                                                                   \
+  static constexpr Mem FUNC(const Label& base, int32_t offset = 0) noexcept {         \
+    return Mem(base, offset, SIZE);                                                   \
+  }                                                                                   \
+  static constexpr Mem FUNC(const Label& base, const Gp& index, uint32_t shift = 0, int32_t offset = 0) noexcept { \
+    return Mem(base, index, shift, offset, SIZE);                                     \
+  }                                                                                   \
+  static constexpr Mem FUNC(const Rip& rip_, int32_t offset = 0) noexcept {           \
+    return Mem(rip_, offset, SIZE);                                                   \
+  }                                                                                   \
+  static constexpr Mem FUNC(uint64_t base) noexcept {                                 \
+    return Mem(base, SIZE);                                                           \
+  }                                                                                   \
+  static constexpr Mem FUNC(uint64_t base, const Gp& index, uint32_t shift = 0) noexcept { \
+    return Mem(base, index, shift, SIZE);                                             \
+  }                                                                                   \
+  static constexpr Mem FUNC(uint64_t base, const Vec& index, uint32_t shift = 0) noexcept { \
+    return Mem(base, index, shift, SIZE);                                             \
+  }                                                                                   \
+                                                                                      \
+  static constexpr Mem FUNC##_abs(uint64_t base) noexcept {                           \
+    return Mem(base, SIZE, BaseMem::kSignatureMemAbs);                                \
+  }                                                                                   \
+  static constexpr Mem FUNC##_abs(uint64_t base, const Gp& index, uint32_t shift = 0) noexcept { \
+    return Mem(base, index, shift, SIZE, BaseMem::kSignatureMemAbs);                  \
+  }                                                                                   \
+  static constexpr Mem FUNC##_abs(uint64_t base, const Vec& index, uint32_t shift = 0) noexcept { \
+    return Mem(base, index, shift, SIZE, BaseMem::kSignatureMemAbs);                  \
+  }                                                                                   \
+                                                                                      \
+  static constexpr Mem FUNC##_rel(uint64_t base) noexcept {                           \
+    return Mem(base, SIZE, BaseMem::kSignatureMemRel);                                \
+  }                                                                                   \
+  static constexpr Mem FUNC##_rel(uint64_t base, const Gp& index, uint32_t shift = 0) noexcept { \
+    return Mem(base, index, shift, SIZE, BaseMem::kSignatureMemRel);                  \
+  }                                                                                   \
+  static constexpr Mem FUNC##_rel(uint64_t base, const Vec& index, uint32_t shift = 0) noexcept { \
+    return Mem(base, index, shift, SIZE, BaseMem::kSignatureMemRel);                  \
+  }
 
-namespace asmjit {
+//! \addtogroup asmjit_x86
+//! \{
 
 // ============================================================================
 // [Forward Declarations]
 // ============================================================================
 
-struct X86Reg;
-struct X86RipReg;
-struct X86SegReg;
-struct X86GpReg;
-struct X86FpReg;
-struct X86MmReg;
-struct X86KReg;
-struct X86XmmReg;
-struct X86YmmReg;
-struct X86ZmmReg;
+class Reg;
+class Mem;
 
-#if !defined(ASMJIT_DISABLE_COMPILER)
-struct X86Var;
-struct X86GpVar;
-struct X86MmVar;
-struct X86KVar;
-struct X86XmmVar;
-struct X86YmmVar;
-struct X86ZmmVar;
-#endif // !ASMJIT_DISABLE_COMPILER
-
-//! \addtogroup asmjit_x86_general
-//! \{
+class Gp;
+class Gpb;
+class GpbLo;
+class GpbHi;
+class Gpw;
+class Gpd;
+class Gpq;
+class Vec;
+class Xmm;
+class Ymm;
+class Zmm;
+class Mm;
+class KReg;
+class SReg;
+class CReg;
+class DReg;
+class St;
+class Bnd;
+class Rip;
 
 // ============================================================================
-// [asmjit::kX86RegClass]
+// [asmjit::x86::Reg]
 // ============================================================================
 
-//! X86/X64 variable class.
-ASMJIT_ENUM(kX86RegClass) {
-  // --------------------------------------------------------------------------
-  // [Regs & Vars]
-  // --------------------------------------------------------------------------
+//! Register traits (X86).
+//!
+//! Register traits contains information about a particular register type. It's
+//! used by asmjit to setup register information on-the-fly and to populate
+//! tables that contain register information (this way it's possible to change
+//! register types and groups without having to reorder these tables).
+template<uint32_t REG_TYPE>
+struct RegTraits : public BaseRegTraits {};
 
-  //! X86/X64 Gp register class (compatible with universal \ref kRegClassGp).
-  kX86RegClassGp = kRegClassGp,
-  //! X86/X64 Mm register class.
-  kX86RegClassMm = 1,
-  //! X86/X64 K register class.
-  kX86RegClassK = 2,
-  //! X86/X64 Xmm/Ymm/Zmm register class.
-  kX86RegClassXyz = 3,
+//! \cond
+// <--------------------+-----+-------------------------+------------------------+---+---+----------------+
+//                      | Reg |        Reg-Type         |        Reg-Group       |Sz |Cnt|     TypeId     |
+// <--------------------+-----+-------------------------+------------------------+---+---+----------------+
+ASMJIT_DEFINE_REG_TRAITS(GpbLo, BaseReg::kTypeGp8Lo     , BaseReg::kGroupGp      , 1 , 16, Type::kIdI8    );
+ASMJIT_DEFINE_REG_TRAITS(GpbHi, BaseReg::kTypeGp8Hi     , BaseReg::kGroupGp      , 1 , 4 , Type::kIdI8    );
+ASMJIT_DEFINE_REG_TRAITS(Gpw  , BaseReg::kTypeGp16      , BaseReg::kGroupGp      , 2 , 16, Type::kIdI16   );
+ASMJIT_DEFINE_REG_TRAITS(Gpd  , BaseReg::kTypeGp32      , BaseReg::kGroupGp      , 4 , 16, Type::kIdI32   );
+ASMJIT_DEFINE_REG_TRAITS(Gpq  , BaseReg::kTypeGp64      , BaseReg::kGroupGp      , 8 , 16, Type::kIdI64   );
+ASMJIT_DEFINE_REG_TRAITS(Xmm  , BaseReg::kTypeVec128    , BaseReg::kGroupVec     , 16, 32, Type::kIdI32x4 );
+ASMJIT_DEFINE_REG_TRAITS(Ymm  , BaseReg::kTypeVec256    , BaseReg::kGroupVec     , 32, 32, Type::kIdI32x8 );
+ASMJIT_DEFINE_REG_TRAITS(Zmm  , BaseReg::kTypeVec512    , BaseReg::kGroupVec     , 64, 32, Type::kIdI32x16);
+ASMJIT_DEFINE_REG_TRAITS(Mm   , BaseReg::kTypeOther0    , BaseReg::kGroupOther0  , 8 , 8 , Type::kIdMmx64 );
+ASMJIT_DEFINE_REG_TRAITS(KReg , BaseReg::kTypeOther1    , BaseReg::kGroupOther1  , 0 , 8 , Type::kIdVoid  );
+ASMJIT_DEFINE_REG_TRAITS(SReg , BaseReg::kTypeCustom + 0, BaseReg::kGroupVirt + 0, 2 , 7 , Type::kIdVoid  );
+ASMJIT_DEFINE_REG_TRAITS(CReg , BaseReg::kTypeCustom + 1, BaseReg::kGroupVirt + 1, 0 , 16, Type::kIdVoid  );
+ASMJIT_DEFINE_REG_TRAITS(DReg , BaseReg::kTypeCustom + 2, BaseReg::kGroupVirt + 2, 0 , 16, Type::kIdVoid  );
+ASMJIT_DEFINE_REG_TRAITS(St   , BaseReg::kTypeCustom + 3, BaseReg::kGroupVirt + 3, 10, 8 , Type::kIdF80   );
+ASMJIT_DEFINE_REG_TRAITS(Bnd  , BaseReg::kTypeCustom + 4, BaseReg::kGroupVirt + 4, 16, 4 , Type::kIdVoid  );
+ASMJIT_DEFINE_REG_TRAITS(Rip  , BaseReg::kTypeIP        , BaseReg::kGroupVirt + 5, 0 , 1 , Type::kIdVoid  );
+//! \endcond
 
-  //! \internal
+//! Register (X86).
+class Reg : public BaseReg {
+public:
+  ASMJIT_DEFINE_ABSTRACT_REG(Reg, BaseReg)
+
+  //! Register type.
+  enum RegType : uint32_t {
+    kTypeNone  = BaseReg::kTypeNone,     //!< No register type or invalid register.
+    kTypeGpbLo = BaseReg::kTypeGp8Lo,    //!< Low GPB register (AL, BL, CL, DL, ...).
+    kTypeGpbHi = BaseReg::kTypeGp8Hi,    //!< High GPB register (AH, BH, CH, DH only).
+    kTypeGpw   = BaseReg::kTypeGp16,     //!< GPW register.
+    kTypeGpd   = BaseReg::kTypeGp32,     //!< GPD register.
+    kTypeGpq   = BaseReg::kTypeGp64,     //!< GPQ register (64-bit).
+    kTypeXmm   = BaseReg::kTypeVec128,   //!< XMM register (SSE+).
+    kTypeYmm   = BaseReg::kTypeVec256,   //!< YMM register (AVX+).
+    kTypeZmm   = BaseReg::kTypeVec512,   //!< ZMM register (AVX512+).
+    kTypeMm    = BaseReg::kTypeOther0,   //!< MMX register.
+    kTypeKReg  = BaseReg::kTypeOther1,   //!< K register (AVX512+).
+    kTypeSReg  = BaseReg::kTypeCustom+0, //!< Segment register (None, ES, CS, SS, DS, FS, GS).
+    kTypeCReg  = BaseReg::kTypeCustom+1, //!< Control register (CR).
+    kTypeDReg  = BaseReg::kTypeCustom+2, //!< Debug register (DR).
+    kTypeSt    = BaseReg::kTypeCustom+3, //!< FPU (x87) register.
+    kTypeBnd   = BaseReg::kTypeCustom+4, //!< Bound register (BND).
+    kTypeRip   = BaseReg::kTypeIP,       //!< Instruction pointer (EIP, RIP).
+    kTypeCount = BaseReg::kTypeCustom+5  //!< Count of register types.
+  };
+
+  //! Register group.
+  enum RegGroup : uint32_t {
+    kGroupGp   = BaseReg::kGroupGp,      //!< GP register group or none (universal).
+    kGroupVec  = BaseReg::kGroupVec,     //!< XMM|YMM|ZMM register group (universal).
+    kGroupMm   = BaseReg::kGroupOther0,  //!< MMX register group (legacy).
+    kGroupKReg = BaseReg::kGroupOther1,  //!< K register group.
+
+    // These are not managed by BaseCompiler nor used by Func-API:
+    kGroupSReg = BaseReg::kGroupVirt+0,  //!< Segment register group.
+    kGroupCReg = BaseReg::kGroupVirt+1,  //!< Control register group.
+    kGroupDReg = BaseReg::kGroupVirt+2,  //!< Debug register group.
+    kGroupSt   = BaseReg::kGroupVirt+3,  //!< FPU register group.
+    kGroupBnd  = BaseReg::kGroupVirt+4,  //!< Bound register group.
+    kGroupRip  = BaseReg::kGroupVirt+5,  //!< Instrucion pointer (IP).
+    kGroupCount                          //!< Count of all register groups.
+  };
+
+  //! Tests whether the register is a GPB register (8-bit).
+  constexpr bool isGpb() const noexcept { return size() == 1; }
+  //! Tests whether the register is a low GPB register (8-bit).
+  constexpr bool isGpbLo() const noexcept { return hasSignature(RegTraits<kTypeGpbLo>::kSignature); }
+  //! Tests whether the register is a high GPB register (8-bit).
+  constexpr bool isGpbHi() const noexcept { return hasSignature(RegTraits<kTypeGpbHi>::kSignature); }
+  //! Tests whether the register is a GPW register (16-bit).
+  constexpr bool isGpw() const noexcept { return hasSignature(RegTraits<kTypeGpw>::kSignature); }
+  //! Tests whether the register is a GPD register (32-bit).
+  constexpr bool isGpd() const noexcept { return hasSignature(RegTraits<kTypeGpd>::kSignature); }
+  //! Tests whether the register is a GPQ register (64-bit).
+  constexpr bool isGpq() const noexcept { return hasSignature(RegTraits<kTypeGpq>::kSignature); }
+  //! Tests whether the register is an XMM register (128-bit).
+  constexpr bool isXmm() const noexcept { return hasSignature(RegTraits<kTypeXmm>::kSignature); }
+  //! Tests whether the register is a YMM register (256-bit).
+  constexpr bool isYmm() const noexcept { return hasSignature(RegTraits<kTypeYmm>::kSignature); }
+  //! Tests whether the register is a ZMM register (512-bit).
+  constexpr bool isZmm() const noexcept { return hasSignature(RegTraits<kTypeZmm>::kSignature); }
+  //! Tests whether the register is an MMX register (64-bit).
+  constexpr bool isMm() const noexcept { return hasSignature(RegTraits<kTypeMm>::kSignature); }
+  //! Tests whether the register is a K register (64-bit).
+  constexpr bool isKReg() const noexcept { return hasSignature(RegTraits<kTypeKReg>::kSignature); }
+  //! Tests whether the register is a segment register.
+  constexpr bool isSReg() const noexcept { return hasSignature(RegTraits<kTypeSReg>::kSignature); }
+  //! Tests whether the register is a control register.
+  constexpr bool isCReg() const noexcept { return hasSignature(RegTraits<kTypeCReg>::kSignature); }
+  //! Tests whether the register is a debug register.
+  constexpr bool isDReg() const noexcept { return hasSignature(RegTraits<kTypeDReg>::kSignature); }
+  //! Tests whether the register is an FPU register (80-bit).
+  constexpr bool isSt() const noexcept { return hasSignature(RegTraits<kTypeSt>::kSignature); }
+  //! Tests whether the register is a bound register.
+  constexpr bool isBnd() const noexcept { return hasSignature(RegTraits<kTypeBnd>::kSignature); }
+  //! Tests whether the register is RIP.
+  constexpr bool isRip() const noexcept { return hasSignature(RegTraits<kTypeRip>::kSignature); }
+
+  template<uint32_t REG_TYPE>
+  inline void setRegT(uint32_t rId) noexcept {
+    setSignature(RegTraits<REG_TYPE>::kSignature);
+    setId(rId);
+  }
+
+  inline void setTypeAndId(uint32_t rType, uint32_t rId) noexcept {
+    ASMJIT_ASSERT(rType < kTypeCount);
+    setSignature(signatureOf(rType));
+    setId(rId);
+  }
+
+  static inline uint32_t groupOf(uint32_t rType) noexcept;
+  template<uint32_t REG_TYPE>
+  static inline uint32_t groupOfT() noexcept { return RegTraits<REG_TYPE>::kGroup; }
+
+  static inline uint32_t typeIdOf(uint32_t rType) noexcept;
+  template<uint32_t REG_TYPE>
+  static inline uint32_t typeIdOfT() noexcept { return RegTraits<REG_TYPE>::kTypeId; }
+
+  static inline uint32_t signatureOf(uint32_t rType) noexcept;
+  template<uint32_t REG_TYPE>
+  static inline uint32_t signatureOfT() noexcept { return RegTraits<REG_TYPE>::kSignature; }
+
+  static inline uint32_t signatureOfVecByType(uint32_t typeId) noexcept {
+    return typeId <= Type::_kIdVec128End ? RegTraits<kTypeXmm>::kSignature :
+           typeId <= Type::_kIdVec256End ? RegTraits<kTypeYmm>::kSignature : RegTraits<kTypeZmm>::kSignature;
+  }
+
+  static inline uint32_t signatureOfVecBySize(uint32_t size) noexcept {
+    return size <= 16 ? RegTraits<kTypeXmm>::kSignature :
+           size <= 32 ? RegTraits<kTypeYmm>::kSignature : RegTraits<kTypeZmm>::kSignature;
+  }
+
+  //! Tests whether the `op` operand is either a low or high 8-bit GPB register.
+  static inline bool isGpb(const Operand_& op) noexcept {
+    // Check operand type, register group, and size. Not interested in register type.
+    const uint32_t kSgn = (Operand::kOpReg << kSignatureOpShift  ) |
+                          (1               << kSignatureSizeShift) ;
+    return (op.signature() & (kSignatureOpMask | kSignatureSizeMask)) == kSgn;
+  }
+
+  static inline bool isGpbLo(const Operand_& op) noexcept { return op.as<Reg>().isGpbLo(); }
+  static inline bool isGpbHi(const Operand_& op) noexcept { return op.as<Reg>().isGpbHi(); }
+  static inline bool isGpw(const Operand_& op) noexcept { return op.as<Reg>().isGpw(); }
+  static inline bool isGpd(const Operand_& op) noexcept { return op.as<Reg>().isGpd(); }
+  static inline bool isGpq(const Operand_& op) noexcept { return op.as<Reg>().isGpq(); }
+  static inline bool isXmm(const Operand_& op) noexcept { return op.as<Reg>().isXmm(); }
+  static inline bool isYmm(const Operand_& op) noexcept { return op.as<Reg>().isYmm(); }
+  static inline bool isZmm(const Operand_& op) noexcept { return op.as<Reg>().isZmm(); }
+  static inline bool isMm(const Operand_& op) noexcept { return op.as<Reg>().isMm(); }
+  static inline bool isKReg(const Operand_& op) noexcept { return op.as<Reg>().isKReg(); }
+  static inline bool isSReg(const Operand_& op) noexcept { return op.as<Reg>().isSReg(); }
+  static inline bool isCReg(const Operand_& op) noexcept { return op.as<Reg>().isCReg(); }
+  static inline bool isDReg(const Operand_& op) noexcept { return op.as<Reg>().isDReg(); }
+  static inline bool isSt(const Operand_& op) noexcept { return op.as<Reg>().isSt(); }
+  static inline bool isBnd(const Operand_& op) noexcept { return op.as<Reg>().isBnd(); }
+  static inline bool isRip(const Operand_& op) noexcept { return op.as<Reg>().isRip(); }
+
+  static inline bool isGpb(const Operand_& op, uint32_t rId) noexcept { return isGpb(op) & (op.id() == rId); }
+  static inline bool isGpbLo(const Operand_& op, uint32_t rId) noexcept { return isGpbLo(op) & (op.id() == rId); }
+  static inline bool isGpbHi(const Operand_& op, uint32_t rId) noexcept { return isGpbHi(op) & (op.id() == rId); }
+  static inline bool isGpw(const Operand_& op, uint32_t rId) noexcept { return isGpw(op) & (op.id() == rId); }
+  static inline bool isGpd(const Operand_& op, uint32_t rId) noexcept { return isGpd(op) & (op.id() == rId); }
+  static inline bool isGpq(const Operand_& op, uint32_t rId) noexcept { return isGpq(op) & (op.id() == rId); }
+  static inline bool isXmm(const Operand_& op, uint32_t rId) noexcept { return isXmm(op) & (op.id() == rId); }
+  static inline bool isYmm(const Operand_& op, uint32_t rId) noexcept { return isYmm(op) & (op.id() == rId); }
+  static inline bool isZmm(const Operand_& op, uint32_t rId) noexcept { return isZmm(op) & (op.id() == rId); }
+  static inline bool isMm(const Operand_& op, uint32_t rId) noexcept { return isMm(op) & (op.id() == rId); }
+  static inline bool isKReg(const Operand_& op, uint32_t rId) noexcept { return isKReg(op) & (op.id() == rId); }
+  static inline bool isSReg(const Operand_& op, uint32_t rId) noexcept { return isSReg(op) & (op.id() == rId); }
+  static inline bool isCReg(const Operand_& op, uint32_t rId) noexcept { return isCReg(op) & (op.id() == rId); }
+  static inline bool isDReg(const Operand_& op, uint32_t rId) noexcept { return isDReg(op) & (op.id() == rId); }
+  static inline bool isSt(const Operand_& op, uint32_t rId) noexcept { return isSt(op) & (op.id() == rId); }
+  static inline bool isBnd(const Operand_& op, uint32_t rId) noexcept { return isBnd(op) & (op.id() == rId); }
+  static inline bool isRip(const Operand_& op, uint32_t rId) noexcept { return isRip(op) & (op.id() == rId); }
+};
+
+//! General purpose register (X86).
+class Gp : public Reg {
+public:
+  ASMJIT_DEFINE_ABSTRACT_REG(Gp, Reg)
+
+  //! Physical id (X86).
   //!
-  //! Last register class that is managed by `X86Compiler`, used by asserts.
-  _kX86RegClassManagedCount = 4,
+  //! \note Register indexes have been reduced to only support general purpose
+  //! registers. There is no need to have enumerations with number suffix that
+  //! expands to the exactly same value as the suffix value itself.
+  enum Id : uint32_t {
+    kIdAx  = 0,  //!< Physical id of AL|AH|AX|EAX|RAX registers.
+    kIdCx  = 1,  //!< Physical id of CL|CH|CX|ECX|RCX registers.
+    kIdDx  = 2,  //!< Physical id of DL|DH|DX|EDX|RDX registers.
+    kIdBx  = 3,  //!< Physical id of BL|BH|BX|EBX|RBX registers.
+    kIdSp  = 4,  //!< Physical id of SPL|SP|ESP|RSP registers.
+    kIdBp  = 5,  //!< Physical id of BPL|BP|EBP|RBP registers.
+    kIdSi  = 6,  //!< Physical id of SIL|SI|ESI|RSI registers.
+    kIdDi  = 7,  //!< Physical id of DIL|DI|EDI|RDI registers.
+    kIdR8  = 8,  //!< Physical id of R8B|R8W|R8D|R8 registers (64-bit only).
+    kIdR9  = 9,  //!< Physical id of R9B|R9W|R9D|R9 registers (64-bit only).
+    kIdR10 = 10, //!< Physical id of R10B|R10W|R10D|R10 registers (64-bit only).
+    kIdR11 = 11, //!< Physical id of R11B|R11W|R11D|R11 registers (64-bit only).
+    kIdR12 = 12, //!< Physical id of R12B|R12W|R12D|R12 registers (64-bit only).
+    kIdR13 = 13, //!< Physical id of R13B|R13W|R13D|R13 registers (64-bit only).
+    kIdR14 = 14, //!< Physical id of R14B|R14W|R14D|R14 registers (64-bit only).
+    kIdR15 = 15  //!< Physical id of R15B|R15W|R15D|R15 registers (64-bit only).
+  };
 
-  // --------------------------------------------------------------------------
-  // [Regs Only]
-  // --------------------------------------------------------------------------
-
-  //! X86/X64 Fp register class.
-  kX86RegClassFp = 4,
-
-  //! Count of X86/X64 register classes.
-  kX86RegClassCount = 5
+  //! Casts this register to 8-bit (LO) part.
+  inline GpbLo r8() const noexcept;
+  //! Casts this register to 8-bit (LO) part.
+  inline GpbLo r8Lo() const noexcept;
+  //! Casts this register to 8-bit (HI) part.
+  inline GpbHi r8Hi() const noexcept;
+  //! Casts this register to 16-bit.
+  inline Gpw r16() const noexcept;
+  //! Casts this register to 32-bit.
+  inline Gpd r32() const noexcept;
+  //! Casts this register to 64-bit.
+  inline Gpq r64() const noexcept;
 };
 
-// ============================================================================
-// [asmjit::kX86RegType]
-// ============================================================================
+//! Vector register (XMM|YMM|ZMM) (X86).
+class Vec : public Reg {
+  ASMJIT_DEFINE_ABSTRACT_REG(Vec, Reg)
 
-//! X86/X64 register type.
-ASMJIT_ENUM(kX86RegType) {
-  //! Gpb-lo register (AL, BL, CL, DL, ...).
-  kX86RegTypeGpbLo = 0x01,
-  //! Gpb-hi register (AH, BH, CH, DH only).
-  kX86RegTypeGpbHi = 0x02,
+  //! Casts this register to XMM (clone).
+  inline Xmm xmm() const noexcept;
+  //! Casts this register to YMM.
+  inline Ymm ymm() const noexcept;
+  //! Casts this register to ZMM.
+  inline Zmm zmm() const noexcept;
 
-  //! \internal
-  //!
-  //! Gpb-hi register patched to native index (4-7).
-  _kX86RegTypePatchedGpbHi = kX86RegTypeGpbLo | kX86RegTypeGpbHi,
-
-  //! Gpw register.
-  kX86RegTypeGpw = 0x10,
-  //! Gpd register.
-  kX86RegTypeGpd = 0x20,
-  //! Gpq register (X64).
-  kX86RegTypeGpq = 0x30,
-
-  //! Fp register.
-  kX86RegTypeFp = 0x40,
-  //! Mm register (MMX+).
-  kX86RegTypeMm = 0x50,
-
-  //! K register (AVX512+).
-  kX86RegTypeK = 0x60,
-
-  //! Xmm register (SSE+).
-  kX86RegTypeXmm = 0x70,
-  //! Ymm register (AVX+).
-  kX86RegTypeYmm = 0x80,
-  //! Zmm register (AVX512+).
-  kX86RegTypeZmm = 0x90,
-
-  //! Instruction pointer (RIP).
-  kX86RegTypeRip = 0xE0,
-  //! Segment register.
-  kX86RegTypeSeg = 0xF0
-};
-
-// ============================================================================
-// [asmjit::kX86RegIndex]
-// ============================================================================
-
-//! X86/X64 register indexes.
-//!
-//! \note Register indexes have been reduced to only support general purpose
-//! registers. There is no need to have enumerations with number suffix that
-//! expands to the exactly same value as the suffix value itself.
-ASMJIT_ENUM(kX86RegIndex) {
-  //! Index of Al/Ah/Ax/Eax/Rax registers.
-  kX86RegIndexAx = 0,
-  //! Index of Cl/Ch/Cx/Ecx/Rcx registers.
-  kX86RegIndexCx = 1,
-  //! Index of Dl/Dh/Dx/Edx/Rdx registers.
-  kX86RegIndexDx = 2,
-  //! Index of Bl/Bh/Bx/Ebx/Rbx registers.
-  kX86RegIndexBx = 3,
-  //! Index of Spl/Sp/Esp/Rsp registers.
-  kX86RegIndexSp = 4,
-  //! Index of Bpl/Bp/Ebp/Rbp registers.
-  kX86RegIndexBp = 5,
-  //! Index of Sil/Si/Esi/Rsi registers.
-  kX86RegIndexSi = 6,
-  //! Index of Dil/Di/Edi/Rdi registers.
-  kX86RegIndexDi = 7,
-  //! Index of R8b/R8w/R8d/R8 registers (64-bit only).
-  kX86RegIndexR8 = 8,
-  //! Index of R9B/R9w/R9d/R9 registers (64-bit only).
-  kX86RegIndexR9 = 9,
-  //! Index of R10B/R10w/R10D/R10 registers (64-bit only).
-  kX86RegIndexR10 = 10,
-  //! Index of R11B/R11w/R11d/R11 registers (64-bit only).
-  kX86RegIndexR11 = 11,
-  //! Index of R12B/R12w/R12d/R12 registers (64-bit only).
-  kX86RegIndexR12 = 12,
-  //! Index of R13B/R13w/R13d/R13 registers (64-bit only).
-  kX86RegIndexR13 = 13,
-  //! Index of R14B/R14w/R14d/R14 registers (64-bit only).
-  kX86RegIndexR14 = 14,
-  //! Index of R15B/R15w/R15d/R15 registers (64-bit only).
-  kX86RegIndexR15 = 15
-};
-
-// ============================================================================
-// [asmjit::kX86Seg]
-// ============================================================================
-
-//! X86/X64 segment codes.
-ASMJIT_ENUM(kX86Seg) {
-  //! No/Default segment.
-  kX86SegDefault = 0,
-  //! Es segment.
-  kX86SegEs = 1,
-  //! Cs segment.
-  kX86SegCs = 2,
-  //! Ss segment.
-  kX86SegSs = 3,
-  //! Ds segment.
-  kX86SegDs = 4,
-  //! Fs segment.
-  kX86SegFs = 5,
-  //! Gs segment.
-  kX86SegGs = 6,
-
-  //! Count of X86 segment registers supported by AsmJit.
-  //!
-  //! \note X86 architecture has 6 segment registers - ES, CS, SS, DS, FS, GS.
-  //! X64 architecture lowers them down to just FS and GS. AsmJit supports 7
-  //! segment registers - all addressable in both X86 and X64 modes and one
-  //! extra called `kX86SegDefault`, which is AsmJit specific and means that there
-  //! is no segment register specified so the segment prefix will not be emitted.
-  kX86SegCount = 7
-};
-
-// ============================================================================
-// [asmjit::kX86MemVSib]
-// ============================================================================
-
-//! X86/X64 index register legacy and AVX2 (VSIB) support.
-ASMJIT_ENUM(kX86MemVSib) {
-  //! Memory operand uses Gpd/Gpq index (or no index register).
-  kX86MemVSibGpz = 0,
-  //! Memory operand uses Xmm index (or no index register).
-  kX86MemVSibXmm = 1,
-  //! Memory operand uses Ymm index (or no index register).
-  kX86MemVSibYmm = 2,
-  //! Memory operand uses Zmm index (or no index register).
-  kX86MemVSibZmm = 3
-};
-
-// ============================================================================
-// [asmjit::kX86MemFlags]
-// ============================================================================
-
-//! \internal
-//!
-//! X86/X64 specific memory flags.
-ASMJIT_ENUM(kX86MemFlags) {
-  kX86MemSegBits    = 0x7,
-  kX86MemSegIndex   = 0,
-  kX86MemSegMask    = kX86MemSegBits << kX86MemSegIndex,
-
-  kX86MemGpdBits    = 0x1,
-  kX86MemGpdIndex   = 3,
-  kX86MemGpdMask    = kX86MemGpdBits << kX86MemGpdIndex,
-
-  kX86MemVSibBits   = 0x3,
-  kX86MemVSibIndex  = 4,
-  kX86MemVSibMask   = kX86MemVSibBits << kX86MemVSibIndex,
-
-  kX86MemShiftBits  = 0x3,
-  kX86MemShiftIndex = 6,
-  kX86MemShiftMask  = kX86MemShiftBits << kX86MemShiftIndex
-};
-
-// This is only defined by `x86operand_regs.cpp` when exporting registers.
-#if defined(ASMJIT_EXPORTS_X86OPERAND_REGS)
-
-// Remap all classes to POD structs so they can be statically initialized
-// without calling a constructor. Compiler will store these in .DATA section.
-struct X86RipReg { Operand::VRegOp data; };
-struct X86SegReg { Operand::VRegOp data; };
-struct X86GpReg  { Operand::VRegOp data; };
-struct X86FpReg  { Operand::VRegOp data; };
-struct X86KReg   { Operand::VRegOp data; };
-struct X86MmReg  { Operand::VRegOp data; };
-struct X86XmmReg { Operand::VRegOp data; };
-struct X86YmmReg { Operand::VRegOp data; };
-struct X86ZmmReg { Operand::VRegOp data; };
-
-#else
-
-// ============================================================================
-// [asmjit::X86RegCount]
-// ============================================================================
-
-//! \internal
-//!
-//! X86/X64 registers count (Gp, Mm, K, Xmm/Ymm/Zmm).
-//!
-//! Since the number of registers changed across CPU generations `X86RegCount`
-//! class is used by `X86Assembler` and `X86Compiler` to provide a way to get
-//! number of available registers dynamically. 32-bit mode offers always only
-//! 8 registers of all classes, however, 64-bit mode offers 16 Gp registers and
-//! 16 Xmm/Ymm/Zmm registers. AVX512 instruction set doubles the number of SIMD
-//! registers (Xmm/Ymm/Zmm) to 32, this mode has to be explicitly enabled to
-//! take effect as it changes some assumptions.
-//! 
-//! `X86RegCount` is also used extensively by `X86Compiler`'s register allocator
-//! and data structures. Fp registers were omitted as they are never mapped to
-//! variables, thus, not needed to be managed.
-//!
-//! \note At the moment `X86RegCount` can fit into 32-bits, having 8-bits for
-//! all register classes (except Fp). This can change in the future after a
-//! new instruction set is announced.
-struct X86RegCount {
-  // --------------------------------------------------------------------------
-  // [Zero]
-  // --------------------------------------------------------------------------
-
-  //! Reset all counters to zero.
-  ASMJIT_INLINE void reset() {
-    _packed = 0;
+  //! Casts this register to a register that has half the size (or XMM if it's already XMM).
+  inline Vec half() const noexcept {
+    return Vec(type() == kTypeZmm ? signatureOf(kTypeYmm) : signatureOf(kTypeXmm), id());
   }
+};
 
-  // --------------------------------------------------------------------------
-  // [Get]
-  // --------------------------------------------------------------------------
+//! Segment register (X86).
+class SReg : public Reg {
+  ASMJIT_DEFINE_FINAL_REG(SReg, Reg, RegTraits<kTypeSReg>)
 
-  //! Get register count by `classId`.
-  ASMJIT_INLINE uint32_t get(uint32_t classId) const {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
-    return _regs[classId];
-  }
+  //! X86 segment id.
+  enum Id : uint32_t {
+    kIdNone = 0, //!< No segment (default).
+    kIdEs   = 1, //!< ES segment.
+    kIdCs   = 2, //!< CS segment.
+    kIdSs   = 3, //!< SS segment.
+    kIdDs   = 4, //!< DS segment.
+    kIdFs   = 5, //!< FS segment.
+    kIdGs   = 6, //!< GS segment.
 
-  //! Get Gp register count.
-  ASMJIT_INLINE uint32_t getGp() const { return _regs[kX86RegClassGp]; }
-  //! Get Mm register count.
-  ASMJIT_INLINE uint32_t getMm() const { return _regs[kX86RegClassMm]; }
-  //! Get K register count.
-  ASMJIT_INLINE uint32_t getK() const { return _regs[kX86RegClassK]; }
-  //! Get Xmm/Ymm/Zmm register count.
-  ASMJIT_INLINE uint32_t getXyz() const { return _regs[kX86RegClassXyz]; }
-
-  // --------------------------------------------------------------------------
-  // [Set]
-  // --------------------------------------------------------------------------
-
-  //! Set register count by `classId`.
-  ASMJIT_INLINE void set(uint32_t classId, uint32_t n) {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
-    ASMJIT_ASSERT(n <= 0xFF);
-
-    _regs[classId] = static_cast<uint8_t>(n);
-  }
-
-  //! Set Gp register count.
-  ASMJIT_INLINE void setGp(uint32_t n) { set(kX86RegClassGp, n); }
-  //! Set Mm register count.
-  ASMJIT_INLINE void setMm(uint32_t n) { set(kX86RegClassMm, n); }
-  //! Set K register count.
-  ASMJIT_INLINE void setK(uint32_t n) { set(kX86RegClassK, n); }
-  //! Set Xmm/Ymm/Zmm register count.
-  ASMJIT_INLINE void setXyz(uint32_t n) { set(kX86RegClassXyz, n); }
-
-  // --------------------------------------------------------------------------
-  // [Add]
-  // --------------------------------------------------------------------------
-
-  //! Add register count by `classId`.
-  ASMJIT_INLINE void add(uint32_t classId, uint32_t n = 1) {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
-    ASMJIT_ASSERT(0xFF - static_cast<uint32_t>(_regs[classId]) >= n);
-
-    _regs[classId] += static_cast<uint8_t>(n);
-  }
-
-  //! Add Gp register count.
-  ASMJIT_INLINE void addGp(uint32_t n) { add(kX86RegClassGp, n); }
-  //! Add Mm register count.
-  ASMJIT_INLINE void addMm(uint32_t n) { add(kX86RegClassMm, n); }
-  //! Add K register count.
-  ASMJIT_INLINE void addK(uint32_t n) { add(kX86RegClassK, n); }
-  //! Add Xmm/Ymm/Zmm register count.
-  ASMJIT_INLINE void addXyz(uint32_t n) { add(kX86RegClassXyz, n); }
-
-  // --------------------------------------------------------------------------
-  // [Misc]
-  // --------------------------------------------------------------------------
-
-  //! Build a register indexes, based on register's `count`.
-  //!
-  //! Register index is used by \ref `X86Compiler` in per-instruction register
-  //! data. Indexes are sorted by register class in Gp, Mm, K, and Xmm/Ymm/Zmm
-  //! order.
-  ASMJIT_INLINE void indexFromRegCount(const X86RegCount& count) {
-    uint32_t x = count._regs[0];
-    uint32_t y;
-
-    _regs[0] = static_cast<uint8_t>(0);
-    _regs[1] = static_cast<uint8_t>(x);
-
-    x = x + count._regs[1];
-    y = x + count._regs[2];
-
-    ASMJIT_ASSERT(x <= 0xFF);
-    ASMJIT_ASSERT(y <= 0xFF);
-
-    _regs[2] = static_cast<uint8_t>(x);
-    _regs[3] = static_cast<uint8_t>(y);
-  }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  union {
-    struct {
-      //! Count of Gp registers.
-      uint8_t _gp;
-      //! Count of Mm registers.
-      uint8_t _mm;
-      //! Count of K registers.
-      uint8_t _k;
-      //! Count of Xmm/Ymm/Zmm registers.
-      uint8_t _xyz;
-      //! \internal
-      uint8_t _reserved[3];
-    };
-
-    uint8_t _regs[4];
-    uint32_t _packed;
+    //! Count of  segment registers supported by AsmJit.
+    //!
+    //! \note X86 architecture has 6 segment registers - ES, CS, SS, DS, FS, GS.
+    //! X64 architecture lowers them down to just FS and GS. AsmJit supports 7
+    //! segment registers - all addressable in both  and X64 modes and one
+    //! extra called `SReg::kIdNone`, which is AsmJit specific and means that
+    //! there is no segment register specified.
+    kIdCount = 7
   };
 };
 
-// ============================================================================
-// [asmjit::X86RegMask]
-// ============================================================================
+//! GPB low or high register (X86).
+class Gpb : public Gp { ASMJIT_DEFINE_ABSTRACT_REG(Gpb, Gp) };
+//! GPB low register (X86).
+class GpbLo : public Gpb { ASMJIT_DEFINE_FINAL_REG(GpbLo, Gpb, RegTraits<kTypeGpbLo>) };
+//! GPB high register (X86).
+class GpbHi : public Gpb { ASMJIT_DEFINE_FINAL_REG(GpbHi, Gpb, RegTraits<kTypeGpbHi>) };
+//! GPW register (X86).
+class Gpw : public Gp { ASMJIT_DEFINE_FINAL_REG(Gpw, Gp, RegTraits<kTypeGpw>) };
+//! GPD register (X86).
+class Gpd : public Gp { ASMJIT_DEFINE_FINAL_REG(Gpd, Gp, RegTraits<kTypeGpd>) };
+//! GPQ register (X86_64).
+class Gpq : public Gp { ASMJIT_DEFINE_FINAL_REG(Gpq, Gp, RegTraits<kTypeGpq>) };
 
-//! \internal
+//! 128-bit XMM register (SSE+).
+class Xmm : public Vec {
+  ASMJIT_DEFINE_FINAL_REG(Xmm, Vec, RegTraits<kTypeXmm>)
+  //! Casts this register to a register that has half the size (XMM).
+  inline Xmm half() const noexcept { return Xmm(id()); }
+};
+
+//! 256-bit YMM register (AVX+).
+class Ymm : public Vec {
+  ASMJIT_DEFINE_FINAL_REG(Ymm, Vec, RegTraits<kTypeYmm>)
+  //! Casts this register to a register that has half the size (XMM).
+  inline Xmm half() const noexcept { return Xmm(id()); }
+};
+
+//! 512-bit ZMM register (AVX512+).
+class Zmm : public Vec {
+  ASMJIT_DEFINE_FINAL_REG(Zmm, Vec, RegTraits<kTypeZmm>)
+  //! Casts this register to a register that has half the size (YMM).
+  inline Ymm half() const noexcept { return Ymm(id()); }
+};
+
+//! 64-bit MMX register (MMX+).
+class Mm : public Reg { ASMJIT_DEFINE_FINAL_REG(Mm, Reg, RegTraits<kTypeMm>) };
+//! 64-bit K register (AVX512+).
+class KReg : public Reg { ASMJIT_DEFINE_FINAL_REG(KReg, Reg, RegTraits<kTypeKReg>) };
+//! 32-bit or 64-bit control register (X86).
+class CReg : public Reg { ASMJIT_DEFINE_FINAL_REG(CReg, Reg, RegTraits<kTypeCReg>) };
+//! 32-bit or 64-bit debug register (X86).
+class DReg : public Reg { ASMJIT_DEFINE_FINAL_REG(DReg, Reg, RegTraits<kTypeDReg>) };
+//! 80-bit FPU register (X86).
+class St : public Reg { ASMJIT_DEFINE_FINAL_REG(St, Reg, RegTraits<kTypeSt>) };
+//! 128-bit BND register (BND+).
+class Bnd : public Reg { ASMJIT_DEFINE_FINAL_REG(Bnd, Reg, RegTraits<kTypeBnd>) };
+//! RIP register (X86).
+class Rip : public Reg { ASMJIT_DEFINE_FINAL_REG(Rip, Reg, RegTraits<kTypeRip>) };
+
+//! \cond
+inline GpbLo Gp::r8() const noexcept { return GpbLo(id()); }
+inline GpbLo Gp::r8Lo() const noexcept { return GpbLo(id()); }
+inline GpbHi Gp::r8Hi() const noexcept { return GpbHi(id()); }
+inline Gpw Gp::r16() const noexcept { return Gpw(id()); }
+inline Gpd Gp::r32() const noexcept { return Gpd(id()); }
+inline Gpq Gp::r64() const noexcept { return Gpq(id()); }
+inline Xmm Vec::xmm() const noexcept { return Xmm(id()); }
+inline Ymm Vec::ymm() const noexcept { return Ymm(id()); }
+inline Zmm Vec::zmm() const noexcept { return Zmm(id()); }
+//! \endcond
+
+//! \namespace asmjit::x86::regs
 //!
-//! X86/X64 registers mask (Gp, Mm, K, Xmm/Ymm/Zmm).
-struct X86RegMask {
-  // --------------------------------------------------------------------------
-  // [Reset]
-  // --------------------------------------------------------------------------
+//! Registers provided by X86 and X64 ISAs are in both `asmjit::x86` and
+//! `asmjit::x86::regs` namespaces so they can be included with using directive.
+//! For example `using namespace asmjit::x86::regs` would include all registers,
+//! but not other X86-specific API, whereas `using namespace asmjit::x86` would
+//! include everything X86-specific.
+#ifndef _DOXYGEN
+namespace regs {
+#endif
 
-  //! Reset all register masks to zero.
-  ASMJIT_INLINE void reset() {
-    _packed.reset();
-  }
+//! Creates an 8-bit low GPB register operand.
+static constexpr GpbLo gpb(uint32_t rId) noexcept { return GpbLo(rId); }
+//! Creates an 8-bit low GPB register operand.
+static constexpr GpbLo gpb_lo(uint32_t rId) noexcept { return GpbLo(rId); }
+//! Creates an 8-bit high GPB register operand.
+static constexpr GpbHi gpb_hi(uint32_t rId) noexcept { return GpbHi(rId); }
+//! Creates a 16-bit GPW register operand.
+static constexpr Gpw gpw(uint32_t rId) noexcept { return Gpw(rId); }
+//! Creates a 32-bit GPD register operand.
+static constexpr Gpd gpd(uint32_t rId) noexcept { return Gpd(rId); }
+//! Creates a 64-bit GPQ register operand (64-bit).
+static constexpr Gpq gpq(uint32_t rId) noexcept { return Gpq(rId); }
+//! Creates a 128-bit XMM register operand.
+static constexpr Xmm xmm(uint32_t rId) noexcept { return Xmm(rId); }
+//! Creates a 256-bit YMM register operand.
+static constexpr Ymm ymm(uint32_t rId) noexcept { return Ymm(rId); }
+//! Creates a 512-bit ZMM register operand.
+static constexpr Zmm zmm(uint32_t rId) noexcept { return Zmm(rId); }
+//! Creates a 64-bit Mm register operand.
+static constexpr Mm mm(uint32_t rId) noexcept { return Mm(rId); }
+//! Creates a 64-bit K register operand.
+static constexpr KReg k(uint32_t rId) noexcept { return KReg(rId); }
+//! Creates a 32-bit or 64-bit control register operand.
+static constexpr CReg cr(uint32_t rId) noexcept { return CReg(rId); }
+//! Creates a 32-bit or 64-bit debug register operand.
+static constexpr DReg dr(uint32_t rId) noexcept { return DReg(rId); }
+//! Creates an 80-bit st register operand.
+static constexpr St st(uint32_t rId) noexcept { return St(rId); }
+//! Creates a 128-bit bound register operand.
+static constexpr Bnd bnd(uint32_t rId) noexcept { return Bnd(rId); }
 
-  // --------------------------------------------------------------------------
-  // [IsEmpty / Has]
-  // --------------------------------------------------------------------------
+static constexpr Gp al = Gp(GpbLo::kSignature, Gp::kIdAx);
+static constexpr Gp bl = Gp(GpbLo::kSignature, Gp::kIdBx);
+static constexpr Gp cl = Gp(GpbLo::kSignature, Gp::kIdCx);
+static constexpr Gp dl = Gp(GpbLo::kSignature, Gp::kIdDx);
+static constexpr Gp spl = Gp(GpbLo::kSignature, Gp::kIdSp);
+static constexpr Gp bpl = Gp(GpbLo::kSignature, Gp::kIdBp);
+static constexpr Gp sil = Gp(GpbLo::kSignature, Gp::kIdSi);
+static constexpr Gp dil = Gp(GpbLo::kSignature, Gp::kIdDi);
+static constexpr Gp r8b = Gp(GpbLo::kSignature, Gp::kIdR8);
+static constexpr Gp r9b = Gp(GpbLo::kSignature, Gp::kIdR9);
+static constexpr Gp r10b = Gp(GpbLo::kSignature, Gp::kIdR10);
+static constexpr Gp r11b = Gp(GpbLo::kSignature, Gp::kIdR11);
+static constexpr Gp r12b = Gp(GpbLo::kSignature, Gp::kIdR12);
+static constexpr Gp r13b = Gp(GpbLo::kSignature, Gp::kIdR13);
+static constexpr Gp r14b = Gp(GpbLo::kSignature, Gp::kIdR14);
+static constexpr Gp r15b = Gp(GpbLo::kSignature, Gp::kIdR15);
 
-  //! Get whether all register masks are zero (empty).
-  ASMJIT_INLINE bool isEmpty() const {
-    return _packed.isZero();
-  }
+static constexpr Gp ah = Gp(GpbHi::kSignature, Gp::kIdAx);
+static constexpr Gp bh = Gp(GpbHi::kSignature, Gp::kIdBx);
+static constexpr Gp ch = Gp(GpbHi::kSignature, Gp::kIdCx);
+static constexpr Gp dh = Gp(GpbHi::kSignature, Gp::kIdDx);
 
-  ASMJIT_INLINE bool has(uint32_t classId, uint32_t mask = 0xFFFFFFFF) const {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
+static constexpr Gp ax = Gp(Gpw::kSignature, Gp::kIdAx);
+static constexpr Gp bx = Gp(Gpw::kSignature, Gp::kIdBx);
+static constexpr Gp cx = Gp(Gpw::kSignature, Gp::kIdCx);
+static constexpr Gp dx = Gp(Gpw::kSignature, Gp::kIdDx);
+static constexpr Gp sp = Gp(Gpw::kSignature, Gp::kIdSp);
+static constexpr Gp bp = Gp(Gpw::kSignature, Gp::kIdBp);
+static constexpr Gp si = Gp(Gpw::kSignature, Gp::kIdSi);
+static constexpr Gp di = Gp(Gpw::kSignature, Gp::kIdDi);
+static constexpr Gp r8w = Gp(Gpw::kSignature, Gp::kIdR8);
+static constexpr Gp r9w = Gp(Gpw::kSignature, Gp::kIdR9);
+static constexpr Gp r10w = Gp(Gpw::kSignature, Gp::kIdR10);
+static constexpr Gp r11w = Gp(Gpw::kSignature, Gp::kIdR11);
+static constexpr Gp r12w = Gp(Gpw::kSignature, Gp::kIdR12);
+static constexpr Gp r13w = Gp(Gpw::kSignature, Gp::kIdR13);
+static constexpr Gp r14w = Gp(Gpw::kSignature, Gp::kIdR14);
+static constexpr Gp r15w = Gp(Gpw::kSignature, Gp::kIdR15);
 
-    switch (classId) {
-      case kX86RegClassGp : return (static_cast<uint32_t>(_gp ) & mask) != 0;
-      case kX86RegClassMm : return (static_cast<uint32_t>(_mm ) & mask) != 0;
-      case kX86RegClassK  : return (static_cast<uint32_t>(_k  ) & mask) != 0;
-      case kX86RegClassXyz: return (static_cast<uint32_t>(_xyz) & mask) != 0;
-    }
+static constexpr Gp eax = Gp(Gpd::kSignature, Gp::kIdAx);
+static constexpr Gp ebx = Gp(Gpd::kSignature, Gp::kIdBx);
+static constexpr Gp ecx = Gp(Gpd::kSignature, Gp::kIdCx);
+static constexpr Gp edx = Gp(Gpd::kSignature, Gp::kIdDx);
+static constexpr Gp esp = Gp(Gpd::kSignature, Gp::kIdSp);
+static constexpr Gp ebp = Gp(Gpd::kSignature, Gp::kIdBp);
+static constexpr Gp esi = Gp(Gpd::kSignature, Gp::kIdSi);
+static constexpr Gp edi = Gp(Gpd::kSignature, Gp::kIdDi);
+static constexpr Gp r8d = Gp(Gpd::kSignature, Gp::kIdR8);
+static constexpr Gp r9d = Gp(Gpd::kSignature, Gp::kIdR9);
+static constexpr Gp r10d = Gp(Gpd::kSignature, Gp::kIdR10);
+static constexpr Gp r11d = Gp(Gpd::kSignature, Gp::kIdR11);
+static constexpr Gp r12d = Gp(Gpd::kSignature, Gp::kIdR12);
+static constexpr Gp r13d = Gp(Gpd::kSignature, Gp::kIdR13);
+static constexpr Gp r14d = Gp(Gpd::kSignature, Gp::kIdR14);
+static constexpr Gp r15d = Gp(Gpd::kSignature, Gp::kIdR15);
 
-    return false;
-  }
+static constexpr Gp rax = Gp(Gpq::kSignature, Gp::kIdAx);
+static constexpr Gp rbx = Gp(Gpq::kSignature, Gp::kIdBx);
+static constexpr Gp rcx = Gp(Gpq::kSignature, Gp::kIdCx);
+static constexpr Gp rdx = Gp(Gpq::kSignature, Gp::kIdDx);
+static constexpr Gp rsp = Gp(Gpq::kSignature, Gp::kIdSp);
+static constexpr Gp rbp = Gp(Gpq::kSignature, Gp::kIdBp);
+static constexpr Gp rsi = Gp(Gpq::kSignature, Gp::kIdSi);
+static constexpr Gp rdi = Gp(Gpq::kSignature, Gp::kIdDi);
+static constexpr Gp r8 = Gp(Gpq::kSignature, Gp::kIdR8);
+static constexpr Gp r9 = Gp(Gpq::kSignature, Gp::kIdR9);
+static constexpr Gp r10 = Gp(Gpq::kSignature, Gp::kIdR10);
+static constexpr Gp r11 = Gp(Gpq::kSignature, Gp::kIdR11);
+static constexpr Gp r12 = Gp(Gpq::kSignature, Gp::kIdR12);
+static constexpr Gp r13 = Gp(Gpq::kSignature, Gp::kIdR13);
+static constexpr Gp r14 = Gp(Gpq::kSignature, Gp::kIdR14);
+static constexpr Gp r15 = Gp(Gpq::kSignature, Gp::kIdR15);
 
-  ASMJIT_INLINE bool hasGp(uint32_t mask = 0xFFFFFFFF) const { return has(kX86RegClassGp, mask); }
-  ASMJIT_INLINE bool hasMm(uint32_t mask = 0xFFFFFFFF) const { return has(kX86RegClassMm, mask); }
-  ASMJIT_INLINE bool hasK(uint32_t mask = 0xFFFFFFFF) const { return has(kX86RegClassK, mask); }
-  ASMJIT_INLINE bool hasXyz(uint32_t mask = 0xFFFFFFFF) const { return has(kX86RegClassXyz, mask); }
+static constexpr Xmm xmm0 = Xmm(0);
+static constexpr Xmm xmm1 = Xmm(1);
+static constexpr Xmm xmm2 = Xmm(2);
+static constexpr Xmm xmm3 = Xmm(3);
+static constexpr Xmm xmm4 = Xmm(4);
+static constexpr Xmm xmm5 = Xmm(5);
+static constexpr Xmm xmm6 = Xmm(6);
+static constexpr Xmm xmm7 = Xmm(7);
+static constexpr Xmm xmm8 = Xmm(8);
+static constexpr Xmm xmm9 = Xmm(9);
+static constexpr Xmm xmm10 = Xmm(10);
+static constexpr Xmm xmm11 = Xmm(11);
+static constexpr Xmm xmm12 = Xmm(12);
+static constexpr Xmm xmm13 = Xmm(13);
+static constexpr Xmm xmm14 = Xmm(14);
+static constexpr Xmm xmm15 = Xmm(15);
+static constexpr Xmm xmm16 = Xmm(16);
+static constexpr Xmm xmm17 = Xmm(17);
+static constexpr Xmm xmm18 = Xmm(18);
+static constexpr Xmm xmm19 = Xmm(19);
+static constexpr Xmm xmm20 = Xmm(20);
+static constexpr Xmm xmm21 = Xmm(21);
+static constexpr Xmm xmm22 = Xmm(22);
+static constexpr Xmm xmm23 = Xmm(23);
+static constexpr Xmm xmm24 = Xmm(24);
+static constexpr Xmm xmm25 = Xmm(25);
+static constexpr Xmm xmm26 = Xmm(26);
+static constexpr Xmm xmm27 = Xmm(27);
+static constexpr Xmm xmm28 = Xmm(28);
+static constexpr Xmm xmm29 = Xmm(29);
+static constexpr Xmm xmm30 = Xmm(30);
+static constexpr Xmm xmm31 = Xmm(31);
 
-  // --------------------------------------------------------------------------
-  // [Get]
-  // --------------------------------------------------------------------------
+static constexpr Ymm ymm0 = Ymm(0);
+static constexpr Ymm ymm1 = Ymm(1);
+static constexpr Ymm ymm2 = Ymm(2);
+static constexpr Ymm ymm3 = Ymm(3);
+static constexpr Ymm ymm4 = Ymm(4);
+static constexpr Ymm ymm5 = Ymm(5);
+static constexpr Ymm ymm6 = Ymm(6);
+static constexpr Ymm ymm7 = Ymm(7);
+static constexpr Ymm ymm8 = Ymm(8);
+static constexpr Ymm ymm9 = Ymm(9);
+static constexpr Ymm ymm10 = Ymm(10);
+static constexpr Ymm ymm11 = Ymm(11);
+static constexpr Ymm ymm12 = Ymm(12);
+static constexpr Ymm ymm13 = Ymm(13);
+static constexpr Ymm ymm14 = Ymm(14);
+static constexpr Ymm ymm15 = Ymm(15);
+static constexpr Ymm ymm16 = Ymm(16);
+static constexpr Ymm ymm17 = Ymm(17);
+static constexpr Ymm ymm18 = Ymm(18);
+static constexpr Ymm ymm19 = Ymm(19);
+static constexpr Ymm ymm20 = Ymm(20);
+static constexpr Ymm ymm21 = Ymm(21);
+static constexpr Ymm ymm22 = Ymm(22);
+static constexpr Ymm ymm23 = Ymm(23);
+static constexpr Ymm ymm24 = Ymm(24);
+static constexpr Ymm ymm25 = Ymm(25);
+static constexpr Ymm ymm26 = Ymm(26);
+static constexpr Ymm ymm27 = Ymm(27);
+static constexpr Ymm ymm28 = Ymm(28);
+static constexpr Ymm ymm29 = Ymm(29);
+static constexpr Ymm ymm30 = Ymm(30);
+static constexpr Ymm ymm31 = Ymm(31);
 
-  ASMJIT_INLINE uint32_t get(uint32_t classId) const {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
+static constexpr Zmm zmm0 = Zmm(0);
+static constexpr Zmm zmm1 = Zmm(1);
+static constexpr Zmm zmm2 = Zmm(2);
+static constexpr Zmm zmm3 = Zmm(3);
+static constexpr Zmm zmm4 = Zmm(4);
+static constexpr Zmm zmm5 = Zmm(5);
+static constexpr Zmm zmm6 = Zmm(6);
+static constexpr Zmm zmm7 = Zmm(7);
+static constexpr Zmm zmm8 = Zmm(8);
+static constexpr Zmm zmm9 = Zmm(9);
+static constexpr Zmm zmm10 = Zmm(10);
+static constexpr Zmm zmm11 = Zmm(11);
+static constexpr Zmm zmm12 = Zmm(12);
+static constexpr Zmm zmm13 = Zmm(13);
+static constexpr Zmm zmm14 = Zmm(14);
+static constexpr Zmm zmm15 = Zmm(15);
+static constexpr Zmm zmm16 = Zmm(16);
+static constexpr Zmm zmm17 = Zmm(17);
+static constexpr Zmm zmm18 = Zmm(18);
+static constexpr Zmm zmm19 = Zmm(19);
+static constexpr Zmm zmm20 = Zmm(20);
+static constexpr Zmm zmm21 = Zmm(21);
+static constexpr Zmm zmm22 = Zmm(22);
+static constexpr Zmm zmm23 = Zmm(23);
+static constexpr Zmm zmm24 = Zmm(24);
+static constexpr Zmm zmm25 = Zmm(25);
+static constexpr Zmm zmm26 = Zmm(26);
+static constexpr Zmm zmm27 = Zmm(27);
+static constexpr Zmm zmm28 = Zmm(28);
+static constexpr Zmm zmm29 = Zmm(29);
+static constexpr Zmm zmm30 = Zmm(30);
+static constexpr Zmm zmm31 = Zmm(31);
 
-    switch (classId) {
-      case kX86RegClassGp : return _gp;
-      case kX86RegClassMm : return _mm;
-      case kX86RegClassK  : return _k;
-      case kX86RegClassXyz: return _xyz;
-    }
+static constexpr Mm mm0 = Mm(0);
+static constexpr Mm mm1 = Mm(1);
+static constexpr Mm mm2 = Mm(2);
+static constexpr Mm mm3 = Mm(3);
+static constexpr Mm mm4 = Mm(4);
+static constexpr Mm mm5 = Mm(5);
+static constexpr Mm mm6 = Mm(6);
+static constexpr Mm mm7 = Mm(7);
 
-    return 0;
-  }
+static constexpr KReg k0 = KReg(0);
+static constexpr KReg k1 = KReg(1);
+static constexpr KReg k2 = KReg(2);
+static constexpr KReg k3 = KReg(3);
+static constexpr KReg k4 = KReg(4);
+static constexpr KReg k5 = KReg(5);
+static constexpr KReg k6 = KReg(6);
+static constexpr KReg k7 = KReg(7);
 
-  ASMJIT_INLINE uint32_t getGp() const { return get(kX86RegClassGp); }
-  ASMJIT_INLINE uint32_t getMm() const { return get(kX86RegClassMm); }
-  ASMJIT_INLINE uint32_t getK() const { return get(kX86RegClassK); }
-  ASMJIT_INLINE uint32_t getXyz() const { return get(kX86RegClassXyz); }
+static constexpr SReg no_seg = SReg(SReg::kIdNone);
+static constexpr SReg es = SReg(SReg::kIdEs);
+static constexpr SReg cs = SReg(SReg::kIdCs);
+static constexpr SReg ss = SReg(SReg::kIdSs);
+static constexpr SReg ds = SReg(SReg::kIdDs);
+static constexpr SReg fs = SReg(SReg::kIdFs);
+static constexpr SReg gs = SReg(SReg::kIdGs);
 
-  // --------------------------------------------------------------------------
-  // [Zero]
-  // --------------------------------------------------------------------------
+static constexpr CReg cr0 = CReg(0);
+static constexpr CReg cr1 = CReg(1);
+static constexpr CReg cr2 = CReg(2);
+static constexpr CReg cr3 = CReg(3);
+static constexpr CReg cr4 = CReg(4);
+static constexpr CReg cr5 = CReg(5);
+static constexpr CReg cr6 = CReg(6);
+static constexpr CReg cr7 = CReg(7);
+static constexpr CReg cr8 = CReg(8);
+static constexpr CReg cr9 = CReg(9);
+static constexpr CReg cr10 = CReg(10);
+static constexpr CReg cr11 = CReg(11);
+static constexpr CReg cr12 = CReg(12);
+static constexpr CReg cr13 = CReg(13);
+static constexpr CReg cr14 = CReg(14);
+static constexpr CReg cr15 = CReg(15);
 
-  ASMJIT_INLINE void zero(uint32_t classId) {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
+static constexpr DReg dr0 = DReg(0);
+static constexpr DReg dr1 = DReg(1);
+static constexpr DReg dr2 = DReg(2);
+static constexpr DReg dr3 = DReg(3);
+static constexpr DReg dr4 = DReg(4);
+static constexpr DReg dr5 = DReg(5);
+static constexpr DReg dr6 = DReg(6);
+static constexpr DReg dr7 = DReg(7);
+static constexpr DReg dr8 = DReg(8);
+static constexpr DReg dr9 = DReg(9);
+static constexpr DReg dr10 = DReg(10);
+static constexpr DReg dr11 = DReg(11);
+static constexpr DReg dr12 = DReg(12);
+static constexpr DReg dr13 = DReg(13);
+static constexpr DReg dr14 = DReg(14);
+static constexpr DReg dr15 = DReg(15);
 
-    switch (classId) {
-      case kX86RegClassGp : _gp  = 0; break;
-      case kX86RegClassMm : _mm  = 0; break;
-      case kX86RegClassK  : _k   = 0; break;
-      case kX86RegClassXyz: _xyz = 0; break;
-    }
-  }
+static constexpr St st0 = St(0);
+static constexpr St st1 = St(1);
+static constexpr St st2 = St(2);
+static constexpr St st3 = St(3);
+static constexpr St st4 = St(4);
+static constexpr St st5 = St(5);
+static constexpr St st6 = St(6);
+static constexpr St st7 = St(7);
 
-  ASMJIT_INLINE void zeroGp() { zero(kX86RegClassGp); }
-  ASMJIT_INLINE void zeroMm() { zero(kX86RegClassMm); }
-  ASMJIT_INLINE void zeroK() { zero(kX86RegClassK); }
-  ASMJIT_INLINE void zeroXyz() { zero(kX86RegClassXyz); }
+static constexpr Bnd bnd0 = Bnd(0);
+static constexpr Bnd bnd1 = Bnd(1);
+static constexpr Bnd bnd2 = Bnd(2);
+static constexpr Bnd bnd3 = Bnd(3);
 
-  // --------------------------------------------------------------------------
-  // [Set]
-  // --------------------------------------------------------------------------
+static constexpr Rip rip = Rip(0);
 
-  ASMJIT_INLINE void set(const X86RegMask& other) {
-    _packed = other._packed;
-  }
+#ifndef _DOXYGEN
+} // {regs}
 
-  ASMJIT_INLINE void set(uint32_t classId, uint32_t mask) {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
+// Make `x86::regs` accessible through `x86` namespace as well.
+using namespace regs;
+#endif
 
-    switch (classId) {
-      case kX86RegClassGp : _gp  = static_cast<uint16_t>(mask); break;
-      case kX86RegClassMm : _mm  = static_cast<uint8_t >(mask); break;
-      case kX86RegClassK  : _k   = static_cast<uint8_t >(mask); break;
-      case kX86RegClassXyz: _xyz = static_cast<uint32_t>(mask); break;
-    }
-  }
+// ============================================================================
+// [asmjit::x86::Mem]
+// ============================================================================
 
-  ASMJIT_INLINE void setGp(uint32_t mask) { return set(kX86RegClassGp, mask); }
-  ASMJIT_INLINE void setMm(uint32_t mask) { return set(kX86RegClassMm, mask); }
-  ASMJIT_INLINE void setK(uint32_t mask) { return set(kX86RegClassK, mask); }
-  ASMJIT_INLINE void setXyz(uint32_t mask) { return set(kX86RegClassXyz, mask); }
+//! Memory operand.
+class Mem : public BaseMem {
+public:
+  //! Additional bits of operand's signature used by `Mem`.
+  enum AdditionalBits : uint32_t {
+    kSignatureMemSegmentShift   = 16,
+    kSignatureMemSegmentMask    = 0x07u << kSignatureMemSegmentShift,
 
-  // --------------------------------------------------------------------------
-  // [And]
-  // --------------------------------------------------------------------------
+    kSignatureMemShiftShift     = 19,
+    kSignatureMemShiftMask      = 0x03u << kSignatureMemShiftShift,
 
-  ASMJIT_INLINE void and_(const X86RegMask& other) {
-    _packed.and_(other._packed);
-  }
-
-  ASMJIT_INLINE void and_(uint32_t classId, uint32_t mask) {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
-
-    switch (classId) {
-      case kX86RegClassGp : _gp  &= static_cast<uint16_t>(mask); break;
-      case kX86RegClassMm : _mm  &= static_cast<uint8_t >(mask); break;
-      case kX86RegClassK  : _k   &= static_cast<uint8_t >(mask); break;
-      case kX86RegClassXyz: _xyz &= static_cast<uint32_t>(mask); break;
-    }
-  }
-
-  ASMJIT_INLINE void andGp(uint32_t mask) { and_(kX86RegClassGp, mask); }
-  ASMJIT_INLINE void andMm(uint32_t mask) { and_(kX86RegClassMm, mask); }
-  ASMJIT_INLINE void andK(uint32_t mask) { and_(kX86RegClassK, mask); }
-  ASMJIT_INLINE void andXyz(uint32_t mask) { and_(kX86RegClassXyz, mask); }
-
-  // --------------------------------------------------------------------------
-  // [AndNot]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE void andNot(const X86RegMask& other) {
-    _packed.andNot(other._packed);
-  }
-
-  ASMJIT_INLINE void andNot(uint32_t classId, uint32_t mask) {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
-
-    switch (classId) {
-      case kX86RegClassGp : _gp  &= ~static_cast<uint16_t>(mask); break;
-      case kX86RegClassMm : _mm  &= ~static_cast<uint8_t >(mask); break;
-      case kX86RegClassK  : _k   &= ~static_cast<uint8_t >(mask); break;
-      case kX86RegClassXyz: _xyz &= ~static_cast<uint32_t>(mask); break;
-    }
-  }
-
-  ASMJIT_INLINE void andNotGp(uint32_t mask) { andNot(kX86RegClassGp, mask); }
-  ASMJIT_INLINE void andNotMm(uint32_t mask) { andNot(kX86RegClassMm, mask); }
-  ASMJIT_INLINE void andNotK(uint32_t mask) { andNot(kX86RegClassK, mask); }
-  ASMJIT_INLINE void andNotXyz(uint32_t mask) { andNot(kX86RegClassXyz, mask); }
-
-  // --------------------------------------------------------------------------
-  // [Or]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE void or_(const X86RegMask& other) {
-    _packed.or_(other._packed);
-  }
-
-  ASMJIT_INLINE void or_(uint32_t classId, uint32_t mask) {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
-    switch (classId) {
-      case kX86RegClassGp : _gp  |= static_cast<uint16_t>(mask); break;
-      case kX86RegClassMm : _mm  |= static_cast<uint8_t >(mask); break;
-      case kX86RegClassK  : _k   |= static_cast<uint8_t >(mask); break;
-      case kX86RegClassXyz: _xyz |= static_cast<uint32_t>(mask); break;
-    }
-  }
-
-  ASMJIT_INLINE void orGp(uint32_t mask) { return or_(kX86RegClassGp, mask); }
-  ASMJIT_INLINE void orMm(uint32_t mask) { return or_(kX86RegClassMm, mask); }
-  ASMJIT_INLINE void orK(uint32_t mask) { return or_(kX86RegClassK, mask); }
-  ASMJIT_INLINE void orXyz(uint32_t mask) { return or_(kX86RegClassXyz, mask); }
-
-  // --------------------------------------------------------------------------
-  // [Xor]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE void xor_(const X86RegMask& other) {
-    _packed.xor_(other._packed);
-  }
-
-  ASMJIT_INLINE void xor_(uint32_t classId, uint32_t mask) {
-    ASMJIT_ASSERT(classId < _kX86RegClassManagedCount);
-
-    switch (classId) {
-      case kX86RegClassGp : _gp  ^= static_cast<uint16_t>(mask); break;
-      case kX86RegClassMm : _mm  ^= static_cast<uint8_t >(mask); break;
-      case kX86RegClassK  : _k   ^= static_cast<uint8_t >(mask); break;
-      case kX86RegClassXyz: _xyz ^= static_cast<uint32_t>(mask); break;
-    }
-  }
-
-  ASMJIT_INLINE void xorGp(uint32_t mask) { xor_(kX86RegClassGp, mask); }
-  ASMJIT_INLINE void xorMm(uint32_t mask) { xor_(kX86RegClassMm, mask); }
-  ASMJIT_INLINE void xorK(uint32_t mask) { xor_(kX86RegClassK, mask); }
-  ASMJIT_INLINE void xorXyz(uint32_t mask) { xor_(kX86RegClassXyz, mask); }
-
-  // --------------------------------------------------------------------------
-  // [Members]
-  // --------------------------------------------------------------------------
-
-  union {
-    struct {
-      //! Gp registers mask (16 bits).
-      uint16_t _gp;
-      //! Mm registers mask (8 bits).
-      uint8_t _mm;
-      //! K registers mask (8 bits).
-      uint8_t _k;
-      //! Xmm/Ymm/Zmm registers mask (32 bits).
-      uint32_t _xyz;
-    };
-
-    //! Packed masks.
-    UInt64 _packed;
+    kSignatureMemBroadcastShift = 21,
+    kSignatureMemBroadcastMask  = 0x7u << kSignatureMemBroadcastShift
   };
-};
 
-// ============================================================================
-// [asmjit::X86Reg]
-// ============================================================================
+  enum Broadcast : uint32_t {
+    kBroadcast1To1 = 0,
+    kBroadcast1To2 = 1,
+    kBroadcast1To4 = 2,
+    kBroadcast1To8 = 3,
+    kBroadcast1To16 = 4,
+    kBroadcast1To32 = 5,
+    kBroadcast1To64 = 6
+  };
 
-//! X86/X86 register base class.
-struct X86Reg : public Reg {
   // --------------------------------------------------------------------------
   // [Construction / Destruction]
   // --------------------------------------------------------------------------
 
-  //! Create a dummy X86 register.
-  ASMJIT_INLINE X86Reg() : Reg() {}
-  //! Create a reference to `other` X86 register.
-  ASMJIT_INLINE X86Reg(const X86Reg& other) : Reg(other) {}
-  //! Create a reference to `other` X86 register and change the index to `index`.
-  ASMJIT_INLINE X86Reg(const X86Reg& other, uint32_t index) : Reg(other, index) {}
-  //! Create a custom X86 register.
-  ASMJIT_INLINE X86Reg(uint32_t type, uint32_t index, uint32_t size) : Reg(type, index, size) {}
-  //! Create non-initialized X86 register.
-  explicit ASMJIT_INLINE X86Reg(const _NoInit&) : Reg(NoInit) {}
+  //! Creates a default `Mem` operand that points to [0].
+  constexpr Mem() noexcept
+    : BaseMem() {}
 
-  // --------------------------------------------------------------------------
-  // [X86Reg Specific]
-  // --------------------------------------------------------------------------
+  constexpr Mem(const Mem& other) noexcept
+    : BaseMem(other) {}
 
-  ASMJIT_REG_OP(X86Reg)
+  //! \cond INTERNAL
+  //!
+  //! A constructor used internally to create `Mem` operand from `Decomposed` data.
+  constexpr explicit Mem(const Decomposed& d) noexcept
+    : BaseMem(d) {}
+  //! \endcond
 
-  //! Get whether the register is Gp register.
-  ASMJIT_INLINE bool isGp() const { return _vreg.type <= kX86RegTypeGpq; }
-  //! Get whether the register is Gp byte (8-bit) register.
-  ASMJIT_INLINE bool isGpb() const { return _vreg.type <= kX86RegTypeGpbHi; }
-  //! Get whether the register is Gp lo-byte (8-bit) register.
-  ASMJIT_INLINE bool isGpbLo() const { return _vreg.type == kX86RegTypeGpbLo; }
-  //! Get whether the register is Gp hi-byte (8-bit) register.
-  ASMJIT_INLINE bool isGpbHi() const { return _vreg.type == kX86RegTypeGpbHi; }
-  //! Get whether the register is Gp word (16-bit) register.
-  ASMJIT_INLINE bool isGpw() const { return _vreg.type == kX86RegTypeGpw; }
-  //! Get whether the register is Gp dword (32-bit) register.
-  ASMJIT_INLINE bool isGpd() const { return _vreg.type == kX86RegTypeGpd; }
-  //! Get whether the register is Gp qword (64-bit) register.
-  ASMJIT_INLINE bool isGpq() const { return _vreg.type == kX86RegTypeGpq; }
+  constexpr Mem(const Label& base, int32_t off, uint32_t size = 0, uint32_t flags = 0) noexcept
+    : BaseMem(Decomposed { Label::kLabelTag, base.id(), 0, 0, off, size, flags }) {}
 
-  //! Get whether the register is Fp register.
-  ASMJIT_INLINE bool isFp() const { return _vreg.type == kX86RegTypeFp; }
-  //! Get whether the register is Mm (64-bit) register.
-  ASMJIT_INLINE bool isMm() const { return _vreg.type == kX86RegTypeMm; }
+  constexpr Mem(const Label& base, const BaseReg& index, uint32_t shift, int32_t off, uint32_t size = 0, uint32_t flags = 0) noexcept
+    : BaseMem(Decomposed { Label::kLabelTag, base.id(), index.type(), index.id(), off, size, flags | (shift << kSignatureMemShiftShift) }) {}
 
-  //! Get whether the register is K (64-bit) register.
-  ASMJIT_INLINE bool isK() const { return _vreg.type == kX86RegTypeK; }
+  constexpr Mem(const BaseReg& base, int32_t off, uint32_t size = 0, uint32_t flags = 0) noexcept
+    : BaseMem(Decomposed { base.type(), base.id(), 0, 0, off, size, flags }) {}
 
-  //! Get whether the register is Xmm (128-bit) register.
-  ASMJIT_INLINE bool isXmm() const { return _vreg.type == kX86RegTypeXmm; }
-  //! Get whether the register is Ymm (256-bit) register.
-  ASMJIT_INLINE bool isYmm() const { return _vreg.type == kX86RegTypeYmm; }
-  //! Get whether the register is Zmm (512-bit) register.
-  ASMJIT_INLINE bool isZmm() const { return _vreg.type == kX86RegTypeZmm; }
+  constexpr Mem(const BaseReg& base, const BaseReg& index, uint32_t shift, int32_t off, uint32_t size = 0, uint32_t flags = 0) noexcept
+    : BaseMem(Decomposed { base.type(), base.id(), index.type(), index.id(), off, size, flags | (shift << kSignatureMemShiftShift) }) {}
 
-  //! Get whether the register is RIP.
-  ASMJIT_INLINE bool isRip() const { return _vreg.type == kX86RegTypeRip; }
-  //! Get whether the register is Segment.
-  ASMJIT_INLINE bool isSeg() const { return _vreg.type == kX86RegTypeSeg; }
+  constexpr explicit Mem(uint64_t base, uint32_t size = 0, uint32_t flags = 0) noexcept
+    : BaseMem(Decomposed { 0, uint32_t(base >> 32), 0, 0, int32_t(uint32_t(base & 0xFFFFFFFFu)), size, flags }) {}
 
-  // --------------------------------------------------------------------------
-  // [Statics]
-  // --------------------------------------------------------------------------
+  constexpr Mem(uint64_t base, const BaseReg& index, uint32_t shift = 0, uint32_t size = 0, uint32_t flags = 0) noexcept
+    : BaseMem(Decomposed { 0, uint32_t(base >> 32), index.type(), index.id(), int32_t(uint32_t(base & 0xFFFFFFFFu)), size, flags | (shift << kSignatureMemShiftShift) }) {}
 
-  //! Get whether the `op` operand is Gpb-Lo or Gpb-Hi register.
-  static ASMJIT_INLINE bool isGpbReg(const Operand& op) {
-    const uint32_t mask = IntUtil::pack32_2x8_1x16(
-      0xFF, 0xFF, ~(_kX86RegTypePatchedGpbHi << 8) & 0xFF00);
+  constexpr Mem(Globals::Init_, uint32_t u0, uint32_t u1, uint32_t u2, uint32_t u3) noexcept
+    : BaseMem(Globals::Init, u0, u1, u2, u3) {}
 
-    return (op._packed[0].u32[0] & mask) == IntUtil::pack32_2x8_1x16(kOperandTypeReg, 1, 0x0000);
-  }
-};
+  inline explicit Mem(Globals::NoInit_) noexcept
+    : BaseMem(Globals::NoInit) {}
 
-// ============================================================================
-// [asmjit::X86RipReg]
-// ============================================================================
+  //! Clones the memory operand.
+  constexpr Mem clone() const noexcept { return Mem(*this); }
 
-//! X86/X64 RIP register.
-struct X86RipReg : public X86Reg {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a RIP register.
-  ASMJIT_INLINE X86RipReg() : X86Reg(kX86RegTypeRip, 0, 0) {}
-  //! Create a reference to `other` RIP register.
-  ASMJIT_INLINE X86RipReg(const X86RipReg& other) : X86Reg(other) {}
-  //! Create non-initialized RIP register.
-  explicit ASMJIT_INLINE X86RipReg(const _NoInit&) : X86Reg(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86RipReg Specific]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_REG_OP(X86RipReg)
-};
-
-// ============================================================================
-// [asmjit::X86SegReg]
-// ============================================================================
-
-//! X86/X64 segment register.
-struct X86SegReg : public X86Reg {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a dummy segment register.
-  ASMJIT_INLINE X86SegReg() : X86Reg() {}
-  //! Create a reference to `other` segment register.
-  ASMJIT_INLINE X86SegReg(const X86SegReg& other) : X86Reg(other) {}
-  //! Create a reference to `other` segment register and change the index to `index`.
-  ASMJIT_INLINE X86SegReg(const X86SegReg& other, uint32_t index) : X86Reg(other, index) {}
-  //! Create a custom segment register.
-  ASMJIT_INLINE X86SegReg(uint32_t type, uint32_t index, uint32_t size) : X86Reg(type, index, size) {}
-  //! Create non-initialized segment register.
-  explicit ASMJIT_INLINE X86SegReg(const _NoInit&) : X86Reg(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86SegReg Specific]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_REG_OP(X86SegReg)
-};
-
-// ============================================================================
-// [asmjit::X86GpReg]
-// ============================================================================
-
-//! X86/X64 Gpb/Gpw/Gpd/Gpq register.
-struct X86GpReg : public X86Reg {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a dummy Gp register.
-  ASMJIT_INLINE X86GpReg() : X86Reg() {}
-  //! Create a reference to `other` Gp register.
-  ASMJIT_INLINE X86GpReg(const X86GpReg& other) : X86Reg(other) {}
-  //! Create a reference to `other` Gp register and change the index to `index`.
-  ASMJIT_INLINE X86GpReg(const X86GpReg& other, uint32_t index) : X86Reg(other, index) {}
-  //! Create a custom Gp register.
-  ASMJIT_INLINE X86GpReg(uint32_t type, uint32_t index, uint32_t size) : X86Reg(type, index, size) {}
-  //! Create non-initialized Gp register.
-  explicit ASMJIT_INLINE X86GpReg(const _NoInit&) : X86Reg(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86GpReg Specific]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_REG_OP(X86GpReg)
-};
-
-// ============================================================================
-// [asmjit::X86FpReg]
-// ============================================================================
-
-//! X86/X64 80-bit Fp register.
-struct X86FpReg : public X86Reg {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a dummy Fp register.
-  ASMJIT_INLINE X86FpReg() : X86Reg() {}
-  //! Create a reference to `other` Fp register.
-  ASMJIT_INLINE X86FpReg(const X86FpReg& other) : X86Reg(other) {}
-  //! Create a reference to `other` Fp register and change the index to `index`.
-  ASMJIT_INLINE X86FpReg(const X86FpReg& other, uint32_t index) : X86Reg(other, index) {}
-  //! Create a custom Fp register.
-  ASMJIT_INLINE X86FpReg(uint32_t type, uint32_t index, uint32_t size) : X86Reg(type, index, size) {}
-  //! Create non-initialized Fp register.
-  explicit ASMJIT_INLINE X86FpReg(const _NoInit&) : X86Reg(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86FpReg Specific]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_REG_OP(X86FpReg)
-};
-
-// ============================================================================
-// [asmjit::X86MmReg]
-// ============================================================================
-
-//! X86/X64 64-bit Mm register (MMX+).
-//!
-//! Structure of MMX register and it's memory mapping:
-//!
-//! ~~~
-//!       Memory Bytes
-//! +--+--+--+--+--+--+--+--+
-//! |00|01|02|03|04|05|06|07|
-//! +--+--+--+--+--+--+--+--+
-//!
-//!       MMX Register
-//! +-----------------------+
-//! |         QWord         |
-//! +-----------+-----------+
-//! |  HI-DWord |  LO-DWord |
-//! +-----------+-----------+
-//! |  W3 |  W2 |  W1 |  W0 |
-//! +--+--+--+--+--+--+--+--+
-//! |07|06|05|04|03|02|01|00|
-//! +--+--+--+--+--+--+--+--+
-//! ~~~
-//!
-//! Move instruction semantics:
-//!
-//!   - `movd` - writes 4-bytes in `LO-DWord` and zeroes `HI-DWord`.
-//!   - `movq` - writes 8-bytes in `QWord`.
-struct X86MmReg : public X86Reg {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a dummy Mm register.
-  ASMJIT_INLINE X86MmReg() : X86Reg() {}
-  //! Create a reference to `other` Mm register.
-  ASMJIT_INLINE X86MmReg(const X86MmReg& other) : X86Reg(other) {}
-  //! Create a reference to `other` Mm register and change the index to `index`.
-  ASMJIT_INLINE X86MmReg(const X86MmReg& other, uint32_t index) : X86Reg(other, index) {}
-  //! Create a custom Mm register.
-  ASMJIT_INLINE X86MmReg(uint32_t type, uint32_t index, uint32_t size) : X86Reg(type, index, size) {}
-  //! Create non-initialized Mm register.
-  explicit ASMJIT_INLINE X86MmReg(const _NoInit&) : X86Reg(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86MmReg Specific]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_REG_OP(X86MmReg)
-};
-
-// ============================================================================
-// [asmjit::X86KReg]
-// ============================================================================
-
-//! X86/X64 64-bit K register (AVX512+).
-struct X86KReg : public X86Reg {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a dummy K register.
-  ASMJIT_INLINE X86KReg() : X86Reg() {}
-  //! Create a reference to `other` K register.
-  ASMJIT_INLINE X86KReg(const X86KReg& other) : X86Reg(other) {}
-  //! Create a reference to `other` K register and change the index to `index`.
-  ASMJIT_INLINE X86KReg(const X86KReg& other, uint32_t index) : X86Reg(other, index) {}
-  //! Create a custom K register.
-  ASMJIT_INLINE X86KReg(uint32_t type, uint32_t index, uint32_t size) : X86Reg(type, index, size) {}
-  //! Create non-initialized K register.
-  explicit ASMJIT_INLINE X86KReg(const _NoInit&) : X86Reg(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86KReg Specific]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_REG_OP(X86KReg)
-};
-
-// ============================================================================
-// [asmjit::X86XmmReg]
-// ============================================================================
-
-//! X86/X64 128-bit Xmm register (SSE+).
-//!
-//! Structure of XMM register and it's memory mapping:
-//!
-//! ~~~
-//!                   Memory Bytes
-//! +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//! |00|01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|
-//! +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//!
-//!                   XMM Register
-//! +-----------------------------------------------+
-//! |                     OWord                     |
-//! +-----------------------+-----------------------+
-//! |      HI-QWord/PD      |      LO-QWord/SD      |
-//! +-----------+-----------+-----------+-----------+
-//! |   D3/PS   |   D2/PS   |   D1/PS   |   D0/SS   |
-//! +-----------+-----------+-----------+-----------+
-//! |  W7 |  W6 |  W5 |  W4 |  W3 |  W2 |  W1 |  W0 |
-//! +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//! |15|14|13|12|11|10|09|08|07|06|05|04|03|02|01|00|
-//! +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//! ~~~
-//!
-//! Move instruction semantics:
-//!
-//!   - `movd` - writes 4-bytes in `D0` and zeroes the rest.
-//!   - `movq` - writes 8-bytes in `Lo-QWord` and zeroes the rest.
-//!   - `movq2dq` - writes 8 bytes in `Lo-QWord` and zeroes the rest.
-//!
-//!   - `movss` - writes 4-bytes in `D0`
-//!       (the rest is zeroed only if the source operand is a memory location).
-//!   - `movsd` - writes 8-bytes in `Lo-QWord`
-//!       (the rest is zeroed only if the source operand is a memory location).
-//!
-//!   - `movaps`,
-//!     `movups`,
-//!     `movapd`,
-//!     `movupd`,
-//!     `movdqu`,
-//!     `movdqa`,
-//!     `lddqu` - writes 16-bytes in `OWord`.
-//!
-//!   - `movlps`,
-//!     `movlpd`,
-//!     `movhlps` - writes 8-bytes in `Lo-QWord` and keeps the rest untouched.
-//!
-//!   - `movhps`,
-//!     `movhpd`,
-//!     `movlhps` - writes 8-bytes in `Hi-QWord` and keeps the rest untouched.
-//!
-//!   - `movddup`,
-//!   - `movsldup`,
-//!   - `movshdup` - writes 16 bytes in `OWord`.
-struct X86XmmReg : public X86Reg {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a dummy Xmm register.
-  ASMJIT_INLINE X86XmmReg() : X86Reg() {}
-  //! Create a reference to `other` Xmm register.
-  ASMJIT_INLINE X86XmmReg(const X86XmmReg& other) : X86Reg(other) {}
-  //! Create a reference to `other` Xmm register and change the index to `index`.
-  ASMJIT_INLINE X86XmmReg(const X86XmmReg& other, uint32_t index) : X86Reg(other, index) {}
-  //! Create a custom Xmm register.
-  ASMJIT_INLINE X86XmmReg(uint32_t type, uint32_t index, uint32_t size) : X86Reg(type, index, size) {}
-  //! Create non-initialized Xmm register.
-  explicit ASMJIT_INLINE X86XmmReg(const _NoInit&) : X86Reg(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86XmmReg Specific]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_REG_OP(X86XmmReg)
-};
-
-// ============================================================================
-// [asmjit::X86YmmReg]
-// ============================================================================
-
-//! X86/X64 256-bit Ymm register (AVX+).
-//!
-//! Structure of YMM register and it's memory mapping:
-//!
-//! ~~~
-//!                                           Memory Bytes
-//! +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//! |00|01|02|03|04|05|06|07|08|09|10|11|12|13|14|15|16|17|18|19|20|21|22|23|24|25|26|27|28|29|30|31|
-//! +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//!
-//!                                           YMM Register
-//! +-----------------------------------------------+-----------------------------------------------+
-//! |                  HI-DQWord                    |                  LO-DQWord                    |
-//! +-----------------------+-----------------------+-----------------------+-----------------------+
-//! |         Q3/PD         |         Q2/PD         |         Q1/PD         |         Q0/SD         |
-//! +-----------+-----------+-----------+-----------+-----------+-----------+-----------+-----------+
-//! |   D7/PS   |   D6/PS   |   D5/PS   |   D4/PS   |   D3/PS   |   D2/PS   |   D1/PS   |   D0/SS   |
-//! +-----------+-----------+-----------+-----------+-----------+-----------+-----------+-----------+
-//! | W15 | W14 | W13 | W12 | W11 | W10 |  W9 |  W8 |  W7 |  W6 |  W5 |  W4 |  W3 |  W2 |  W1 |  W0 |
-//! +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//! |31|30|29|28|27|26|25|24|23|22|21|20|19|18|17|16|15|14|13|12|11|10|09|08|07|06|05|04|03|02|01|00|
-//! +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
-//! ~~~
-struct X86YmmReg : public X86Reg {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a dummy Ymm register.
-  ASMJIT_INLINE X86YmmReg() : X86Reg() {}
-  //! Create a reference to `other` Ymm register.
-  ASMJIT_INLINE X86YmmReg(const X86YmmReg& other) : X86Reg(other) {}
-  //! Create a reference to `other` Ymm register and change the index to `index`.
-  ASMJIT_INLINE X86YmmReg(const X86YmmReg& other, uint32_t index) : X86Reg(other, index) {}
-  //! Create a custom Ymm register.
-  ASMJIT_INLINE X86YmmReg(uint32_t type, uint32_t index, uint32_t size) : X86Reg(type, index, size) {}
-  //! Create non-initialized Ymm register.
-  explicit ASMJIT_INLINE X86YmmReg(const _NoInit&) : X86Reg(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86YmmReg Specific]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_REG_OP(X86YmmReg)
-};
-
-// ============================================================================
-// [asmjit::X86ZmmReg]
-// ============================================================================
-
-//! X86/X64 512-bit Zmm register (AVX512+).
-struct X86ZmmReg : public X86Reg {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  //! Create a dummy Zmm register.
-  ASMJIT_INLINE X86ZmmReg() : X86Reg() {}
-  //! Create a reference to `other` Zmm register.
-  ASMJIT_INLINE X86ZmmReg(const X86ZmmReg& other) : X86Reg(other) {}
-  //! Create a reference to `other` Zmm register and change the index to `index`.
-  ASMJIT_INLINE X86ZmmReg(const X86ZmmReg& other, uint32_t index) : X86Reg(other, index) {}
-  //! Create a custom Zmm register.
-  ASMJIT_INLINE X86ZmmReg(uint32_t type, uint32_t index, uint32_t size) : X86Reg(type, index, size) {}
-  //! Create non-initialized Zmm register.
-  explicit ASMJIT_INLINE X86ZmmReg(const _NoInit&) : X86Reg(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86ZmmReg Specific]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_REG_OP(X86ZmmReg)
-};
-
-// ============================================================================
-// [asmjit::X86Mem]
-// ============================================================================
-
-//! X86 memory operand.
-struct X86Mem : public BaseMem {
-  // --------------------------------------------------------------------------
-  // [Construction / Destruction]
-  // --------------------------------------------------------------------------
-
-  ASMJIT_INLINE X86Mem() : BaseMem(NoInit) {
-    reset();
-  }
-
-  ASMJIT_INLINE X86Mem(const Label& label, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeLabel, 0, label._base.id);
-    _init_packed_d2_d3(kInvalidValue, disp);
-  }
-
-  ASMJIT_INLINE X86Mem(const Label& label, const X86GpReg& index, uint32_t shift, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    ASMJIT_ASSERT(shift <= 3);
-
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeLabel,
-      (kX86MemVSibGpz << kX86MemVSibIndex)
-        + (shift << kX86MemShiftIndex),
-      label.getId());
-    _vmem.index = index.getRegIndex();
-    _vmem.displacement = disp;
-  }
-
-  ASMJIT_INLINE X86Mem(const X86GpReg& base, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeBaseIndex,
-      _getGpdFlags(base)
-        + (kX86MemVSibGpz << kX86MemVSibIndex),
-      base.getRegIndex());
-    _init_packed_d2_d3(kInvalidValue, disp);
-  }
-
-  ASMJIT_INLINE X86Mem(const X86GpReg& base, const X86GpReg& index, uint32_t shift, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    ASMJIT_ASSERT(shift <= 3);
-
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeBaseIndex,
-      _getGpdFlags(base) + (shift << kX86MemShiftIndex),
-      base.getRegIndex());
-    _vmem.index = index.getRegIndex();
-    _vmem.displacement = disp;
-  }
-
-  ASMJIT_INLINE X86Mem(const X86GpReg& base, const X86XmmReg& index, uint32_t shift, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    ASMJIT_ASSERT(shift <= 3);
-
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeBaseIndex,
-      _getGpdFlags(base)
-        + (kX86MemVSibXmm << kX86MemVSibIndex)
-        + (shift << kX86MemShiftIndex),
-      base.getRegIndex());
-    _vmem.index = index.getRegIndex();
-    _vmem.displacement = disp;
-  }
-
-  ASMJIT_INLINE X86Mem(const X86GpReg& base, const X86YmmReg& index, uint32_t shift, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    ASMJIT_ASSERT(shift <= 3);
-
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeBaseIndex,
-      _getGpdFlags(base)
-        + (kX86MemVSibYmm << kX86MemVSibIndex)
-        + (shift << kX86MemShiftIndex),
-      base.getRegIndex());
-    _vmem.index = index.getRegIndex();
-    _vmem.displacement = disp;
-  }
-
-#if !defined(ASMJIT_DISABLE_COMPILER)
-  ASMJIT_INLINE X86Mem(const Label& label, const X86GpVar& index, uint32_t shift, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    ASMJIT_ASSERT(shift <= 3);
-
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeLabel,
-      (kX86MemVSibGpz << kX86MemVSibIndex)
-        + (shift << kX86MemShiftIndex),
-      label.getId());
-    _vmem.index = ASMJIT_OP_ID(index);
-    _vmem.displacement = disp;
-  }
-
-  ASMJIT_INLINE X86Mem(const X86GpVar& base, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeBaseIndex,
-      _getGpdFlags(reinterpret_cast<const Var&>(base))
-        + (kX86MemVSibGpz << kX86MemVSibIndex),
-      ASMJIT_OP_ID(base));
-    _init_packed_d2_d3(kInvalidValue, disp);
-  }
-
-  ASMJIT_INLINE X86Mem(const X86GpVar& base, const X86GpVar& index, uint32_t shift, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    ASMJIT_ASSERT(shift <= 3);
-
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeBaseIndex,
-      _getGpdFlags(reinterpret_cast<const Var&>(base))
-        + (shift << kX86MemShiftIndex),
-      ASMJIT_OP_ID(base));
-    _vmem.index = ASMJIT_OP_ID(index);
-    _vmem.displacement = disp;
-  }
-
-  ASMJIT_INLINE X86Mem(const X86GpVar& base, const X86XmmVar& index, uint32_t shift, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    ASMJIT_ASSERT(shift <= 3);
-
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeBaseIndex,
-      _getGpdFlags(reinterpret_cast<const Var&>(base))
-        + (kX86MemVSibXmm << kX86MemVSibIndex)
-        + (shift << kX86MemShiftIndex),
-      ASMJIT_OP_ID(base));
-    _vmem.index = ASMJIT_OP_ID(index);
-    _vmem.displacement = disp;
-  }
-
-  ASMJIT_INLINE X86Mem(const X86GpVar& base, const X86YmmVar& index, uint32_t shift, int32_t disp, uint32_t size = 0) : BaseMem(NoInit) {
-    ASMJIT_ASSERT(shift <= 3);
-
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, kMemTypeBaseIndex,
-      _getGpdFlags(reinterpret_cast<const Var&>(base))
-        + (kX86MemVSibYmm << kX86MemVSibIndex)
-        + (shift << kX86MemShiftIndex),
-      ASMJIT_OP_ID(base));
-    _vmem.index = ASMJIT_OP_ID(index);
-    _vmem.displacement = disp;
-  }
-
-  ASMJIT_INLINE X86Mem(const _Init&, uint32_t memType, const X86Var& base, int32_t disp, uint32_t size) : BaseMem(NoInit) {
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, memType, 0, ASMJIT_OP_ID(base));
-    _vmem.index = kInvalidValue;
-    _vmem.displacement = disp;
-  }
-
-  ASMJIT_INLINE X86Mem(const _Init&, uint32_t memType, const X86Var& base, const X86GpVar& index, uint32_t shift, int32_t disp, uint32_t size) : BaseMem(NoInit) {
-    ASMJIT_ASSERT(shift <= 3);
-
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, memType, shift << kX86MemShiftIndex, ASMJIT_OP_ID(base));
-    _vmem.index = ASMJIT_OP_ID(index);
-    _vmem.displacement = disp;
-  }
-#endif // !ASMJIT_DISABLE_COMPILER
-
-  ASMJIT_INLINE X86Mem(const X86Mem& other) : BaseMem(other) {}
-  explicit ASMJIT_INLINE X86Mem(const _NoInit&) : BaseMem(NoInit) {}
-
-  // --------------------------------------------------------------------------
-  // [X86Mem Specific]
-  // --------------------------------------------------------------------------
-
-  //! Clone X86Mem operand.
-  ASMJIT_INLINE X86Mem clone() const {
-    return X86Mem(*this);
-  }
-
-  //! Reset X86Mem operand.
-  ASMJIT_INLINE void reset() {
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, 0, kMemTypeBaseIndex, 0, kInvalidValue);
-    _init_packed_d2_d3(kInvalidValue, 0);
-  }
-
-  //! \internal
-  ASMJIT_INLINE void _init(uint32_t memType, uint32_t base, int32_t disp, uint32_t size) {
-    _init_packed_op_sz_b0_b1_id(kOperandTypeMem, size, memType, 0, base);
-    _vmem.index = kInvalidValue;
-    _vmem.displacement = disp;
-  }
-
-  // --------------------------------------------------------------------------
-  // [Segment]
-  // --------------------------------------------------------------------------
-
-  //! Get whether the memory operand has segment override prefix.
-  ASMJIT_INLINE bool hasSegment() const {
-    return (_vmem.flags & kX86MemSegMask) != (kX86SegDefault << kX86MemSegIndex);
-  }
-
-  //! Get memory operand segment, see `kX86Seg`.
-  ASMJIT_INLINE uint32_t getSegment() const {
-    return (static_cast<uint32_t>(_vmem.flags) >> kX86MemSegIndex) & kX86MemSegBits;
-  }
-
-  //! Set memory operand segment, see `kX86Seg`.
-  ASMJIT_INLINE X86Mem& setSegment(uint32_t segIndex) {
-    _vmem.flags = static_cast<uint8_t>(
-      (static_cast<uint32_t>(_vmem.flags) & kX86MemSegMask) + (segIndex << kX86MemSegIndex));
-    return *this;
-  }
-
-  //! Set memory operand segment, see `kX86Seg`.
-  ASMJIT_INLINE X86Mem& setSegment(const X86SegReg& seg) {
-    return setSegment(seg.getRegIndex());
-  }
-
-  // --------------------------------------------------------------------------
-  // [Gpd]
-  // --------------------------------------------------------------------------
-
-  //! Get whether the memory operand has 32-bit GP base.
-  ASMJIT_INLINE bool hasGpdBase() const {
-    return (_packed[0].u32[0] & IntUtil::pack32_4x8(0x00, 0x00, 0x00, kX86MemGpdMask)) != 0;
-  }
-
-  //! Set whether the memory operand has 32-bit GP base.
-  ASMJIT_INLINE X86Mem& setGpdBase() {
-    _packed[0].u32[0] |= IntUtil::pack32_4x8(0x00, 0x00, 0x00, kX86MemGpdMask);
-    return *this;
-  }
-
-  //! Set whether the memory operand has 32-bit GP base to `b`.
-  ASMJIT_INLINE X86Mem& setGpdBase(uint32_t b) {
-    _packed[0].u32[0] &=~IntUtil::pack32_4x8(0x00, 0x00, 0x00, kX86MemGpdMask);
-    _packed[0].u32[0] |= IntUtil::pack32_4x8(0x00, 0x00, 0x00, b << kX86MemGpdIndex);
-    return *this;
-  }
-
-  // --------------------------------------------------------------------------
-  // [VSib]
-  // --------------------------------------------------------------------------
-
-  //! Get V-SIB type.
-  ASMJIT_INLINE uint32_t getVSib() const {
-    return (static_cast<uint32_t>(_vmem.flags) >> kX86MemVSibIndex) & kX86MemVSibBits;
-  }
-
-  //! Set V-SIB type.
-  ASMJIT_INLINE X86Mem& _setVSib(uint32_t vsib) {
-    _packed[0].u32[0] &=~IntUtil::pack32_4x8(0x00, 0x00, 0x00, kX86MemVSibMask);
-    _packed[0].u32[0] |= IntUtil::pack32_4x8(0x00, 0x00, 0x00, vsib << kX86MemVSibIndex);
-    return *this;
-  }
-
-  // --------------------------------------------------------------------------
-  // [Size]
-  // --------------------------------------------------------------------------
-
-  //! Set memory operand size.
-  ASMJIT_INLINE X86Mem& setSize(uint32_t size) {
-    _vmem.size = static_cast<uint8_t>(size);
-    return *this;
-  }
-
-  // --------------------------------------------------------------------------
-  // [Base]
-  // --------------------------------------------------------------------------
-
-  //! Get whether the memory operand has base register.
-  ASMJIT_INLINE bool hasBase() const {
-    return _vmem.base != kInvalidValue;
-  }
-
-  //! Get memory operand base register code, variable id, or `kInvalidValue`.
-  ASMJIT_INLINE uint32_t getBase() const {
-    return _vmem.base;
-  }
-
-  //! Set memory operand base register code, variable id, or `kInvalidValue`.
-  ASMJIT_INLINE X86Mem& setBase(uint32_t base) {
-    _vmem.base = base;
-    return *this;
-  }
-
-  // --------------------------------------------------------------------------
-  // [Index]
-  // --------------------------------------------------------------------------
-
-  //! Get whether the memory operand has index.
-  ASMJIT_INLINE bool hasIndex() const {
-    return _vmem.index != kInvalidValue;
-  }
-
-  //! Get memory operand index register code, variable id, or `kInvalidValue`.
-  ASMJIT_INLINE uint32_t getIndex() const {
-    return _vmem.index;
-  }
-
-  //! Set memory operand index register code, variable id, or `kInvalidValue`.
-  ASMJIT_INLINE X86Mem& setIndex(uint32_t index) {
-    _vmem.index = index;
-    return *this;
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86GpReg& index) {
-    _vmem.index = index.getRegIndex();
-    return _setVSib(kX86MemVSibGpz);
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86GpReg& index, uint32_t shift) {
-    _vmem.index = index.getRegIndex();
-    return _setVSib(kX86MemVSibGpz).setShift(shift);
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86XmmReg& index) {
-    _vmem.index = index.getRegIndex();
-    return _setVSib(kX86MemVSibXmm);
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86XmmReg& index, uint32_t shift) {
-    _vmem.index = index.getRegIndex();
-    return _setVSib(kX86MemVSibXmm).setShift(shift);
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86YmmReg& index) {
-    _vmem.index = index.getRegIndex();
-    return _setVSib(kX86MemVSibYmm);
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86YmmReg& index, uint32_t shift) {
-    _vmem.index = index.getRegIndex();
-    return _setVSib(kX86MemVSibYmm).setShift(shift);
-  }
-
-#if !defined(ASMJIT_DISABLE_COMPILER)
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86GpVar& index) {
-    _vmem.index = ASMJIT_OP_ID(index);
-    return _setVSib(kX86MemVSibGpz);
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86GpVar& index, uint32_t shift) {
-    _vmem.index = ASMJIT_OP_ID(index);
-    return _setVSib(kX86MemVSibGpz).setShift(shift);
-  }
-
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86XmmVar& index) {
-    _vmem.index = ASMJIT_OP_ID(index);
-    return _setVSib(kX86MemVSibXmm);
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86XmmVar& index, uint32_t shift) {
-    _vmem.index = ASMJIT_OP_ID(index);
-    return _setVSib(kX86MemVSibXmm).setShift(shift);
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86YmmVar& index) {
-    _vmem.index = ASMJIT_OP_ID(index);
-    return _setVSib(kX86MemVSibYmm);
-  }
-
-  //! Set memory index.
-  ASMJIT_INLINE X86Mem& setIndex(const X86YmmVar& index, uint32_t shift) {
-    _vmem.index = ASMJIT_OP_ID(index);
-    return _setVSib(kX86MemVSibYmm).setShift(shift);
-  }
-#endif // !ASMJIT_DISABLE_COMPILER
-
-  //! Reset memory index.
-  ASMJIT_INLINE X86Mem& resetIndex() {
-    _vmem.index = kInvalidValue;
-    return _setVSib(kX86MemVSibGpz);
-  }
-
-  // --------------------------------------------------------------------------
-  // [Misc]
-  // --------------------------------------------------------------------------
-
-  //! Get whether the memory operand has base and index register.
-  ASMJIT_INLINE bool hasBaseOrIndex() const {
-    return _vmem.base != kInvalidValue || _vmem.index != kInvalidValue;
-  }
-
-  //! Get whether the memory operand has base and index register.
-  ASMJIT_INLINE bool hasBaseAndIndex() const {
-    return _vmem.base != kInvalidValue && _vmem.index != kInvalidValue;
-  }
-
-  // --------------------------------------------------------------------------
-  // [Shift]
-  // --------------------------------------------------------------------------
-
-  //! Get whether the memory operand has shift used.
-  ASMJIT_INLINE bool hasShift() const {
-    return (_vmem.flags & kX86MemShiftMask) != 0;
-  }
-
-  //! Get memory operand index scale (0, 1, 2 or 3).
-  ASMJIT_INLINE uint32_t getShift() const {
-    return _vmem.flags >> kX86MemShiftIndex;
-  }
-
-  //! Set memory operand index scale (0, 1, 2 or 3).
-  ASMJIT_INLINE X86Mem& setShift(uint32_t shift) {
-    _packed[0].u32[0] &=~IntUtil::pack32_4x8(0x00, 0x00, 0x00, kX86MemShiftMask);
-    _packed[0].u32[0] |= IntUtil::pack32_4x8(0x00, 0x00, 0x00, shift << kX86MemShiftIndex);
-    return *this;
-  }
-
-  // --------------------------------------------------------------------------
-  // [Displacement]
-  // --------------------------------------------------------------------------
-
-  //! Get memory operand relative displacement.
-  ASMJIT_INLINE int32_t getDisplacement() const {
-    return _vmem.displacement;
-  }
-
-  //! Set memory operand relative displacement.
-  ASMJIT_INLINE X86Mem& setDisplacement(int32_t disp) {
-    _vmem.displacement = disp;
-    return *this;
-  }
-
-  //! Reset memory operand relative displacement.
-  ASMJIT_INLINE X86Mem& resetDisplacement(int32_t disp) {
-    _vmem.displacement = 0;
-    return *this;
-  }
-
-  //! Adjust memory operand relative displacement by `disp`.
-  ASMJIT_INLINE X86Mem& adjust(int32_t disp) {
-    _vmem.displacement += disp;
-    return *this;
-  }
-
-  //! Get new memory operand adjusted by `disp`.
-  ASMJIT_INLINE X86Mem adjusted(int32_t disp) const {
-    X86Mem result(*this);
-    result.adjust(disp);
+  //! Creates a new copy of this memory operand adjusted by `off`.
+  inline Mem cloneAdjusted(int64_t off) const noexcept {
+    Mem result(*this);
+    result.addOffset(off);
     return result;
   }
+
+  //! Converts memory `baseType` and `baseId` to `x86::Reg` instance.
+  //!
+  //! The memory must have a valid base register otherwise the result will be wrong.
+  inline Reg baseReg() const noexcept { return Reg::fromTypeAndId(baseType(), baseId()); }
+
+  //! Converts memory `indexType` and `indexId` to `x86::Reg` instance.
+  //!
+  //! The memory must have a valid index register otherwise the result will be wrong.
+  inline Reg indexReg() const noexcept { return Reg::fromTypeAndId(indexType(), indexId()); }
+
+  constexpr Mem _1to1() const noexcept { return Mem(Globals::Init, (_signature & ~kSignatureMemBroadcastMask) | (kBroadcast1To1 << kSignatureMemBroadcastShift), _baseId, _data[0], _data[1]); }
+  constexpr Mem _1to2() const noexcept { return Mem(Globals::Init, (_signature & ~kSignatureMemBroadcastMask) | (kBroadcast1To2 << kSignatureMemBroadcastShift), _baseId, _data[0], _data[1]); }
+  constexpr Mem _1to4() const noexcept { return Mem(Globals::Init, (_signature & ~kSignatureMemBroadcastMask) | (kBroadcast1To4 << kSignatureMemBroadcastShift), _baseId, _data[0], _data[1]); }
+  constexpr Mem _1to8() const noexcept { return Mem(Globals::Init, (_signature & ~kSignatureMemBroadcastMask) | (kBroadcast1To8 << kSignatureMemBroadcastShift), _baseId, _data[0], _data[1]); }
+  constexpr Mem _1to16() const noexcept { return Mem(Globals::Init, (_signature & ~kSignatureMemBroadcastMask) | (kBroadcast1To16 << kSignatureMemBroadcastShift), _baseId, _data[0], _data[1]); }
+  constexpr Mem _1to32() const noexcept { return Mem(Globals::Init, (_signature & ~kSignatureMemBroadcastMask) | (kBroadcast1To32 << kSignatureMemBroadcastShift), _baseId, _data[0], _data[1]); }
+  constexpr Mem _1to64() const noexcept { return Mem(Globals::Init, (_signature & ~kSignatureMemBroadcastMask) | (kBroadcast1To64 << kSignatureMemBroadcastShift), _baseId, _data[0], _data[1]); }
+
+  // --------------------------------------------------------------------------
+  // [Mem]
+  // --------------------------------------------------------------------------
+
+  using BaseMem::setIndex;
+
+  inline void setIndex(const BaseReg& index, uint32_t shift) noexcept {
+    setIndex(index);
+    setShift(shift);
+  }
+
+  //! Tests whether the memory operand has a segment override.
+  constexpr bool hasSegment() const noexcept { return _hasSignaturePart<kSignatureMemSegmentMask>(); }
+  //! Returns the associated segment override as `SReg` operand.
+  constexpr SReg segment() const noexcept { return SReg(segmentId()); }
+  //! Returns segment override register id, see `SReg::Id`.
+  constexpr uint32_t segmentId() const noexcept { return _getSignaturePart<kSignatureMemSegmentMask>(); }
+
+  //! Sets the segment override to `seg`.
+  inline void setSegment(const SReg& seg) noexcept { setSegment(seg.id()); }
+  //! Sets the segment override to `id`.
+  inline void setSegment(uint32_t rId) noexcept { _setSignaturePart<kSignatureMemSegmentMask>(rId); }
+  //! Resets the segment override.
+  inline void resetSegment() noexcept { _setSignaturePart<kSignatureMemSegmentMask>(0); }
+
+  //! Tests whether the memory operand has shift (aka scale) value.
+  constexpr bool hasShift() const noexcept { return _hasSignaturePart<kSignatureMemShiftMask>(); }
+  //! Returns the memory operand's shift (aka scale) value.
+  constexpr uint32_t shift() const noexcept { return _getSignaturePart<kSignatureMemShiftMask>(); }
+  //! Sets the memory operand's shift (aka scale) value.
+  inline void setShift(uint32_t shift) noexcept { _setSignaturePart<kSignatureMemShiftMask>(shift); }
+  //! Resets the memory operand's shift (aka scale) value to zero.
+  inline void resetShift() noexcept { _setSignaturePart<kSignatureMemShiftMask>(0); }
+
+  //! Tests whether the memory operand has broadcast {1tox}.
+  constexpr bool hasBroadcast() const noexcept { return _hasSignaturePart<kSignatureMemBroadcastMask>(); }
+  //! Returns the memory operand's broadcast.
+  constexpr uint32_t getBroadcast() const noexcept { return _getSignaturePart<kSignatureMemBroadcastMask>(); }
+  //! Sets the memory operand's broadcast.
+  inline void setBroadcast(uint32_t bcst) noexcept { _setSignaturePart<kSignatureMemBroadcastMask>(bcst); }
+  //! Resets the memory operand's broadcast to none.
+  inline void resetBroadcast() noexcept { _setSignaturePart<kSignatureMemBroadcastMask>(0); }
 
   // --------------------------------------------------------------------------
   // [Operator Overload]
   // --------------------------------------------------------------------------
 
-  ASMJIT_INLINE X86Mem& operator=(const X86Mem& other) {
-    _copy(other);
-    return *this;
-  }
-
-  ASMJIT_INLINE bool operator==(const X86Mem& other) const {
-    return (_packed[0] == other._packed[0]) & (_packed[1] == other._packed[1]) ;
-  }
-
-  ASMJIT_INLINE bool operator!=(const X86Mem& other) const {
-    return !(*this == other);
-  }
-
-  // --------------------------------------------------------------------------
-  // [Static]
-  // --------------------------------------------------------------------------
-
-  static ASMJIT_INLINE uint32_t _getGpdFlags(const Operand& base) {
-    return (base._vreg.size & 0x4) << (kX86MemGpdIndex - 2);
-  }
-};
-#endif // ASMJIT_EXPORTS_X86OPERAND_REGS
-
-// ============================================================================
-// [asmjit::X86RegData]
-// ============================================================================
-
-struct X86RegData {
-  X86RipReg rip;
-  X86GpReg noGp;
-
-  X86SegReg seg[7];
-
-  X86GpReg gpbLo[16];
-  X86GpReg gpbHi[4];
-
-  X86GpReg gpw[16];
-  X86GpReg gpd[16];
-  X86GpReg gpq[16];
-
-  X86FpReg fp[8];
-  X86MmReg mm[8];
-  X86KReg k[8];
-
-  X86XmmReg xmm[32];
-  X86YmmReg ymm[32];
-  X86ZmmReg zmm[32];
+  inline Mem& operator=(const Mem& other) noexcept = default;
 };
 
-ASMJIT_VAR const X86RegData x86RegData;
+//! Creates `[base.reg + offset]` memory operand.
+static constexpr Mem ptr(const Gp& base, int32_t offset = 0, uint32_t size = 0) noexcept {
+  return Mem(base, offset, size);
+}
+//! Creates `[base.reg + (index << shift) + offset]` memory operand (scalar index).
+static constexpr Mem ptr(const Gp& base, const Gp& index, uint32_t shift = 0, int32_t offset = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, offset, size);
+}
+//! Creates `[base.reg + (index << shift) + offset]` memory operand (vector index).
+static constexpr Mem ptr(const Gp& base, const Vec& index, uint32_t shift = 0, int32_t offset = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, offset, size);
+}
+
+//! Creates `[base + offset]` memory operand.
+static constexpr Mem ptr(const Label& base, int32_t offset = 0, uint32_t size = 0) noexcept {
+  return Mem(base, offset, size);
+}
+//! Creates `[base + (index << shift) + offset]` memory operand.
+static constexpr Mem ptr(const Label& base, const Gp& index, uint32_t shift = 0, int32_t offset = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, offset, size);
+}
+//! Creates `[base + (index << shift) + offset]` memory operand.
+static constexpr Mem ptr(const Label& base, const Vec& index, uint32_t shift = 0, int32_t offset = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, offset, size);
+}
+
+//! Creates `[rip + offset]` memory operand.
+static constexpr Mem ptr(const Rip& rip_, int32_t offset = 0, uint32_t size = 0) noexcept {
+  return Mem(rip_, offset, size);
+}
+
+//! Creates `[base]` absolute memory operand.
+static constexpr Mem ptr(uint64_t base, uint32_t size = 0) noexcept {
+  return Mem(base, size);
+}
+//! Creates `[base + (index.reg << shift)]` absolute memory operand.
+static constexpr Mem ptr(uint64_t base, const Reg& index, uint32_t shift = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, size);
+}
+//! Creates `[base + (index.reg << shift)]` absolute memory operand.
+static constexpr Mem ptr(uint64_t base, const Vec& index, uint32_t shift = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, size);
+}
+
+//! Creates `[base]` absolute memory operand (absolute).
+static constexpr Mem ptr_abs(uint64_t base, uint32_t size = 0) noexcept {
+  return Mem(base, size, BaseMem::kSignatureMemAbs);
+}
+//! Creates `[base + (index.reg << shift)]` absolute memory operand (absolute).
+static constexpr Mem ptr_abs(uint64_t base, const Reg& index, uint32_t shift = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, size, BaseMem::kSignatureMemAbs);
+}
+//! Creates `[base + (index.reg << shift)]` absolute memory operand (absolute).
+static constexpr Mem ptr_abs(uint64_t base, const Vec& index, uint32_t shift = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, size, BaseMem::kSignatureMemAbs);
+}
+
+//! Creates `[base]` relative memory operand (relative).
+static constexpr Mem ptr_rel(uint64_t base, uint32_t size = 0) noexcept {
+  return Mem(base, size, BaseMem::kSignatureMemRel);
+}
+//! Creates `[base + (index.reg << shift)]` relative memory operand (relative).
+static constexpr Mem ptr_rel(uint64_t base, const Reg& index, uint32_t shift = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, size, BaseMem::kSignatureMemRel);
+}
+//! Creates `[base + (index.reg << shift)]` relative memory operand (relative).
+static constexpr Mem ptr_rel(uint64_t base, const Vec& index, uint32_t shift = 0, uint32_t size = 0) noexcept {
+  return Mem(base, index, shift, size, BaseMem::kSignatureMemRel);
+}
+
+// Definition of memory operand constructors that use platform independent naming.
+ASMJIT_MEM_PTR(ptr_8, 1)
+ASMJIT_MEM_PTR(ptr_16, 2)
+ASMJIT_MEM_PTR(ptr_32, 4)
+ASMJIT_MEM_PTR(ptr_48, 6)
+ASMJIT_MEM_PTR(ptr_64, 8)
+ASMJIT_MEM_PTR(ptr_80, 10)
+ASMJIT_MEM_PTR(ptr_128, 16)
+ASMJIT_MEM_PTR(ptr_256, 32)
+ASMJIT_MEM_PTR(ptr_512, 64)
+
+// Definition of memory operand constructors that use X86-specific convention.
+ASMJIT_MEM_PTR(byte_ptr, 1)
+ASMJIT_MEM_PTR(word_ptr, 2)
+ASMJIT_MEM_PTR(dword_ptr, 4)
+ASMJIT_MEM_PTR(qword_ptr, 8)
+ASMJIT_MEM_PTR(tword_ptr, 10)
+ASMJIT_MEM_PTR(oword_ptr, 16)
+ASMJIT_MEM_PTR(dqword_ptr, 16)
+ASMJIT_MEM_PTR(qqword_ptr, 32)
+ASMJIT_MEM_PTR(xmmword_ptr, 16)
+ASMJIT_MEM_PTR(ymmword_ptr, 32)
+ASMJIT_MEM_PTR(zmmword_ptr, 64)
 
 // ============================================================================
-// [asmjit::x86]
+// [asmjit::x86::OpData]
 // ============================================================================
 
-namespace x86 {
+struct OpData {
+  //! Information about all architecture registers.
+  ArchRegs archRegs;
+};
+ASMJIT_VARAPI const OpData opData;
 
-// ============================================================================
-// [asmjit::x86 - Reg]
-// ============================================================================
-
-#define ASMJIT_DEF_REG(_Type_, _Name_, _Field_) \
-  static const _Type_& _Name_ = x86RegData._Field_
-
-ASMJIT_DEF_REG(X86RipReg, rip, rip);        //!< RIP register.
-ASMJIT_DEF_REG(X86GpReg , noGpReg, noGp);   //!< No GP register (for `X86Mem` operand.).
-
-ASMJIT_DEF_REG(X86SegReg, es   , seg[1]);   //!< Cs segment register.
-ASMJIT_DEF_REG(X86SegReg, cs   , seg[2]);   //!< Ss segment register.
-ASMJIT_DEF_REG(X86SegReg, ss   , seg[3]);   //!< Ds segment register.
-ASMJIT_DEF_REG(X86SegReg, ds   , seg[4]);   //!< Es segment register.
-ASMJIT_DEF_REG(X86SegReg, fs   , seg[5]);   //!< Fs segment register.
-ASMJIT_DEF_REG(X86SegReg, gs   , seg[6]);   //!< Gs segment register.
-
-ASMJIT_DEF_REG(X86GpReg , al   , gpbLo[0]); //!< 8-bit Gpb-lo register.
-ASMJIT_DEF_REG(X86GpReg , cl   , gpbLo[1]); //!< 8-bit Gpb-lo register.
-ASMJIT_DEF_REG(X86GpReg , dl   , gpbLo[2]); //!< 8-bit Gpb-lo register.
-ASMJIT_DEF_REG(X86GpReg , bl   , gpbLo[3]); //!< 8-bit Gpb-lo register.
-ASMJIT_DEF_REG(X86GpReg , spl  , gpbLo[4]); //!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , bpl  , gpbLo[5]); //!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , sil  , gpbLo[6]); //!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , dil  , gpbLo[7]); //!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , r8b  , gpbLo[8]); //!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , r9b  , gpbLo[9]); //!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , r10b , gpbLo[10]);//!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , r11b , gpbLo[11]);//!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , r12b , gpbLo[12]);//!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , r13b , gpbLo[13]);//!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , r14b , gpbLo[14]);//!< 8-bit Gpb-lo register (X64).
-ASMJIT_DEF_REG(X86GpReg , r15b , gpbLo[15]);//!< 8-bit Gpb-lo register (X64).
-
-ASMJIT_DEF_REG(X86GpReg , ah   , gpbHi[0]); //!< 8-bit Gpb-hi register.
-ASMJIT_DEF_REG(X86GpReg , ch   , gpbHi[1]); //!< 8-bit Gpb-hi register.
-ASMJIT_DEF_REG(X86GpReg , dh   , gpbHi[2]); //!< 8-bit Gpb-hi register.
-ASMJIT_DEF_REG(X86GpReg , bh   , gpbHi[3]); //!< 8-bit Gpb-hi register.
-
-ASMJIT_DEF_REG(X86GpReg , ax   , gpw[0]);   //!< 16-bit Gpw register.
-ASMJIT_DEF_REG(X86GpReg , cx   , gpw[1]);   //!< 16-bit Gpw register.
-ASMJIT_DEF_REG(X86GpReg , dx   , gpw[2]);   //!< 16-bit Gpw register.
-ASMJIT_DEF_REG(X86GpReg , bx   , gpw[3]);   //!< 16-bit Gpw register.
-ASMJIT_DEF_REG(X86GpReg , sp   , gpw[4]);   //!< 16-bit Gpw register.
-ASMJIT_DEF_REG(X86GpReg , bp   , gpw[5]);   //!< 16-bit Gpw register.
-ASMJIT_DEF_REG(X86GpReg , si   , gpw[6]);   //!< 16-bit Gpw register.
-ASMJIT_DEF_REG(X86GpReg , di   , gpw[7]);   //!< 16-bit Gpw register.
-ASMJIT_DEF_REG(X86GpReg , r8w  , gpw[8]);   //!< 16-bit Gpw register (X64).
-ASMJIT_DEF_REG(X86GpReg , r9w  , gpw[9]);   //!< 16-bit Gpw register (X64).
-ASMJIT_DEF_REG(X86GpReg , r10w , gpw[10]);  //!< 16-bit Gpw register (X64).
-ASMJIT_DEF_REG(X86GpReg , r11w , gpw[11]);  //!< 16-bit Gpw register (X64).
-ASMJIT_DEF_REG(X86GpReg , r12w , gpw[12]);  //!< 16-bit Gpw register (X64).
-ASMJIT_DEF_REG(X86GpReg , r13w , gpw[13]);  //!< 16-bit Gpw register (X64).
-ASMJIT_DEF_REG(X86GpReg , r14w , gpw[14]);  //!< 16-bit Gpw register (X64).
-ASMJIT_DEF_REG(X86GpReg , r15w , gpw[15]);  //!< 16-bit Gpw register (X64).
-
-ASMJIT_DEF_REG(X86GpReg , eax  , gpd[0]);   //!< 32-bit Gpd register.
-ASMJIT_DEF_REG(X86GpReg , ecx  , gpd[1]);   //!< 32-bit Gpd register.
-ASMJIT_DEF_REG(X86GpReg , edx  , gpd[2]);   //!< 32-bit Gpd register.
-ASMJIT_DEF_REG(X86GpReg , ebx  , gpd[3]);   //!< 32-bit Gpd register.
-ASMJIT_DEF_REG(X86GpReg , esp  , gpd[4]);   //!< 32-bit Gpd register.
-ASMJIT_DEF_REG(X86GpReg , ebp  , gpd[5]);   //!< 32-bit Gpd register.
-ASMJIT_DEF_REG(X86GpReg , esi  , gpd[6]);   //!< 32-bit Gpd register.
-ASMJIT_DEF_REG(X86GpReg , edi  , gpd[7]);   //!< 32-bit Gpd register.
-ASMJIT_DEF_REG(X86GpReg , r8d  , gpd[8]);   //!< 32-bit Gpd register (X64).
-ASMJIT_DEF_REG(X86GpReg , r9d  , gpd[9]);   //!< 32-bit Gpd register (X64).
-ASMJIT_DEF_REG(X86GpReg , r10d , gpd[10]);  //!< 32-bit Gpd register (X64).
-ASMJIT_DEF_REG(X86GpReg , r11d , gpd[11]);  //!< 32-bit Gpd register (X64).
-ASMJIT_DEF_REG(X86GpReg , r12d , gpd[12]);  //!< 32-bit Gpd register (X64).
-ASMJIT_DEF_REG(X86GpReg , r13d , gpd[13]);  //!< 32-bit Gpd register (X64).
-ASMJIT_DEF_REG(X86GpReg , r14d , gpd[14]);  //!< 32-bit Gpd register (X64).
-ASMJIT_DEF_REG(X86GpReg , r15d , gpd[15]);  //!< 32-bit Gpd register (X64).
-
-ASMJIT_DEF_REG(X86GpReg , rax  , gpq[0]);   //!< 64-bit Gpq register (X64).
-ASMJIT_DEF_REG(X86GpReg , rcx  , gpq[1]);   //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , rdx  , gpq[2]);   //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , rbx  , gpq[3]);   //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , rsp  , gpq[4]);   //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , rbp  , gpq[5]);   //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , rsi  , gpq[6]);   //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , rdi  , gpq[7]);   //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , r8   , gpq[8]);   //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , r9   , gpq[9]);   //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , r10  , gpq[10]);  //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , r11  , gpq[11]);  //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , r12  , gpq[12]);  //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , r13  , gpq[13]);  //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , r14  , gpq[14]);  //!< 64-bit Gpq register (X64)
-ASMJIT_DEF_REG(X86GpReg , r15  , gpq[15]);  //!< 64-bit Gpq register (X64)
-
-ASMJIT_DEF_REG(X86FpReg , fp0  , fp[0]);    //!< 80-bit Fp register.
-ASMJIT_DEF_REG(X86FpReg , fp1  , fp[1]);    //!< 80-bit Fp register.
-ASMJIT_DEF_REG(X86FpReg , fp2  , fp[2]);    //!< 80-bit Fp register.
-ASMJIT_DEF_REG(X86FpReg , fp3  , fp[3]);    //!< 80-bit Fp register.
-ASMJIT_DEF_REG(X86FpReg , fp4  , fp[4]);    //!< 80-bit Fp register.
-ASMJIT_DEF_REG(X86FpReg , fp5  , fp[5]);    //!< 80-bit Fp register.
-ASMJIT_DEF_REG(X86FpReg , fp6  , fp[6]);    //!< 80-bit Fp register.
-ASMJIT_DEF_REG(X86FpReg , fp7  , fp[7]);    //!< 80-bit Fp register.
-
-ASMJIT_DEF_REG(X86MmReg , mm0  , mm[0]);    //!< 64-bit Mm register.
-ASMJIT_DEF_REG(X86MmReg , mm1  , mm[1]);    //!< 64-bit Mm register.
-ASMJIT_DEF_REG(X86MmReg , mm2  , mm[2]);    //!< 64-bit Mm register.
-ASMJIT_DEF_REG(X86MmReg , mm3  , mm[3]);    //!< 64-bit Mm register.
-ASMJIT_DEF_REG(X86MmReg , mm4  , mm[4]);    //!< 64-bit Mm register.
-ASMJIT_DEF_REG(X86MmReg , mm5  , mm[5]);    //!< 64-bit Mm register.
-ASMJIT_DEF_REG(X86MmReg , mm6  , mm[6]);    //!< 64-bit Mm register.
-ASMJIT_DEF_REG(X86MmReg , mm7  , mm[7]);    //!< 64-bit Mm register.
-
-ASMJIT_DEF_REG(X86KReg  , k0   , k[0]);     //!< 64-bit K register.
-ASMJIT_DEF_REG(X86KReg  , k1   , k[1]);     //!< 64-bit K register.
-ASMJIT_DEF_REG(X86KReg  , k2   , k[2]);     //!< 64-bit K register.
-ASMJIT_DEF_REG(X86KReg  , k3   , k[3]);     //!< 64-bit K register.
-ASMJIT_DEF_REG(X86KReg  , k4   , k[4]);     //!< 64-bit K register.
-ASMJIT_DEF_REG(X86KReg  , k5   , k[5]);     //!< 64-bit K register.
-ASMJIT_DEF_REG(X86KReg  , k6   , k[6]);     //!< 64-bit K register.
-ASMJIT_DEF_REG(X86KReg  , k7   , k[7]);     //!< 64-bit K register.
-
-ASMJIT_DEF_REG(X86XmmReg, xmm0 , xmm[0]);   //!< 128-bit Xmm register.
-ASMJIT_DEF_REG(X86XmmReg, xmm1 , xmm[1]);   //!< 128-bit Xmm register.
-ASMJIT_DEF_REG(X86XmmReg, xmm2 , xmm[2]);   //!< 128-bit Xmm register.
-ASMJIT_DEF_REG(X86XmmReg, xmm3 , xmm[3]);   //!< 128-bit Xmm register.
-ASMJIT_DEF_REG(X86XmmReg, xmm4 , xmm[4]);   //!< 128-bit Xmm register.
-ASMJIT_DEF_REG(X86XmmReg, xmm5 , xmm[5]);   //!< 128-bit Xmm register.
-ASMJIT_DEF_REG(X86XmmReg, xmm6 , xmm[6]);   //!< 128-bit Xmm register.
-ASMJIT_DEF_REG(X86XmmReg, xmm7 , xmm[7]);   //!< 128-bit Xmm register.
-ASMJIT_DEF_REG(X86XmmReg, xmm8 , xmm[8]);   //!< 128-bit Xmm register (X64).
-ASMJIT_DEF_REG(X86XmmReg, xmm9 , xmm[9]);   //!< 128-bit Xmm register (X64).
-ASMJIT_DEF_REG(X86XmmReg, xmm10, xmm[10]);  //!< 128-bit Xmm register (X64).
-ASMJIT_DEF_REG(X86XmmReg, xmm11, xmm[11]);  //!< 128-bit Xmm register (X64).
-ASMJIT_DEF_REG(X86XmmReg, xmm12, xmm[12]);  //!< 128-bit Xmm register (X64).
-ASMJIT_DEF_REG(X86XmmReg, xmm13, xmm[13]);  //!< 128-bit Xmm register (X64).
-ASMJIT_DEF_REG(X86XmmReg, xmm14, xmm[14]);  //!< 128-bit Xmm register (X64).
-ASMJIT_DEF_REG(X86XmmReg, xmm15, xmm[15]);  //!< 128-bit Xmm register (X64).
-ASMJIT_DEF_REG(X86XmmReg, xmm16, xmm[16]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm17, xmm[17]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm18, xmm[18]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm19, xmm[19]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm20, xmm[20]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm21, xmm[21]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm22, xmm[22]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm23, xmm[23]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm24, xmm[24]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm25, xmm[25]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm26, xmm[26]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm27, xmm[27]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm28, xmm[28]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm29, xmm[29]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm30, xmm[30]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86XmmReg, xmm31, xmm[31]);  //!< 128-bit Xmm register (X64 & AVX512VL+).
-
-ASMJIT_DEF_REG(X86YmmReg, ymm0 , ymm[0]);   //!< 256-bit Ymm register.
-ASMJIT_DEF_REG(X86YmmReg, ymm1 , ymm[1]);   //!< 256-bit Ymm register.
-ASMJIT_DEF_REG(X86YmmReg, ymm2 , ymm[2]);   //!< 256-bit Ymm register.
-ASMJIT_DEF_REG(X86YmmReg, ymm3 , ymm[3]);   //!< 256-bit Ymm register.
-ASMJIT_DEF_REG(X86YmmReg, ymm4 , ymm[4]);   //!< 256-bit Ymm register.
-ASMJIT_DEF_REG(X86YmmReg, ymm5 , ymm[5]);   //!< 256-bit Ymm register.
-ASMJIT_DEF_REG(X86YmmReg, ymm6 , ymm[6]);   //!< 256-bit Ymm register.
-ASMJIT_DEF_REG(X86YmmReg, ymm7 , ymm[7]);   //!< 256-bit Ymm register.
-ASMJIT_DEF_REG(X86YmmReg, ymm8 , ymm[8]);   //!< 256-bit Ymm register (X64).
-ASMJIT_DEF_REG(X86YmmReg, ymm9 , ymm[9]);   //!< 256-bit Ymm register (X64).
-ASMJIT_DEF_REG(X86YmmReg, ymm10, ymm[10]);  //!< 256-bit Ymm register (X64).
-ASMJIT_DEF_REG(X86YmmReg, ymm11, ymm[11]);  //!< 256-bit Ymm register (X64).
-ASMJIT_DEF_REG(X86YmmReg, ymm12, ymm[12]);  //!< 256-bit Ymm register (X64).
-ASMJIT_DEF_REG(X86YmmReg, ymm13, ymm[13]);  //!< 256-bit Ymm register (X64).
-ASMJIT_DEF_REG(X86YmmReg, ymm14, ymm[14]);  //!< 256-bit Ymm register (X64).
-ASMJIT_DEF_REG(X86YmmReg, ymm15, ymm[15]);  //!< 256-bit Ymm register (X64).
-ASMJIT_DEF_REG(X86YmmReg, ymm16, ymm[16]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm17, ymm[17]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm18, ymm[18]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm19, ymm[19]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm20, ymm[20]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm21, ymm[21]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm22, ymm[22]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm23, ymm[23]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm24, ymm[24]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm25, ymm[25]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm26, ymm[26]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm27, ymm[27]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm28, ymm[28]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm29, ymm[29]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm30, ymm[30]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-ASMJIT_DEF_REG(X86YmmReg, ymm31, ymm[31]);  //!< 256-bit Ymm register (X64 & AVX512VL+).
-
-ASMJIT_DEF_REG(X86ZmmReg, zmm0 , zmm[0]);   //!< 512-bit Zmm register.
-ASMJIT_DEF_REG(X86ZmmReg, zmm1 , zmm[1]);   //!< 512-bit Zmm register.
-ASMJIT_DEF_REG(X86ZmmReg, zmm2 , zmm[2]);   //!< 512-bit Zmm register.
-ASMJIT_DEF_REG(X86ZmmReg, zmm3 , zmm[3]);   //!< 512-bit Zmm register.
-ASMJIT_DEF_REG(X86ZmmReg, zmm4 , zmm[4]);   //!< 512-bit Zmm register.
-ASMJIT_DEF_REG(X86ZmmReg, zmm5 , zmm[5]);   //!< 512-bit Zmm register.
-ASMJIT_DEF_REG(X86ZmmReg, zmm6 , zmm[6]);   //!< 512-bit Zmm register.
-ASMJIT_DEF_REG(X86ZmmReg, zmm7 , zmm[7]);   //!< 512-bit Zmm register.
-ASMJIT_DEF_REG(X86ZmmReg, zmm8 , zmm[8]);   //!< 512-bit Zmm register (X64).
-ASMJIT_DEF_REG(X86ZmmReg, zmm9 , zmm[9]);   //!< 512-bit Zmm register (X64).
-ASMJIT_DEF_REG(X86ZmmReg, zmm10, zmm[10]);  //!< 512-bit Zmm register (X64).
-ASMJIT_DEF_REG(X86ZmmReg, zmm11, zmm[11]);  //!< 512-bit Zmm register (X64).
-ASMJIT_DEF_REG(X86ZmmReg, zmm12, zmm[12]);  //!< 512-bit Zmm register (X64).
-ASMJIT_DEF_REG(X86ZmmReg, zmm13, zmm[13]);  //!< 512-bit Zmm register (X64).
-ASMJIT_DEF_REG(X86ZmmReg, zmm14, zmm[14]);  //!< 512-bit Zmm register (X64).
-ASMJIT_DEF_REG(X86ZmmReg, zmm15, zmm[15]);  //!< 512-bit Zmm register (X64).
-ASMJIT_DEF_REG(X86ZmmReg, zmm16, zmm[16]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm17, zmm[17]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm18, zmm[18]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm19, zmm[19]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm20, zmm[20]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm21, zmm[21]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm22, zmm[22]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm23, zmm[23]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm24, zmm[24]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm25, zmm[25]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm26, zmm[26]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm27, zmm[27]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm28, zmm[28]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm29, zmm[29]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm30, zmm[30]);  //!< 512-bit Zmm register (X64 & AVX512+).
-ASMJIT_DEF_REG(X86ZmmReg, zmm31, zmm[31]);  //!< 512-bit Zmm register (X64 & AVX512+).
-#undef ASMJIT_DEF_REG
-
-// This is only defined by `x86operand_regs.cpp` when exporting registers.
-#if !defined(ASMJIT_EXPORTS_X86OPERAND_REGS)
-
-//! Create 8-bit Gpb-lo register operand.
-static ASMJIT_INLINE X86GpReg gpb_lo(uint32_t index) { return X86GpReg(kX86RegTypeGpbLo, index, 1); }
-//! Create 8-bit Gpb-hi register operand.
-static ASMJIT_INLINE X86GpReg gpb_hi(uint32_t index) { return X86GpReg(kX86RegTypeGpbHi, index, 1); }
-//! Create 16-bit Gpw register operand.
-static ASMJIT_INLINE X86GpReg gpw(uint32_t index) { return X86GpReg(kX86RegTypeGpw, index, 2); }
-//! Create 32-bit Gpd register operand.
-static ASMJIT_INLINE X86GpReg gpd(uint32_t index) { return X86GpReg(kX86RegTypeGpd, index, 4); }
-//! Create 64-bit Gpq register operand (X64).
-static ASMJIT_INLINE X86GpReg gpq(uint32_t index) { return X86GpReg(kX86RegTypeGpq, index, 8); }
-//! Create 80-bit Fp register operand.
-static ASMJIT_INLINE X86FpReg fp(uint32_t index) { return X86FpReg(kX86RegTypeFp, index, 10); }
-//! Create 64-bit Mm register operand.
-static ASMJIT_INLINE X86MmReg mm(uint32_t index) { return X86MmReg(kX86RegTypeMm, index, 8); }
-//! Create 64-bit K register operand.
-static ASMJIT_INLINE X86KReg k(uint32_t index) { return X86KReg(kX86RegTypeK, index, 8); }
-//! Create 128-bit Xmm register operand.
-static ASMJIT_INLINE X86XmmReg xmm(uint32_t index) { return X86XmmReg(kX86RegTypeXmm, index, 16); }
-//! Create 256-bit Ymm register operand.
-static ASMJIT_INLINE X86YmmReg ymm(uint32_t index) { return X86YmmReg(kX86RegTypeYmm, index, 32); }
-//! Create 512-bit Zmm register operand.
-static ASMJIT_INLINE X86ZmmReg zmm(uint32_t index) { return X86ZmmReg(kX86RegTypeZmm, index, 64); }
-
-// ============================================================================
-// [asmjit::x86 - Ptr (Reg)]
-// ============================================================================
-
-//! Create `[base.reg + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const X86GpReg& base, int32_t disp = 0, uint32_t size = 0) {
-  return X86Mem(base, disp, size);
-}
-//! Create `[base.reg + (index.reg << shift) + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const X86GpReg& base, const X86GpReg& index, uint32_t shift = 0, int32_t disp = 0, uint32_t size = 0) {
-  return X86Mem(base, index, shift, disp, size);
-}
-//! Create `[base.reg + (xmm.reg << shift) + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const X86GpReg& base, const X86XmmReg& index, uint32_t shift = 0, int32_t disp = 0, uint32_t size = 0) {
-  return X86Mem(base, index, shift, disp, size);
-}
-//! Create `[base.reg + (ymm.reg << shift) + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const X86GpReg& base, const X86YmmReg& index, uint32_t shift = 0, int32_t disp = 0, uint32_t size = 0) {
-  return X86Mem(base, index, shift, disp, size);
-}
-//! Create `[label + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const Label& label, int32_t disp = 0, uint32_t size = 0) {
-  return X86Mem(label, disp, size);
-}
-//! Create `[label + (index.reg << shift) + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const Label& label, const X86GpReg& index, uint32_t shift, int32_t disp = 0, uint32_t size = 0) { \
-  return X86Mem(label, index, shift, disp, size); \
+//! \cond
+// ... Reg methods that require `opData`.
+inline uint32_t Reg::groupOf(uint32_t rType) noexcept {
+  ASMJIT_ASSERT(rType <= BaseReg::kTypeMax);
+  return opData.archRegs.regInfo[rType].group();
 }
 
-//! Create `[pAbs + disp]` absolute memory operand with no/custom size information.
-ASMJIT_API X86Mem ptr_abs(Ptr pAbs, int32_t disp = 0, uint32_t size = 0);
-//! Create `[pAbs + (index.reg << shift) + disp]` absolute memory operand with no/custom size information.
-ASMJIT_API X86Mem ptr_abs(Ptr pAbs, const X86Reg& index, uint32_t shift = 0, int32_t disp = 0, uint32_t size = 0);
-
-//! \internal
-#define ASMJIT_EXPAND_PTR_REG(_Prefix_, _Size_) \
-  /*! Create `[base.reg + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const X86GpReg& base, int32_t disp = 0) { \
-    return X86Mem(base, disp, _Size_); \
-  } \
-  /*! Create `[base.reg + (index.reg << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const X86GpReg& base, const X86GpReg& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr(base, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[base.reg + (xmm.reg << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const X86GpReg& base, const X86XmmReg& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr(base, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[base.reg + (ymm.reg << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const X86GpReg& base, const X86YmmReg& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr(base, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[label + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const Label& label, int32_t disp = 0) { \
-    return ptr(label, disp, _Size_); \
-  } \
-  /*! Create `[label + (index.reg << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const Label& label, const X86GpReg& index, uint32_t shift, int32_t disp = 0) { \
-    return ptr(label, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[pAbs + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr##_abs(Ptr pAbs, int32_t disp = 0) { \
-    return ptr_abs(pAbs, disp, _Size_); \
-  } \
-  /*! Create `[pAbs + (index.reg << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr##_abs(Ptr pAbs, const X86GpReg& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr_abs(pAbs, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[pAbs + (xmm.reg << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr##_abs(Ptr pAbs, const X86XmmReg& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr_abs(pAbs, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[pAbs + (ymm.reg << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr##_abs(Ptr pAbs, const X86YmmReg& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr_abs(pAbs, index, shift, disp, _Size_); \
-  }
-
-ASMJIT_EXPAND_PTR_REG(byte, 1)
-ASMJIT_EXPAND_PTR_REG(word, 2)
-ASMJIT_EXPAND_PTR_REG(dword, 4)
-ASMJIT_EXPAND_PTR_REG(qword, 8)
-ASMJIT_EXPAND_PTR_REG(tword, 10)
-ASMJIT_EXPAND_PTR_REG(oword, 16)
-ASMJIT_EXPAND_PTR_REG(yword, 32)
-ASMJIT_EXPAND_PTR_REG(zword, 64)
-#undef ASMJIT_EXPAND_PTR_REG
-
-// ============================================================================
-// [asmjit::x86 - Ptr (Var)]
-// ============================================================================
-
-#if !defined(ASMJIT_DISABLE_COMPILER)
-//! Create `[base.var + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const X86GpVar& base, int32_t disp = 0, uint32_t size = 0) {
-  return X86Mem(base, disp, size);
-}
-//! Create `[base.var + (index.var << shift) + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const X86GpVar& base, const X86GpVar& index, uint32_t shift = 0, int32_t disp = 0, uint32_t size = 0) {
-  return X86Mem(base, index, shift, disp, size);
-}
-//! Create `[base.var + (xmm.var << shift) + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const X86GpVar& base, const X86XmmVar& index, uint32_t shift = 0, int32_t disp = 0, uint32_t size = 0) {
-  return X86Mem(base, index, shift, disp, size);
-}
-//! Create `[base.var + (ymm.var << shift) + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const X86GpVar& base, const X86YmmVar& index, uint32_t shift = 0, int32_t disp = 0, uint32_t size = 0) {
-  return X86Mem(base, index, shift, disp, size);
-}
-//! Create `[label + (index.var << shift) + disp]` memory operand with no/custom size information.
-static ASMJIT_INLINE X86Mem ptr(const Label& label, const X86GpVar& index, uint32_t shift, int32_t disp = 0, uint32_t size = 0) { \
-  return X86Mem(label, index, shift, disp, size); \
+inline uint32_t Reg::typeIdOf(uint32_t rType) noexcept {
+  ASMJIT_ASSERT(rType <= BaseReg::kTypeMax);
+  return opData.archRegs.regTypeToTypeId[rType];
 }
 
-//! Create `[pAbs + (index.var << shift) + disp]` absolute memory operand with no/custom size information.
-ASMJIT_API X86Mem ptr_abs(Ptr pAbs, const X86Var& index, uint32_t shift = 0, int32_t disp = 0, uint32_t size = 0);
-
-//! \internal
-#define ASMJIT_EXPAND_PTR_VAR(_Prefix_, _Size_) \
-  /*! Create `[base.var + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const X86GpVar& base, int32_t disp = 0) { \
-    return X86Mem(base, disp, _Size_); \
-  } \
-  /*! Create `[base.var + (index.var << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const X86GpVar& base, const X86GpVar& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr(base, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[base.var + (xmm.var << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const X86GpVar& base, const X86XmmVar& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr(base, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[base.var + (ymm.var << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const X86GpVar& base, const X86YmmVar& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr(base, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[label + (index.var << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr(const Label& label, const X86GpVar& index, uint32_t shift, int32_t disp = 0) { \
-    return ptr(label, index, shift, disp, _Size_); \
-  } \
-  /*! Create `[pAbs + (index.var << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr##_abs(Ptr pAbs, const X86GpVar& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr_abs(pAbs, reinterpret_cast<const X86Var&>(index), shift, disp, _Size_); \
-  } \
-  /*! Create `[pAbs + (xmm.var << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr##_abs(Ptr pAbs, const X86XmmVar& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr_abs(pAbs, reinterpret_cast<const X86Var&>(index), shift, disp, _Size_); \
-  } \
-  /*! Create `[pAbs + (ymm.var << shift) + disp]` memory operand. */ \
-  static ASMJIT_INLINE X86Mem _Prefix_##_ptr##_abs(Ptr pAbs, const X86YmmVar& index, uint32_t shift = 0, int32_t disp = 0) { \
-    return ptr_abs(pAbs, reinterpret_cast<const X86Var&>(index), shift, disp, _Size_); \
-  }
-
-ASMJIT_EXPAND_PTR_VAR(byte, 1)
-ASMJIT_EXPAND_PTR_VAR(word, 2)
-ASMJIT_EXPAND_PTR_VAR(dword, 4)
-ASMJIT_EXPAND_PTR_VAR(qword, 8)
-ASMJIT_EXPAND_PTR_VAR(tword, 10)
-ASMJIT_EXPAND_PTR_VAR(oword, 16)
-ASMJIT_EXPAND_PTR_VAR(yword, 32)
-ASMJIT_EXPAND_PTR_VAR(zword, 64)
-#undef ASMJIT_EXPAND_PTR_VAR
-#endif // !ASMJIT_DISABLE_COMPILER
-
-#endif // !ASMJIT_EXPORTS_X86OPERAND_REGS
-
-} // x86 namespace
+inline uint32_t Reg::signatureOf(uint32_t rType) noexcept {
+  ASMJIT_ASSERT(rType <= BaseReg::kTypeMax);
+  return opData.archRegs.regInfo[rType].signature();
+}
+//! \endcond
 
 //! \}
 
-} // asmjit namespace
+ASMJIT_END_SUB_NAMESPACE
 
-// [Cleanup]
-#undef ASMJIT_OP_ID
+// ============================================================================
+// [asmjit::Type::IdOfT<x86::Reg>]
+// ============================================================================
 
-// [Api-End]
-#include "../apiend.h"
+//! \cond INTERNAL
+ASMJIT_BEGIN_NAMESPACE
+ASMJIT_DEFINE_TYPE_ID(x86::Gpb, kIdI8);
+ASMJIT_DEFINE_TYPE_ID(x86::Gpw, kIdI16);
+ASMJIT_DEFINE_TYPE_ID(x86::Gpd, kIdI32);
+ASMJIT_DEFINE_TYPE_ID(x86::Gpq, kIdI64);
+ASMJIT_DEFINE_TYPE_ID(x86::Mm , kIdMmx64);
+ASMJIT_DEFINE_TYPE_ID(x86::Xmm, kIdI32x4);
+ASMJIT_DEFINE_TYPE_ID(x86::Ymm, kIdI32x8);
+ASMJIT_DEFINE_TYPE_ID(x86::Zmm, kIdI32x16);
+ASMJIT_END_NAMESPACE
+//! \endcond
 
-// [Guard]
-#endif // _ASMJIT_X86_X86OPERAND_H
+#undef ASMJIT_MEM_PTR
+
+#endif // ASMJIT_X86_X86OPERAND_H_INCLUDED

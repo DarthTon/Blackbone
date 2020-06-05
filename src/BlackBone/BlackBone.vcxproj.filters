@@ -37,9 +37,6 @@
     <Filter Include="DriverControl">
       <UniqueIdentifier>{3ed75fd0-62a1-4a6a-a158-6749fb3f3d90}</UniqueIdentifier>
     </Filter>
-    <Filter Include="AsmJit\Core">
-      <UniqueIdentifier>{84644925-22dd-4022-be68-30ddf267b977}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Process\Remote">
       <UniqueIdentifier>{f688ae04-991b-40b2-9243-89e38275be42}</UniqueIdentifier>
     </Filter>
@@ -51,6 +48,9 @@
     </Filter>
     <Filter Include="Syscalls">
       <UniqueIdentifier>{8ce61b72-1088-4cd7-b7a9-e7cdb027304e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="AsmJit\Core">
+      <UniqueIdentifier>{17723aac-b0ad-4dcc-b805-f12c231d4303}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -135,60 +135,6 @@
     <ClCompile Include="PE\PEImage.cpp">
       <Filter>PE</Filter>
     </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\x86\x86assembler.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\x86\x86cpuinfo.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\x86\x86inst.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\x86\x86operand.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\x86\x86operand_regs.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\assembler.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\codegen.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\constpool.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\containers.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\cpuinfo.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\cputicks.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\error.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\globals.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\operand.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\runtime.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\string.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\vmem.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
-    <ClCompile Include="..\3rd_party\AsmJit\base\zone.cpp">
-      <Filter>AsmJit\Core</Filter>
-    </ClCompile>
     <ClCompile Include="Process\RPC\RemoteLocalHook.cpp">
       <Filter>Process\Remote</Filter>
     </ClCompile>
@@ -210,6 +156,147 @@
     </ClCompile>
     <ClCompile Include="Symbols\SymbolData.cpp">
       <Filter>Symbols</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86archdata.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86assembler.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86builder.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86callconv.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86compiler.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86features.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86formatter.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86instapi.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86instdb.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86internal.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86operand.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\x86\x86rapass.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\arch.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\assembler.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\builder.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\callconv.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\codeholder.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\compiler.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\constpool.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\cpuinfo.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\emitter.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\emitterutils.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\environment.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\errorhandler.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\formatter.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\func.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\globals.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\inst.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\jitallocator.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\jitruntime.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\logger.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\operand.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\osutils.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\ralocal.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\rapass.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\rastack.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\string.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\support.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\target.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\type.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\virtmem.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\zone.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\zonehash.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\zonelist.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\zonestack.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\zonetree.cpp">
+      <Filter>AsmJit\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\3rd_party\AsmJit\core\zonevector.cpp">
+      <Filter>AsmJit\Core</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -358,87 +445,6 @@
     <ClInclude Include="Misc\Thunk.hpp">
       <Filter>Misc</Filter>
     </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\x86\x86assembler.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\x86\x86cpuinfo.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\x86\x86inst.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\x86\x86operand.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\apibegin.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\apiend.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\asmjit.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\build.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\config.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\host.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\x86.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\assembler.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\codegen.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\constpool.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\containers.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\cpuinfo.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\cputicks.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\error.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\globals.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\lock.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\operand.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\runtime.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\string.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\vectypes.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\vmem.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
-    <ClInclude Include="..\3rd_party\AsmJit\base\zone.h">
-      <Filter>AsmJit\Core</Filter>
-    </ClInclude>
     <ClInclude Include="Process\RPC\RemoteLocalHook.h">
       <Filter>Process\Remote</Filter>
     </ClInclude>
@@ -486,6 +492,204 @@
     </ClInclude>
     <ClInclude Include="Syscalls\Syscall.h">
       <Filter>Syscalls</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\asmjit.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86archdata_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86assembler.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86builder.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86callconv_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86compiler.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86emitter.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86features.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86formatter_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86globals.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86instapi_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86instdb.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86instdb_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86internal_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86opcode_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86operand.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\x86\x86rapass_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\api-build_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\api-config.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\arch.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\assembler.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\builder.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\callconv.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\codebuffer.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\codebufferwriter_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\codeholder.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\compiler.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\constpool.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\cpuinfo.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\datatypes.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\emitter.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\emitterutils_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\environment.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\errorhandler.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\features.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\formatter.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\func.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\globals.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\inst.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\jitallocator.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\jitruntime.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\logger.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\misc_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\operand.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\osutils.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\osutils_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\raassignment_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\rabuilders_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\radefs_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\ralocal_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\rapass_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\rastack_p.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\string.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\support.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\target.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\type.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\virtmem.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\zone.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\zonehash.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\zonelist.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\zonestack.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\zonestring.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\zonetree.h">
+      <Filter>AsmJit\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\3rd_party\AsmJit\core\zonevector.h">
+      <Filter>AsmJit\Core</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
