@@ -43,6 +43,9 @@
     <ClCompile Include="TestSymbols.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="TestModules.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h" />
