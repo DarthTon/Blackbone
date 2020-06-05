@@ -135,7 +135,7 @@ ModuleDataPtr ProcessModules::GetModule(
 /// <returns>Module data. nullptr if not found</returns>
 ModuleDataPtr ProcessModules::GetMainModule()
 {
-    if (_proc.barrier().TargetWow64)
+    if (_proc.barrier().targetWow64)
     {
         _PEB32 peb = { 0 };
         if (_proc.core().peb32( &peb ) == 0)

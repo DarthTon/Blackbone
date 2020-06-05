@@ -59,21 +59,22 @@ namespace Testing
 
         TEST_METHOD( InvalidHandles )
         {
-            Process proc;
+            Process baseProc;
+            baseProc.CreateAndAttach( GetTestHelperHost32() );
 
-            HANDLE hProc = OpenProcess( PROCESS_ALL_ACCESS & ~PROCESS_CREATE_THREAD, FALSE, GetCurrentProcessId() );
+            Process proc1;
+            AssertEx::NtSuccess( proc1.Attach( baseProc.pid(), PROCESS_ALL_ACCESS & ~PROCESS_CREATE_THREAD ) );
+            AssertEx::AreEqual( STATUS_ACCESS_DENIED, proc1.threads().CreateNew( reinterpret_cast<ptr_t>(&VoidFn), 0 ).status );
 
-            AssertEx::NtSuccess( proc.Attach( hProc ) );
-            AssertEx::AreEqual( STATUS_ACCESS_DENIED, proc.threads().CreateNew( reinterpret_cast<ptr_t>(&VoidFn), 0 ).status );
-            proc.Detach();
-
-            hProc = OpenProcess( PROCESS_ALL_ACCESS & ~PROCESS_VM_READ, FALSE, GetCurrentProcessId() );
-            AssertEx::NtSuccess( proc.Attach( hProc ) );
+            Process proc2;
+            AssertEx::NtSuccess( proc2.Attach( baseProc.pid(), PROCESS_ALL_ACCESS & ~PROCESS_VM_READ ) );
 
             PEB_T peb = { };
-            AssertEx::IsNotZero( proc.core().peb( &peb ) );
+            AssertEx::IsNotZero( proc2.core().peb( &peb ) );
             AssertEx::IsZero( peb.ImageBaseAddress );
             AssertEx::AreEqual( STATUS_ACCESS_DENIED, LastNtStatus() );
+
+            baseProc.Terminate();
         }
 
     private:
