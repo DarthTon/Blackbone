@@ -63,15 +63,16 @@ public:
         // Construct jump to hook handler
 #ifdef USE64
         // mov gs:[0x28], this
-        (*jmpToHook)->mov( asmjit::host::rax, (uint64_t)this );
-        (*jmpToHook)->mov( asmjit::host::qword_ptr_abs( 0x28 ).setSegment( asmjit::host::gs ), asmjit::host::rax );
+        ( *jmpToHook )->mov( asmjit::x86::rax, reinterpret_cast<uint64_t>(this) );
+        (*jmpToHook)->mov( asmjit::x86::qword_ptr_abs( 0x28 ).setSegment( asmjit::x86::gs ), asmjit::x86::rax );
 #else
         // mov fs:[0x14], this
-        (*jmpToHook)->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ), (uint32_t)this );
+        (*jmpToHook)->mov( asmjit::x86::dword_ptr_abs( 0x14 ).setSegment( asmjit::x86::fs ), reinterpret_cast<uint32_t>(this) );
 #endif // USE64
 
-        (*jmpToHook)->jmp( (asmjit::Ptr)this->_internalHandler );
-        (*jmpToHook)->relocCode( this->_buf );
+        (*jmpToHook)->jmp( reinterpret_cast<uint64_t>(this->_internalHandler) );
+
+        jmpToHook->relocateCode( this->_buf );
 
         // Modify VTable copy
         if (copyVtable)

@@ -32,17 +32,17 @@ NTSTATUS RemoteLocalHook::AllocateMem( ptr_t /*address*/, size_t codeSize )
     return allocation.status;
 }
 
-NTSTATUS RemoteLocalHook::SetHook( ptr_t address, asmjit::Assembler& hook )
+NTSTATUS RemoteLocalHook::SetHook( ptr_t address, asmjit::x86::Assembler& hook )
 {
     _address = address;
-    NTSTATUS status = AllocateMem( address, hook.getCodeSize() );
+    /*NTSTATUS status = AllocateMem( address, hook.getCodeSize() );
     if (!NT_SUCCESS( status ))
-        return status;
+        return status;*/
 
     return _process.core().isWow64() ? SetHook32( address, hook ) : SetHook64( address, hook );
 }
 
-NTSTATUS RemoteLocalHook::SetHook32( ptr_t address, asmjit::Assembler& hook )
+NTSTATUS RemoteLocalHook::SetHook32( ptr_t address, asmjit::x86::Assembler& hook )
 {
     NTSTATUS status = STATUS_SUCCESS;
     auto& mem = _process.memory();
@@ -55,8 +55,9 @@ NTSTATUS RemoteLocalHook::SetHook32( ptr_t address, asmjit::Assembler& hook )
     _ctx.hook32.jmp.ptr = static_cast<int32_t>(_pThunkCode - address - 5);
 
     uint8_t buf[0x1000] = { 0 };
-    hook.setBaseAddress( _hookData.ptr<int32_t>() );
-    hook.relocCode( buf );
+    const auto& codeBuf = hook.code()->textSection()->buffer();
+    hook.code()->relocateToBase( _hookData.ptr<int32_t>() );
+    memcpy( buf, codeBuf.data(), codeBuf.size() );
 
     mem.Write( _pHookCode, buf );
     mem.Write( _pThunkCode, _ctx.hook32.codeSize + _ctx.hook32.jmp_size, _ctx.hook32.original_code );
@@ -72,7 +73,7 @@ NTSTATUS RemoteLocalHook::SetHook32( ptr_t address, asmjit::Assembler& hook )
     return status;
 }
 
-NTSTATUS RemoteLocalHook::SetHook64( ptr_t /*address*/, asmjit::Assembler& /*hook*/ )
+NTSTATUS RemoteLocalHook::SetHook64( ptr_t /*address*/, asmjit::x86::Assembler& /*hook*/ )
 {
     _hook64 = true;
     return STATUS_NOT_IMPLEMENTED;

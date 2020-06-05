@@ -55,7 +55,7 @@ public:
     RemoteLocalHook( class Process& process );
     ~RemoteLocalHook();
 
-    NTSTATUS SetHook( ptr_t address, asmjit::Assembler& hook );
+    NTSTATUS SetHook( ptr_t address, asmjit::x86::Assembler& hook );
     NTSTATUS Restore();
 
 private:
@@ -64,9 +64,9 @@ private:
 
     NTSTATUS AllocateMem( ptr_t address, size_t codeSize );
 
-    NTSTATUS SetHook32( ptr_t address, asmjit::Assembler& hook );
+    NTSTATUS SetHook32( ptr_t address, asmjit::x86::Assembler& hook );
 
-    NTSTATUS SetHook64( ptr_t address, asmjit::Assembler& hook );
+    NTSTATUS SetHook64( ptr_t address, asmjit::x86::Assembler& hook );
 
     bool CopyOldCode( ptr_t address, bool x64 );
 

@@ -153,11 +153,11 @@ int main( int /*argc*/, char* /*argv[]*/ )
         auto& a = *asmPtr;
 
         a.GenPrologue();
-        a->add( a->zcx, a->zdx );
-        a->mov( a->zax, a->zcx );
+        a->add( a->zcx(), a->zdx() );
+        a->mov( a->zax(), a->zcx() );
         a.GenEpilogue();
 
-        auto func = reinterpret_cast<uintptr_t( __fastcall* )(uintptr_t, uintptr_t)>(a->make());
+        auto func = reinterpret_cast<uintptr_t( __fastcall* )(uintptr_t, uintptr_t)>(a.make());
         [[maybe_unused]] uintptr_t r = func( 10, 5 );
     }
 
@@ -183,7 +183,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
             a.GenEpilogue();
 
             uint64_t result = 0;
-            remote.ExecInNewThread( a->make(), a->getCodeSize(), result );
+            remote.ExecInNewThread( a.make(), a.getCodeSize(), result );
         }
 
         // Execute in main thread
@@ -197,7 +197,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
             a.GenEpilogue();
 
             uint64_t result = 0;
-            remote.ExecInAnyThread( a->make(), a->getCodeSize(), result, mainThread );
+            remote.ExecInAnyThread( a.make(), a.getCodeSize(), result, mainThread );
         }
     }
 

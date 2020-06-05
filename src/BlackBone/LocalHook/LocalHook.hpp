@@ -153,32 +153,31 @@ private:
         // Construct jump to thunk
         //
 #ifdef USE64
-        (*jmpToThunk)->mov( asmjit::host::rax, (uint64_t)this->_buf );
-        (*jmpToThunk)->jmp( asmjit::host::rax );
+        (*jmpToThunk)->mov( asmjit::x86::rax, reinterpret_cast<uint64_t>(this->_buf) );
+        (*jmpToThunk)->jmp( asmjit::x86::rax );
 
-        this->_origSize = (*jmpToThunk)->getCodeSize();
+        this->_origSize = jmpToThunk->getCodeSize();
 #else
-        (*jmpToThunk)->jmp( (asmjit::Ptr)this->_buf );
-        this->_origSize = (*jmpToThunk)->getCodeSize();
+        (*jmpToThunk)->jmp( reinterpret_cast<uint64_t>(this->_buf) );
+        this->_origSize = jmpToThunk->getCodeSize();
 #endif
         
-        DetourBase::CopyOldCode( (uint8_t*)this->_original );
+        DetourBase::CopyOldCode( reinterpret_cast<uint8_t*>(this->_original) );
 
         // Construct jump to hook handler
 #ifdef USE64
         // mov gs:[0x28], this
-        (*jmpToHook)->mov( asmjit::host::rax, (uint64_t)this );
-        (*jmpToHook)->mov( asmjit::host::qword_ptr_abs( 0x28 ).setSegment( asmjit::host::gs ), asmjit::host::rax );
+        (*jmpToHook)->mov( asmjit::x86::rax, reinterpret_cast<uint64_t>(this) );
+        (*jmpToHook)->mov( asmjit::x86::qword_ptr_abs( 0x28 ).setSegment( asmjit::x86::gs ), asmjit::x86::rax );
 #else
         // mov fs:[0x14], this
-        (*jmpToHook)->mov( asmjit::host::dword_ptr_abs( 0x14 ).setSegment( asmjit::host::fs ) , (uint32_t)this );
+        (*jmpToHook)->mov( asmjit::x86::dword_ptr_abs( 0x14 ).setSegment( asmjit::x86::fs ), reinterpret_cast<uint32_t>(this) );
 #endif // USE64
+        (*jmpToHook)->jmp( reinterpret_cast<uint64_t>(&HookHandler<Fn, C>::Handler) );
 
-        (*jmpToHook)->jmp( (asmjit::Ptr)&HookHandler<Fn, C>::Handler );
-        (*jmpToHook)->relocCode( this->_buf );
-
-        (*jmpToThunk)->setBaseAddress( (uintptr_t)this->_original );
-        auto codeSize = (*jmpToThunk)->relocCode( this->_newCode );
+        jmpToHook->relocateCode( this->_buf );
+        jmpToThunk->relocateCode( this->_newCode, reinterpret_cast<uint64_t>(this->_original) );
+        auto codeSize = jmpToThunk->getCodeSize();
 
         DWORD flOld = 0;
         if (!VirtualProtect( this->_original, codeSize, PAGE_EXECUTE_READWRITE, &flOld ))

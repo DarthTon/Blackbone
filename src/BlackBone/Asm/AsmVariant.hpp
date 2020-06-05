@@ -1,10 +1,7 @@
 #pragma  once
 
-
 #include "../Config.h"
-#pragma warning(disable : 4100)
 #include "../../3rd_party/AsmJit/AsmJit.h"
-#pragma warning(default : 4100)
 
 #include <vector>
 
@@ -121,25 +118,25 @@ struct AsmVariant
         , size( sizeof( double ) )
         , imm_double_val( _imm_fpu ) { }
 
-    BLACKBONE_API AsmVariant( asmjit::GpReg _reg )
+    BLACKBONE_API AsmVariant( asmjit::x86::Gp _reg )
         : type( reg )
         , size( sizeof( uintptr_t ) )
         , reg_val( _reg ) { }
 
     // Stack variable
-    BLACKBONE_API AsmVariant( asmjit::Mem _mem )
+    BLACKBONE_API AsmVariant( asmjit::x86::Mem _mem )
         : type( mem )
         , size( sizeof( uintptr_t ) )
         , mem_val( _mem ) { }
 
     // Pointer to stack address
-    BLACKBONE_API AsmVariant( asmjit::Mem* _mem )
+    BLACKBONE_API AsmVariant( asmjit::x86::Mem* _mem )
         : type( mem_ptr )
         , size( sizeof( uintptr_t ) )
         , mem_val( *_mem ) { }
 
-    BLACKBONE_API AsmVariant( const asmjit::Mem* _mem )
-        : AsmVariant( const_cast<asmjit::Mem*>(_mem) ) { }
+    BLACKBONE_API AsmVariant( const asmjit::x86::Mem* _mem )
+        : AsmVariant( const_cast<asmjit::x86::Mem*>(_mem) ) { }
 
     BLACKBONE_API AsmVariant( const AsmVariant& ) = default;
     BLACKBONE_API AsmVariant( AsmVariant&& ) = default;
@@ -172,10 +169,10 @@ struct AsmVariant
         imm_val64 = val;
     }
 
-    eType  type = noarg;    // Variable type
-    size_t size = 0;        // Variable size
-    asmjit::GpReg reg_val;  // General purpose register
-    asmjit::Mem   mem_val;  // Memory pointer
+    eType type = noarg;         // Variable type
+    size_t size = 0;            // Variable size
+    asmjit::x86::Gp reg_val;    // General purpose register
+    asmjit::x86::Mem mem_val;   // Memory pointer
 
     // Immediate values
     union
@@ -220,7 +217,7 @@ struct AsmFunctionPtr: public AsmVariant
     AsmFunctionPtr( const void* ptr )
         : AsmVariant( reinterpret_cast<uintptr_t>(ptr) ) { }
 
-    AsmFunctionPtr( asmjit::GpReg reg_ )
+    AsmFunctionPtr( asmjit::x86::Gp reg_ )
         : AsmVariant( reg_ ) { }
 };
 

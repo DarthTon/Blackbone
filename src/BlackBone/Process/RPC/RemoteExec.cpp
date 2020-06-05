@@ -72,21 +72,20 @@ NTSTATUS RemoteExec::ExecInNewThread(
         {
             a->GenCall( createActStack->procAddress, { _userData.ptr() + 0x3100 } );
 
-            (*a)->mov( (*a)->zax, _userData.ptr() + 0x3100 );
-            (*a)->mov( (*a)->zax, (*a)->intptr_ptr( (*a)->zax ) );
-
-            (*a)->mov( (*a)->zdx, asmjit::host::dword_ptr_abs( 0x30 ).setSegment( asmjit::host::gs ) );
-            (*a)->mov( (*a)->intptr_ptr( (*a)->zdx, 0x2C8 ), (*a)->zax );
+            (*a)->mov( (*a)->zax(), _userData.ptr() + 0x3100 );
+            (*a)->mov( (*a)->zax(), (*a)->intptr_ptr( (*a)->zax() ) );
+            (*a)->mov( (*a)->zdx(), asmjit::x86::dword_ptr_abs( 0x30 ).setSegment( asmjit::x86::gs ) );
+            (*a)->mov( (*a)->intptr_ptr( (*a)->zdx(), 0x2C8 ), (*a)->zax() );
         }
     }
 
     a->GenCall( _userCode.ptr(), { } );
-    (*a)->mov( (*a)->zdx, _userData.ptr() + INTRET_OFFSET );
-    (*a)->mov( asmjit::host::dword_ptr( (*a)->zdx ), (*a)->zax );
+    (*a)->mov( (*a)->zdx(), _userData.ptr() + INTRET_OFFSET );
+    (*a)->mov( asmjit::x86::dword_ptr( (*a)->zdx() ), (*a)->zax() );
     a->GenEpilogue( switchMode, 4 );
     
     // Execute code in newly created thread
-    if (!NT_SUCCESS( status = _userCode.Write( size, (*a)->getCodeSize(), (*a)->make() ) ))
+    if (!NT_SUCCESS( status = _userCode.Write( size, a->getCodeSize(), a->make() ) ))
         return status;
 
     auto thread = _threads.CreateNew( _userCode.ptr() + size, _userData.ptr()/*, HideFromDebug*/ );
@@ -198,11 +197,11 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     if (!_process.core().isWow64())
     {
         const int count = 15;
-        static const asmjit::GpReg regs[] =
+        static const asmjit::x86::Gp regs[] =
         {
-            asmjit::host::rax, asmjit::host::rbx, asmjit::host::rcx, asmjit::host::rdx, asmjit::host::rsi,
-            asmjit::host::rdi, asmjit::host::r8,  asmjit::host::r9,  asmjit::host::r10, asmjit::host::r11,
-            asmjit::host::r12, asmjit::host::r13, asmjit::host::r14, asmjit::host::r15, asmjit::host::rbp
+            asmjit::x86::rax, asmjit::x86::rbx, asmjit::x86::rcx, asmjit::x86::rdx, asmjit::x86::rsi,
+            asmjit::x86::rdi, asmjit::x86::r8,  asmjit::x86::r9,  asmjit::x86::r10, asmjit::x86::r11,
+            asmjit::x86::r12, asmjit::x86::r13, asmjit::x86::r14, asmjit::x86::r15, asmjit::x86::rbp
         };
 
         if (!NT_SUCCESS( status = thd->GetContext( ctx64, CONTEXT64_CONTROL, true ) ))
@@ -216,22 +215,22 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         // I don't care about FPU, XMM and anything else
         // Stack must be aligned on 16 bytes 
         //
-        (*a)->sub( asmjit::host::rsp, count * sizeof( uint64_t ) );
+        (*a)->sub( asmjit::x86::rsp, count * sizeof( uint64_t ) );
         (*a)->pushf(); 
 
         // Save registers
         for (int i = 0; i < count; i++)
-            (*a)->mov( asmjit::Mem( asmjit::host::rsp, i * sizeof( uint64_t ) ), regs[i] );
+            (*a)->mov( asmjit::x86::Mem( asmjit::x86::rsp, i * sizeof( uint64_t ) ), regs[i] );
 
         a->GenCall( _userCode.ptr(), { _userData.ptr() } );
         AddReturnWithEvent( *a );
 
         // Restore registers
         for (int i = 0; i < count; i++)
-            (*a)->mov( regs[i], asmjit::Mem( asmjit::host::rsp, i * sizeof( uint64_t ) ) );
+            (*a)->mov( regs[i], asmjit::x86::Mem( asmjit::x86::rsp, i * sizeof( uint64_t ) ) );
 
         (*a)->popf();
-        (*a)->add( asmjit::host::rsp, count * sizeof( uint64_t ) );
+        (*a)->add( asmjit::x86::rsp, count * sizeof( uint64_t ) );
 
         // jmp [rip]
         (*a)->dw( '\xFF\x25' );
@@ -250,7 +249,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         (*a)->pushf();
 
         a->GenCall( _userCode.ptr(), { _userData.ptr() } );
-        (*a)->add( asmjit::host::esp, sizeof( uint32_t ) );
+        (*a)->add( asmjit::x86::esp, sizeof( uint32_t ) );
         AddReturnWithEvent( *a, mt_mod32, rt_int32, INTRET_OFFSET );
 
         (*a)->popf();
@@ -260,7 +259,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         (*a)->ret();
     }
 
-    if (NT_SUCCESS( status = _userCode.Write( size, (*a)->getCodeSize(), (*a)->make() ) ))
+    if (NT_SUCCESS( status = _userCode.Write( size, a->getCodeSize(), a->make() ) ))
     {
         if (_process.core().isWow64())
         {
@@ -395,11 +394,11 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
             if(createActStack)
             {
                 a->GenCall( createActStack->procAddress, { _userData.ptr() + 0x3000 } );
-                (*a)->mov( (*a)->zax, _userData.ptr() + 0x3000 );
-                (*a)->mov( (*a)->zax, (*a)->intptr_ptr( (*a)->zax ) );
+                (*a)->mov( (*a)->zax(), _userData.ptr() + 0x3000 );
+                (*a)->mov( (*a)->zax(), (*a)->intptr_ptr( (*a)->zax() ) );
 
-                (*a)->mov( (*a)->zdx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );
-                (*a)->mov( (*a)->intptr_ptr( (*a)->zdx, 0x2c8 ), (*a)->zax );
+                (*a)->mov( (*a)->zdx(), asmjit::x86::dword_ptr_abs( 0x18 ).setSegment( asmjit::x86::fs ) );
+                (*a)->mov( (*a)->intptr_ptr( (*a)->zdx(), 0x2c8 ), (*a)->zax() );
             }
         }*/          
 
@@ -426,7 +425,7 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
         liDelay.QuadPart = -10 * 1000 * 5;
 
         _workerCode.Write( 0, liDelay );
-        _workerCode.Write( sizeof(LARGE_INTEGER), (*a)->getCodeSize(), (*a)->make() );
+        _workerCode.Write( sizeof(LARGE_INTEGER), a->getCodeSize(), a->make() );
 
         auto thd = _threads.CreateNew( _workerCode.ptr() + sizeof( LARGE_INTEGER ), _userData.ptr()/*, HideFromDebug*/ );
         if (!thd)
@@ -515,7 +514,7 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
     for (auto& arg : args)
     {
         // Transform 64 bit imm values
-        if (arg.type == AsmVariant::imm && arg.size > sizeof( uint32_t ) && a.assembler()->getArch() == asmjit::kArchX86)
+        if (arg.type == AsmVariant::imm && arg.size > sizeof( uint32_t ) && a.assembler()->environment().is32Bit())
         {
             arg.type = AsmVariant::dataStruct;
             arg.buf.resize( arg.size );
@@ -548,15 +547,15 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
     // Retrieve result from XMM0 or ST0
     if (retType == rt_float || retType == rt_double)
     {
-        a->mov( a->zax, _userData.ptr<size_t>() + RET_OFFSET );
+        a->mov( a->zax(), _userData.ptr<size_t>() + RET_OFFSET );
 
 #ifdef USE64
         if (retType == rt_double)
-            a->movsd( asmjit::Mem( a->zax, 0 ), asmjit::host::xmm0 );
+            a->movsd( asmjit::x86::Mem( a->zax(), 0 ), asmjit::x86::xmm0 );
         else
-            a->movss( asmjit::Mem( a->zax, 0 ), asmjit::host::xmm0 );
+            a->movss( asmjit::x86::Mem( a->zax(), 0 ), asmjit::x86::xmm0 );
 #else
-        a->fstp( asmjit::Mem( a->zax, 0, retType * sizeof( float ) ) );
+        a->fstp( asmjit::x86::Mem( a->zax(), 0, retType * sizeof( float ) ) );
 #endif
     }
 

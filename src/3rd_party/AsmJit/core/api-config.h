@@ -493,7 +493,8 @@ namespace asmjit {
     namespace asmjit {                                                        \
       __pragma(warning(push))                                                 \
       __pragma(warning(disable: 4127))  /* conditional expression is const */ \
-      __pragma(warning(disable: 4201))  /* nameless struct/union */
+      __pragma(warning(disable: 4201))  /* nameless struct/union */           \
+      __pragma(warning(disable: 5054))  /* operator '==': deprecated */
   #define ASMJIT_END_NAMESPACE                                                \
       __pragma(warning(pop))                                                  \
     }

@@ -95,15 +95,15 @@ public:
         // Choose execution thread
         if (!contextThread)
         {
-            status = _process.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), tmpResult );
+            status = _process.remote().ExecInNewThread( a->make(), a->getCodeSize(), tmpResult );
         }
         else if (contextThread == _process.remote().getWorker())
         {
-            status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), tmpResult );
+            status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), tmpResult );
         }
         else
         {
-            status = _process.remote().ExecInAnyThread( (*a)->make(), (*a)->getCodeSize(), tmpResult, contextThread );
+            status = _process.remote().ExecInAnyThread( a->make(), a->getCodeSize(), tmpResult, contextThread );
         }
 
         // Get function return value

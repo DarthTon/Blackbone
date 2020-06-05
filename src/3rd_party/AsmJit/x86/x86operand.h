@@ -863,9 +863,9 @@ public:
   constexpr uint32_t segmentId() const noexcept { return _getSignaturePart<kSignatureMemSegmentMask>(); }
 
   //! Sets the segment override to `seg`.
-  inline void setSegment(const SReg& seg) noexcept { setSegment(seg.id()); }
+  inline Mem& setSegment(const SReg& seg) noexcept { setSegment(seg.id()); return *this; }
   //! Sets the segment override to `id`.
-  inline void setSegment(uint32_t rId) noexcept { _setSignaturePart<kSignatureMemSegmentMask>(rId); }
+  inline Mem& setSegment(uint32_t rId) noexcept { _setSignaturePart<kSignatureMemSegmentMask>(rId); return *this; }
   //! Resets the segment override.
   inline void resetSegment() noexcept { _setSignaturePart<kSignatureMemSegmentMask>(0); }
 

@@ -124,8 +124,8 @@ public:
     /// <param name="a">Target assembly helper</param>
     BLACKBONE_API void SaveCallResult( IAsmHelper& a, uint32_t retOffset = RET_OFFSET )
     {
-        a->mov( a->zdx, _userData.ptr() + retOffset );
-        a->mov( asmjit::host::dword_ptr( a->zdx ), a->zax );
+        a->mov( a->zdx(), _userData.ptr() + retOffset );
+        a->mov( asmjit::x86::dword_ptr( a->zdx() ), a->zax() );
     }
 
     /// <summary>

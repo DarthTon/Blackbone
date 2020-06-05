@@ -1004,7 +1004,7 @@ NTSTATUS MMap::EnableExceptions( ImageContextPtr pImage )
                 _process.remote().AddReturnWithEvent( *a, pImage->ldrEntry.type );
                 a->GenEpilogue();
 
-                auto status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+                auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
                 if (!NT_SUCCESS( status ))
                     return status;
             }
@@ -1051,7 +1051,7 @@ NTSTATUS MMap::DisableExceptions( ImageContextPtr pImage )
         _process.remote().AddReturnWithEvent( *a );
         a->GenEpilogue();
 
-        auto status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+        auto status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
         if (!NT_SUCCESS( status ))
             return status;
     }
@@ -1165,9 +1165,9 @@ call_result_t<uint64_t> MMap::RunModuleInitializers( ImageContextPtr pImage, DWO
     // ActivateActCtx
     if (_pAContext.valid() && pActivateActx)
     {
-        (*a)->mov( (*a)->zax, _pAContext.ptr() );
-        (*a)->mov( (*a)->zax, asmjit::host::dword_ptr( (*a)->zax ) );
-        a->GenCall( pActivateActx->procAddress, { 0, (*a)->zax, _pAContext.ptr() + sizeof( ptr_t ) } );
+        (*a)->mov( (*a)->zax(), _pAContext.ptr() );
+        (*a)->mov( (*a)->zax(), asmjit::x86::dword_ptr( (*a)->zax() ) );
+        a->GenCall( pActivateActx->procAddress, { 0, (*a)->zax(), _pAContext.ptr() + sizeof( ptr_t ) } );
     }
 
     // Prepare custom arguments
@@ -1210,16 +1210,16 @@ call_result_t<uint64_t> MMap::RunModuleInitializers( ImageContextPtr pImage, DWO
     // DeactivateActCtx
     if (_pAContext.valid() && pDeactivateActx)
     {
-        (*a)->mov( (*a)->zax, _pAContext.ptr() + sizeof( ptr_t ) );
-        (*a)->mov( (*a)->zax, asmjit::host::dword_ptr( (*a)->zax ) );
-        a->GenCall( pDeactivateActx->procAddress, { 0, (*a)->zax } );
+        (*a)->mov( (*a)->zax(), _pAContext.ptr() + sizeof( ptr_t ) );
+        (*a)->mov( (*a)->zax(), asmjit::x86::dword_ptr( (*a)->zax() ) );
+        a->GenCall( pDeactivateActx->procAddress, { 0, (*a)->zax() } );
     }
 
     // Set invalid return code offset to preserve one from DllMain
     _process.remote().AddReturnWithEvent( *a, pImage->ldrEntry.type, rt_int32, ARGS_OFFSET );
     a->GenEpilogue();
 
-    NTSTATUS status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+    NTSTATUS status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
     if (!NT_SUCCESS( status ))
         return status;
 
@@ -1286,17 +1286,17 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
         act32.lpResourceName = image.manifestID();
 
         (*a)->push( _pAContext.ptr<uint32_t>() + static_cast<uint32_t>(sizeof( ptr_t )) );
-        (*a)->mov( asmjit::host::eax, static_cast<uint32_t>(pCreateActx->procAddress) );
-        (*a)->call( (*a)->zax );
-        (*a)->mov( asmjit::host::edx, _pAContext.ptr<uint32_t>() );
-        //a->mov( asmjit::host::dword_ptr( asmjit::host::edx ), asmjit::host::eax );
+        (*a)->mov( asmjit::x86::eax, static_cast<uint32_t>(pCreateActx->procAddress) );
+        (*a)->call( (*a)->zax() );
+        (*a)->mov( asmjit::x86::edx, _pAContext.ptr<uint32_t>() );
+        //a->mov( asmjit::x86::dword_ptr( asmjit::x86::edx ), asmjit::x86::eax );
         (*a)->dw( '\x01\x02' );
 
         auto pTermThd = _process.modules().GetNtdllExport( "NtTerminateThread", mt_mod32 );
-        (*a)->push( (*a)->zax );
+        (*a)->push( (*a)->zax() );
         (*a)->push( uint32_t( 0 ) );
-        (*a)->mov( asmjit::host::eax, static_cast<uint32_t>(pTermThd->procAddress) );
-        (*a)->call( (*a)->zax );
+        (*a)->mov( asmjit::x86::eax, static_cast<uint32_t>(pTermThd->procAddress) );
+        (*a)->call( (*a)->zax() );
         (*a)->ret( 4 );
         
         // Write path to file
@@ -1311,7 +1311,7 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
         if (!pCode)
             return pCode.status;
 
-        pCode->Write( 0, (*a)->getCodeSize(), (*a)->make() );
+        pCode->Write( 0, a->getCodeSize(), a->make() );
 
         result = _process.remote().ExecDirect( pCode->ptr<ptr_t>(), _pAContext.ptr<size_t>() + sizeof( ptr_t ) );
     }
@@ -1351,13 +1351,13 @@ NTSTATUS MMap::CreateActx( const pe::PEImage& image  )
         a->GenPrologue();
         a->GenCall( pCreateActx->procAddress, { _pAContext.ptr() + sizeof( ptr_t ) } );
 
-        (*a)->mov( (*a)->zdx, _pAContext.ptr() );
-        (*a)->mov( (*a)->intptr_ptr( (*a)->zdx ), (*a)->zax );
+        (*a)->mov( (*a)->zdx(), _pAContext.ptr() );
+        (*a)->mov( (*a)->intptr_ptr( (*a)->zdx() ), (*a)->zax() );
 
         _process.remote().AddReturnWithEvent( *a, image.mType() );
         a->GenEpilogue();
 
-        status = _process.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), result );
+        status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result );
         if (!NT_SUCCESS( status ))
             return status;
     }
@@ -1442,9 +1442,9 @@ NTSTATUS MMap::ProbeRemoteSxS( std::wstring& path )
     // ActivateActCtx
     if (actx && pActivateActx)
     {
-        a->mov( a->zax, actx );
-        a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
-        a.GenCall( pActivateActx->procAddress, { 0, a->zax, actx + sizeof( ptr_t ) } );
+        a->mov( a->zax(), actx );
+        a->mov( a->zax(), asmjit::x86::dword_ptr( a->zax() ) );
+        a.GenCall( pActivateActx->procAddress, { 0, a->zax(), actx + sizeof( ptr_t ) } );
     }
 
     // RtlDosApplyFileIsolationRedirection_Ustr
@@ -1463,16 +1463,16 @@ NTSTATUS MMap::ProbeRemoteSxS( std::wstring& path )
     // DeactivateActCtx
     if (actx && pDeactivateActx)
     {
-        a->mov( a->zax, actx + sizeof( ptr_t ) );
-        a->mov( a->zax, asmjit::host::dword_ptr( a->zax ) );
-        a.GenCall( pDeactivateActx->procAddress, { 0, a->zax } );
+        a->mov( a->zax(), actx + sizeof( ptr_t ) );
+        a->mov( a->zax(), asmjit::x86::dword_ptr( a->zax() ) );
+        a.GenCall( pDeactivateActx->procAddress, { 0, a->zax() } );
     }
 
     _process.remote().AddReturnWithEvent( a, mt_default, rt_int32, ARGS_OFFSET );
     a.GenEpilogue();
 
     uint64_t result = 0;
-    if (!NT_SUCCESS( status = _process.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), result ) ))
+    if (!NT_SUCCESS( status = _process.remote().ExecInWorkerThread( a.make(), a.getCodeSize(), result ) ))
         return status;
 
     status = static_cast<NTSTATUS>(result);

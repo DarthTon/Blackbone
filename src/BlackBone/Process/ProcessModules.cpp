@@ -269,7 +269,7 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleData& hMod, con
             // New size should take care of max number of present names (max name length is assumed to be 255 chars)
             expSize = static_cast<DWORD>(
                 pExpData->AddressOfNameOrdinals - expBase
-                + max( pExpData->NumberOfFunctions, pExpData->NumberOfNames ) * 255
+                + std::max( pExpData->NumberOfFunctions, pExpData->NumberOfNames ) * 255
                 );
 
             expData.reset( reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(malloc( expSize )) );
@@ -483,16 +483,16 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, T
     if (pThread != nullptr)
     {
         if (pThread == _proc.remote().getWorker())
-            status = _proc.remote().ExecInWorkerThread( (*a)->make(), (*a)->getCodeSize(), res );
+            status = _proc.remote().ExecInWorkerThread( a->make(), a->getCodeSize(), res );
         else
-            status = _proc.remote().ExecInAnyThread( (*a)->make(), (*a)->getCodeSize(), res, pThread );
+            status = _proc.remote().ExecInAnyThread( a->make(), a->getCodeSize(), res, pThread );
 
         if (NT_SUCCESS( status ))
             status = static_cast<NTSTATUS>(res);
     }
     else
     {
-        status = _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, switchMode );
+        status = _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res, switchMode );
         if (NT_SUCCESS( status ))
             status = static_cast<NTSTATUS>(res);
     }
@@ -537,7 +537,7 @@ NTSTATUS ProcessModules::Unload( const ModuleDataPtr& hMod )
     a->GenCall( pUnload->procAddress, { hMod->baseAddress } );
     (*a)->ret();
 
-    _proc.remote().ExecInNewThread( (*a)->make(), (*a)->getCodeSize(), res, threadSwitch );
+    _proc.remote().ExecInNewThread( a->make(), a->getCodeSize(), res, threadSwitch );
 
     // Remove module from cache
     _modules.erase( std::make_pair( hMod->name, hMod->type ) );
@@ -632,7 +632,7 @@ void ProcessModules::UpdateModuleCache( eModSeachType search, eModType type )
 
 
 using namespace asmjit;
-using namespace asmjit::host;
+using namespace asmjit::x86;
 
 #ifdef COMPILER_MSVC
 
@@ -761,175 +761,175 @@ bool ProcessModules::InjectPureIL(
     ALLOC_STACK_VAR( sa, stack_returnCode,   HRESULT );
 
 #ifdef USE64
-    GpReg callReg = r13;
+    Gp callReg = r13;
 
 #else
-    GpReg callReg = edx;
+    Gp callReg = edx;
 
-    a->push( a->zbp );
-    a->mov( a->zbp, a->zsp );
+    a->push( a->zbp() );
+    a->mov( a->zbp(), a->zsp() );
 #endif
 
     // function prologue  
-    a->sub( a->zsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
-    a->xor_( a->zsi, a->zsi );
+    a->sub( a->zsp(), Align( sa.getTotalSize(), 0x10 ) + 8 );
+    a->xor_( a->zsi(), a->zsi() );
 
     // CLRCreateInstance()
     a.GenCall( (uintptr_t)pfnCreateInstance->procAddress, { address_CLSID_CLRMetaHost, address_IID_ICLRMetaHost, &stack_MetaHost } );
     // success?
-    a->test( a->zax, a->zax );
+    a->test( a->zax(), a->zax() );
     a->jnz( L_Error1 );
 
     // pMetaHost->GetRuntime()
-    a->mov( a->zax, stack_MetaHost );
-    a->mov( a->zcx, a->intptr_ptr( a->zax ) );
-    a->mov( callReg, a->intptr_ptr( a->zcx, 3 * sizeof( void* ) ) );
-    a.GenCall( callReg, { a->zcx, address_VersionString, address_IID_ICLRRuntimeInfo, &stack_RuntimeInfo } );
+    a->mov( a->zax(), stack_MetaHost );
+    a->mov( a->zcx(), a->intptr_ptr( a->zax() ) );
+    a->mov( callReg, a->intptr_ptr( a->zcx(), 3 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx(), address_VersionString, address_IID_ICLRRuntimeInfo, &stack_RuntimeInfo } );
     // success?
-    a->test( a->zax, a->zax );
+    a->test( a->zax(), a->zax() );
     a->jnz( L_Error2 );
     
     // pRuntimeInterface->IsStarted()
-    a->mov( a->zcx, stack_RuntimeInfo );
-    a->mov( a->zax, a->intptr_ptr( a->zcx ) );
-    a->mov( callReg, a->intptr_ptr( a->zax, 14 * sizeof( void* ) ) );
-    a.GenCall( callReg, { a->zcx, &stack_IsStarted, &stack_StartupFlags } );
+    a->mov( a->zcx(), stack_RuntimeInfo );
+    a->mov( a->zax(), a->intptr_ptr( a->zcx() ) );
+    a->mov( callReg, a->intptr_ptr( a->zax(), 14 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx(), &stack_IsStarted, &stack_StartupFlags } );
     // success?
-    a->test( a->zax, a->zax );
+    a->test( a->zax(), a->zax() );
     a->jnz( L_Error3 );
 
     // pRuntimeTime->GetInterface()
-    a->mov( a->zcx, stack_RuntimeInfo );
-    a->mov( a->zax, a->intptr_ptr( a->zcx ) );
-    a->mov( callReg, a->intptr_ptr( a->zax, 9 * sizeof( void* ) ) );
-    a.GenCall( callReg, { a->zcx, address_CLSID_CLRRuntimeHost, address_IID_ICLRRuntimeHost, &stack_RuntimeHost } );
+    a->mov( a->zcx(), stack_RuntimeInfo );
+    a->mov( a->zax(), a->intptr_ptr( a->zcx() ) );
+    a->mov( callReg, a->intptr_ptr( a->zax(), 9 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx(), address_CLSID_CLRRuntimeHost, address_IID_ICLRRuntimeHost, &stack_RuntimeHost } );
     // success?
-    a->test( a->zax, a->zax );
+    a->test( a->zax(), a->zax() );
     a->jnz( L_Error3 );
 
     // jump if already started
-    a->cmp( stack_IsStarted, a->zsi );
+    a->cmp( stack_IsStarted, a->zsi() );
     a->jne( L_SkipStart ); 
 
     // pRuntimeHost->Start()
-    a->mov( a->zcx, stack_RuntimeHost );
-    a->mov( a->zax, a->intptr_ptr( a->zcx ) );
-    a->mov( callReg, a->intptr_ptr( a->zax, 3 * sizeof( void* ) ) );
-    a.GenCall( callReg, { a->zcx } );
+    a->mov( a->zcx(), stack_RuntimeHost );
+    a->mov( a->zax(), a->intptr_ptr( a->zcx() ) );
+    a->mov( callReg, a->intptr_ptr( a->zax(), 3 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx() } );
     // success?
-    a->test( a->zax, a->zax );
+    a->test( a->zax(), a->zax() );
     a->jnz( L_Error5 );
 
     // pRuntimeHost->ExecuteInDefaultAppDomain()
     a->bind( L_SkipStart );
 
-    a->mov( a->zcx, stack_RuntimeHost );
-    a->mov( a->zax, a->intptr_ptr( a->zcx ) );
-    a->mov( callReg, a->intptr_ptr( a->zax, 11 * sizeof( void* ) ) );
-    a.GenCall( callReg, { a->zcx, address_netAssemblyDll, address_netAssemblyClass, address_netAssemblyMethod,
+    a->mov( a->zcx(), stack_RuntimeHost );
+    a->mov( a->zax(), a->intptr_ptr( a->zcx() ) );
+    a->mov( callReg, a->intptr_ptr( a->zax(), 11 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zcx(), address_netAssemblyDll, address_netAssemblyClass, address_netAssemblyMethod,
                           address_netAssemblyArgs, &stack_returnCode } );
     // success?
-    a->test( a->zax, a->zax );
+    a->test( a->zax(), a->zax() );
     a->jnz( L_Error6 );
 
     // Release unneeded interfaces
-    a->mov( a->zcx, stack_RuntimeHost );
+    a->mov( a->zcx(), stack_RuntimeHost );
     a->call( L_ReleaseInterface );
-    a->mov( a->zcx, stack_RuntimeInfo );
+    a->mov( a->zcx(), stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( a->zcx, stack_MetaHost );
+    a->mov( a->zcx(), stack_MetaHost );
     a->call( L_ReleaseInterface );
 
     // Write the managed code's return value to the first DWORD
     // in the allocated buffer
     a->mov( eax, stack_returnCode );
-    a->mov( a->zdx, address.ptr<uintptr_t>() );
-    a->mov( dword_ptr( a->zdx ), eax );
-    a->mov( a->zax, 0 );
+    a->mov( a->zdx(), address.ptr<uintptr_t>() );
+    a->mov( dword_ptr( a->zdx() ), eax );
+    a->mov( a->zax(), 0 );
 
     // stack restoration
     a->bind( L_Exit );
 
 #ifdef USE64
-    a->add( a->zsp, Align( sa.getTotalSize(), 0x10 ) + 8 );
+    a->add( a->zsp(), Align( sa.getTotalSize(), 0x10 ) + 8 );
 #else
-    a->mov( a->zsp, a->zbp );
-    a->pop( a->zbp );
+    a->mov( a->zsp(), a->zbp() );
+    a->pop( a->zbp() );
 #endif
 
     a->ret();
 
     // CLRCreateInstance() failed
     a->bind( L_Error1 );
-    a->mov( a->zax, 1 );
+    a->mov( a->zax(), 1 );
     a->jmp( L_Exit );
 
     // pMetaHost->GetRuntime() failed
     a->bind( L_Error2 );
-    a->mov( a->zcx, stack_MetaHost );
+    a->mov( a->zcx(), stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( a->zax, 2 );
+    a->mov( a->zax(), 2 );
     a->jmp( L_Exit );
 
     // pRuntimeInterface->IsStarted() failed
     a->bind( L_Error3 );
-    a->mov( a->zcx, stack_RuntimeInfo );
+    a->mov( a->zcx(), stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( a->zcx, stack_MetaHost );
+    a->mov( a->zcx(), stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( a->zax, 3 );
+    a->mov( a->zax(), 3 );
     a->jmp( L_Exit );
 
     // pRuntimeTime->GetInterface() failed
     a->bind( L_Error4 );
-    a->mov( a->zcx, stack_RuntimeInfo );
+    a->mov( a->zcx(), stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( a->zcx, stack_MetaHost );
+    a->mov( a->zcx(), stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( a->zax, 4 );
+    a->mov( a->zax(), 4 );
     a->jmp( L_Exit );
 
     // pRuntimeHost->Start() failed
     a->bind( L_Error5 );
-    a->mov( a->zcx, stack_RuntimeHost );
+    a->mov( a->zcx(), stack_RuntimeHost );
     a->call( L_ReleaseInterface );
-    a->mov( a->zcx, stack_RuntimeInfo );
+    a->mov( a->zcx(), stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( a->zcx, stack_MetaHost );
+    a->mov( a->zcx(), stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( a->zax, 5 );
+    a->mov( a->zax(), 5 );
     a->jmp( L_Exit );
 
     // pRuntimeHost->ExecuteInDefaultAppDomain() failed
     a->bind( L_Error6 );
-    a->push( a->zax );
-    a->mov( a->zcx, stack_RuntimeHost );
+    a->push( a->zax() );
+    a->mov( a->zcx(), stack_RuntimeHost );
     a->call( L_ReleaseInterface );
-    a->mov( a->zcx, stack_RuntimeInfo );
+    a->mov( a->zcx(), stack_RuntimeInfo );
     a->call( L_ReleaseInterface );
-    a->mov( a->zcx, stack_MetaHost );
+    a->mov( a->zcx(), stack_MetaHost );
     a->call( L_ReleaseInterface );
-    a->mov( a->zax, 6 );
-    a->pop( a->zax );
+    a->mov( a->zax(), 6 );
+    a->pop( a->zax() );
     a->jmp( L_Exit );
 
     // void __fastcall ReleaseInterface(IUnknown* pInterface)
     a->bind( L_ReleaseInterface );
-    a->mov( a->zax, a->zcx );
-    a->mov( a->zcx, a->intptr_ptr( a->zax ) );
-    a->mov( callReg, a->intptr_ptr( a->zcx, 2 * sizeof( void* ) ) );
-    a.GenCall( callReg, { a->zax } );
+    a->mov( a->zax(), a->zcx() );
+    a->mov( a->zcx(), a->intptr_ptr( a->zax() ) );
+    a->mov( callReg, a->intptr_ptr( a->zcx(), 2 * sizeof( void* ) ) );
+    a.GenCall( callReg, { a->zax() } );
 
     a->ret();
 
     // write JIT code to target
-    size_t codeSize = a->getCodeSize();
+    size_t codeSize = a.getCodeSize();
     ptr_t codeAddress = address.ptr() + offset;
 
     std::vector<uint8_t> codeBuffer( codeSize );
 
-    a->setBaseAddress( codeAddress );
-    a->relocCode( codeBuffer.data() );
+    a.relocateCode( codeBuffer.data(), codeAddress );
+
     if (address.Write( offset, codeSize, codeBuffer.data() ) != STATUS_SUCCESS)
     {
         returnCode = 17;
