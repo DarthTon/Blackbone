@@ -94,4 +94,4 @@
 ## License
 Blackbone is licensed under the MIT License. Dependencies are under their respective licenses.
 
-[![Build status](https://github.com/DarthTon/BlackBone/workflows/Main/badge.svg)]
+![Library](https://github.com/DarthTon/Blackbone/workflows/Library/badge.svg?branch=master) ![Driver](https://github.com/DarthTon/Blackbone/workflows/Driver/badge.svg?branch=master)
