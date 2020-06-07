@@ -1,6 +1,6 @@
 name: Library
 on: 
-  pull_request:
+  push:
     paths:
     - 'src/**'
     - '!src/BlackBoneDrv/**'

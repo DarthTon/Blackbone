@@ -1,6 +1,6 @@
 name: Driver
 on:
-  pull_request:
+  push:
     paths:
       - 'src/BlackBoneDrv/**'
 
