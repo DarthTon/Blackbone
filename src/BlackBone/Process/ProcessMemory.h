@@ -10,6 +10,13 @@
 namespace blackbone
 {
 
+
+enum class MemProtectionCasting
+{
+    none,   // Don't change provided memory protection flags
+    useDep  // Strip executable flag if DEP is off
+};
+
 class ProcessMemory : public RemoteMemory
 {
 public:
@@ -178,6 +185,18 @@ public:
     /// <returns>Found regions</returns>
     BLACKBONE_API std::vector<MEMORY_BASIC_INFORMATION64> EnumRegions( bool includeFree = false );
 
+    /// <summary>
+    /// Get memory protection casting behavior 
+    /// </summary>
+    /// <returns>current behavior</returns>
+    BLACKBONE_API MemProtectionCasting protectionCasting() {  return _casting; }
+
+    /// <summary>
+    /// Set memory protection casting behavior 
+    /// </summary>
+    /// <param name="flag">new behavior</param>
+    BLACKBONE_API void protectionCasting( MemProtectionCasting casting ) { _casting = casting; }
+
     BLACKBONE_API inline class ProcessCore& core() { return _core; }
     BLACKBONE_API inline class Process* process()  { return _process; }
 
@@ -188,6 +207,7 @@ private:
 private:
     class Process* _process;    // Owning process object
     class ProcessCore& _core;   // Core routines
+    MemProtectionCasting _casting = MemProtectionCasting::useDep;
 };
 
 }

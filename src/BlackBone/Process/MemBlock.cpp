@@ -89,13 +89,15 @@ call_result_t<MemBlock> MemBlock::Allocate(
     )
 {
     ptr_t desired64 = desired;
-    DWORD newProt = CastProtection( protection, process.core().DEP() );
+    DWORD finalProt = protection;
+    if(process.protectionCasting() == MemProtectionCasting::useDep)
+        finalProt = CastProtection( protection, process.core().DEP() );
     
-    NTSTATUS status = process.core().native()->VirtualAllocExT( desired64, size, MEM_RESERVE | MEM_COMMIT, newProt );
+    NTSTATUS status = process.core().native()->VirtualAllocExT( desired64, size, MEM_RESERVE | MEM_COMMIT, finalProt );
     if (!NT_SUCCESS( status ))
     {
         desired64 = 0;
-        status = process.core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, newProt );
+        status = process.core().native()->VirtualAllocExT( desired64, size, MEM_COMMIT, finalProt );
         if (NT_SUCCESS( status ))
             return call_result_t<MemBlock>( MemBlock( &process, desired64, size, protection, own ), STATUS_IMAGE_NOT_AT_BASE );
         else
@@ -157,13 +159,15 @@ NTSTATUS MemBlock::Protect( DWORD protection, uintptr_t offset /*= 0*/, size_t s
     if (!_pImpl)
         return STATUS_MEMORY_NOT_ALLOCATED;
 
-    auto prot = CastProtection( protection, _pImpl->_memory->core().DEP() );
+    DWORD finalProt = protection;
+    if (_pImpl->_memory->protectionCasting() == MemProtectionCasting::useDep)
+        finalProt = CastProtection( protection, _pImpl->_memory->core().DEP() );
 
     if (size == 0)
         size = _pImpl->_size;
 
-    return _pImpl->_physical ? Driver().ProtectMem( _pImpl->_memory->core().pid(), _pImpl->_ptr + offset, size, prot ) :
-        _pImpl->_memory->Protect( _pImpl->_ptr + offset, size, prot, pOld );
+    return _pImpl->_physical ? Driver().ProtectMem( _pImpl->_memory->core().pid(), _pImpl->_ptr + offset, size, finalProt ) :
+        _pImpl->_memory->Protect( _pImpl->_ptr + offset, size, finalProt, pOld );
 }
 
 /// <summary>

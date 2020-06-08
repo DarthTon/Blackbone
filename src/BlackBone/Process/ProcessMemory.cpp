@@ -74,7 +74,11 @@ NTSTATUS ProcessMemory::Protect( ptr_t pAddr, size_t size, DWORD flProtect, DWOR
     if (pOld == nullptr)
         pOld = &junk;
 
-    return _core.native()->VirtualProtectExT( pAddr, size, CastProtection( flProtect, _core.DEP() ), pOld );
+    DWORD finalProt = flProtect;
+    if (_casting == MemProtectionCasting::useDep)
+        finalProt = CastProtection( flProtect, _core.DEP() );
+
+    return _core.native()->VirtualProtectExT( pAddr, size, finalProt, pOld );
 }
 
 /// <summary>
