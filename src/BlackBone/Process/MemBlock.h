@@ -134,6 +134,23 @@ public:
         );
 
     /// <summary>
+    /// Allocate new memory block as close to a given location as possible.
+    /// </summary>
+    /// <param name="process">Process memory routines</param>
+    /// <param name="size">Block size</param>
+    /// <param name="desired">Desired base address of new block</param>
+    /// <param name="protection">Win32 Memory protection flags</param>
+    /// <param name="own">false if caller will be responsible for block deallocation</param>
+    /// <returns>Memory block. If failed - returned block will be invalid</returns>
+    BLACKBONE_API static call_result_t<MemBlock> AllocateClosest(
+    	class ProcessMemory& process,
+        size_t size,
+        ptr_t desired,
+        DWORD protection = PAGE_EXECUTE_READWRITE,
+        bool own = true
+    	);
+
+    /// <summary>
     /// Reallocate existing block for new size
     /// </summary>
     /// <param name="size">New block size</param>

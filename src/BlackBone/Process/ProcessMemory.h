@@ -34,6 +34,16 @@ public:
     BLACKBONE_API call_result_t<MemBlock> Allocate( size_t size, DWORD protection = PAGE_EXECUTE_READWRITE, ptr_t desired = 0, bool own = true );
 
     /// <summary>
+    /// Allocate new memory block as close to a desired location as possible
+    /// </summary>
+    /// <param name="size">Block size</param>
+    /// <param name="protection">Memory protection</param>
+    /// <param name="desired">Desired base address of new block</param>
+    /// <param name="desired">false if caller will be responsible for block deallocation</param>
+    /// <returns>Memory block. If failed - returned block will be invalid</returns>
+    BLACKBONE_API call_result_t<MemBlock> AllocateClosest( size_t size, DWORD protection = PAGE_EXECUTE_READWRITE, ptr_t desired = 0, bool own = true );
+
+    /// <summary>
     /// Free memory
     /// </summary>
     /// <param name="pAddr">Memory address to release.</param>
