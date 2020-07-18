@@ -29,6 +29,11 @@ call_result_t<MemBlock> ProcessMemory::Allocate( size_t size, DWORD protection /
     return MemBlock::Allocate( *this, size, desired, protection, own );
 }
 
+call_result_t<MemBlock> ProcessMemory::AllocateClosest( size_t size, DWORD protection /*= PAGE_EXECUTE_READWRITE*/, ptr_t desired /*= 0*/, bool own /*= true*/ )
+{
+    return MemBlock::AllocateClosest( *this, size, desired, protection, own );
+}
+
 /// <summary>
 /// Free memory
 /// </summary>

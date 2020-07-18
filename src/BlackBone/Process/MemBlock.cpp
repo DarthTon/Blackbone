@@ -109,6 +109,89 @@ call_result_t<MemBlock> MemBlock::Allocate(
     return MemBlock( &process, desired64, size, protection, own );
 }
 
+call_result_t<MemBlock> MemBlock::AllocateClosest(
+	class ProcessMemory& process,
+	size_t size,
+	ptr_t desired,
+	DWORD protection /*= PAGE_EXECUTE_READWRITE*/,
+	bool own /*= true*/
+	)
+{
+    DWORD finalProt = protection;
+    if(process.protectionCasting() == MemProtectionCasting::useDep)
+        finalProt = CastProtection( protection, process.core().DEP() );
+
+    NTSTATUS status = STATUS_SUCCESS;
+
+    uint32_t pageSize = process.core().native()->pageSize();
+    ptr_t alignedSize = Align( size, pageSize );
+
+    SYSTEM_INFO sinfo;
+    GetNativeSystemInfo(&sinfo);
+
+    MemBlock buf;
+
+    ptr_t leftLimit = (ptr_t) sinfo.lpMinimumApplicationAddress;
+    ptr_t rightLimit = (ptr_t) sinfo.lpMaximumApplicationAddress;
+
+    ptr_t right = (desired / pageSize) * pageSize;
+    ptr_t left = right - alignedSize;
+
+    MEMORY_BASIC_INFORMATION64 minfo;
+
+    while (left != 0)
+    {
+    	if (desired-left < right-desired  &&  left >= leftLimit  &&  left != 0)
+    	{
+    		// Look to the left
+    		if (process.core().native()->VirtualQueryExT( left, &minfo ))
+				break;
+
+    		if (minfo.State == MEM_FREE  &&  minfo.RegionSize >= size)
+    		{
+    			status = process.core().native()->VirtualAllocExT( left, size, MEM_RESERVE | MEM_COMMIT, finalProt );
+				if (NT_SUCCESS( status ))
+				{
+					buf = MemBlock( &process, left, size, protection, own );
+					break;
+				}
+    		}
+    		else
+    		{
+    			left = minfo.AllocationBase - alignedSize;
+    		}
+    	}
+    	else if (right < rightLimit)
+    	{
+    		// Look to the right
+    		if (process.core().native()->VirtualQueryExT( right, &minfo ))
+    			break;
+
+    		if (minfo.State == MEM_FREE  &&  minfo.RegionSize >= size)
+    		{
+    			status = process.core().native()->VirtualAllocExT( right, size, MEM_RESERVE | MEM_COMMIT, finalProt );
+    			if (NT_SUCCESS( status ))
+    			{
+    				buf = MemBlock( &process, right, size, protection, own );
+    				break;
+    			}
+    		}
+    		else
+    		{
+    			right = minfo.BaseAddress + minfo.RegionSize;
+    		}
+    	}
+    	else
+    	{
+    		break;
+    	}
+    }
+
+    if (!buf.valid())
+    	return MemBlock::Allocate( process, size, desired, protection, own );
+    return buf;
+}
+
 /// <summary>
 /// Reallocate existing block for new size
 /// </summary>
