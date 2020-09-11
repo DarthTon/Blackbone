@@ -7,6 +7,7 @@
 #include "../Symbols/SymbolData.h"
 #include "../Asm/AsmFactory.h"
 
+#include <iterator>
 #include <memory>
 #include <type_traits>
 
