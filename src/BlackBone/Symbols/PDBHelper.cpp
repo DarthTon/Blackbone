@@ -136,7 +136,7 @@ HRESULT PDBHelper::PopulateSymbols()
     while (SUCCEEDED( symbols->Next( 1, &symbol, &count ) ) && count != 0)
     {
         DWORD rva = 0;
-        BSTR name = nullptr;
+        CComBSTR name;
 
         symbol->get_relativeVirtualAddress( &rva );
         symbol->get_undecoratedName( &name );
