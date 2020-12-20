@@ -2,7 +2,8 @@ name: Driver
 on:
   push:
     paths:
-      - 'src/BlackBoneDrv/**'
+    - '.github/**'
+    - 'src/BlackBoneDrv/**'
 
 jobs:
   driver:

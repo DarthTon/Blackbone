@@ -2,6 +2,7 @@ name: Library
 on: 
   push:
     paths:
+    - '.github/**'
     - 'src/**'
     - '!src/BlackBoneDrv/**'
 
