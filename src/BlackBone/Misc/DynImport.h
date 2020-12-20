@@ -78,9 +78,9 @@ public:
     /// <param name="name">Function name</param>
     /// <param name="module">Module name</param>
     /// <returns>true on success</returns>
-    BLACKBONE_API FARPROC load( const std::string& name, const std::wstring& module )
+    BLACKBONE_API FARPROC load( const std::string& name, const std::wstring& modName )
     {
-        auto mod = GetModuleHandleW( module.c_str() );
+        auto mod = GetModuleHandleW( modName.c_str() );
         return load( name, mod );
     }
 
@@ -110,7 +110,7 @@ private:
 };
 
 // Syntax sugar
-#define LOAD_IMPORT(name, module) (DynImport::Instance().load( name, module ))
+#define LOAD_IMPORT(name, mod) (DynImport::Instance().load( name, mod ))
 #define GET_IMPORT(name) (DynImport::Instance().get<fn ## name>( #name ))
 #define SAFE_NATIVE_CALL(name, ...) (DynImport::Instance().safeNativeCall<fn ## name>( #name, __VA_ARGS__ ))
 #define SAFE_CALL(name, ...) (DynImport::Instance().safeCall<fn ## name>( #name, __VA_ARGS__ ))

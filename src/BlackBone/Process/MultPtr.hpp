@@ -96,9 +96,9 @@ public:
     /// <param name="proc">Target process</param>
     /// <param name="base">Base address</param>
     /// <param name="offsets">Offsets</param>
-    multi_ptr_ex( Process* proc, uintptr_t base = 0, const vecOffsets& offsets = vecOffsets() )
+    multi_ptr_ex( Process* proc, uintptr_t base = 0, const multi_ptr<T>::vecOffsets& offsets = multi_ptr<T>::vecOffsets() )
         : _proc( proc )
-        , multi_ptr( base, offsets ) { }
+        , multi_ptr<T>( base, offsets ) { }
 
     /// <summary>
     /// Commit changed object into process
@@ -118,7 +118,7 @@ private:
     /// Read object from pointer
     /// </summary>
     /// <returns>Pointer to local copy or nullptr if invalid</returns>
-    virtual type_ptr read()
+    virtual multi_ptr<T>::type_ptr read()
     { 
         auto ptr = get_ptr();
         if (ptr == 0)
@@ -133,18 +133,18 @@ private:
     /// <returns>Pointer value or 0 if chain is invalid</returns>
     uintptr_t get_ptr()
     {
-        uintptr_t ptr = _base;
+        uintptr_t ptr = multi_ptr<T>::_base;
         if (!NT_SUCCESS( _proc->memory().Read( ptr, ptr ) ))
             return 0;
 
-        if (!_offsets.empty())
+        if (!multi_ptr<T>::_offsets.empty())
         {
-            for (intptr_t i = 0; i < static_cast<intptr_t>(_offsets.size()) - 1; i++)
-                if (!NT_SUCCESS( _proc->memory().Read( ptr + _offsets[i], ptr ) ))
+            for (intptr_t i = 0; i < static_cast<intptr_t>(multi_ptr<T>::_offsets.size()) - 1; i++)
+                if (!NT_SUCCESS( _proc->memory().Read( ptr + multi_ptr<T>::_offsets[i], ptr ) ))
                     return 0;
 
-            ptr += _offsets.back();
-            if (type_is_ptr)
+            ptr += multi_ptr<T>::_offsets.back();
+            if (multi_ptr<T>::type_is_ptr)
                 if (!NT_SUCCESS( _proc->memory().Read( ptr, ptr ) ))
                     return 0;
         }
@@ -155,6 +155,6 @@ private:
 
 private:
     Process* _proc = nullptr;       // Target process
-    type _data;                     // Local object copy
+    multi_ptr<T>::type _data;     // Local object copy
 };
 }

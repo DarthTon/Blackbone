@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <type_traits>
+#include <iterator>
 
 #ifdef COMPILER_MSVC
 #include <mscoree.h>

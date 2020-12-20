@@ -459,7 +459,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
     // Event name
     swprintf_s( pEventName, ARRAYSIZE( pEventName ), L"\\BaseNamedObjects\\_MMapEvent_0x%x_0x%x", threadID, GetTickCount() );
 
-    wchar_t* szStringSecurityDis = L"S:(ML;;NW;;;LW)D:(A;;GA;;;S-1-15-2-1)(A;;GA;;;WD)";
+    const wchar_t* szStringSecurityDis = L"S:(ML;;NW;;;LW)D:(A;;GA;;;S-1-15-2-1)(A;;GA;;;WD)";
     PSECURITY_DESCRIPTOR pDescriptor = nullptr;
     ConvertStringSecurityDescriptorToSecurityDescriptorW( szStringSecurityDis, SDDL_REVISION_1, &pDescriptor, NULL );
     auto guard = std::unique_ptr<void, decltype(&LocalFree)>( pDescriptor, &LocalFree );

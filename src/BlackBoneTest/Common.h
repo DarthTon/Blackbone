@@ -18,7 +18,7 @@
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace blackbone;
 
-constexpr wchar_t* ModuleName = L"BlackBoneTest.dll";
+constexpr wchar_t ModuleName[] = L"BlackBoneTest.dll";
 
 /// <summary>
 /// Some extensions for Assert

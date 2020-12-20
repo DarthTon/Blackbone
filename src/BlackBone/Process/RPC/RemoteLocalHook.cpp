@@ -181,7 +181,7 @@ NTSTATUS RemoteLocalHook::CopyOldCode( bool x64 )
     uint32_t thunkSize = 0;
     ldasm_data ld = { 0 };
 
-    const int64_t diffMinVals[] = {0ll, -128ll, -32768ll, -8388608ll, -2147483648ll, -549755813888ll, -140737488355328ll, -36028797018963968ll, -9223372036854775808ll};
+    const int64_t diffMinVals[] = {0ll, -128ll, -32768ll, -8388608ll, -2147483648ll, -549755813888ll, -140737488355328ll, -36028797018963968ll, -9223372036854775807ll};
     const int64_t diffMaxVals[] = {0ll, 127ll, 32767ll, 8388607ll, 2147483647ll, 549755813887ll, 140737488355327ll, 36028797018963967ll, 9223372036854775807ll};
 
     do
@@ -232,7 +232,7 @@ NTSTATUS RemoteLocalHook::CopyOldCode( bool x64 )
     }
     else
     {
-    	_ctx.origCodeSize = thunkSize;
+		_ctx.origCodeSize = static_cast<uint8_t>(thunkSize);
     }
 
     return status;
@@ -240,7 +240,7 @@ NTSTATUS RemoteLocalHook::CopyOldCode( bool x64 )
 
 uint8_t RemoteLocalHook::GenerateJump( uint8_t* code, ptr_t toAddr, ptr_t fromAddr, bool x64 ) const
 {
-	uint8_t size;
+	size_t size = 0;
 
 	auto asmp = AsmFactory::GetAssembler();
 	auto& a = *asmp;
@@ -299,7 +299,7 @@ uint8_t RemoteLocalHook::GenerateJump( uint8_t* code, ptr_t toAddr, ptr_t fromAd
 	}
 
 	assert(size <= sizeof(_ctx.hookJumpCode));
-	return size;
+	return static_cast<uint8_t>(size);
 }
 
 }

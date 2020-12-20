@@ -1,5 +1,6 @@
 #pragma once
 #include "Winheaders.h"
+#include <memory>
 
 namespace blackbone
 {

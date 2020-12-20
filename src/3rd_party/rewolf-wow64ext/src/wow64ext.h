@@ -362,9 +362,9 @@ struct _CONTEXT64_2
 extern "C"
 {
 	DWORD64 __cdecl X64Call(DWORD64 func, int argC, ...);
-	DWORD64 __cdecl GetModuleHandle64(wchar_t* lpModuleName);
+	DWORD64 __cdecl GetModuleHandle64(const wchar_t* lpModuleName);
     DWORD64 __cdecl getNTDLL64();
-	DWORD64 __cdecl GetProcAddress64(DWORD64 hModule, char* funcName);
+	DWORD64 __cdecl GetProcAddress64(DWORD64 hModule, const char* funcName);
 	SIZE_T __cdecl VirtualQueryEx64(HANDLE hProcess, DWORD64 lpAddress, MEMORY_BASIC_INFORMATION64* lpBuffer, SIZE_T dwLength);
 	DWORD64 __cdecl VirtualAllocEx64(HANDLE hProcess, DWORD64 lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect);
 	BOOL __cdecl VirtualFreeEx64(HANDLE hProcess, DWORD64 lpAddress, SIZE_T dwSize, DWORD dwFreeType);

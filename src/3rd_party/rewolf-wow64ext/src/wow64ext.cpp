@@ -227,7 +227,7 @@ _move_0:                            ;//
 #endif
 }
 
-bool cmpMem64(void* dstMem, DWORD64 srcMem, size_t sz)
+bool cmpMem64(const void* dstMem, DWORD64 srcMem, size_t sz)
 {
     if ((nullptr == dstMem) || (0 == srcMem) || (0 == sz))
         return false;
@@ -299,7 +299,7 @@ DWORD64 getTEB64()
     return reg.v;
 }
 
-extern "C" DWORD64 __cdecl GetModuleHandle64(wchar_t* lpModuleName)
+extern "C" DWORD64 __cdecl GetModuleHandle64(const wchar_t* lpModuleName)
 {
 	if (!g_isWow64)
 		return 0;
@@ -413,7 +413,7 @@ extern "C" VOID __cdecl SetLastErrorFromX64Call(DWORD64 status)
 	}
 }
 
-extern "C" DWORD64 __cdecl GetProcAddress64(DWORD64 hModule, char* funcName)
+extern "C" DWORD64 __cdecl GetProcAddress64(DWORD64 hModule, const char* funcName)
 {
     static DWORD64 _LdrGetProcedureAddress = 0;
     if (0 == _LdrGetProcedureAddress)

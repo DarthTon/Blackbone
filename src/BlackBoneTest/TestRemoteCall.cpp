@@ -2,8 +2,8 @@
 
 namespace Testing
 {
-    constexpr char* g_string = "The quick brown fox jumps over the lazy dog";
-    constexpr wchar_t* g_wstring = L"The quick brown fox jumps over the lazy dog";
+    constexpr char g_string[] = "The quick brown fox jumps over the lazy dog";
+    constexpr wchar_t g_wstring[] = L"The quick brown fox jumps over the lazy dog";
 
     struct Dummy
     {
