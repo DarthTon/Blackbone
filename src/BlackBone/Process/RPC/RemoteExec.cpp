@@ -278,7 +278,11 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     if (NT_SUCCESS( status ))
     {
         WaitForSingleObject( _hWaitEvent, 20 * 1000/*INFINITE*/ );
-        status = _userData.Read( RET_OFFSET, callResult );
+        
+        if (!_process.core().isWow64())
+            status = _userData.Read( RET_OFFSET, callResult );
+        else
+            status = _userData.Read( INTRET_OFFSET, callResult );
     }
 
     return status;
@@ -485,7 +489,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
     if (!DuplicateHandle( GetCurrentProcess(), _hWaitEvent, _process.core().handle(), &hRemoteHandle, 0, FALSE, DUPLICATE_SAME_ACCESS ))
         return LastNtStatus();
 
-    return _userData.Write( EVENT_OFFSET, sizeof( int32_t ), &hRemoteHandle );
+    return _userData.Write( EVENT_OFFSET, sizeof( uintptr_t ), &hRemoteHandle );
 }
 
 /// <summary>
