@@ -3,7 +3,7 @@
 #include <stdint.h>
 
 // Architecture-dependent pointer size
-#define WordSize sizeof(void*)
+#define BlackBoneWordSize sizeof(void*)
 
 // Rebase address
 #define MAKE_PTR(T, pRVA, base)           (T)((ptr_t)pRVA + (ptr_t)base)
@@ -112,7 +112,7 @@ inline size_t Align( size_t val, size_t alignment )
 }
 
 // Offset of 'LastStatus' field in TEB
-#define LAST_STATUS_OFS (0x598 + 0x197 * WordSize)
+#define LAST_STATUS_OFS (0x598 + 0x197 * BlackBoneWordSize)
 
 using NTSTATUS = long;
 
