@@ -142,6 +142,47 @@ namespace Testing
             }
         }
 
+        TEST_METHOD( BoundThread )
+        {
+            Process process;
+            AssertEx::NtSuccess( process.Attach( GetCurrentProcessId() ) );
+
+            DWORD id = 0;
+            auto code = []( void* ) -> DWORD
+            {
+                for (;;)
+                    Sleep( 1 );
+
+                return ERROR_SUCCESS;
+            };
+
+            HANDLE hThread = CreateThread( nullptr, 0, code, nullptr, 0, &id );
+
+            AssertEx::IsNotNull( hThread );
+            AssertEx::IsNotZero( id );
+
+            auto thread = process.threads().get( id );
+            AssertEx::IsNotNull( thread.get() );
+
+            auto pFN = MakeRemoteFunction<decltype(&TestFn)>( process, &TestFn, thread );
+            double d = 0.0;
+
+            _input.ival = 0xDEAD;
+            _input.fval = 1337.0f;
+            _input.uval = 0xDEADC0DEA4DBEEFull;
+
+            for (auto i = 0; i < 100; i++)
+            {
+                auto [status, result] = pFN.Call( { 1, 2.0f, 3.0, &d, 5ll, _cbuf, _wbuf, &_output, _input } );
+                AssertEx::NtSuccess( status );
+                AssertEx::IsTrue( result.has_value() );
+                AssertEx::AreEqual( 1 + 5, result.value() );
+            }
+
+            TerminateThread( hThread, ERROR_SUCCESS );
+            CloseHandle( hThread );
+        }
+
         TEST_METHOD( NtQueryVirtualMemory )
         {
             auto path = GetTestHelperHost();

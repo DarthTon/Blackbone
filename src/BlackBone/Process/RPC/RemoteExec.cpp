@@ -225,7 +225,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
             (*a)->mov( asmjit::Mem( asmjit::host::rsp, i * sizeof( uint64_t ) ), regs[i] );
 
         a->GenCall( _userCode[_currentBufferIdx].ptr(), { _userData[_currentBufferIdx].ptr() } );
-        AddReturnWithEvent( *a );
+        AddReturnWithEvent( *a, mt_mod64, rt_int32, INTRET_OFFSET );
 
         // Restore registers
         for (int i = 0; i < count; i++)
@@ -279,11 +279,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
     if (NT_SUCCESS( status ))
     {
         WaitForSingleObject( _hWaitEvent, 20 * 1000/*INFINITE*/ );
-
-        if (!_process.core().isWow64())
-            status = _userData[_currentBufferIdx].Read( RET_OFFSET, callResult );
-        else
-            status = _userData[_currentBufferIdx].Read( INTRET_OFFSET, callResult );
+        status = _userData[_currentBufferIdx].Read( INTRET_OFFSET, callResult );
     }
 
     SwitchActiveBuffer();

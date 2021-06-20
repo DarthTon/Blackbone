@@ -55,7 +55,7 @@ public:
     RemoteFunctionBase( Process& proc, ptr_t ptr, ThreadPtr boundThread = nullptr )
         : _process( proc )
         , _ptr( ptr )
-		, _boundThread(boundThread)
+        , _boundThread( boundThread )
     {
         static_assert(
             (... && !std::is_reference_v<Args>),
@@ -71,7 +71,7 @@ public:
         auto a = AsmFactory::GetAssembler( _process.core().isWow64() );
 
         if (!contextThread)
-        	contextThread = _boundThread;
+            contextThread = _boundThread;
 
         // Ensure RPC environment exists
         status = _process.remote().CreateRPCEnvironment( Worker_None, contextThread != nullptr );
@@ -133,19 +133,19 @@ public:
         CallArguments a( args, std::index_sequence_for<Args...>() ); 
         return Call( a, contextThread ); 
     } 
-        
+
     call_result_t<ReturnType> Call( const std::initializer_list<AsmVariant>& args, ThreadPtr contextThread = nullptr ) 
     { 
         CallArguments a( args ); 
         return Call( a, contextThread ); 
     } 
-        
+
     call_result_t<ReturnType> operator()( const Args&... args ) 
     { 
         CallArguments a( args... ); 
         return Call( a ); 
     } 
-        
+
     auto MakeArguments( const Args&... args ) 
     { 
         return CallArguments( args... ); 
@@ -155,7 +155,7 @@ public:
     { 
         return CallArguments( args ); 
     } 
-        
+
     auto MakeArguments( const std::tuple<Args...>& args ) 
     { 
         return CallArguments( args, std::index_sequence_for<Args...>() ); 
