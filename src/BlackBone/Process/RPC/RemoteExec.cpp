@@ -18,7 +18,7 @@ RemoteExec::RemoteExec( Process& proc )
     , _threads( _process.threads() )
     , _hWaitEvent( NULL )
     , _apcPatched( false )
-	, _bufPingPongIdx( 0 )
+    , _currentBufferIdx( 0 )
 {
 }
 
@@ -71,9 +71,9 @@ NTSTATUS RemoteExec::ExecInNewThread(
         auto createActStack = _mods.GetNtdllExport( "RtlAllocateActivationContextStack", mt_mod64 );
         if (createActStack)
         {
-            a->GenCall( createActStack->procAddress, { _userData[_bufPingPongIdx].ptr() + 0x3100 } );
+            a->GenCall( createActStack->procAddress, { _userData[_currentBufferIdx].ptr() + 0x3100 } );
 
-            (*a)->mov( (*a)->zax, _userData[_bufPingPongIdx].ptr() + 0x3100 );
+            (*a)->mov( (*a)->zax, _userData[_currentBufferIdx].ptr() + 0x3100 );
             (*a)->mov( (*a)->zax, (*a)->intptr_ptr( (*a)->zax ) );
 
             (*a)->mov( (*a)->zdx, asmjit::host::dword_ptr_abs( 0x30 ).setSegment( asmjit::host::gs ) );
@@ -81,23 +81,23 @@ NTSTATUS RemoteExec::ExecInNewThread(
         }
     }
 
-    a->GenCall( _userCode[_bufPingPongIdx].ptr(), { } );
-    (*a)->mov( (*a)->zdx, _userData[_bufPingPongIdx].ptr() + INTRET_OFFSET );
+    a->GenCall( _userCode[_currentBufferIdx].ptr(), { } );
+    (*a)->mov( (*a)->zdx, _userData[_currentBufferIdx].ptr() + INTRET_OFFSET );
     (*a)->mov( asmjit::host::dword_ptr( (*a)->zdx ), (*a)->zax );
     a->GenEpilogue( switchMode, 4 );
-    
+
     // Execute code in newly created thread
-    if (!NT_SUCCESS( status = _userCode[_bufPingPongIdx].Write( size, (*a)->getCodeSize(), (*a)->make() ) ))
+    if (!NT_SUCCESS( status = _userCode[_currentBufferIdx].Write( size, (*a)->getCodeSize(), (*a)->make() ) ))
         return status;
 
-    auto thread = _threads.CreateNew( _userCode[_bufPingPongIdx].ptr() + size, _userData[_bufPingPongIdx].ptr()/*, HideFromDebug*/ );
+    auto thread = _threads.CreateNew( _userCode[_currentBufferIdx].ptr() + size, _userData[_currentBufferIdx].ptr()/*, HideFromDebug*/ );
     if (!thread)
         return thread.status;
     if (!(*thread)->Join())
         return LastNtStatus();
 
-    callResult = _userData[_bufPingPongIdx].Read<uint64_t>( INTRET_OFFSET, 0 );
-    switchPingPongBuffers();
+    callResult = _userData[_currentBufferIdx].Read<uint64_t>( INTRET_OFFSET, 0 );
+    SwitchActiveBuffer();
     return STATUS_SUCCESS;
 }
 
@@ -150,22 +150,19 @@ NTSTATUS RemoteExec::ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& cal
             _apcPatched = true;
     }*/
 
-    auto pRemoteCode = _userCode[_bufPingPongIdx].ptr();
+    auto pRemoteCode = _userCode[_currentBufferIdx].ptr();
 
     // Execute code in thread context
     // TODO: Find out why am I passing pRemoteCode as an argument???
     if (NT_SUCCESS( _process.core().native()->QueueApcT( _workerThread->handle(), pRemoteCode, pRemoteCode ) ))
     {
         status = WaitForSingleObject( _hWaitEvent, 30 * 1000 /*wait 30s*/ );
-        callResult = _userData[_bufPingPongIdx].Read<uint64_t>( RET_OFFSET, 0 );
+        callResult = _userData[_currentBufferIdx].Read<uint64_t>( RET_OFFSET, 0 );
     }
     else
         return LastNtStatus();
 
-    // Ensure APC function fully returns
-    // UPDATE: No longer necessary because of buffer ping-ponging, see switchPingPongBuffers() :)
-    //Sleep( 1 );
-    switchPingPongBuffers();
+    SwitchActiveBuffer();
 
     return status;
 }
@@ -227,7 +224,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         for (int i = 0; i < count; i++)
             (*a)->mov( asmjit::Mem( asmjit::host::rsp, i * sizeof( uint64_t ) ), regs[i] );
 
-        a->GenCall( _userCode[_bufPingPongIdx].ptr(), { _userData[_bufPingPongIdx].ptr() } );
+        a->GenCall( _userCode[_currentBufferIdx].ptr(), { _userData[_currentBufferIdx].ptr() } );
         AddReturnWithEvent( *a );
 
         // Restore registers
@@ -253,7 +250,7 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         (*a)->pusha();
         (*a)->pushf();
 
-        a->GenCall( _userCode[_bufPingPongIdx].ptr(), { _userData[_bufPingPongIdx].ptr() } );
+        a->GenCall( _userCode[_currentBufferIdx].ptr(), { _userData[_currentBufferIdx].ptr() } );
         (*a)->add( asmjit::host::esp, sizeof( uint32_t ) );
         AddReturnWithEvent( *a, mt_mod32, rt_int32, INTRET_OFFSET );
 
@@ -264,16 +261,16 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         (*a)->ret();
     }
 
-    if (NT_SUCCESS( status = _userCode[_bufPingPongIdx].Write( size, (*a)->getCodeSize(), (*a)->make() ) ))
+    if (NT_SUCCESS( status = _userCode[_currentBufferIdx].Write( size, (*a)->getCodeSize(), (*a)->make() ) ))
     {
         if (_process.core().isWow64())
         {
-            ctx32.Eip = static_cast<uint32_t>(_userCode[_bufPingPongIdx].ptr() + size);
+            ctx32.Eip = static_cast<uint32_t>(_userCode[_currentBufferIdx].ptr() + size);
             status = thd->SetContext( ctx32, true );
         }     
         else
         {
-            ctx64.Rip = _userCode[_bufPingPongIdx].ptr() + size;
+            ctx64.Rip = _userCode[_currentBufferIdx].ptr() + size;
             status = thd->SetContext( ctx64, true );
         }
     }
@@ -284,12 +281,12 @@ NTSTATUS RemoteExec::ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callRe
         WaitForSingleObject( _hWaitEvent, 20 * 1000/*INFINITE*/ );
 
         if (!_process.core().isWow64())
-            status = _userData[_bufPingPongIdx].Read( RET_OFFSET, callResult );
+            status = _userData[_currentBufferIdx].Read( RET_OFFSET, callResult );
         else
-            status = _userData[_bufPingPongIdx].Read( INTRET_OFFSET, callResult );
+            status = _userData[_currentBufferIdx].Read( INTRET_OFFSET, callResult );
     }
 
-    switchPingPongBuffers();
+    SwitchActiveBuffer();
 
     return status;
 }
@@ -415,7 +412,7 @@ call_result_t<DWORD> RemoteExec::CreateWorkerThread()
                 (*a)->mov( (*a)->zdx, asmjit::host::dword_ptr_abs( 0x18 ).setSegment( asmjit::host::fs ) );
                 (*a)->mov( (*a)->intptr_ptr( (*a)->zdx, 0x2c8 ), (*a)->zax );
             }
-        }*/          
+        }*/
 
         auto ntdll = _mods.GetModule( L"ntdll.dll", Sections );
         auto proc = _mods.GetExport( ntdll, "NtDelayExecution" );
@@ -501,7 +498,7 @@ NTSTATUS RemoteExec::CreateAPCEvent( DWORD threadID )
 
     status = _userData[0].Write( EVENT_OFFSET, sizeof( uintptr_t ), &hRemoteHandle );
     if (!NT_SUCCESS( status ))
-    	return status;
+        return status;
     return _userData[1].Write( EVENT_OFFSET, sizeof( uintptr_t ), &hRemoteHandle );
 }
 
@@ -542,8 +539,8 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
 
         if (arg.type == AsmVariant::dataStruct || arg.type == AsmVariant::dataPtr)
         {
-            _userData[_bufPingPongIdx].Write( data_offset, arg.size, reinterpret_cast<const void*>(arg.imm_val) );
-            arg.new_imm_val = _userData[_bufPingPongIdx].ptr() + data_offset;
+            _userData[_currentBufferIdx].Write( data_offset, arg.size, reinterpret_cast<const void*>(arg.imm_val) );
+            arg.new_imm_val = _userData[_currentBufferIdx].ptr() + data_offset;
 
             // Add some padding after data
             data_offset += arg.size + 0x10;
@@ -554,7 +551,7 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
     // This variable contains address of buffer in which return value is copied
     if (retType == rt_struct)
     {
-        args.emplace( args.begin(), AsmVariant( _userData[_bufPingPongIdx].ptr<uintptr_t>() + ARGS_OFFSET ) );
+        args.emplace( args.begin(), AsmVariant( _userData[_currentBufferIdx].ptr<uintptr_t>() + ARGS_OFFSET ) );
         args.front().new_imm_val = args.front().imm_val;
         args.front().type = AsmVariant::structRet;
     }
@@ -565,7 +562,7 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
     // Retrieve result from XMM0 or ST0
     if (retType == rt_float || retType == rt_double)
     {
-        a->mov( a->zax, _userData[_bufPingPongIdx].ptr<size_t>() + RET_OFFSET );
+        a->mov( a->zax, _userData[_currentBufferIdx].ptr<size_t>() + RET_OFFSET );
 
 #ifdef USE64
         if (retType == rt_double)
@@ -591,24 +588,24 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
 /// <returns>Status</returns>
 NTSTATUS RemoteExec::CopyCode( PVOID pCode, size_t size )
 {
-    if (!_userCode[_bufPingPongIdx].valid())
+    if (!_userCode[_currentBufferIdx].valid())
     {
         auto mem = _memory.Allocate( size );
         if (!mem)
             return mem.status;
 
-        _userCode[_bufPingPongIdx] = std::move( mem.result() );
+        _userCode[_currentBufferIdx] = std::move( mem.result() );
     }
 
     // Reallocate for larger code
-    if (size > _userCode[_bufPingPongIdx].size())
+    if (size > _userCode[_currentBufferIdx].size())
     {
-        auto res = _userCode[_bufPingPongIdx].Realloc( size );
+        auto res = _userCode[_currentBufferIdx].Realloc( size );
         if (!res)
             return res.status;
     }
 
-    return _userCode[_bufPingPongIdx].Write( 0, size, pCode );
+    return _userCode[_currentBufferIdx].Write( 0, size, pCode );
 }
 
 /// <summary>
@@ -626,16 +623,16 @@ void RemoteExec::AddReturnWithEvent(
     )
 {
     // Allocate block if missing
-    if (!_userData[_bufPingPongIdx].valid())
+    if (!_userData[_currentBufferIdx].valid())
     {
         auto mem = _memory.Allocate( 0x4000, PAGE_READWRITE );
         if (!mem)
             return;
 
-        _userData[_bufPingPongIdx] = std::move( mem.result() );
+        _userData[_currentBufferIdx] = std::move( mem.result() );
     }
 
-    ptr_t ptr = _userData[_bufPingPongIdx].ptr();
+    ptr_t ptr = _userData[_currentBufferIdx].ptr();
     auto pSetEvent = _process.modules().GetNtdllExport( "NtSetEvent", mt );
     if(pSetEvent)
         a.SaveRetValAndSignalEvent( pSetEvent->procAddress, ptr + retOffset, ptr + EVENT_OFFSET, ptr + ERR_OFFSET, retType );

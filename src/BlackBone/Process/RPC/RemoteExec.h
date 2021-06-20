@@ -124,7 +124,7 @@ public:
     /// <param name="a">Target assembly helper</param>
     BLACKBONE_API void SaveCallResult( IAsmHelper& a, uint32_t retOffset = RET_OFFSET )
     {
-        a->mov( a->zdx, _userData[_bufPingPongIdx].ptr() + retOffset );
+        a->mov( a->zdx, _userData[_currentBufferIdx].ptr() + retOffset );
         a->mov( asmjit::host::dword_ptr( a->zdx ), a->zax );
     }
 
@@ -136,17 +136,17 @@ public:
     template<typename T>
     NTSTATUS GetCallResult( T& result )
     {
-    	// This method is called after an RPC call, so the ping pong buffers have already been switched, so
-    	// we want to access the OTHER buffer here.
+        // This method is called after an RPC call, so the ping pong buffers have already been switched, so
+        // we want to access the OTHER buffer here.
         if constexpr (sizeof( T ) > sizeof( uint64_t ))
         {
             if constexpr (std::is_reference_v<T>)
-                return _userData[1-_bufPingPongIdx].Read( _userData[1-_bufPingPongIdx].Read<uintptr_t>( RET_OFFSET, 0 ), sizeof( T ), reinterpret_cast<PVOID>(&result) );
+                return _userData[1 - _currentBufferIdx].Read( _userData[1 - _currentBufferIdx].Read<uintptr_t>( RET_OFFSET, 0 ), sizeof( T ), reinterpret_cast<PVOID>(&result) );
             else
-                return _userData[1-_bufPingPongIdx].Read( ARGS_OFFSET, sizeof( T ), reinterpret_cast<PVOID>(&result) );
+                return _userData[1 - _currentBufferIdx].Read( ARGS_OFFSET, sizeof( T ), reinterpret_cast<PVOID>(&result) );
         }
         else
-            return _userData[1-_bufPingPongIdx].Read( RET_OFFSET, sizeof( T ), reinterpret_cast<PVOID>(&result) );
+            return _userData[1 - _currentBufferIdx].Read( RET_OFFSET, sizeof( T ), reinterpret_cast<PVOID>(&result) );
     }
 
     /// <summary>
@@ -155,7 +155,7 @@ public:
     /// <returns></returns>
     BLACKBONE_API NTSTATUS GetLastStatus()
     {
-        return _userData[_bufPingPongIdx].Read<NTSTATUS>( ERR_OFFSET, STATUS_NOT_FOUND );
+        return _userData[_currentBufferIdx].Read<NTSTATUS>( ERR_OFFSET, STATUS_NOT_FOUND );
     }
 
     /// <summary>
@@ -209,18 +209,18 @@ private:
     /// <returns>Status</returns>
     NTSTATUS CopyCode( PVOID pCode, size_t size );
 
-    void switchPingPongBuffers()
+    void SwitchActiveBuffer()
     {
-    	// The ExecIn*() methods might return while the remote RPC code is still executing (it still has to
-    	// return after signaling the event), making it possible to start another RPC call which would then
-    	// overwrite the _userData/_userCode blocks that are still in use by the previous call. If subsequent
-    	// RPC calls use the same buffers, this creates a race condition, very rarely resulting in crashes in
-    	// the remote process, especially in KiUserApcDispatcher().
-    	//
-    	// For this reason, we allocate two separate instances of _userCode and _userData, and switch between
-    	// them for subsequent RPC calls (buffer ping-ponging). This should prevent the race condition without
-    	// having to Sleep() for an arbitrary amount of time after each RPC call.
-    	_bufPingPongIdx = 1-_bufPingPongIdx;
+        // The ExecIn*() methods might return while the remote RPC code is still executing (it still has to
+        // return after signaling the event), making it possible to start another RPC call which would then
+        // overwrite the _userData/_userCode blocks that are still in use by the previous call. If subsequent
+        // RPC calls use the same buffers, this creates a race condition, very rarely resulting in crashes in
+        // the remote process, especially in KiUserApcDispatcher().
+        //
+        // For this reason, we allocate two separate instances of _userCode and _userData, and switch between
+        // them for subsequent RPC calls (buffer ping-ponging). This should prevent the race condition without
+        // having to Sleep() for an arbitrary amount of time after each RPC call.
+        _currentBufferIdx = 1 - _currentBufferIdx;
     }
 
     RemoteExec( const RemoteExec& ) = delete;
@@ -240,7 +240,7 @@ private:
     MemBlock  _userCode[2];     // Codecave for code execution
     MemBlock  _userData[2];     // Region to store copied structures and strings
     bool      _apcPatched;      // KiUserApcDispatcher was patched
-    int		  _bufPingPongIdx;	// Index of the currently used _userCode/_userData block. See switchPingPongBuffers().
+    int       _currentBufferIdx;// Index of the currently used _userCode/_userData block. See SwitchActiveBuffer().
 };
 
 

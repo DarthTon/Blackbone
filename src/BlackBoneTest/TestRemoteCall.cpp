@@ -119,6 +119,29 @@ namespace Testing
             AssertEx::IsZero( memcmp( &_input, &_output, sizeof( _input ) ) );
         }
 
+        TEST_METHOD( CallLoop )
+        {
+            Process process;
+            AssertEx::NtSuccess( process.Attach( GetCurrentProcessId() ) );
+            AssertEx::NtSuccess( process.remote().CreateRPCEnvironment( Worker_CreateNew, true ) );
+
+            auto pFN = MakeRemoteFunction<decltype(&TestFn)>( process, &TestFn );
+            auto worker = process.remote().getWorker();
+            double d = 0.0;
+
+            _input.ival = 0xDEAD;
+            _input.fval = 1337.0f;
+            _input.uval = 0xDEADC0DEA4DBEEFull;
+
+            for(auto i = 0; i < 10000; i++)
+            {
+                auto [status, result] = pFN.Call( { 1, 2.0f, 3.0, &d, 5ll, _cbuf, _wbuf, &_output, _input }, worker );
+                AssertEx::NtSuccess( status );
+                AssertEx::IsTrue( result.has_value() );
+                AssertEx::AreEqual( 1 + 5, result.value() );
+            }
+        }
+
         TEST_METHOD( NtQueryVirtualMemory )
         {
             auto path = GetTestHelperHost();
