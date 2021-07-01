@@ -1,5 +1,6 @@
 #include "AsmHelper32.h"
 
+#include <limits>
 #include <set>
 #include <assert.h>
 

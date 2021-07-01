@@ -57,6 +57,9 @@ NTSTATUS RemoteExec::ExecInNewThread(
     case blackbone::AutoSwitch:
         switchMode = _process.barrier().type == wow_32_64;
         break;
+
+    default:
+    	break;
     }
 
     auto a = switchMode ? AsmFactory::GetAssembler( AsmFactory::asm64 ) 

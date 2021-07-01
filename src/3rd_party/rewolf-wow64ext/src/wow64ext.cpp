@@ -85,6 +85,7 @@ extern "C" DWORD64 __cdecl X64Call(DWORD64 func, int argC, ...)
     reg64 _r9 = { (argC > 0) ? argC--, va_arg(args, DWORD64) : 0 };
     reg64 _rax = { 0 };
 
+#ifdef _MSC_VER
     reg64 restArgs = { (DWORD64)&va_arg(args, DWORD64) };
     
     // conversion to QWORD for easier use in inline assembly
@@ -173,6 +174,7 @@ _ls_e:                                                  ;//
         mov    fs, ax
     }
 #endif // _M_IX86
+#endif // _MSC_VER
 
     return _rax.v;
 }

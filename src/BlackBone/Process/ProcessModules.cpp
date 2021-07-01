@@ -7,6 +7,7 @@
 #include "../Symbols/SymbolData.h"
 #include "../Asm/AsmFactory.h"
 
+#include <algorithm>
 #include <memory>
 #include <type_traits>
 #include <iterator>
@@ -270,7 +271,7 @@ call_result_t<exportData> ProcessModules::GetExport( const ModuleData& hMod, con
             // New size should take care of max number of present names (max name length is assumed to be 255 chars)
             expSize = static_cast<DWORD>(
                 pExpData->AddressOfNameOrdinals - expBase
-                + max( pExpData->NumberOfFunctions, pExpData->NumberOfNames ) * 255
+                + (std::max)( pExpData->NumberOfFunctions, pExpData->NumberOfNames ) * 255
                 );
 
             expData.reset( reinterpret_cast<IMAGE_EXPORT_DIRECTORY*>(malloc( expSize )) );
@@ -407,7 +408,7 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, T
     img.Release();
 
     // Already loaded
-    if (mod = GetModule( path, LdrList, img.mType() ))
+    if ((mod = GetModule( path, LdrList, img.mType() )))
         return call_result_t<ModuleDataPtr>( mod, STATUS_IMAGE_ALREADY_LOADED );
 
     // Image path
@@ -418,7 +419,7 @@ call_result_t<ModuleDataPtr> ProcessModules::Inject( const std::wstring& path, T
     // Write dll name into target process
     auto fillDllName = [&modName, &path]( auto& ustr )
     {
-        ustr.Buffer = modName->ptr<std::decay_t<decltype(ustr)>::type>() + sizeof( ustr );
+        ustr.Buffer = modName->ptr<typename std::decay_t<decltype(ustr)>::type>() + sizeof( ustr );
         ustr.MaximumLength = ustr.Length = static_cast<USHORT>(path.size() * sizeof( wchar_t ));
 
         modName->Write( 0, ustr );

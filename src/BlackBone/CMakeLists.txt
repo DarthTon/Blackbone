@@ -7,6 +7,11 @@ endif()
 
 include_directories(..)
 
+if(NOT MSVC)
+    # Standard ATL headers aren't compatible with MinGW/Clang, so we use the ones from ReactOS.
+    include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../3rd_party/reactos-atl/atl")
+endif()
+
 ##########################################################
 set(SOURCE_ASMJIT   ../3rd_party/asmjit/base/assembler.cpp
                     ../3rd_party/Asmjit/base/codegen.cpp

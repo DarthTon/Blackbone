@@ -1,4 +1,3 @@
-#pragma once
 #include "SymbolData.h"
 
 namespace blackbone

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../Include/Winheaders.h"
+#include "../../Subsystem/NativeSubsystem.h"
 #include "Thread.h"
 
 #include <vector>

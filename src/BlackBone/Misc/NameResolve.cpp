@@ -314,7 +314,7 @@ NTSTATUS NameResolve::ProbeSxSRedirect( std::wstring& path, Process& proc, HANDL
     SAFE_CALL( RtlInitUnicodeString, &OriginalName, path.c_str() );
 
     DllName1.Buffer = wBuf;
-    DllName1.Length = NULL;
+    DllName1.Length = 0;
     DllName1.MaximumLength = sizeof( wBuf );
 
     // Use activation context
