@@ -79,9 +79,42 @@ struct regDR7
     uint32_t rw3  : 2;
     uint32_t len3 : 2;
 
-    inline void setLocal( int idx, int val ) { idx == 0 ? l0   = val : (idx == 1 ? l1   = val : (idx == 2 ? l2   = val : l3   = val)); }
-    inline void setRW   ( int idx, int val ) { idx == 0 ? rw0  = val : (idx == 1 ? rw1  = val : (idx == 2 ? rw2  = val : rw3  = val)); }
-    inline void setLen  ( int idx, int val ) { idx == 0 ? len0 = val : (idx == 1 ? len1 = val : (idx == 2 ? len2 = val : len3 = val)); }
+	inline void setLocal( int idx, int val )
+	{
+		if (idx == 0) {
+			l0 = val;
+		} else if (idx == 1) {
+			l1 = val;
+		} else if (idx == 2) {
+			l2 = val;
+		} else {
+			l3 = val;
+		}
+	}
+	inline void setRW( int idx, int val )
+	{
+		if (idx == 0) {
+			rw0 = val;
+		} else if (idx == 1) {
+			rw1 = val;
+		} else if (idx == 2) {
+			rw2 = val;
+		} else {
+			rw3 = val;
+		}
+	}
+	inline void setLen( int idx, int val )
+	{
+		if (idx == 0) {
+			len0 = val;
+		} else if (idx == 1) {
+			len1 = val;
+		} else if (idx == 2) {
+			len2 = val;
+		} else {
+			len3 = val;
+		}
+	}
 
     inline bool empty() const { return (l0 | l1 | l2 | l3) ? false : true; }
     inline int  getFreeIndex() const { return !l0 ? 0 : (!l1 ? 1 : (!l2 ? 2 : (!l3 ? 3 : -1))); }

@@ -407,11 +407,13 @@ uintptr_t PEImage::ResolveRVAToVA( uintptr_t Rva, AddressType type /*= VA*/ ) co
         {
             for (auto& sec : _sections)
             {
-                if (Rva >= sec.VirtualAddress && Rva < sec.VirtualAddress + sec.Misc.VirtualSize)
-                    if (type == VA)
+                if (Rva >= sec.VirtualAddress && Rva < sec.VirtualAddress + sec.Misc.VirtualSize) {
+                    if (type == VA) {
                         return reinterpret_cast<uintptr_t>(_pFileBase.get()) + Rva - sec.VirtualAddress + sec.PointerToRawData;
-                    else
+                    } else {
                         return Rva - sec.VirtualAddress + sec.PointerToRawData;
+                    }
+                }
             }
 
             return 0;

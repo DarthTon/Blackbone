@@ -86,6 +86,7 @@
 ## Requirements
 
 - Visual Studio 2017 15.7 or higher
+ 	- There is limited support for MinGW and Clang. See [README_MINGW_CLANG.md](README_MINGW_CLANG.md)
 - Windows SDK 10.0.17134 or higher
 - WDK 10.0.17134 or higher (driver only)
 - VC++ 2017 Libs for Spectre (x86 and x64)

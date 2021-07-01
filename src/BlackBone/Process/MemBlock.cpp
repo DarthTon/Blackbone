@@ -189,7 +189,7 @@ call_result_t<MemBlock> MemBlock::AllocateClosest(
 
     if (!buf.valid())
     	return MemBlock::Allocate( process, size, desired, protection, own );
-    return buf;
+    return std::move(buf);
 }
 
 /// <summary>

@@ -39,7 +39,7 @@ struct ProcessInfo
     std::wstring imageName;
     std::vector<ThreadInfo> threads;
 
-    bool operator < (const ProcessInfo& other)
+    bool operator < (const ProcessInfo& other) const
     {
         return this->pid < other.pid;
     }

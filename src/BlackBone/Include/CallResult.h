@@ -46,6 +46,7 @@ struct call_result_t
 #else
 
 #include <memory>
+#include <stdexcept>
 #include <cassert>
 
 namespace blackbone

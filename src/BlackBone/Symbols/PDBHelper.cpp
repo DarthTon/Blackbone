@@ -14,6 +14,16 @@
     } \
 }
 
+#ifndef _MSC_VER
+// The version of __uuidof() provided by MinGW/Clang requires us defining UUIDs
+// manually. See: https://stackoverflow.com/a/22518905/1566841
+// The UUID itself was copied from dia2.idl from the DIA SDK.
+
+// 79F1BB5F-B66E-48e5-B6A9-1545C323CA3D
+__CRT_UUID_DECL(IDiaDataSource, 0x79F1BB5F, 0xB66E, 0x48e5, 0xB6, 0xA9, 0x15, 0x45, 0xC3, 0x23, 0xCA, 0x3D);
+#endif
+
+
 namespace blackbone
 {
 
