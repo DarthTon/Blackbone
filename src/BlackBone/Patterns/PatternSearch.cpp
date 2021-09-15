@@ -98,6 +98,9 @@ bool PatternSearch::SearchWithHandler(
 	ptr_t value_offset /*= 0*/
 	) const
 {
+    if (scanSize == 0)
+        return false;
+
 	size_t bad_char_skip[UCHAR_MAX + 1];
 
     const uint8_t* haystack = reinterpret_cast<const uint8_t*>(scanStart);
