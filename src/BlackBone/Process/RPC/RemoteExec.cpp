@@ -553,6 +553,11 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
     }
         
     a.GenPrologue();
+    if (_process.core().isWow64())
+    {
+        a->pusha();
+        a->pushf();
+    }
     a.GenCall( pfn, args, cc );
 
     // Retrieve result from XMM0 or ST0
@@ -571,6 +576,11 @@ NTSTATUS RemoteExec::PrepareCallAssembly(
     }
 
     AddReturnWithEvent( a, mt_default, retType );
+    if (_process.core().isWow64())
+    {
+        a->popf();
+        a->popa();
+    }
     a.GenEpilogue();
 
     return STATUS_SUCCESS;
