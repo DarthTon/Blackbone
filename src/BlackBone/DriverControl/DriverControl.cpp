@@ -93,7 +93,7 @@ NTSTATUS DriverControl::Reload( std::wstring path /*= L"" */ )
         NULL, OPEN_EXISTING, 0, NULL
         );
 
-    if (_hDriver != INVALID_HANDLE_VALUE)
+    if (_hDriver == INVALID_HANDLE_VALUE)
     {
         _loadStatus = LastNtStatus();
         BLACKBONE_TRACE( L"Failed to open driver handle. Status 0x%X", _loadStatus );
