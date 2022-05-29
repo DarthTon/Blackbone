@@ -69,7 +69,57 @@ void FindPattern( const ScanParams& scan32, const ScanParams& scan64, const Offs
 /// <param name="result">Result</param>
 void OSFillPatterns( std::unordered_map<ptr_t*, OffsetData>& patterns, SymbolData& result )
 {
-    if (IsWindows10RS3OrGreater())
+
+
+    if (IsWindows11OrGreater()) {
+
+        auto offset = 0x0;
+
+        // RtlpInsertInvertedFunctionTableEntry
+        // 49 8B E8 48 8B FA 0F 84
+        patterns.emplace(&result.LdrpInvertedFunctionTable64, OffsetData{ "\x49\x8b\xe8\x48\x8b\xfa\x0f\x84", true, -1, -0xF, 2, 6 });
+
+        // RtlInsertInvertedFunctionTable
+        // 53 56 57 8D 45 F8 8B FA
+        patterns.emplace(&result.RtlInsertInvertedFunctionTable32, OffsetData{ "\x53\x56\x57\x8d\x45\xf8\x8b\xfa", false, 0x8 });
+
+        // RtlpInsertInvertedFunctionTableEntry
+        // 33 F6 46 3B C6
+        patterns.emplace(&result.LdrpInvertedFunctionTable32, OffsetData{ "\x33\xF6\x46\x3B\xC6", false, -1, -0x1B });
+
+        // LdrpHandleTlsData
+        // 33 F6 85 C0 79 03 - RS5-20H1
+        // 8B C1 8D 4D AC/BC 51 - RS3/RS4
+        auto pattern = "\x8b\xc1\x8d\x4d\xbc\x51";
+        if (IsWindows10RS5OrGreater())
+            pattern = "\x33\xf6\x85\xc0\x79\x03";
+        else if (IsWindows10RS4OrGreater())
+            pattern = "\x8b\xc1\x8d\x4d\xac\x51";
+
+        offset = 0x18;
+        if (IsWindows1020H1OrGreater())
+            offset = 0x2C;
+        else if (IsWindows1019H1OrGreater())
+            offset = 0x2E;
+        else if (IsWindows10RS5OrGreater())
+            offset = 0x2C;
+
+        patterns.emplace(&result.LdrpHandleTlsData32, OffsetData{ pattern, false, offset });
+        // LdrProtectMrdata
+       // 85 DB 75 35 85 FF 75 0A 8D
+        patterns.emplace(&result.LdrProtectMrdata, OffsetData{ "\x85\xdb\x75\x35\x85\xff\x75\x0a\x8d", true, -0x1e });
+
+        // RtlInsertInvertedFunctionTable
+        // 48 89 5C 24 08 57 48 83 EC 30 8B DA
+        patterns.emplace(&result.RtlInsertInvertedFunctionTable64, OffsetData{ "\x48\x89\x5C\x24\x08\x57\x48\x83\xEC\x30\x8B\xDA", true, 0 });
+
+        // LdrpHandleTlsData64
+        // 41 55 41 56 41 57 48 81 EC F0 00 00
+        patterns.emplace(&result.LdrpHandleTlsData64, OffsetData{ "\x41\x55\x41\x56\x41\x57\x48\x81\xEC\xF0\x00\x00", true, -0xf });
+
+    }
+
+    else   if (IsWindows10RS3OrGreater())
     {
         // LdrpHandleTlsData
         // 74 33 44 8D 43 09
