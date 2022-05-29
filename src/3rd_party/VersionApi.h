@@ -14,7 +14,8 @@
 #define _WIN32_WINNT_WIN7           0x0601
 #define _WIN32_WINNT_WIN8           0x0602
 #define _WIN32_WINNT_WINBLUE        0x0603
-#define _WIN32_WINNT_WIN10          0x0A00        
+#define _WIN32_WINNT_WIN10          0x0A00  
+#define _WIN32_WINNT_WIN11          0x55F0
 
 using fnRtlGetVersion = NTSTATUS( NTAPI* )(PRTL_OSVERSIONINFOEXW lpVersionInformation);
 
@@ -301,6 +302,13 @@ VERSIONHELPERAPI
 IsWindows1020H1OrGreater()
 {
     return IsWindowsVersionOrGreater( HIBYTE( _WIN32_WINNT_WIN10 ), LOBYTE( _WIN32_WINNT_WIN10 ), 0, Build_20H1 );
+}
+
+
+VERSIONHELPERAPI
+IsWindows11OrGreater()
+{
+    return IsWindowsVersionOrGreater(HIBYTE(_WIN32_WINNT_WIN11), LOBYTE(_WIN32_WINNT_WIN11), 0, 0);
 }
 
 VERSIONHELPERAPI
