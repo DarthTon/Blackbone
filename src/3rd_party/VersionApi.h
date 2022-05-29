@@ -309,7 +309,7 @@ VERSIONHELPERAPI
 IsWindows11OrGreater()
 {
     return IsWindowsVersionOrGreater(HIBYTE(_WIN32_WINNT_WIN11), LOBYTE(_WIN32_WINNT_WIN11), 0, 0);
-
+}
 
 VERSIONHELPERAPI
 IsWindowsServer()
