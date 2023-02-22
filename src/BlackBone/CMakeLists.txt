@@ -6,6 +6,7 @@ enable_language(ASM_MASM)
 endif()
 
 include_directories(..)
+include_directories(../3rd_party)
 
 ##########################################################
 set(SOURCE_ASMJIT   ../3rd_party/asmjit/base/assembler.cpp

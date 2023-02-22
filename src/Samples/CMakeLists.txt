@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 3.13)
 project (Samples)
 
 include_directories(..)
+include_directories(../3rd_party)
 
 cmake_policy(SET CMP0015 NEW)
 
