@@ -198,8 +198,11 @@ call_result_t<ModuleDataPtr> MMap::MapImageInternal(
             }
 
             // Don't run initializer for pure IL dlls
-            if (!img->peImage.pureIL() || img->peImage.isExe())
-                status = RunModuleInitializers( img, DLL_PROCESS_ATTACH, pCustomArgs ).status;
+            if (!(img->flags & NoExecute))
+            {
+                if (!img->peImage.pureIL() || img->peImage.isExe())
+                    status = RunModuleInitializers(img, DLL_PROCESS_ATTACH, pCustomArgs).status;
+            }
 
             if (!NT_SUCCESS( status ))
             {
@@ -364,7 +367,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     // Allocate normally if something went wrong
     if (!pImage->imgMem.valid())
     {
-        auto mem = _process.memory().Allocate( pImage->peImage.imageSize(), PAGE_EXECUTE_READWRITE, pImage->peImage.imageBase() );
+        auto mem = _process.memory().Allocate( pImage->peImage.imageSize(), (pImage->flags & NoExecute) ? PAGE_READWRITE : PAGE_EXECUTE_READWRITE, pImage->peImage.imageBase() );
         if (!mem)
         {
             BLACKBONE_TRACE( L"ManualMap: Failed to allocate memory for image, status 0x%X", status );
@@ -439,7 +442,7 @@ call_result_t<ModuleDataPtr> MMap::FindOrMapModule(
     }
 
     // Apply proper memory protection for sections
-    if (!(flags & HideVAD))
+    if (!(flags & HideVAD) && !(flags & NoExecute))
         ProtectImageMemory( pImage );
 
     // Make exception handling possible (C and C++)
@@ -526,7 +529,10 @@ NTSTATUS MMap::UnmapAllModules()
         BLACKBONE_TRACE( L"ManualMap: Unmapping image '%ls'", pImage->ldrEntry.name.c_str() );
 
         // Call main
-        RunModuleInitializers( pImage, DLL_PROCESS_DETACH );
+        if (!(pImage->flags & NoExecute))
+        {
+            RunModuleInitializers(pImage, DLL_PROCESS_DETACH);
+        }
 
         // Remove VEH
         if (!(pImage->flags & NoExceptions))

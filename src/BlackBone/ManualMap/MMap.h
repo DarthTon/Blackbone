@@ -108,6 +108,7 @@ enum eLoadFlags
     NoSxS           = 0x08000,  // Do not apply SxS activation context
     NoTLS           = 0x10000,  // Skip TLS initialization and don't execute TLS callbacks
     IsDependency    = 0x20000,  // Module is a dependency
+    NoExecute       = 0x40000,  // Don't run initializer
 };
 
 ENUM_OPS( eLoadFlags )
