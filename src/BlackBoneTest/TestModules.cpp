@@ -8,7 +8,7 @@ TEST_CLASS( Modules )
 public:
     TEST_METHOD_INITIALIZE( ClassInitialize )
     {
-        AssertEx::NtSuccess( _proc.Attach( GetCurrentProcessId() ) );
+        _proc.Attach( GetCurrentProcessId() );
     }
 
     TEST_METHOD( MainModule )
@@ -57,8 +57,7 @@ public:
         AssertEx::IsNotNull( reinterpret_cast<void*>(expected) );
 
         auto result = _proc.modules().GetExport( L"kernel32.dll", "CreateFileW" );
-        AssertEx::IsTrue( result.success() );
-        AssertEx::AreEqual( reinterpret_cast<ptr_t>(expected), result->procAddress );
+        AssertEx::AreEqual( reinterpret_cast<ptr_t>(expected), result.procAddress );
     }
 
 private:

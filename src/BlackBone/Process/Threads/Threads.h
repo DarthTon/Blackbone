@@ -12,8 +12,7 @@ namespace blackbone
 class ProcessThreads
 {
 public:
-    BLACKBONE_API ProcessThreads( class ProcessCore& core );
-    BLACKBONE_API ~ProcessThreads();
+    BLACKBONE_API ProcessThreads( class ProcessCore* core );
 
     ProcessThreads( const ProcessThreads& ) = delete;
     ProcessThreads& operator =( const ProcessThreads& ) = delete;
@@ -21,11 +20,11 @@ public:
     /// <summary>
     /// Create the thread.
     /// </summary>
-    /// <param name="threadProc">Thread enty point</param>
+    /// <param name="threadProc">Thread entry point</param>
     /// <param name="arg">Thread argument.</param>
     /// <param name="flags">Thread creation flags</param>
     /// <returns>New thread object</returns>
-    BLACKBONE_API call_result_t<ThreadPtr> CreateNew(
+    BLACKBONE_API ThreadPtr CreateNew(
         ptr_t threadProc,
         ptr_t arg,
         enum CreateThreadFlags flags = static_cast<CreateThreadFlags>(0)
@@ -69,7 +68,7 @@ public:
     BLACKBONE_API ThreadPtr get( DWORD id ) const;
 
 private:
-    class ProcessCore& _core;   // Core process functions
+    class ProcessCore* _core;   // Core process functions
 };
 
 }

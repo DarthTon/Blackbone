@@ -5,7 +5,6 @@
 #include "../../Include/Types.h"
 #include "../../Include/NativeStructures.h"
 #include "../../Include/Macro.h"
-#include "../../Include/CallResult.h"
 
 namespace blackbone
 {
@@ -32,38 +31,34 @@ struct NtLdrEntry : ModuleData
 class NtLdr
 {
 public:
-    BLACKBONE_API NtLdr( class Process& proc );
+    BLACKBONE_API NtLdr( class Process* proc );
 
     /// <summary>
     /// Initialize some loader stuff
     /// </summary>
     /// <param name="initFor">Target module type</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool Init( eModType initFor = mt_default );
+    BLACKBONE_API void Init( eModType initFor = mt_default );
 
     /// <summary>
     /// Add module to some loader structures 
     /// (LdrpHashTable, LdrpModuleIndex( win8 only ), InMemoryOrderModuleList( win7 only ))
     /// </summary>
     /// <param name="mod">Module data</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool CreateNTReference( NtLdrEntry& mod );
+    BLACKBONE_API void CreateNTReference( NtLdrEntry& mod );
 
     /// <summary>
     /// Create thread static TLS array
     /// </summary>
     /// <param name="mod">Module data</param>
     /// <param name="tlsPtr">TLS directory of target image</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr );
+    BLACKBONE_API void AddStaticTLSEntry( NtLdrEntry& mod, ptr_t tlsPtr );
 
     /// <summary>
     /// Create module record in LdrpInvertedFunctionTable
     /// Used to create fake SAFESEH entries
     /// </summary>
     /// <param name="mod">Module data</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool InsertInvertedFunctionTable( NtLdrEntry& mod );
+    BLACKBONE_API void InsertInvertedFunctionTable( NtLdrEntry& mod );
 
     /// <summary>
     /// Free static TLS
@@ -80,28 +75,25 @@ public:
     /// <param name="noThread">Don't create new threads during unlink</param>
     /// <returns>true on success</returns>
     BLACKBONE_API bool Unlink( const ModuleData& mod, bool noThread = false );
-private:
 
+private:
     /// <summary>
     /// Find LdrpHashTable[] variable
     /// </summary>
-    /// <returns>true on success</returns>
     template<typename T>
-    bool FindLdrpHashTable();
+    void FindLdrpHashTable();
 
     /// <summary>
     /// Find LdrpModuleIndex variable under win8
     /// </summary>
-    /// <returns>true on success</returns>
     template<typename T>
-    bool FindLdrpModuleIndexBase();
+    void FindLdrpModuleIndexBase();
 
     /// <summary>
     /// Find Loader heap base
     /// </summary>
-    /// <returns>true on success</returns>
     template<typename T>
-    bool FindLdrHeap();
+    void FindLdrHeap();
 
     /// <summary>
     ///  Initialize OS-specific module entry
@@ -172,7 +164,7 @@ private:
     /// <param name="size">Module type</param>
     /// <param name="size">Size to allocate</param>
     /// <returns>Allocated address</returns>
-    call_result_t<ptr_t> AllocateInHeap( eModType mt, size_t size );
+    ptr_t AllocateInHeap( eModType mt, size_t size );
 
     /// <summary>
     /// Get module native node ptr or create new
@@ -221,7 +213,7 @@ private:
     NtLdr& operator =( const NtLdr& ) = delete;
 
 private:
-    class Process& _process;                // Process memory routines
+    class Process* _process;                // Process memory routines
 
     ptr_t _LdrpHashTable = 0;               // LdrpHashTable address
     ptr_t _LdrpModuleIndexBase = 0;         // LdrpModuleIndex address

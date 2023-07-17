@@ -99,8 +99,7 @@ namespace Testing
 
         TEST_METHOD( LocalCall )
         {
-            Process process;
-            AssertEx::NtSuccess( process.Attach( GetCurrentProcessId() ) );
+            Process process( GetCurrentProcessId() );
             auto pFN = MakeRemoteFunction<decltype(&TestFn)>( process, &TestFn );
             double d = 0.0;
 
@@ -108,11 +107,9 @@ namespace Testing
             _input.fval = 1337.0f;
             _input.uval = 0xDEADC0DEA4DBEEFull;
 
-            auto[status, result] = pFN.Call( { 1, 2.0f, 3.0, &d, 5ll, _cbuf, _wbuf, &_output, _input } );
-            AssertEx::NtSuccess( status );
-            AssertEx::IsTrue( result.has_value() );
+            auto result = pFN.Call( { 1, 2.0f, 3.0, &d, 5ll, _cbuf, _wbuf, &_output, _input } );
 
-            AssertEx::AreEqual( 1 + 5, result.value() );
+            AssertEx::AreEqual( 1 + 5, result );
             AssertEx::AreEqual( 3.0 + 2.0f, d, 0.001 );
             AssertEx::AreEqual( _cbuf, g_string );
             AssertEx::AreEqual( _wbuf, g_wstring );
@@ -122,8 +119,8 @@ namespace Testing
         TEST_METHOD( CallLoop )
         {
             Process process;
-            AssertEx::NtSuccess( process.Attach( GetCurrentProcessId() ) );
-            AssertEx::NtSuccess( process.remote().CreateRPCEnvironment( Worker_CreateNew, true ) );
+            process.Attach( GetCurrentProcessId() );
+            process.remote().CreateRPCEnvironment( Worker_CreateNew, true );
 
             auto pFN = MakeRemoteFunction<decltype(&TestFn)>( process, &TestFn );
             auto worker = process.remote().getWorker();
@@ -135,17 +132,15 @@ namespace Testing
 
             for(auto i = 0; i < 10000; i++)
             {
-                auto [status, result] = pFN.Call( { 1, 2.0f, 3.0, &d, 5ll, _cbuf, _wbuf, &_output, _input }, worker );
-                AssertEx::NtSuccess( status );
-                AssertEx::IsTrue( result.has_value() );
-                AssertEx::AreEqual( 1 + 5, result.value() );
+                auto result = pFN.Call( { 1, 2.0f, 3.0, &d, 5ll, _cbuf, _wbuf, &_output, _input }, worker );
+                AssertEx::AreEqual( 1 + 5, result);
             }
         }
 
         TEST_METHOD( BoundThread )
         {
             Process process;
-            AssertEx::NtSuccess( process.Attach( GetCurrentProcessId() ) );
+            process.Attach( GetCurrentProcessId() );
 
             DWORD id = 0;
             auto code = []( void* ) -> DWORD
@@ -173,10 +168,8 @@ namespace Testing
 
             for (auto i = 0; i < 100; i++)
             {
-                auto [status, result] = pFN.Call( { 1, 2.0f, 3.0, &d, 5ll, _cbuf, _wbuf, &_output, _input } );
-                AssertEx::NtSuccess( status );
-                AssertEx::IsTrue( result.has_value() );
-                AssertEx::AreEqual( 1 + 5, result.value() );
+                auto result = pFN.Call( { 1, 2.0f, 3.0, &d, 5ll, _cbuf, _wbuf, &_output, _input } );
+                AssertEx::AreEqual( 1 + 5, result );
             }
 
             TerminateThread( hThread, ERROR_SUCCESS );
@@ -189,8 +182,7 @@ namespace Testing
             AssertEx::IsTrue( Utils::FileExists( path ) );
 
             // Give process some time to initialize
-            Process process;
-            AssertEx::NtSuccess( process.CreateAndAttach( path ) );
+            auto process = Process::CreateNew( path );
             Sleep( 100 );
 
             auto hMainMod = process.modules().GetMainModule();
@@ -211,8 +203,7 @@ namespace Testing
 
             process.Terminate();
 
-            AssertEx::NtSuccess( result.status );
-            AssertEx::NtSuccess( result.result() );
+            AssertEx::NtSuccess( result );
 
             std::wstring name( reinterpret_cast<wchar_t*>(buf + sizeof( UNICODE_STRING )) );
             AssertEx::AreNotEqual( name.npos, name.rfind( Utils::StripPath( path ) ) );
@@ -224,38 +215,31 @@ namespace Testing
             AssertEx::IsTrue( Utils::FileExists( path ) );
 
             // Give process some time to initialize
-            Process process;
-            AssertEx::NtSuccess( process.CreateAndAttach( path ) );
+            auto process = Process::CreateNew( path );
             Sleep( 100 );
 
             auto CreateFileWPtr = process.modules().GetExport( L"kernel32.dll", "CreateFileW" );
             auto WriteFilePtr = process.modules().GetExport( L"kernel32.dll", "WriteFile" );
             auto CloseHandlePtr = process.modules().GetExport( L"kernel32.dll", "CloseHandle" );
 
-            AssertEx::IsTrue( CreateFileWPtr.success() );
-            AssertEx::IsTrue( WriteFilePtr.success() );
-            AssertEx::IsTrue( CloseHandlePtr.success() );
-
             uint8_t writeBuf[] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 };
 
-            RemoteFunction<decltype(&CreateFileW)> pCreateFile( process, CreateFileWPtr->procAddress );
-            RemoteFunction<decltype(&WriteFile)> pWriteFile( process, WriteFilePtr->procAddress );
-            RemoteFunction<decltype(&CloseHandle)> pCloseHandle( process, CloseHandlePtr->procAddress );
+            RemoteFunction<decltype(&CreateFileW)> pCreateFile( process, CreateFileWPtr.procAddress );
+            RemoteFunction<decltype(&WriteFile)> pWriteFile( process, WriteFilePtr.procAddress );
+            RemoteFunction<decltype(&CloseHandle)> pCloseHandle( process, CloseHandlePtr.procAddress );
 
             auto filePath = L"DummyFile_FileOP.dat";
             auto handle = pCreateFile.Call( filePath, GENERIC_WRITE, 0x7, nullptr, CREATE_ALWAYS, 0, nullptr );
 
-            AssertEx::NtSuccess( handle.status );
-            AssertEx::IsNotNull( handle.result() );
+            AssertEx::IsNotNull( handle );
 
             DWORD bytes = 0;
-            auto success = pWriteFile.Call( { handle.result(), writeBuf, sizeof( writeBuf ), &bytes, nullptr } );
-            pCloseHandle.Call( handle.result(), nullptr );
+            auto success = pWriteFile.Call( { handle, writeBuf, sizeof( writeBuf ), &bytes, nullptr } );
+            pCloseHandle.Call( handle, nullptr );
 
             process.Terminate();
 
-            AssertEx::NtSuccess( success.status );
-            AssertEx::IsTrue( success.result() );
+            AssertEx::IsTrue( success );
             AssertEx::AreEqual( static_cast<DWORD>(sizeof( writeBuf )), bytes );
 
             // Check locally

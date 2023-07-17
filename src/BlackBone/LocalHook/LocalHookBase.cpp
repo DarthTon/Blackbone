@@ -24,7 +24,7 @@ bool DetourBase::AllocateBuffer( uint8_t* nearest )
     if (_buf != nullptr)
         return true;
 
-    MEMORY_BASIC_INFORMATION mbi = { 0 };
+    MEMORY_BASIC_INFORMATION mbi = { };
     for (SIZE_T addr = (SIZE_T)nearest; addr > (SIZE_T)nearest - 0x80000000; addr = (SIZE_T)mbi.BaseAddress - 1)
     {
         if (!VirtualQuery( (LPCVOID)addr, &mbi, sizeof( mbi ) ))
@@ -90,7 +90,7 @@ bool DetourBase::EnableHook()
 /// <returns>true on success</returns>
 bool DetourBase::ToggleHBP( int index, bool enable )
 {
-    CONTEXT context = { 0 };
+    CONTEXT context = { };
     context.ContextFlags = CONTEXT_DEBUG_REGISTERS;
 
     if (GetThreadContext( GetCurrentThread(), &context ) != TRUE)
@@ -107,14 +107,14 @@ bool DetourBase::ToggleHBP( int index, bool enable )
 /// <summary>
 /// Copy original function bytes
 /// </summary>
-/// <param name="Ptr">Origianl function address</param>
+/// <param name="Ptr">Original function address</param>
 void DetourBase::CopyOldCode( uint8_t* ptr )
 { 
     // Store original bytes
     uint8_t* src = ptr;
     uint8_t* thunk = _origThunk, *original = _origCode;
     uint32_t all_len = 0;
-    ldasm_data ld = { 0 };
+    ldasm_data ld = { };
 
     do 
     {

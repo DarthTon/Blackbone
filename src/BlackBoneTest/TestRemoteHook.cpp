@@ -52,29 +52,26 @@ namespace Testing
             auto path = GetTestHelperHost();
             AssertEx::IsFalse( path.empty() );
 
-
             // Give process some time to initialize
-            AssertEx::NtSuccess( hooker.process.CreateAndAttach( path ) );
+            hooker.process.CreateAndAttach( path );
             Sleep( 100 );
 
             // Remote helper function
             auto terminatePtr = hooker.process.modules().GetExport( hooker.process.modules().GetMainModule(), "TerminateProc" );
-            AssertEx::IsTrue( terminatePtr.success() );
 
             // Get function
             auto pHookFn = hooker.process.modules().GetNtdllExport( "NtOpenProcess" );
-            AssertEx::IsTrue( pHookFn.success() );
 
             // Hook and try to terminate from remote process
-            AssertEx::NtSuccess( hooker.process.hooks().Apply( RemoteHook::hwbp, pHookFn->procAddress, &HookClass::HookNtOpenProcess, hooker ) );
+            AssertEx::NtSuccess( hooker.process.hooks().Apply( RemoteHook::hwbp, pHookFn.procAddress, &HookClass::HookNtOpenProcess, hooker ) );
 
-            auto terminate = MakeRemoteFunction<long( *)(DWORD)>( hooker.process, terminatePtr->procAddress );
+            auto terminate = MakeRemoteFunction<long( *)(DWORD)>( hooker.process, terminatePtr.procAddress );
             auto result = terminate( GetCurrentProcessId() );
 
             hooker.process.Terminate();
 
-            AssertEx::IsTrue( result.success() );
-            AssertEx::AreEqual( ERROR_ACCESS_DENIED, result.result() );
+            AssertEx::IsTrue( result );
+            AssertEx::AreEqual( ERROR_ACCESS_DENIED, result );
             AssertEx::AreEqual( 1, hooker.calls );
         }
 
@@ -86,19 +83,18 @@ namespace Testing
             AssertEx::IsFalse( path.empty() );
 
             // Give process some time to initialize
-            AssertEx::NtSuccess( hooker.process.CreateAndAttach( path ) );
+            hooker.process.CreateAndAttach( path );
             Sleep( 100 );
 
             // Get function
             auto pHookFn = hooker.process.modules().GetNtdllExport( "NtAllocateVirtualMemory" );
-            AssertEx::IsTrue( pHookFn.success() );
 
             PVOID base = nullptr;
             SIZE_T size = 0xDEAD;
-            auto NtAllocateVirtualMemory = MakeRemoteFunction<NTSTATUS( __stdcall * )(HANDLE, PVOID*, ULONG_PTR, PSIZE_T, ULONG, ULONG)>( hooker.process, pHookFn->procAddress );
+            auto NtAllocateVirtualMemory = MakeRemoteFunction<NTSTATUS( __stdcall * )(HANDLE, PVOID*, ULONG_PTR, PSIZE_T, ULONG, ULONG)>( hooker.process, pHookFn.procAddress );
 
             // Hook and try to call
-            AssertEx::NtSuccess( hooker.process.hooks().Apply( RemoteHook::hwbp, pHookFn->procAddress, &HookClass::HookNtAllocateVirtualMemory, hooker ) );
+            AssertEx::NtSuccess( hooker.process.hooks().Apply( RemoteHook::hwbp, pHookFn.procAddress, &HookClass::HookNtAllocateVirtualMemory, hooker ) );
             auto result = NtAllocateVirtualMemory.Call( { GetCurrentProcess(), &base, 0, &size, MEM_RESERVE | MEM_COMMIT, PAGE_EXECUTE_READWRITE } );
 
             hooker.process.Terminate();

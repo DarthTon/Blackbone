@@ -91,7 +91,7 @@ namespace Testing
         {
             AsmVariant a( "Text" );
 
-            AssertEx::AreEqual( AsmVariant::dataPtr, a.type );
+            AssertEx::AreEqual( AsmVariant::dataPtrConst, a.type );
         }
 
         TEST_METHOD( StringConstPtr )
@@ -99,7 +99,7 @@ namespace Testing
             const char* cstring = "Text";
             AsmVariant a( cstring );
 
-            AssertEx::AreEqual( AsmVariant::dataPtr, a.type );
+            AssertEx::AreEqual( AsmVariant::dataPtrConst, a.type );
             AssertEx::AreEqual( reinterpret_cast<uint64_t>(cstring), a.imm_val64 );
         }
 
@@ -108,7 +108,7 @@ namespace Testing
             const char str_array[] = "Text";
             AsmVariant a( str_array );
 
-            AssertEx::AreEqual( AsmVariant::dataPtr, a.type );
+            AssertEx::AreEqual( AsmVariant::dataPtrConst, a.type );
             AssertEx::AreEqual( reinterpret_cast<uint64_t>(str_array), a.imm_val64 );
             AssertEx::AreEqual( sizeof( str_array ), a.size );
         }
@@ -128,7 +128,7 @@ namespace Testing
         {
             AsmVariant a( L"Text" );
 
-            AssertEx::AreEqual( AsmVariant::dataPtr, a.type );
+            AssertEx::AreEqual( AsmVariant::dataPtrConst, a.type );
         }
 
         TEST_METHOD( WStringConstPtr )
@@ -136,7 +136,7 @@ namespace Testing
             const wchar_t* cwstring = L"Text";
             AsmVariant a( cwstring );
 
-            AssertEx::AreEqual( AsmVariant::dataPtr, a.type );
+            AssertEx::AreEqual( AsmVariant::dataPtrConst, a.type );
             AssertEx::AreEqual( reinterpret_cast<uint64_t>(cwstring), a.imm_val64 );
         }
 
@@ -145,7 +145,7 @@ namespace Testing
             const wchar_t  wstr_array[] = L"Text";
             AsmVariant a( wstr_array );
 
-            AssertEx::AreEqual( a.type, AsmVariant::dataPtr );
+            AssertEx::AreEqual( a.type, AsmVariant::dataPtrConst );
             AssertEx::AreEqual( reinterpret_cast<uint64_t>(wstr_array), a.imm_val64 );
             AssertEx::AreEqual( sizeof( wstr_array ), a.size );
         }

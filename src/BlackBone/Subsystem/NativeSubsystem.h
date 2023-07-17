@@ -27,10 +27,10 @@ ENUM_OPS(CreateThreadFlags)
 class Native
 {
 public:
-    BLACKBONE_API Native( HANDLE hProcess, bool x86OS = false );
-    BLACKBONE_API ~Native();
+    BLACKBONE_API Native( HANDLE hProcess, bool x86OS = false ) noexcept;
+    BLACKBONE_API ~Native() = default;
 
-    BLACKBONE_API inline const Wow64Barrier& GetWow64Barrier() const { return _wowBarrier; }
+    BLACKBONE_API const Wow64Barrier& GetWow64Barrier() const noexcept { return _wowBarrier; }
 
     /// <summary>
     /// Allocate virtual memory
@@ -40,7 +40,7 @@ public:
     /// <param name="flAllocationType">Allocation type</param>
     /// <param name="flProtect">Memory protection</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect );
+    virtual NTSTATUS VirtualAllocExT( ptr_t& lpAddress, size_t dwSize, DWORD flAllocationType, DWORD flProtect ) noexcept;
 
     /// <summary>
     /// Free virtual memory
@@ -49,7 +49,7 @@ public:
     /// <param name="dwSize">Region size</param>
     /// <param name="dwFreeType">Memory release type.</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType );
+    virtual NTSTATUS VirtualFreeExT( ptr_t lpAddress, size_t dwSize, DWORD dwFreeType ) noexcept;
 
     /// <summary>
     /// Change memory protection
@@ -59,7 +59,7 @@ public:
     /// <param name="flProtect">New protection.</param>
     /// <param name="flOld">Old protection</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS VirtualProtectExT( ptr_t lpAddress, DWORD64 dwSize, DWORD flProtect, DWORD* flOld );
+    virtual NTSTATUS VirtualProtectExT( ptr_t lpAddress, DWORD64 dwSize, DWORD flProtect, DWORD* flOld ) noexcept;
 
     /// <summary>
     /// Read virtual memory
@@ -67,9 +67,9 @@ public:
     /// <param name="lpBaseAddress">Memory address</param>
     /// <param name="lpBuffer">Output buffer</param>
     /// <param name="nSize">Number of bytes to read</param>
-    /// <param name="lpBytes">Mumber of bytes read</param>
+    /// <param name="lpBytes">Number of bytes read</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS ReadProcessMemoryT( ptr_t lpBaseAddress, LPVOID lpBuffer, size_t nSize, DWORD64 *lpBytes = nullptr );
+    virtual NTSTATUS ReadProcessMemoryT( ptr_t lpBaseAddress, LPVOID lpBuffer, size_t nSize, DWORD64 *lpBytes = nullptr ) noexcept;
 
     /// <summary>
     /// Write virtual memory
@@ -77,9 +77,9 @@ public:
     /// <param name="lpBaseAddress">Memory address</param>
     /// <param name="lpBuffer">Buffer to write</param>
     /// <param name="nSize">Number of bytes to read</param>
-    /// <param name="lpBytes">Mumber of bytes read</param>
+    /// <param name="lpBytes">Number of bytes read</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer, size_t nSize, DWORD64 *lpBytes = nullptr );
+    virtual NTSTATUS WriteProcessMemoryT( ptr_t lpBaseAddress, LPCVOID lpBuffer, size_t nSize, DWORD64 *lpBytes = nullptr ) noexcept;
 
     /// <summary>
     /// Query virtual memory
@@ -87,7 +87,7 @@ public:
     /// <param name="lpAddress">Address to query</param>
     /// <param name="lpBuffer">Retrieved memory info</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 lpBuffer );
+    virtual NTSTATUS VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 lpBuffer ) noexcept;
 
     /// <summary>
     /// Query virtual memory
@@ -95,7 +95,7 @@ public:
     /// <param name="lpAddress">Address to query</param>
     /// <param name="lpBuffer">Retrieved memory info</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS VirtualQueryExT( ptr_t lpAddress, MEMORY_INFORMATION_CLASS infoClass, LPVOID lpBuffer, size_t bufSize );
+    virtual NTSTATUS VirtualQueryExT( ptr_t lpAddress, MEMORY_INFORMATION_CLASS infoClass, LPVOID lpBuffer, size_t bufSize ) noexcept;
 
     /// <summary>
     /// Call NtQueryInformationProcess for underlying process
@@ -104,7 +104,7 @@ public:
     /// <param name="lpBuffer">Output buffer</param>
     /// <param name="bufSize">Buffer size</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize );
+    virtual NTSTATUS QueryProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize ) noexcept;
 
     /// <summary>
     /// Call NtSetInformationProcess for underlying process
@@ -113,7 +113,7 @@ public:
     /// <param name="lpBuffer">Input buffer</param>
     /// <param name="bufSize">Buffer size</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize );
+    virtual NTSTATUS SetProcessInfoT( PROCESSINFOCLASS infoClass, LPVOID lpBuffer, uint32_t bufSize ) noexcept;
 
     /// <summary>
     /// Creates new thread in the remote process
@@ -124,7 +124,7 @@ public:
     /// <param name="flags">Creation flags</param>
     /// <param name="access">Access override</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access = THREAD_ALL_ACCESS );
+    virtual NTSTATUS CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t arg, CreateThreadFlags flags, DWORD access = THREAD_ALL_ACCESS ) noexcept;
 
     /// <summary>
     /// Get native thread context
@@ -132,7 +132,7 @@ public:
     /// <param name="hThread">Thread handle.</param>
     /// <param name="ctx">Thread context</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS GetThreadContextT( HANDLE hThread, _CONTEXT64& ctx );
+    virtual NTSTATUS GetThreadContextT( HANDLE hThread, _CONTEXT64& ctx ) noexcept;
 
     /// <summary>
     /// Get WOW64 thread context
@@ -140,7 +140,7 @@ public:
     /// <param name="hThread">Thread handle.</param>
     /// <param name="ctx">Thread context</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx );
+    virtual NTSTATUS GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx ) noexcept;
 
     /// <summary>
     /// Set native thread context
@@ -148,7 +148,7 @@ public:
     /// <param name="hThread">Thread handle.</param>
     /// <param name="ctx">Thread context</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx );
+    virtual NTSTATUS SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx ) noexcept;
 
     /// <summary>
     /// Set WOW64 thread context
@@ -156,7 +156,7 @@ public:
     /// <param name="hThread">Thread handle.</param>
     /// <param name="ctx">Thread context</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx );
+    virtual NTSTATUS SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx ) noexcept;
 
     /// <summary>
     /// NtQueueApcThread
@@ -165,42 +165,42 @@ public:
     /// <param name="func">APC function</param>
     /// <param name="arg">APC argument</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS QueueApcT( HANDLE hThread, ptr_t func, ptr_t arg );
+    virtual NTSTATUS QueueApcT( HANDLE hThread, ptr_t func, ptr_t arg ) noexcept;
 
     /// <summary>
     /// Get WOW64 PEB
     /// </summary>
     /// <param name="ppeb">Retrieved PEB</param>
     /// <returns>PEB pointer</returns>
-    virtual ptr_t getPEB( _PEB32* ppeb );
+    virtual ptr_t getPEB( _PEB32* ppeb ) noexcept;
 
     /// <summary>
     /// Get native PEB
     /// </summary>
     /// <param name="ppeb">Retrieved PEB</param>
     /// <returns>PEB pointer</returns>
-    virtual ptr_t getPEB( _PEB64* ppeb );
+    virtual ptr_t getPEB( _PEB64* ppeb ) noexcept;
 
     /// <summary>
     /// Get WOW64 TEB
     /// </summary>
     /// <param name="ppeb">Retrieved TEB</param>
     /// <returns>TEB pointer</returns>
-    virtual ptr_t getTEB( HANDLE hThread, _TEB32* pteb );
+    virtual ptr_t getTEB( HANDLE hThread, _TEB32* pteb ) noexcept;
 
     /// <summary>
     /// Get native TEB
     /// </summary>
     /// <param name="ppeb">Retrieved TEB</param>
     /// <returns>TEB pointer</returns>
-    virtual ptr_t getTEB( HANDLE hThread, _TEB64* pteb );
+    virtual ptr_t getTEB( HANDLE hThread, _TEB64* pteb ) noexcept;
 
     /// <summary>
     /// Enumerate valid memory regions
     /// </summary>
     /// <param name="includeFree">If true - non-allocated regions will be included in list</param>
     /// <returns>Found regions</returns>>
-    BLACKBONE_API std::vector<MEMORY_BASIC_INFORMATION64> EnumRegions( bool includeFree = false );
+    BLACKBONE_API std::vector<MEMORY_BASIC_INFORMATION64> EnumRegions( bool includeFree = false ) noexcept;
 
     /// <summary>
     /// Enumerate process modules
@@ -208,20 +208,20 @@ public:
     /// <param name="result">Found modules</param>
     /// <param name="mtype">Module type: x86 or x64</param>
     /// <returns>Module count</returns>
-    BLACKBONE_API std::vector<ModuleDataPtr> EnumModules( eModSeachType search = LdrList, eModType mtype = mt_default );
+    BLACKBONE_API std::vector<ModuleDataPtr> EnumModules( eModSeachType search = LdrList, eModType mtype = mt_default ) noexcept;
 
     /// <summary>
     /// Get lowest possible valid address value
     /// </summary>
     /// <returns>Address value</returns>
-    BLACKBONE_API inline ptr_t minAddr() const { return 0x10000; }
+    BLACKBONE_API ptr_t minAddr() const noexcept { return 0x10000; }
 
     /// <summary>
     /// Get highest possible valid address value
     /// </summary>
     /// <returns>Address value</returns>
-    BLACKBONE_API inline ptr_t maxAddr() const { return 0x7FFFFFFEFFFF; }
-    
+    BLACKBONE_API ptr_t maxAddr() const noexcept { return 0x7FFFFFFEFFFF; }
+
     /// <summary>
     /// Get highest possible valid address value
     /// </summary>
@@ -232,7 +232,8 @@ public:
     /// Get page size
     /// </summary>
     /// <returns>Address value</returns>
-    BLACKBONE_API inline uint32_t pageSize() const { return _pageSize; }
+    BLACKBONE_API uint32_t pageSize() const noexcept { return _pageSize; }
+
 private:
 
     /// <summary>
@@ -241,21 +242,21 @@ private:
     /// <param name="result">Found modules</param>
     /// <returns>Module count</returns>
     template<typename T>
-    std::vector<ModuleDataPtr> EnumModulesT();
+    std::vector<ModuleDataPtr> EnumModulesT() noexcept;
 
     /// <summary>
     /// Enum process section objects
     /// </summary>
     /// <param name="result">Found modules</param>
     /// <returns>Sections count</returns>
-    std::vector<ModuleDataPtr> EnumSections();
+    std::vector<ModuleDataPtr> EnumSections() noexcept;
 
     /// <summary>
     /// Enum pages containing valid PE headers
     /// </summary>
     /// <param name="result">Found modules</param>
     /// <returns>Sections count</returns>
-    std::vector<ModuleDataPtr> EnumPEHeaders();
+    std::vector<ModuleDataPtr> EnumPEHeaders() noexcept;
 
 protected:
     HANDLE _hProcess;           // Process handle

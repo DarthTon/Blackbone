@@ -239,12 +239,20 @@ private:
         if (!this->_vecHandler)
             return false;
 
-        this->_breakpoints.insert( std::make_pair( this->_original, (DetourBase*)this ) );
+        this->_breakpoints.insert( std::make_pair( this->_original, static_cast<DetourBase*>(this) ) );
 
         // Add breakpoint to every thread
         for (auto& thd : thisProc.threads().getAll())
-            this->_hwbpIdx[thd->id()] = thd->AddHWBP( reinterpret_cast<ptr_t>(this->_original), hwbp_execute, hwbp_1 ).result();
-    
+        {
+            try
+            {
+                this->_hwbpIdx[thd->id()] = thd->AddHWBP( reinterpret_cast<ptr_t>(this->_original), hwbp_execute, hwbp_1 ); 
+            }
+            catch (const nt_exception&)
+            {    
+            }
+        }
+
         return this->_hooked = true;
     }
 };

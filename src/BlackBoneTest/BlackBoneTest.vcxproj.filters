@@ -43,6 +43,12 @@
     <ClCompile Include="TestSymbols.cpp">
       <Filter>Tests</Filter>
     </ClCompile>
+    <ClCompile Include="TestScopeExit.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="TestPebTeb.cpp">
+      <Filter>Tests</Filter>
+    </ClCompile>
     <ClCompile Include="TestModules.cpp">
       <Filter>Tests</Filter>
     </ClCompile>

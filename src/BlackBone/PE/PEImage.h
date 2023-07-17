@@ -307,7 +307,7 @@ private:
     /// Get manifest from image data
     /// </summary>
     /// <param name="size">Manifest size</param>
-    /// <param name="manifestID">Mmanifest ID</param>
+    /// <param name="manifestID">Manifest ID</param>
     /// <returns>Manifest data</returns>
     void* GetManifest( uint32_t& size, int32_t& manifestID );
 

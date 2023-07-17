@@ -14,56 +14,55 @@ namespace blackbone
 class RemoteContext
 {
 public:
-    BLACKBONE_API RemoteContext( 
-        ProcessMemory& memory,
-        Thread& thd,
-        _CONTEXT64& ctx,
+    BLACKBONE_API RemoteContext(
+        ProcessMemory* memory,
+        Thread* thd,
+        _CONTEXT64* ctx,
         ptr_t frame_ptr,
         BOOL x64,
         int wordSize
-        )
+    )
         : _memory( memory )
         , _thd( thd )
         , _ctx( ctx )
         , _x64Target( x64 )
         , _wordSize( wordSize )
-        , _frame_ptr( frame_ptr != 0 ? frame_ptr : ctx.Rsp )
-    {     
-    }
-
-    BLACKBONE_API ~RemoteContext()
+        , _frame_ptr( frame_ptr != 0 ? frame_ptr : ctx->Rsp )
     {
     }
 
+    RemoteContext( const RemoteContext& ) = delete;
+    RemoteContext& operator = ( const RemoteContext& ) = delete;
+
     // memory object
-    BLACKBONE_API inline ProcessMemory& memory()
+    BLACKBONE_API ProcessMemory* memory()
     { 
         return _memory; 
     }
     
     // Native context
-    BLACKBONE_API inline _CONTEXT64& native()
-    { 
-        return _ctx; 
+    BLACKBONE_API _CONTEXT64& native()
+    {
+        return *_ctx;
     }
 
     /// <summary>
     /// Get current process thread where exception occurred
     /// </summary>
     /// <returns>Thread</returns>
-    BLACKBONE_API  inline Thread& getThread()
+    BLACKBONE_API Thread& getThread()
     {
-        return _thd;
+        return *_thd;
     }
 
     /// <summary>
-    /// 
+    /// Get current frame return address
     /// </summary>
     /// <returns>Return address</returns>
-    BLACKBONE_API inline const ptr_t returnAddress() const
-    { 
+    BLACKBONE_API ptr_t returnAddress() const
+    {
         ptr_t val = 0;
-        _memory.Read( _frame_ptr, _wordSize, &val );
+        _memory->Read( _frame_ptr, _wordSize, &val );
 
         return val;
     }
@@ -72,20 +71,19 @@ public:
     /// Set return address of current frame
     /// </summary>
     /// <param name="val">New return address</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API inline bool returnAddress( ptr_t val ) const
-    { 
-        return (_memory.Write( _frame_ptr, _wordSize, &val ) == STATUS_SUCCESS);
+    BLACKBONE_API void returnAddress( ptr_t val ) const
+    {
+        _memory->Write( _frame_ptr, _wordSize, &val );
     }
- 
+
     /// <summary>
     /// Set new integer return value. Has no effect on FPU.
     /// Has effect only if called in return callback
     /// </summary>
     /// <param name="val">New return value</param>
-    BLACKBONE_API inline void setReturnValue( ptr_t val ) const
-    { 
-        memcpy( &_ctx.Rax, &val, _wordSize );
+    BLACKBONE_API void setReturnValue( ptr_t val ) const
+    {
+        memcpy( &_ctx->Rax, &val, _wordSize );
     }
 
     /// <summary>
@@ -96,8 +94,7 @@ public:
     {
         ptr_t val = returnAddress();
         SET_BIT( val, (_wordSize * 8 - 1) );
-        if (returnAddress( val ) == false)
-            return 0;
+        returnAddress( val );
 
         return val;
     }
@@ -110,8 +107,7 @@ public:
     {
         auto val = returnAddress();
         RESET_BIT( val, (_wordSize * 8 - 1) );
-        if (!returnAddress( val ))
-            return 0;
+        returnAddress( val );
 
         return val;
     }
@@ -126,27 +122,27 @@ public:
     /// <returns>Argument value</returns>
     BLACKBONE_API DWORD64 getArg( int index )
     {
-        if(_x64Target)
+        if (_x64Target)
         {
             switch (index)
             {
-            case 0:
-                return _ctx.Rcx;
-            case 1:
-                return _ctx.Rdx;
-            case 2:
-                return _ctx.R8;
-            case 3:
-                return _ctx.R9;
+                case 0:
+                    return _ctx->Rcx;
+                case 1:
+                    return _ctx->Rdx;
+                case 2:
+                    return _ctx->R8;
+                case 3:
+                    return _ctx->R9;
 
-            default:
-                return _memory.Read<DWORD64>( _ctx.Rsp + 0x28 + (index - 4) * _wordSize ).result( 0 );
+                default:
+                    return _memory->Read<DWORD64>( _ctx->Rsp + 0x28 + (index - 4) * _wordSize );
             }
         }
         else
         {
             DWORD64 val = 0;
-            _memory.Read( _ctx.Rsp + 4 + index * _wordSize, _wordSize, &val );
+            _memory->Read( _ctx->Rsp + 4 + index * _wordSize, _wordSize, &val );
             return val;
         }
     }
@@ -158,35 +154,32 @@ public:
     /// </summary>
     /// <param name="index">0-based argument index</param>
     /// <param name="val">New argument value</param>
-    /// <returns>true on success</returns>
-    BLACKBONE_API bool setArg( int index, DWORD64 val )
+    BLACKBONE_API void setArg( int index, DWORD64 val )
     {
         if (_x64Target)
         {
             switch (index)
             {
-            case 0:
-                _ctx.Rcx = val;
-                break;
-            case 1:
-                _ctx.Rdx = val;
-                break;
-            case 2:
-                _ctx.R8 = val;
-                break;
-            case 3:
-                _ctx.R9 = val;
-                break;
+                case 0:
+                    _ctx->Rcx = val;
+                    break;
+                case 1:
+                    _ctx->Rdx = val;
+                    break;
+                case 2:
+                    _ctx->R8 = val;
+                    break;
+                case 3:
+                    _ctx->R9 = val;
+                    break;
 
-            default:
-                return (_memory.Write( _ctx.Rsp + 0x28 + (index - 4) * _wordSize, val ) == STATUS_SUCCESS);
+                default:
+                    _memory->Write( _ctx->Rsp + 0x28 + (index - 4) * _wordSize, val );
             }
-
-            return true;
         }
         else
         {
-            return  (_memory.Write( _ctx.Rsp + 4 + index * _wordSize, _wordSize, &val ) == STATUS_SUCCESS);
+            _memory->Write( _ctx->Rsp + 4 + index * _wordSize, _wordSize, &val );
         }
     }
 
@@ -198,49 +191,47 @@ public:
     BLACKBONE_API DWORD lastError()
     {
         ptr_t pteb = 0;
-        LONG offset = 0;
+        size_t offset = 0;
 
-        if( _x64Target )
+        if (_x64Target)
         {
-            pteb = _thd.teb( (_TEB64*)nullptr );
-            offset = FIELD_OFFSET( _TEB64, LastErrorValue );
+            pteb = _thd->teb64();
+            offset = offsetOf( &_TEB64::LastErrorValue );
         }
         else
         {
-            pteb = _thd.teb( (_TEB32*)nullptr );
-            offset = FIELD_OFFSET( _TEB32, LastErrorValue );
+            pteb = _thd->teb32();
+            offset = offsetOf( &_TEB32::LastErrorValue );
         }
 
+        DWORD code = 0xFFFFFFFF;
         if (pteb)
-            return _memory.Read<DWORD>( pteb + offset ).result( 0xFFFFFFFF );
+            _memory->Read( pteb + offset, code );
 
-        return 0xFFFFFFFF;
+        return code;
     }
 
     /// <summary>
     /// Set last thread error code
     /// </summary>
     /// <returns>Last error code, -1 if function failed</returns>
-    BLACKBONE_API DWORD lastError( DWORD newError )
+    BLACKBONE_API void lastError( DWORD newError )
     {
         ptr_t pteb = 0;
-        LONG offset = 0;
+        size_t offset = 0;
 
         if (_x64Target)
         {
-            pteb = _thd.teb( (_TEB64*)nullptr );
-            offset = FIELD_OFFSET( _TEB64, LastErrorValue );
+            pteb = _thd->teb64();
+            offset = offsetOf( &_TEB64::LastErrorValue );
         }
         else
         {
-            pteb = _thd.teb( (_TEB32*)nullptr );
-            offset = FIELD_OFFSET( _TEB32, LastErrorValue );
+            pteb = _thd->teb32();
+            offset = offsetOf( &_TEB32::LastErrorValue );
         }
 
-        if (!pteb)
-            return 0xFFFFFFFF;
-
-        return _memory.Write( pteb + offset, newError );
+        _memory->Write( pteb + offset, newError );
     }
 
 
@@ -250,38 +241,24 @@ public:
     /// <returns>Data value</returns>
     BLACKBONE_API ptr_t getUserContext()
     {
-        auto pteb = _thd.teb( (_TEB64*)nullptr );
-        if (!pteb)
-            return 0;
-            
-        return _memory.Read<ptr_t>( pteb + FIELD_OFFSET( _NT_TIB_T<DWORD64>, ArbitraryUserPointer ) ).result( 0 );
+        auto pteb = _thd->teb64();
+        return _memory->Read<ptr_t>( pteb + offsetOf( &_NT_TIB_T<DWORD64>::ArbitraryUserPointer ) );
     }
 
     /// <summary>
     /// Set arbitrary thread data
     /// </summary>
     /// <returns>true on success</returns>
-    BLACKBONE_API bool setUserContext( ptr_t context )
+    BLACKBONE_API void setUserContext( ptr_t context )
     {
-        auto pteb = _thd.teb( (_TEB64*)nullptr );
-        if(pteb)
-        {
-            if (_memory.Write( pteb + FIELD_OFFSET( _NT_TIB_T<DWORD64>, ArbitraryUserPointer ), context ) == STATUS_SUCCESS)
-                return true;
-        }
-
-        return false;
+        auto pteb = _thd->teb64();
+        _memory->Write( pteb + offsetOf( &_NT_TIB_T<DWORD64>::ArbitraryUserPointer ), context );
     }
 
-
 private:
-    RemoteContext( const RemoteContext& ) = delete;
-    RemoteContext& operator = ( const RemoteContext& ) = delete;
-
-private:
-    ProcessMemory& _memory; // Process memory routines
-    Thread& _thd;           // Current thread
-    _CONTEXT64& _ctx;       // Current thread context
+    ProcessMemory* _memory; // Process memory routines
+    Thread* _thd;           // Current thread
+    _CONTEXT64* _ctx;       // Current thread context
 
     BOOL  _x64Target = FALSE;   // Target process is 64 bit
     int   _wordSize = 4;        // 4 for x86, 8 for x64

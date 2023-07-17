@@ -87,8 +87,7 @@ namespace Testing
 
         TEST_METHOD( Remote )
         {
-            Process proc;
-            AssertEx::NtSuccess( proc.Attach( GetCurrentProcessId() ) );
+            Process proc( GetCurrentProcessId() );
 
             const float newVal = 25.0f;
 
@@ -98,7 +97,7 @@ namespace Testing
             AssertEx::IsNotZero( pVal_ex->fval );
 
             pVal_ex->fval = 25.0;
-            AssertEx::AreEqual( STATUS_SUCCESS, ptr_ex.commit() );
+            ptr_ex.commit();
             pVal_ex = ptr_ex.get();
 
             AssertEx::IsNotNull( pVal_ex );

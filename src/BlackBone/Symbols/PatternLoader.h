@@ -11,7 +11,6 @@ namespace blackbone
 /// <param name="ntdll32">Mapped x86 ntdll</param>
 /// <param name="ntdll64">Mapped x64 ntdll</param>
 /// <param name="result">Result</param>
-/// <returns>Status code</returns>
-NTSTATUS ScanSymbolPatterns( const pe::PEImage& ntdll32, const pe::PEImage& ntdll64, SymbolData& result );
+void ScanSymbolPatterns( const pe::PEImage& ntdll32, const pe::PEImage& ntdll64, SymbolData& result );
 
 }

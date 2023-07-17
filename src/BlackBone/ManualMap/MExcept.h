@@ -32,7 +32,6 @@ class MExcept
 {
 public:
     BLACKBONE_API MExcept() = default;
-    BLACKBONE_API ~MExcept() = default;
 
     MExcept( const MExcept& ) = delete;
     MExcept& operator =( const MExcept& ) = delete;
@@ -44,8 +43,7 @@ public:
     /// <param name="proc">Target process</param>
     /// <param name="mod">Target module</param>
     /// <param name="partial">Partial exception support</param>
-    /// <returns>Error code</returns>
-    BLACKBONE_API NTSTATUS CreateVEH( class Process& proc, ModuleData& mod, bool partial );
+    BLACKBONE_API void CreateVEH( class Process* proc, ModuleData& mod, bool partial );
 
     /// <summary>
     /// Removes VEH from target process
@@ -53,8 +51,7 @@ public:
     /// <param name="proc">Target process</param>
     /// <param name="partial">Partial exception support</param>
     /// <param name="mt">Module type</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS RemoveVEH( class Process& proc, bool partial, eModType mt );
+    BLACKBONE_API void RemoveVEH( class Process* proc, bool partial, eModType mt );
 
     /// <summary>
     /// Reset data
@@ -62,9 +59,9 @@ public:
     BLACKBONE_API void reset() { _pModTable.Free(); }
 
 private:
-    MemBlock _pVEHCode;    // VEH function codecave
-    MemBlock _pModTable;   // x64 module address range table
-    uint64_t _hVEH = 0;    // VEH handle
+    MemBlock  _pVEHCode;    // VEH function codecave
+    MemBlock  _pModTable;   // x64 module address range table
+    uint64_t  _hVEH = 0;    // VEH handle
 
     static uint8_t _handler32[];
     static uint8_t _handler64[];

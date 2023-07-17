@@ -11,8 +11,8 @@ namespace blackbone
 class x86Native : public Native
 {
 public:
-    BLACKBONE_API x86Native( HANDLE hProcess );
-    BLACKBONE_API ~x86Native();
+    BLACKBONE_API x86Native( HANDLE hProcess ) noexcept;
+    BLACKBONE_API ~x86Native() = default;
 
     /// <summary>
     /// Query virtual memory
@@ -20,7 +20,7 @@ public:
     /// <param name="lpAddress">Address to query</param>
     /// <param name="lpBuffer">Retrieved memory info</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 lpBuffer );
+    virtual NTSTATUS VirtualQueryExT( ptr_t lpAddress, PMEMORY_BASIC_INFORMATION64 lpBuffer ) noexcept;
 
     /// <summary>
     /// Get WOW64 thread context
@@ -28,7 +28,7 @@ public:
     /// <param name="hThread">Thread handle.</param>
     /// <param name="ctx">Thread context</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx );
+    virtual NTSTATUS GetThreadContextT( HANDLE hThread, _CONTEXT32& ctx ) noexcept;
 
     /// <summary>
     /// Get native thread context
@@ -36,7 +36,7 @@ public:
     /// <param name="hThread">Thread handle.</param>
     /// <param name="ctx">Thread context</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS GetThreadContextT( HANDLE hThread, _CONTEXT64& ctx );
+    virtual NTSTATUS GetThreadContextT( HANDLE hThread, _CONTEXT64& ctx ) noexcept;
 
     /// <summary>
     /// Set WOW64 thread context
@@ -44,7 +44,7 @@ public:
     /// <param name="hThread">Thread handle.</param>
     /// <param name="ctx">Thread context</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx );
+    virtual NTSTATUS SetThreadContextT( HANDLE hThread, _CONTEXT32& ctx ) noexcept;
 
     /// <summary>
     /// Set native thread context
@@ -52,37 +52,35 @@ public:
     /// <param name="hThread">Thread handle.</param>
     /// <param name="ctx">Thread context</param>
     /// <returns>Status code</returns>
-    virtual NTSTATUS SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx );
+    virtual NTSTATUS SetThreadContextT( HANDLE hThread, _CONTEXT64& ctx ) noexcept;
 
     /// <summary>
     /// Gets WOW64 PEB
     /// </summary>
     /// <param name="ppeb">Retrieved PEB</param>
     /// <returns>PEB pointer</returns>
-    virtual ptr_t getPEB( _PEB32* ppeb );
+    virtual ptr_t getPEB( _PEB32* ppeb ) noexcept;
 
     /// <summary>
     /// Get native PEB
     /// </summary>
     /// <param name="ppeb">Retrieved PEB</param>
     /// <returns>PEB pointer</returns>
-    virtual ptr_t getPEB( _PEB64* ppeb );
+    virtual ptr_t getPEB( _PEB64* ppeb ) noexcept;
 
     /// <summary>
     /// Get WOW64 TEB
     /// </summary>
     /// <param name="ppeb">Retrieved TEB</param>
     /// <returns>TEB pointer</returns>
-    virtual ptr_t getTEB( HANDLE hThread, _TEB32* pteb );
+    virtual ptr_t getTEB( HANDLE hThread, _TEB32* pteb ) noexcept;
 
     /// <summary>
     /// Get native TEB
     /// </summary>
     /// <param name="ppeb">Retrieved TEB</param>
     /// <returns>TEB pointer</returns>
-    virtual ptr_t getTEB( HANDLE hThread, _TEB64* pteb );
-
-private:
+    virtual ptr_t getTEB( HANDLE hThread, _TEB64* pteb ) noexcept;
 };
 
 }

@@ -99,7 +99,7 @@ public:
     /// <summary>
     /// Allocate virtual memory
     /// </summary>
-    /// <param name="pid">Tarhet PID</param>
+    /// <param name="pid">Target PID</param>
     /// <param name="base">Desired base. If 0 address is chosed by the system</param>
     /// <param name="size">Region size</param>
     /// <param name="type">Allocation type - MEM_RESERVE/MEM_COMMIT</param>
@@ -110,7 +110,7 @@ public:
     /// <summary>
     /// Free virtual memory
     /// </summary>
-    /// <param name="pid">Tarhet PID</param>
+    /// <param name="pid">Target PID</param>
     /// <param name="base">Desired base. If 0 address is chosed by the system</param>
     /// <param name="size">Region size</param>
     /// <param name="type">Free type - MEM_RELEASE/MEM_DECOMMIT</param>
@@ -250,7 +250,7 @@ public:
     /// <summary>
     /// Manually map another system driver into system space
     /// </summary>
-    /// <param name="path">Fully quialified path to the drver</param>
+    /// <param name="path">Fully qualified path to the driver</param>
     /// <returns>Status code</returns>
     BLACKBONE_API NTSTATUS MMapDriver( const std::wstring& path );
 

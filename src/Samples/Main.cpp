@@ -11,6 +11,15 @@ void MapCmdFromMem();
 
 int main( int /*argc*/, char* /*argv[]*/ )
 {
+    try
+    {
+        Process::CreateNew( L"C:\\InvalidName.*?" );
+    }
+    catch (const nt_exception& e)
+    {
+        std::cout << e.what();
+    }
+
     // List all process PIDs matching name
     auto pids = Process::EnumByName( L"explorer.exe" );
 
@@ -21,8 +30,9 @@ int main( int /*argc*/, char* /*argv[]*/ )
     auto all = Process::EnumByNameOrPID( 0, L"" );
 
     // Attach to a process
-    if (Process explorer; !pids.empty() && NT_SUCCESS( explorer.Attach( pids.front() ) ))
+    try
     {
+        auto explorer = Process( pids.front() );
         auto& core = explorer.core();
 
         // Get bitness info about this and target processes
@@ -37,15 +47,17 @@ int main( int /*argc*/, char* /*argv[]*/ )
         [[maybe_unused]] auto peb_ptr = core.peb( &peb );
 
         // Get all process handles
-        if (auto handles = explorer.EnumHandles(); handles)
+        if (auto handles = explorer.EnumHandles(); true)
         {
             // do stuff with handles...
         }
     }
+    catch (const std::exception&)
+    {
+    }
 
     // Start new suspended process and attach immediately
-    Process notepad; 
-    notepad.CreateAndAttach( L"C:\\windows\\system32\\notepad.exe", true );
+    auto notepad = Process::CreateNew( L"C:\\windows\\system32\\notepad.exe", true );
     {
         // do stuff...
         notepad.Resume();
@@ -67,9 +79,6 @@ int main( int /*argc*/, char* /*argv[]*/ )
 
         // Get export symbol from module found by name
         auto LoadLibraryWPtr = modules.GetExport( L"kernel32.dll", "LoadLibraryW" );
-        if (LoadLibraryWPtr)
-        {
-        }
 
         // Unlink module from loader structures
         if (modules.Unlink( mainMod ))
@@ -85,7 +94,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
         //
         // Read memory
         //
-        IMAGE_DOS_HEADER dosHeader = { };
+        IMAGE_DOS_HEADER dosHeader = {};
 
         // Method 1
         memory.Read( mainMod->baseAddress, dosHeader );
@@ -94,7 +103,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
         memory.Read( mainMod->baseAddress, sizeof( dosHeader ), &dosHeader );
 
         // Method 3
-        auto[status, dosHeader2] = memory.Read<IMAGE_DOS_HEADER>( mainMod->baseAddress );
+        auto dosHeader2 = memory.Read<IMAGE_DOS_HEADER>( mainMod->baseAddress );
 
         // Change memory protection
         if (NT_SUCCESS( memory.Protect( mainMod->baseAddress, sizeof( dosHeader ), PAGE_READWRITE ) ))
@@ -111,13 +120,18 @@ int main( int /*argc*/, char* /*argv[]*/ )
         }
 
         // Allocate memory
-        if (auto[status2, block] = memory.Allocate( 0x1000, PAGE_EXECUTE_READWRITE ); NT_SUCCESS( status2 ))
+        try
         {
+            auto block = memory.Allocate( 0x1000, PAGE_EXECUTE_READWRITE );
+
             // Write into memory block
-            block->Write( 0x10, 12.0 );
+            block.Write( 0x10, 12.0 );
 
             // Read from memory block
-            [[maybe_unused]] auto dval = block->Read<double>( 0x10, 0.0 );
+            [[maybe_unused]] auto dval = block.Read<double>( 0x10, 0.0 );
+        }
+        catch (const std::exception&)
+        {
         }
 
         // Enumerate regions
@@ -136,7 +150,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
         auto thread = notepad.threads().get( mainThread->id() );
 
         // Get context
-        CONTEXT_T ctx = { };
+        CONTEXT_T ctx = {};
         if (thread->GetContext( ctx, CONTEXT_FLOATING_POINT ))
         {
             // Set context
@@ -165,50 +179,46 @@ int main( int /*argc*/, char* /*argv[]*/ )
     {
         auto& remote = notepad.remote();
         remote.CreateRPCEnvironment( Worker_None, true );
-        
+
         auto GetModuleHandleWPtr = notepad.modules().GetExport( L"kernel32.dll", "GetModuleHandleW" );
-        if (GetModuleHandleWPtr)
-        {
-            // Direct execution in the new thread without stub
-            [[maybe_unused]] DWORD mod = remote.ExecDirect( GetModuleHandleWPtr->procAddress, 0 );
-        }
+
+        // Direct execution in the new thread without stub
+        [[maybe_unused]] DWORD mod = remote.ExecDirect( GetModuleHandleWPtr.procAddress, 0 );
 
         // Execute in the new thread using stub
-        if (auto asmPtr = AsmFactory::GetAssembler(); asmPtr && GetModuleHandleWPtr)
+        if (auto asmPtr = AsmFactory::GetAssembler(); asmPtr)
         {
             auto& a = *asmPtr;
 
             a.GenPrologue();
-            a.GenCall( static_cast<uintptr_t>(GetModuleHandleWPtr->procAddress), { nullptr }, cc_stdcall );
+            a.GenCall( static_cast<uintptr_t>(GetModuleHandleWPtr.procAddress), { nullptr }, cc_stdcall );
             a.GenEpilogue();
 
-            uint64_t result = 0;
-            remote.ExecInNewThread( a->make(), a->getCodeSize(), result );
+            remote.ExecInNewThread( a->make(), a->getCodeSize() );
         }
 
         // Execute in main thread
         auto mainThread = notepad.threads().getMain();
-        if (auto asmPtr = AsmFactory::GetAssembler(); asmPtr && mainThread && GetModuleHandleWPtr)
+        if (auto asmPtr = AsmFactory::GetAssembler(); asmPtr && mainThread)
         {
             auto& a = *asmPtr;
 
             a.GenPrologue();
-            a.GenCall( static_cast<uintptr_t>(GetModuleHandleWPtr->procAddress), { nullptr }, cc_stdcall );
+            a.GenCall( static_cast<uintptr_t>(GetModuleHandleWPtr.procAddress), { nullptr }, cc_stdcall );
             a.GenEpilogue();
 
-            uint64_t result = 0;
-            remote.ExecInAnyThread( a->make(), a->getCodeSize(), result, mainThread );
+            remote.ExecInAnyThread( a->make(), a->getCodeSize(), mainThread );
         }
     }
 
     // Pattern scanning
-    if (Process process; NT_SUCCESS( process.Attach( GetCurrentProcessId() ) ))
+    /*if (Process process; NT_SUCCESS( process.Attach( GetCurrentProcessId() ) ))
     {
         PatternSearch ps{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 0 };
 
         std::vector<ptr_t> results;
         ps.SearchRemoteWhole( process, false, 0, results );
-    }
+    }*/
 
     // Remote function calls
     {
@@ -216,23 +226,25 @@ int main( int /*argc*/, char* /*argv[]*/ )
         if (auto pMessageBoxW = MakeRemoteFunction<decltype(&MessageBoxW)>( notepad, L"user32.dll", "MessageBoxW" ))
         {
             auto result = pMessageBoxW( HWND_DESKTOP, L"Hello world!", L"Title", MB_OKCANCEL );
-            if (*result == IDCANCEL)
+            if (result == IDCANCEL)
             {
             }
         }
 
         // Call in specific thread
         auto mainThread = notepad.threads().getMain();
-        if (auto pIsGUIThread = MakeRemoteFunction<decltype(&IsGUIThread)>( notepad, L"user32.dll", "IsGUIThread" ); pIsGUIThread && mainThread)
+        if (auto pIsGUIThread = MakeRemoteFunction<decltype(&IsGUIThread)>( notepad, L"user32.dll", "IsGUIThread" );
+            pIsGUIThread && mainThread)
         {
             auto result = pIsGUIThread.Call( { FALSE }, mainThread );
-            if (*result)
+            if (result)
             {
             }
         }
 
         // Complex args
-        if (auto pMultiByteToWideChar = MakeRemoteFunction<decltype(&MultiByteToWideChar)>( notepad, L"kernel32.dll", "MultiByteToWideChar" ))
+        if (auto pMultiByteToWideChar = MakeRemoteFunction<decltype(&MultiByteToWideChar)>(
+            notepad, L"kernel32.dll", "MultiByteToWideChar" ))
         {
             auto args = pMultiByteToWideChar.MakeArguments( { CP_ACP, 0, "Sample text", -1, nullptr, 0 } );
             std::wstring converted( 32, L'\0' );
@@ -243,13 +255,13 @@ int main( int /*argc*/, char* /*argv[]*/ )
 
             auto length = pMultiByteToWideChar.Call( args );
             if (length)
-                converted.resize( *length - 1 );
+                converted.resize( length - 1 );
         }
     }
 
     // Direct syscalls, currently works for x64 only
     {
-        uint8_t buf[32] = { };
+        uint8_t buf[32] = {};
         uintptr_t bytes = 0;
 
         NTSTATUS status = syscall::nt_syscall(
@@ -257,7 +269,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
             GetCurrentProcess(),
             GetModuleHandle( nullptr ),
             buf,
-            sizeof(buf),
+            sizeof( buf ),
             &bytes
         );
 

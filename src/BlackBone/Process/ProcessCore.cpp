@@ -2,6 +2,7 @@
 #include "ProcessCore.h"
 #include "../Misc/DynImport.h"
 #include "../Include/Macro.h"
+#include "../Include/Exception.h"
 #include <3rd_party/VersionApi.h>
 
 namespace blackbone
@@ -10,11 +11,6 @@ namespace blackbone
 #ifdef COMPILER_GCC
 #define PROCESS_DEP_ENABLE  0x00000001
 #endif
-
-ProcessCore::ProcessCore()
-    : _native( nullptr )
-{
-}
 
 ProcessCore::~ProcessCore()
 {
@@ -26,23 +22,25 @@ ProcessCore::~ProcessCore()
 /// </summary>
 /// <param name="pid">Process ID</param>
 /// <param name="access">Access mask</param>
-/// <returns>Status</returns>
-NTSTATUS ProcessCore::Open( DWORD pid, DWORD access )
+///
+void ProcessCore::Open( DWORD pid, DWORD access )
 {
-    // Handle current process differently
-    _hProcess = (pid == GetCurrentProcessId()) ? GetCurrentProcess() : OpenProcess( access, false, pid );
-
-    // Some routines in win10 do not support pseudo handle
-    if (IsWindows10OrGreater() && pid == GetCurrentProcessId())
-        _hProcess = OpenProcess( PROCESS_ALL_ACCESS, FALSE, pid );
-
-    if (_hProcess)
+    if (pid == GetCurrentProcessId())
     {
-        _pid = pid;
-        return Init();
+        // Some routines in win10 do not support pseudo handle
+        if (IsWindows10OrGreater())
+            _hProcess = OpenProcess( PROCESS_ALL_ACCESS, FALSE, pid );
+        else
+            _hProcess = GetCurrentProcess();
     }
+    else
+        _hProcess = OpenProcess( access, false, pid );
 
-    return LastNtStatus();
+    if (!_hProcess)
+        THROW_WITH_STATUS_AND_LOG( LastNtStatus(), "failed to open process" );
+
+    _pid = pid;
+    Init();
 }
 
 /// <summary>
@@ -51,7 +49,7 @@ NTSTATUS ProcessCore::Open( DWORD pid, DWORD access )
 /// <param name="pid">Process ID</param>
 /// <param name="access">Access mask</param>
 /// <returns>Status</returns>
-NTSTATUS ProcessCore::Open( HANDLE handle )
+void ProcessCore::Open( HANDLE handle )
 {
     _hProcess = handle;
     _pid = GetProcessId( _hProcess );
@@ -60,18 +58,17 @@ NTSTATUS ProcessCore::Open( HANDLE handle )
     if (IsWindows10OrGreater() && _pid == GetCurrentProcessId())
         _hProcess = OpenProcess( PROCESS_ALL_ACCESS, FALSE, _pid );
 
-    return Init();
+    Init();
 }
 
 
 /// <summary>
 /// Initialize some internal data
 /// </summary>
-/// <returns>Status code</returns>
-NTSTATUS ProcessCore::Init()
+void ProcessCore::Init()
 {
     // Detect x86 OS
-    SYSTEM_INFO info = { { 0 } };
+    SYSTEM_INFO info = { };
     GetNativeSystemInfo( &info );
 
     if (info.wProcessorArchitecture == PROCESSOR_ARCHITECTURE_INTEL)
@@ -104,8 +101,37 @@ NTSTATUS ProcessCore::Init()
         if (SAFE_CALL( GetProcessDEPPolicy, _hProcess, &flags, &perm ))
             _dep = (flags & PROCESS_DEP_ENABLE) != 0;
     }
+}
 
-    return STATUS_SUCCESS;
+/// <summary>
+/// Get WOW64 PEB
+/// </summary>
+/// <param name="ppeb">Retrieved PEB32</param>
+/// <returns>PEB pointer</returns>
+ptr_t ProcessCore::peb( _PEB32 * ppeb )
+{
+    if (!_native)
+        THROW_AND_LOG( "native subsystem not initialized" );
+
+    auto ptr = _native->getPEB( ppeb );
+    if (ptr == 0)
+        THROW_WITH_STATUS_AND_LOG( LastNtStatus(), "failed to get PEB address" );
+
+    return ptr;
+}
+
+/// <summary>
+/// Get native PEB
+/// </summary>
+/// <param name="ppeb">Retrieved PEB64</param>
+/// <returns>PEB pointer</returns>
+ptr_t ProcessCore::peb( _PEB64 * ppeb )
+{
+    auto ptr = _native->getPEB( ppeb );
+    if (ptr == 0)
+        THROW_WITH_STATUS_AND_LOG( LastNtStatus(), "failed to get PEB address" );
+
+    return ptr;
 }
 
 /// <summary>
@@ -120,16 +146,14 @@ void ProcessCore::Close()
 
 bool ProcessCore::isProtected()
 {
-    if (_hProcess)
-    {
-        _PROCESS_EXTENDED_BASIC_INFORMATION_T<DWORD64> info = { 0 };
-        info.Size = sizeof( info );
-        
-        _native->QueryProcessInfoT( ProcessBasicInformation, &info, sizeof( info ) );
-        return info.Flags.IsProtectedProcess;
-    }
+    if (!_hProcess || !_native)
+        THROW_AND_LOG( "no active process" );
 
-    return false;
+    _PROCESS_EXTENDED_BASIC_INFORMATION_T<DWORD64> info = { };
+    info.Size = sizeof( info );
+
+    _native->QueryProcessInfoT( ProcessBasicInformation, &info, sizeof( info ) );
+    return info.Flags.IsProtectedProcess;
 }
 
 }

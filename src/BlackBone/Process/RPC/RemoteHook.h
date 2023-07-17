@@ -18,7 +18,7 @@ namespace blackbone
 class RemoteHook
 {
 public:
-    
+
     // Hook type
     enum eHookType
     {
@@ -69,7 +69,7 @@ public:
     using setAddresses = std::map<ptr_t, bool>;
 
 public:
-    BLACKBONE_API RemoteHook( class ProcessMemory& memory );
+    BLACKBONE_API RemoteHook( class ProcessMemory* memory );
     BLACKBONE_API ~RemoteHook();
 
     /// <summary>
@@ -142,7 +142,6 @@ public:
     BLACKBONE_API void reset();
 
 private:
-
     /// <summary>
     /// Hook specified address
     /// </summary>
@@ -239,12 +238,12 @@ private:
     RemoteHook& operator =( const RemoteHook& ) = delete;
 
 private:
-    class ProcessMemory& _memory;
-    class ProcessCore&   _core;
-    CriticalSection _lock;              // Hook lock
+    class ProcessMemory* _memory;
+    class ProcessCore*   _core;
+    CriticalSection     _lock;          // Hook lock
 
     DWORD        _debugPID = 0;         // PID of process being debugged
-    HANDLE       _hEventThd = NULL;     // Debug Event thread
+    HANDLE       _hEventThd = nullptr;  // Debug Event thread
     BOOL         _x64Target = FALSE;    // Target is x64 process
     int          _wordSize = 4;         // 4 or 8 bytes
     bool         _active = false;       // Event thread activity flag

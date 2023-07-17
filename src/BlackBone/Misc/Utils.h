@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Config.h"
 #include "../Include/Winheaders.h"
 #include <string>
 #include <vector>
@@ -89,6 +90,7 @@ public:
     /// <param name="code">The code.</param>
     /// <returns>Error message</returns>
     BLACKBONE_API static std::wstring GetErrorDescription( NTSTATUS code );
+    BLACKBONE_API static std::string GetErrorDescriptionA( NTSTATUS code );
 
     /// <summary>
     /// Check if file exists
@@ -96,6 +98,11 @@ public:
     /// <param name="path">Full-qualified file path</param>
     /// <returns>true if exists</returns>
     BLACKBONE_API static bool FileExists( const std::wstring& path );
+
+    /// <summary>
+    /// Convert export name or ordinal to string
+    /// </summary>
+    BLACKBONE_API static std::string NameOrdToString( const char* name_ord );
 };
 
 
@@ -110,7 +117,13 @@ public:
         InitializeCriticalSection( &_native );
     }
 
-    BLACKBONE_API  ~CriticalSection()
+    BLACKBONE_API CriticalSection( const CriticalSection& ) = default;
+    BLACKBONE_API CriticalSection( CriticalSection&& ) = default;
+
+    BLACKBONE_API CriticalSection& operator =( const CriticalSection& ) = default;
+    BLACKBONE_API CriticalSection& operator =( CriticalSection&& ) = default;
+
+    BLACKBONE_API ~CriticalSection()
     {
         DeleteCriticalSection( &_native );
     }
@@ -137,19 +150,21 @@ class CSLock
 {
 public:
     BLACKBONE_API CSLock( CriticalSection& cs )
-        : _cs( cs ) 
+        : _cs( cs )
     {
         cs.lock();
     }
+
+    BLACKBONE_API CSLock( const CSLock& ) = delete;
+    BLACKBONE_API CSLock( CSLock&& ) = default;
+
+    BLACKBONE_API CSLock& operator = ( const CSLock& ) = delete;
+    BLACKBONE_API CSLock& operator = ( CSLock&& ) = default;
 
     BLACKBONE_API ~CSLock()
     {
         _cs.unlock();
     }
-
-private:
-    CSLock( const CSLock& ) = delete;
-    CSLock& operator = ( const CSLock& ) = delete;
 
 private:
     CriticalSection& _cs;
@@ -187,22 +202,22 @@ private:
 #if _MSC_VER >= 1900 
 namespace tuple_detail
 {
-    template<typename T, typename F, size_t... Is>
-    void visit_each( T&& t, F f, std::index_sequence<Is...> ) { auto l = { (f( std::get<Is>( t ) ), 0)... }; }
+template<typename T, typename F, size_t... Is>
+void visit_each( T&& t, F f, std::index_sequence<Is...> ) { auto l = { (f( std::get<Is>( t ) ), 0)... }; }
 
-    template<typename... Ts>
-    void copyTuple( std::tuple<Ts...> const& from, std::vector<char>& to )
+template<typename... Ts>
+void copyTuple( std::tuple<Ts...> const& from, std::vector<char>& to )
+{
+    auto func = [&to]( auto& v )
     {
-        auto func = [&to]( auto& v )
-        {
-            auto ptr = to.size();
-            to.resize( ptr + sizeof( v ) );
-            memcpy( to.data() + ptr, &v, sizeof( v ) );
-            return 0;
-        };
+        auto ptr = to.size();
+        to.resize( ptr + sizeof( v ) );
+        memcpy( to.data() + ptr, &v, sizeof( v ) );
+        return 0;
+    };
 
-        visit_each( from, func, std::index_sequence_for<Ts...>() );
-    }
+    visit_each( from, func, std::index_sequence_for<Ts...>() );
+}
 }
 #endif
 }

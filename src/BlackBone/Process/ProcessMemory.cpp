@@ -1,6 +1,6 @@
 #include "ProcessMemory.h"
 #include "Process.h"
-#include "../Misc/Trace.hpp"
+#include "../Include/Exception.h"
 
 namespace blackbone
 {
@@ -8,11 +8,7 @@ namespace blackbone
 ProcessMemory::ProcessMemory( Process* process )
     : RemoteMemory( process )
     , _process( process )
-    , _core( process->core() )  
-{
-}
-
-ProcessMemory::~ProcessMemory()
+    , _core( &process->core() )  
 {
 }
 
@@ -23,13 +19,13 @@ ProcessMemory::~ProcessMemory()
 /// <param name="protection">Memory protection</param>
 /// <param name="desired">Desired base address of new block</param>
 /// <param name="own">false if caller will be responsible for block deallocation</param>
-/// <returns>Memory block. If failed - returned block will be invalid</returns>
-call_result_t<MemBlock> ProcessMemory::Allocate( size_t size, DWORD protection /*= PAGE_EXECUTE_READWRITE*/, ptr_t desired /*= 0*/, bool own /*= true*/ )
+/// <returns>Memory block</returns>
+MemBlock ProcessMemory::Allocate( size_t size, DWORD protection /*= PAGE_EXECUTE_READWRITE*/, ptr_t desired /*= 0*/, bool own /*= true*/ )
 {
     return MemBlock::Allocate( *this, size, desired, protection, own );
 }
 
-call_result_t<MemBlock> ProcessMemory::AllocateClosest( size_t size, DWORD protection /*= PAGE_EXECUTE_READWRITE*/, ptr_t desired /*= 0*/, bool own /*= true*/ )
+MemBlock ProcessMemory::AllocateClosest( size_t size, DWORD protection /*= PAGE_EXECUTE_READWRITE*/, ptr_t desired /*= 0*/, bool own /*= true*/ )
 {
     return MemBlock::AllocateClosest( *this, size, desired, protection, own );
 }
@@ -51,7 +47,7 @@ NTSTATUS ProcessMemory::Free( ptr_t pAddr, size_t size /*= 0*/, DWORD freeType /
         BLACKBONE_TRACE( L"Free: Free at address 0x%p", static_cast<uintptr_t>(pAddr) );
     }
 #endif
-    return _core.native()->VirtualFreeExT( pAddr, size, freeType );
+    return _core->native()->VirtualFreeExT( pAddr, size, freeType );
 }
 
 /// <summary>
@@ -62,7 +58,7 @@ NTSTATUS ProcessMemory::Free( ptr_t pAddr, size_t size /*= 0*/, DWORD freeType /
 /// <returns>Status</returns>
 NTSTATUS ProcessMemory::Query( ptr_t pAddr, PMEMORY_BASIC_INFORMATION64 pInfo )
 {
-    return _core.native()->VirtualQueryExT( pAddr, pInfo );
+    return _core->native()->VirtualQueryExT( pAddr, pInfo );
 }
 
 /// <summary>
@@ -81,15 +77,15 @@ NTSTATUS ProcessMemory::Protect( ptr_t pAddr, size_t size, DWORD flProtect, DWOR
 
     DWORD finalProt = flProtect;
     if (_casting == MemProtectionCasting::useDep)
-        finalProt = CastProtection( flProtect, _core.DEP() );
+        finalProt = CastProtection( flProtect, _core->DEP() );
 
-    return _core.native()->VirtualProtectExT( pAddr, size, finalProt, pOld );
+    return _core->native()->VirtualProtectExT( pAddr, size, finalProt, pOld );
 }
 
 /// <summary>
 /// Read data
 /// </summary>
-/// <param name="dwAddress">Memoey address to read from</param>
+/// <param name="dwAddress">Memory address to read from</param>
 /// <param name="dwSize">Size of data to read</param>
 /// <param name="pResult">Output buffer</param>
 /// <param name="handleHoles">
@@ -97,7 +93,7 @@ NTSTATUS ProcessMemory::Protect( ptr_t pAddr, size_t size, DWORD flProtect, DWOR
 /// Otherwise function will fail if there is at least one non-committed page in region.
 /// </param>
 /// <returns>Status</returns>
-NTSTATUS ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, bool handleHoles /*= false*/ )
+NTSTATUS ProcessMemory::ReadNoThrow( ptr_t dwAddress, size_t dwSize, PVOID pResult, bool handleHoles /*= false*/ )
 {
     DWORD64 dwRead = 0;
     if (dwAddress == 0)
@@ -105,38 +101,49 @@ NTSTATUS ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, boo
 
     // Simple read
     if (!handleHoles)
-    {
-        return _core.native()->ReadProcessMemoryT( dwAddress, pResult, dwSize, &dwRead );
-    }
+        return _core->native()->ReadProcessMemoryT( dwAddress, pResult, dwSize, &dwRead );
+
     // Read all committed memory regions
-    else
+    MEMORY_BASIC_INFORMATION64 mbi = { };
+    for (ptr_t memptr = dwAddress; memptr < dwAddress + dwSize; memptr = mbi.BaseAddress + mbi.RegionSize)
     {
-        MEMORY_BASIC_INFORMATION64 mbi = { 0 };
+        if (!NT_SUCCESS( _core->native()->VirtualQueryExT( memptr, &mbi ) ))
+            continue;
 
-        for (ptr_t memptr = dwAddress; memptr < dwAddress + dwSize; memptr = mbi.BaseAddress + mbi.RegionSize)
-        {
-            if (_core.native()->VirtualQueryExT( memptr, &mbi ) != STATUS_SUCCESS)
-                continue;
+        // Filter empty regions
+        if (mbi.State != MEM_COMMIT || mbi.Protect == PAGE_NOACCESS)
+            continue;
 
-            // Filter empty regions
-            if (mbi.State != MEM_COMMIT || mbi.Protect == PAGE_NOACCESS)
-                continue;
+        uint64_t region_ptr = memptr - dwAddress;
 
-            uint64_t region_ptr = memptr - dwAddress;
+        NTSTATUS status = _core->native()->ReadProcessMemoryT(
+            mbi.BaseAddress,
+            reinterpret_cast<uint8_t*>(pResult) + region_ptr,
+            static_cast<size_t>(mbi.RegionSize),
+            &dwRead
+        );
 
-            auto status = _core.native()->ReadProcessMemoryT(
-                mbi.BaseAddress,
-                reinterpret_cast<uint8_t*>(pResult) + region_ptr,
-                static_cast<size_t>(mbi.RegionSize),
-                &dwRead
-            );
-
-            if (!NT_SUCCESS( status ))
-                return status;
-        }
+        if (!NT_SUCCESS( status ))
+            continue;
     }
 
     return STATUS_SUCCESS;
+}
+
+/// <summary>
+/// Read data
+/// </summary>
+/// <param name="dwAddress">Memory address to read from</param>
+/// <param name="dwSize">Size of data to read</param>
+/// <param name="pResult">Output buffer</param>
+/// <param name="handleHoles">
+/// If true, function will try to read all committed pages in range ignoring uncommitted ones.
+/// Otherwise function will fail if there is at least one non-committed page in region.
+/// </param>
+void ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, bool handleHoles /*= false*/ )
+{
+    NTSTATUS status = ReadNoThrow( dwAddress, dwSize, pResult, handleHoles );
+    THROW_ON_FAIL_AND_LOG( status, "failed to read from address 0x%p", dwAddress );
 }
 
 /// <summary>
@@ -149,19 +156,19 @@ NTSTATUS ProcessMemory::Read( ptr_t dwAddress, size_t dwSize, PVOID pResult, boo
 /// If true, function will try to read all committed pages in range ignoring uncommitted ones.
 /// Otherwise function will fail if there is at least one non-committed page in region.
 /// </param>
-/// <returns>Status</returns>
-NTSTATUS ProcessMemory::Read( const std::vector<ptr_t>& adrList, size_t dwSize, PVOID pResult, bool handleHoles /*= false */ )
+void ProcessMemory::Read( const std::vector<ptr_t>& adrList, size_t dwSize, PVOID pResult, bool handleHoles /*= false */ )
 {
     if (adrList.empty())
-        return STATUS_INVALID_PARAMETER;
-    if(adrList.size() == 1)
+        THROW_AND_LOG( "address list is empty" );
+
+    if (adrList.size() == 1)
         return Read( adrList.front(), dwSize, pResult, handleHoles );
 
     bool wow64 = _process->barrier().targetWow64;
-    ptr_t ptr = wow64 ? Read<uint32_t>( adrList[0] ).result( 0 ) : Read<ptr_t>( adrList[0] ).result( 0 );
+    ptr_t ptr = wow64 ? Read<uint32_t>( adrList[0] ): Read<ptr_t>( adrList[0] );
 
     for (size_t i = 1; i < adrList.size() - 1; i++)
-        ptr = wow64 ? Read<uint32_t>( ptr + adrList[i] ).result( 0 ) : Read<ptr_t>( ptr + adrList[i] ).result( 0 );
+        ptr = wow64 ? Read<uint32_t>( ptr + adrList[i] ) : Read<ptr_t>( ptr + adrList[i] );
 
     return Read( ptr + adrList.back(), dwSize, pResult, handleHoles );
 }
@@ -173,9 +180,21 @@ NTSTATUS ProcessMemory::Read( const std::vector<ptr_t>& adrList, size_t dwSize, 
 /// <param name="dwSize">Size of data to write</param>
 /// <param name="pData">Buffer to write</param>
 /// <returns>Status</returns>
-NTSTATUS ProcessMemory::Write( ptr_t pAddress, size_t dwSize, const void* pData )
+NTSTATUS ProcessMemory::WriteNoThrow( ptr_t pAddress, size_t dwSize, const void * pData )
 {
-    return _core.native()->WriteProcessMemoryT( pAddress, pData, dwSize );
+    return _core->native()->WriteProcessMemoryT( pAddress, pData, dwSize );
+}
+
+/// <summary>
+/// Write data
+/// </summary>
+/// <param name="pAddress">Memory address to write to</param>
+/// <param name="dwSize">Size of data to write</param>
+/// <param name="pData">Buffer to write</param>
+void ProcessMemory::Write( ptr_t pAddress, size_t dwSize, const void* pData )
+{
+    NTSTATUS status = _core->native()->WriteProcessMemoryT( pAddress, pData, dwSize );
+    THROW_ON_FAIL_AND_LOG( status, "failed to write to address 0x%p", pAddress );
 }
 
 /// <summary>
@@ -184,21 +203,21 @@ NTSTATUS ProcessMemory::Write( ptr_t pAddress, size_t dwSize, const void* pData 
 /// <param name="adrList">Base address + list of offsets</param>
 /// <param name="dwSize">Size of data to write</param>
 /// <param name="pData">Buffer to write</param>
-/// <returns>Status</returns>
-NTSTATUS ProcessMemory::Write( const std::vector<ptr_t>& adrList, size_t dwSize, const void* pData )
+void ProcessMemory::Write( const std::vector<ptr_t>& adrList, size_t dwSize, const void* pData )
 {
     if (adrList.empty())
-        return STATUS_INVALID_PARAMETER;
+        THROW_AND_LOG( "address list is empty" );
+
     if (adrList.size() == 1)
         return Write( adrList.front(), dwSize, pData );
 
     bool wow64 = _process->barrier().targetWow64;
-    ptr_t ptr = wow64 ? Read<uint32_t>( adrList[0] ).result( 0 ) : Read<ptr_t>( adrList[0] ).result( 0 );
+    ptr_t ptr = wow64 ? Read<uint32_t>( adrList[0] ): Read<ptr_t>( adrList[0] );
 
     for (size_t i = 1; i < adrList.size() - 1; i++)
-        ptr = wow64 ? Read<uint32_t>( ptr + adrList[i] ).result( 0 ) : Read<ptr_t>( ptr + adrList[i] ).result( 0 );
+        ptr = wow64 ? Read<uint32_t>( ptr + adrList[i] ) : Read<ptr_t>( ptr + adrList[i] );
 
-    return Write( ptr + adrList.back(), dwSize, pData );
+    Write( ptr + adrList.back(), dwSize, pData );
 }
 
 /// <summary>
@@ -208,7 +227,7 @@ NTSTATUS ProcessMemory::Write( const std::vector<ptr_t>& adrList, size_t dwSize,
 /// <returns>Found regions</returns>
 std::vector<MEMORY_BASIC_INFORMATION64> ProcessMemory::EnumRegions( bool includeFree /*= false*/ )
 {
-    return _core.native()->EnumRegions( includeFree );
+    return _core->native()->EnumRegions( includeFree );
 }
 
 }

@@ -15,7 +15,15 @@ namespace Testing
             AssertEx::IsNotZero( ntdll32.imageBase() );
             AssertEx::IsNotZero( ntdll64.imageBase() );
        
-            AssertEx::NtSuccess( sl.LoadFromPatterns( ntdll32, ntdll64, fromPatterns ) );
+            sl.LoadFromPatterns( ntdll32, ntdll64, fromPatterns );
+
+            AssertEx::IsNotZero( fromPatterns.LdrpHandleTlsData32 );
+            AssertEx::IsNotZero( fromPatterns.LdrpHandleTlsData64 );
+            AssertEx::IsNotZero( fromPatterns.LdrpInvertedFunctionTable32 );
+            AssertEx::IsNotZero( fromPatterns.LdrpInvertedFunctionTable64 );
+            AssertEx::IsNotZero( fromPatterns.LdrProtectMrdata );
+            AssertEx::IsNotZero( fromPatterns.RtlInsertInvertedFunctionTable32 );
+            AssertEx::IsNotZero( fromPatterns.RtlInsertInvertedFunctionTable64 );
 
             if (NT_SUCCESS( sl.LoadFromSymbols( ntdll32, ntdll64, fromSymbols ) ))
             {

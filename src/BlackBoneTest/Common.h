@@ -1,5 +1,6 @@
 #pragma once
 #include <BlackBone/Config.h>
+#include <BlackBone/Include/ScopeExit.h>
 #include <BlackBone/Process/Process.h>
 #include <BlackBone/Process/MultPtr.hpp>
 #include <BlackBone/Process/RPC/RemoteFunction.hpp>
@@ -14,6 +15,7 @@
 
 #include <iostream>
 #include <CppUnitTest.h>
+#include <set>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace blackbone;
@@ -46,6 +48,10 @@ public:
 
 namespace Microsoft::VisualStudio::CppUnitTestFramework {
     template<> inline std::wstring ToString<AsmVariant::eType>( const AsmVariant::eType& t ) { RETURN_WIDE_STRING( t ); }
+
+#ifdef USE64
+    //template<> inline std::wstring ToString<intptr_t>(const intptr_t& t) { RETURN_WIDE_STRING(t); }
+#endif
 }
 
 inline std::wstring GetTestHelperDir()

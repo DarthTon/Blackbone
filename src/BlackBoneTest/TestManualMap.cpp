@@ -68,25 +68,20 @@ namespace Testing
     private:
         void MapFromFile( const std::wstring& hostPath, const std::wstring& dllPath )
         {
-            Process proc;
-            NTSTATUS status = proc.CreateAndAttach( hostPath );
-            AssertEx::NtSuccess( status );
-            proc.EnsureInit();
+            auto proc = Process::CreateNew( hostPath );
+            Sleep( 500 );
 
             auto image = proc.mmap().MapImage( dllPath, ManualImports, &MapCallback );
-            AssertEx::IsTrue( image.success() );
-            AssertEx::IsNotNull( image.result().get() );
+            AssertEx::IsNotNull( image.get() );
 
-            auto g_loadDataPtr = proc.modules().GetExport( image.result(), "g_LoadData" );
-            AssertEx::IsTrue( g_loadDataPtr.success() );
-            AssertEx::IsNotZero( g_loadDataPtr->procAddress );
+            auto g_loadDataPtr = proc.modules().GetExport( image, "g_LoadData" );
+            AssertEx::IsNotZero( g_loadDataPtr.procAddress );
 
-            auto g_loadData = proc.memory().Read<DllLoadData>( g_loadDataPtr->procAddress );
-            AssertEx::IsTrue( g_loadData.success() );
+            auto g_loadData = proc.memory().Read<DllLoadData>( g_loadDataPtr.procAddress );
 
             proc.Terminate();
 
-            ValidateDllLoad( g_loadData.result() );
+            ValidateDllLoad( g_loadData );
         }
 
         void MapFromMemory( const std::wstring& hostPath, const std::wstring& dllPath )
@@ -94,25 +89,20 @@ namespace Testing
             auto[buf, size] = GetFileData( dllPath );
             AssertEx::IsNotZero( size );
 
-            Process proc;
-            NTSTATUS status = proc.CreateAndAttach( hostPath );
-            AssertEx::NtSuccess( status );
-            proc.EnsureInit();
+            auto proc = Process::CreateNew( hostPath );
+            Sleep( 500 );
 
             auto image = proc.mmap().MapImage( size, buf.get(), false, ManualImports, &MapCallback );
-            AssertEx::IsTrue( image.success() );
-            AssertEx::IsNotNull( image.result().get() );
+            AssertEx::IsNotNull( image.get() );
 
-            auto g_loadDataPtr = proc.modules().GetExport( image.result(), "g_LoadData" );
-            AssertEx::IsTrue( g_loadDataPtr.success() );
-            AssertEx::IsNotZero( g_loadDataPtr->procAddress );
+            auto g_loadDataPtr = proc.modules().GetExport( image, "g_LoadData" );
+            AssertEx::IsNotZero( g_loadDataPtr.procAddress );
 
-            auto g_loadData = proc.memory().Read<DllLoadData>( g_loadDataPtr->procAddress );
-            AssertEx::IsTrue( g_loadData.success() );
+            auto g_loadData = proc.memory().Read<DllLoadData>( g_loadDataPtr.procAddress );
 
             proc.Terminate();
 
-            ValidateDllLoad( g_loadData.result() );
+            ValidateDllLoad( g_loadData );
         }
 
         void ValidateDllLoad( const DllLoadData& data )

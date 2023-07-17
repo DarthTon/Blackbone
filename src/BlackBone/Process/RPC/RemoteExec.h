@@ -28,8 +28,14 @@ class RemoteExec
     using vecArgs = std::vector<AsmVariant>;
 
 public:
-    BLACKBONE_API RemoteExec( class Process& proc );
+    BLACKBONE_API RemoteExec( class Process* proc );
     BLACKBONE_API ~RemoteExec();
+
+    RemoteExec( const RemoteExec& ) = delete;
+    RemoteExec( RemoteExec&& ) = default;
+
+    RemoteExec& operator =( const RemoteExec& ) = delete;
+    RemoteExec& operator =( RemoteExec&& ) = default;
 
     /// <summary>
     /// Create environment for future remote procedure calls
@@ -41,43 +47,35 @@ public:
     /// |       8/8 bytes       |   8/8 bytes  |      8/8 bytes     |    8/8 bytes    |                                          |
     /// --------------------------------------------------------------------------------------------------------------------------
     /// </summary>
-    /// <param name="mode">Worket thread mode</param>
+    /// <param name="mode">Worker thread mode</param>
     /// <param name="bEvent">Create sync event for worker thread</param>
-    /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS CreateRPCEnvironment( WorkerThreadMode mode = Worker_None, bool bEvent = false );
+    BLACKBONE_API void CreateRPCEnvironment( WorkerThreadMode mode = Worker_None, bool bEvent = false );
 
     /// <summary>
     /// Create new thread and execute code in it. Wait until execution ends
     /// </summary>
     /// <param name="pCode">Code to execute</param>
     /// <param name="size">Code size</param>
-    /// <param name="callResult">Code return value</param>
     /// <param name="modeSwitch">Switch wow64 thread to long mode upon creation</param>
-    /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS ExecInNewThread(
-        PVOID pCode, size_t size, 
-        uint64_t& callResult, 
-        eThreadModeSwitch modeSwitch = AutoSwitch 
-        );
+    /// <returns>Return code</returns>
+    BLACKBONE_API uint64_t ExecInNewThread( PVOID pCode, size_t size, eThreadModeSwitch modeSwitch = AutoSwitch );
 
     /// <summary>
     /// Execute code in context of our worker thread
     /// </summary>
-    /// <param name="pCode">Cde to execute</param>
+    /// <param name="pCode">Code to execute</param>
     /// <param name="size">Code size.</param>
-    /// <param name="callResult">Execution result</param>
-    /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS ExecInWorkerThread( PVOID pCode, size_t size, uint64_t& callResult );
+    /// <returns>Call result</returns>
+    BLACKBONE_API uint64_t ExecInWorkerThread( PVOID pCode, size_t size );
 
     /// <summary>
     /// Execute code in context of any existing thread
     /// </summary>
-    /// <param name="pCode">Cde to execute</param>
+    /// <param name="pCode">Code to execute</param>
     /// <param name="size">Code size.</param>
-    /// <param name="callResult">Execution result</param>
     /// <param name="thd">Target thread</param>
-    /// <returns>Status</returns>
-    BLACKBONE_API NTSTATUS ExecInAnyThread( PVOID pCode, size_t size, uint64_t& callResult, ThreadPtr& thread );
+    /// <returns>Call result</returns>
+    BLACKBONE_API uint64_t ExecInAnyThread( PVOID pCode, size_t size, ThreadPtr& thread );
 
     /// <summary>
     /// Create new thread with specified entry point and argument
@@ -95,8 +93,7 @@ public:
     /// <param name="args">Function arguments</param>
     /// <param name="cc">Calling convention</param>
     /// <param name="retType">Return type</param>
-    /// <returns>Status code</returns>
-    BLACKBONE_API NTSTATUS PrepareCallAssembly(
+    BLACKBONE_API void PrepareCallAssembly(
         IAsmHelper& a,
         ptr_t pfn,
         std::vector<blackbone::AsmVariant>& args,
@@ -132,21 +129,20 @@ public:
     /// Retrieve call result
     /// </summary>
     /// <param name="result">Retrieved result</param>
-    /// <returns>true on success</returns>
     template<typename T>
-    NTSTATUS GetCallResult( T& result )
+    T GetCallResult()
     {
         // This method is called after an RPC call, so the ping pong buffers have already been switched, so
         // we want to access the OTHER buffer here.
         if constexpr (sizeof( T ) > sizeof( uint64_t ))
         {
             if constexpr (std::is_reference_v<T>)
-                return _userData[1 - _currentBufferIdx].Read( _userData[1 - _currentBufferIdx].Read<uintptr_t>( RET_OFFSET, 0 ), sizeof( T ), reinterpret_cast<PVOID>(&result) );
+                return _userData[1 - _currentBufferIdx].Read<T>( _userData[1 - _currentBufferIdx].Read<uintptr_t>( RET_OFFSET ) );
             else
-                return _userData[1 - _currentBufferIdx].Read( ARGS_OFFSET, sizeof( T ), reinterpret_cast<PVOID>(&result) );
+                return _userData[1 - _currentBufferIdx].Read<T>( ARGS_OFFSET );
         }
         else
-            return _userData[1 - _currentBufferIdx].Read( RET_OFFSET, sizeof( T ), reinterpret_cast<PVOID>(&result) );
+            return _userData[1 - _currentBufferIdx].Read<T>( RET_OFFSET );
     }
 
     /// <summary>
@@ -155,7 +151,7 @@ public:
     /// <returns></returns>
     BLACKBONE_API NTSTATUS GetLastStatus()
     {
-        return _userData[_currentBufferIdx].Read<NTSTATUS>( ERR_OFFSET, STATUS_NOT_FOUND );
+        return _userData[1 - _currentBufferIdx].Read<NTSTATUS>( ERR_OFFSET, STATUS_NOT_FOUND );
     }
 
     /// <summary>
@@ -179,7 +175,7 @@ public:
     /// Ge memory routines
     /// </summary>
     /// <returns></returns>
-    BLACKBONE_API class ProcessMemory& memory() { return _memory; }
+    //BLACKBONE_API class ProcessMemory& memory() { return *_memory; }
 
     /// <summary>
     /// Reset instance
@@ -187,27 +183,24 @@ public:
     BLACKBONE_API void reset();
 
 private:
-
     /// <summary>
     /// Create worker RPC thread
     /// </summary>
     /// <returns>Thread ID</returns>
-    call_result_t<DWORD> CreateWorkerThread();
+    DWORD CreateWorkerThread();
 
     /// <summary>
     /// Create event to synchronize APC procedures
     /// </summary>
     /// <param name="threadID">The thread identifier.</param>
-    /// <returns>Status code</returns>
-    NTSTATUS CreateAPCEvent( DWORD threadID );
+    void CreateAPCEvent( DWORD threadID );
 
     /// <summary>
     /// Copy executable code into remote codecave for future execution
     /// </summary>
     /// <param name="pCode">Code to copy</param>
     /// <param name="size">Code size</param>
-    /// <returns>Status</returns>
-    NTSTATUS CopyCode( PVOID pCode, size_t size );
+    void CopyCode( PVOID pCode, size_t size );
 
     void SwitchActiveBuffer()
     {
@@ -223,15 +216,12 @@ private:
         _currentBufferIdx = 1 - _currentBufferIdx;
     }
 
-    RemoteExec( const RemoteExec& ) = delete;
-    RemoteExec& operator =(const RemoteExec&) = delete;
-
-private:    
+private:
     // Process routines
-    class Process&        _process;
-    class ProcessModules& _mods;
-    class ProcessMemory&  _memory;
-    class ProcessThreads& _threads;
+    class Process*        _process;
+    class ProcessModules* _mods;
+    class ProcessMemory*  _memory;
+    class ProcessThreads* _threads;
 
     ThreadPtr _workerThread;    // Worker thread handle
     ThreadPtr _hijackThread;    // Thread to use for hijacking  

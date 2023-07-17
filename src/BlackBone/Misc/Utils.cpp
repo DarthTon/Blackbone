@@ -36,7 +36,7 @@ std::string Utils::WstringToUTF8( const std::wstring& str )
 /// <returns>wide char string</returns>
 std::wstring Utils::AnsiToWstring( const std::string& input, DWORD locale /*= CP_ACP*/ )
 {
-    wchar_t buf[2048] = { 0 };
+    wchar_t buf[2048] = { };
     MultiByteToWideChar( locale, 0, input.c_str(), (int)input.length(), buf, ARRAYSIZE( buf ) );
     return buf;
 }
@@ -49,7 +49,7 @@ std::wstring Utils::AnsiToWstring( const std::string& input, DWORD locale /*= CP
 /// <returns>ANSI string</returns>
 std::string Utils::WstringToAnsi( const std::wstring& input, DWORD locale /*= CP_ACP*/ )
 {
-    char buf[2048] = { 0 };
+    char buf[2048] = { };
     WideCharToMultiByte( locale, 0, input.c_str(), (int)input.length(), buf, ARRAYSIZE( buf ), nullptr, nullptr );
     return buf;
 }
@@ -62,7 +62,7 @@ std::string Utils::WstringToAnsi( const std::wstring& input, DWORD locale /*= CP
 /// <returns>Formatted string</returns>
 std::wstring Utils::FormatString( const wchar_t* fmt, ... )
 {
-    wchar_t buf[4096] = { 0 };
+    wchar_t buf[4096] = { };
 
     va_list vl;
     va_start( vl, fmt );
@@ -119,7 +119,7 @@ std::wstring Utils::GetParent( const std::wstring& path )
 /// <returns>Exe directory</returns>
 std::wstring Utils::GetExeDirectory()
 {
-    wchar_t imgName[MAX_PATH] = { 0 };
+    wchar_t imgName[MAX_PATH] = { };
     DWORD len = ARRAYSIZE(imgName);
 
     auto pFunc = GET_IMPORT( QueryFullProcessImageNameW );
@@ -165,6 +165,28 @@ std::wstring Utils::ToLower( std::wstring str )
     return str;
 }
 
+template<typename T, auto Formatter>
+std::basic_string<T> GetErrorDescriptionT( NTSTATUS code )
+{
+    std::basic_string<T> result;
+    T* lpMsgBuf = nullptr;
+
+    if (Formatter(
+        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+        FORMAT_MESSAGE_FROM_SYSTEM |
+        FORMAT_MESSAGE_FROM_HMODULE |
+        FORMAT_MESSAGE_IGNORE_INSERTS,
+        GetModuleHandleW( L"ntdll.dll" ),
+        code, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
+        (T*)&lpMsgBuf, 0, NULL ) != 0)
+    {
+        result = lpMsgBuf;
+        LocalFree( lpMsgBuf );
+    }
+
+    return result;
+}
+
 /// <summary>
 /// Get system error description
 /// </summary>
@@ -172,24 +194,17 @@ std::wstring Utils::ToLower( std::wstring str )
 /// <returns>Error message</returns>
 std::wstring Utils::GetErrorDescription( NTSTATUS code )
 {
-    LPWSTR lpMsgBuf = nullptr;
+    return GetErrorDescriptionT<wchar_t, FormatMessageW>( code );
+}
 
-    if (FormatMessageW(
-        FORMAT_MESSAGE_ALLOCATE_BUFFER |
-        FORMAT_MESSAGE_FROM_SYSTEM |
-        FORMAT_MESSAGE_FROM_HMODULE |
-        FORMAT_MESSAGE_IGNORE_INSERTS,
-        GetModuleHandleW( L"ntdll.dll" ),
-        code, MAKELANGID( LANG_NEUTRAL, SUBLANG_DEFAULT ),
-        (LPWSTR)&lpMsgBuf, 0, NULL ) != 0)
-    {
-        std::wstring ret( lpMsgBuf );
-
-        LocalFree( lpMsgBuf );
-        return ret;
-    }
-
-    return L"";
+/// <summary>
+/// Get system error description
+/// </summary>
+/// <param name="code">The code.</param>
+/// <returns>Error message</returns>
+std::string Utils::GetErrorDescriptionA( NTSTATUS code )
+{
+    return GetErrorDescriptionT<char, FormatMessageA>( code );
 }
 
 /// <summary>
@@ -200,6 +215,15 @@ std::wstring Utils::GetErrorDescription( NTSTATUS code )
 bool Utils::FileExists( const std::wstring& path )
 {
     return (GetFileAttributesW( path.c_str() ) != 0xFFFFFFFF );
+}
+
+
+std::string Utils::NameOrdToString( const char * name_ord )
+{
+    if (reinterpret_cast<uintptr_t>(name_ord) <= 0xFFFF)
+        return  "ordinal " + std::to_string( reinterpret_cast<uintptr_t>(name_ord) );
+
+    return name_ord;
 }
 
 

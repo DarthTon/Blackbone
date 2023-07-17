@@ -10,9 +10,9 @@ namespace blackbone
 // CPU will raise #GP if length exceeds this value
 #define MAX_INSTRUCTION_LENGTH 15
 
-RemoteHook::RemoteHook( class ProcessMemory& memory )
+RemoteHook::RemoteHook( class ProcessMemory* memory )
     : _memory( memory )
-    , _core( _memory.core() )
+    , _core( _memory->core() )
 {  
 }
 
@@ -28,12 +28,12 @@ RemoteHook::~RemoteHook()
 NTSTATUS RemoteHook::EnsureDebug()
 {
     // Close previous debug object
-    if (_debugPID != 0 && _debugPID != _core.pid())
+    if (_debugPID != 0 && _debugPID != _core->pid())
     {
         EndDebug();
     }
     // Already debugging
-    else if (_debugPID == _core.pid())
+    else if (_debugPID == _core->pid())
     {
         return STATUS_SUCCESS;
     }
@@ -44,11 +44,11 @@ NTSTATUS RemoteHook::EnsureDebug()
     BOOL isDebugged = FALSE;
 
     // Can't debug x64 process from x32 one.
-    if (_core.native()->GetWow64Barrier().type == wow_32_64)
+    if (_core->native()->GetWow64Barrier().type == wow_32_64)
         return STATUS_OBJECT_TYPE_MISMATCH;
 
     // Already under debugger
-    CheckRemoteDebuggerPresent( _core.handle(), &isDebugged );
+    CheckRemoteDebuggerPresent( _core->handle(), &isDebugged );
     if (isDebugged == TRUE)
         return STATUS_ALREADY_REGISTERED;
 
@@ -100,10 +100,10 @@ NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, con
         GetExitCodeThread( _hEventThd, &exitCode );
     }
 
-    HookData data = { { 0 } };
+    HookData data = { };
 
     // Store old byte
-    data.oldByte = _memory.Read<uint8_t>( ptr ).result();
+    data.oldByte = _memory->Read<uint8_t>( ptr );
     data.type = type;
     data.onExecute.freeFn = newFn;
     data.onExecute.classFn.classPtr = pClass;
@@ -116,27 +116,37 @@ NTSTATUS RemoteHook::ApplyP( eHookType type, uint64_t ptr, fnCallback newFn, con
         // Set for single thread
         if (pThread != nullptr)
         {
-            data.hwbp_idx = pThread->AddHWBP( ptr, hwbp_execute, hwbp_1 ).result( -1 );
-            if (data.hwbp_idx == -1)
+            try
+            {
+                data.hwbp_idx = pThread->AddHWBP( ptr, hwbp_execute, hwbp_1 );    
+            }
+            catch (const nt_exception&)
+            {
                 return STATUS_NO_MORE_ENTRIES;
+            }
         }
         // Set for all threads
         else
         {
-            for (auto& thread : _memory.process()->threads().getAll())
-                thread->AddHWBP( ptr, hwbp_execute, hwbp_1 );
+            for (auto& thread : _memory->process()->threads().getAll())
+            {
+                try
+                {
+                    thread->AddHWBP( ptr, hwbp_execute, hwbp_1 );
+                }
+                catch (const nt_exception&)
+                {
+                }
+            }
         }
     }
     // Write int3
     else
     {
         DWORD flOld = 0;
-        _memory.Protect( ptr, sizeof( uint8_t ), PAGE_EXECUTE_READWRITE, &flOld );
-        status = _memory.Write<uint8_t>( ptr, 0xCC );
-        _memory.Protect( ptr, sizeof( uint8_t ), flOld, nullptr );
-
-        if (!NT_SUCCESS( status ))
-            return status;
+        _memory->Protect( ptr, sizeof( uint8_t ), PAGE_EXECUTE_READWRITE, &flOld );
+        _memory->Write<uint8_t>( ptr, 0xCC );
+        _memory->Protect( ptr, sizeof( uint8_t ), flOld, nullptr );
     }
 
     // Store hooked address
@@ -200,11 +210,11 @@ void RemoteHook::Restore( const HookData &hook, uint64_t ptr )
     {       
         if (hook.threadID != 0)
         {
-            Thread( hook.threadID, &_core ).RemoveHWBP( hook.hwbp_idx );
+            Thread( hook.threadID, _core ).RemoveHWBP( hook.hwbp_idx );
         }   
         else
         {
-            auto threads = _memory.process()->threads().getAll();
+            auto threads = _memory->process()->threads().getAll();
             for (auto& thread : threads)
                 thread->RemoveHWBP( ptr );
         }
@@ -213,9 +223,9 @@ void RemoteHook::Restore( const HookData &hook, uint64_t ptr )
     else
     {
         DWORD flOld = 0;
-        _memory.Protect( ptr, sizeof( uint8_t ), PAGE_EXECUTE_READWRITE, &flOld );
-        _memory.Write( ptr, hook.oldByte );
-        _memory.Protect( ptr, sizeof( uint8_t ), flOld, nullptr );
+        _memory->Protect( ptr, sizeof( uint8_t ), PAGE_EXECUTE_READWRITE, &flOld );
+        _memory->Write( ptr, hook.oldByte );
+        _memory->Protect( ptr, sizeof( uint8_t ), flOld, nullptr );
     }
 }
 
@@ -239,30 +249,30 @@ DWORD RemoteHook::EventThreadWrap( LPVOID lpParam )
 DWORD RemoteHook::EventThread()
 {
     // Try to debug process
-    if (DebugActiveProcess( _core.pid() ) != TRUE)
+    if (DebugActiveProcess( _core->pid() ) != TRUE)
         return LastNtStatus();
 
     DebugSetProcessKillOnExit( FALSE );
 
-    _debugPID = _core.pid();
+    _debugPID = _core->pid();
 
     // Determine if target is Wow64
-    _x64Target = !_core.native()->GetWow64Barrier().targetWow64;
+    _x64Target = !_core->native()->GetWow64Barrier().targetWow64;
     _wordSize = _x64Target ? sizeof( int64_t ) : sizeof( int32_t );
 
     // 
     // Reset debug flag in PEB
     //
-    _memory.Write( fieldPtr( _core.peb64(), &_PEB64::BeingDebugged ), uint8_t( 0 ) );
+    _memory->Write( fieldPtr( _core->peb64(), &_PEB64::BeingDebugged ), uint8_t( 0 ) );
     if (!_x64Target)
-        _memory.Write( fieldPtr( _core.peb32(), &_PEB32::BeingDebugged ), uint8_t( 0 ) );
+        _memory->Write( fieldPtr( _core->peb32(), &_PEB32::BeingDebugged ), uint8_t( 0 ) );
 
     _active = true;
 
     // Process debug events
     while (_active)
     {
-        DEBUG_EVENT DebugEv = { 0 };
+        DEBUG_EVENT DebugEv = { };
         DWORD status = DBG_CONTINUE;
 
         if (!WaitForDebugEvent( &DebugEv, 100 ))
@@ -280,7 +290,7 @@ DWORD RemoteHook::EventThread()
                 for(auto& hook : _hooks)
                     if (hook.second.type == hwbp && hook.second.threadID == 0)
                     {
-                        Thread th( DebugEv.u.CreateThread.hThread, &_core );
+                        Thread th( DebugEv.u.CreateThread.hThread, _core );
                         th.AddHWBP( hook.first, hwbp_execute, hwbp_1 );
                     }
                 break;
@@ -339,7 +349,7 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
     // Prevent highest bit extension.
     ptr_t addr = (uintptr_t)DebugEv.u.Exception.ExceptionRecord.ExceptionAddress;
     ptr_t ip = 0, sp = 0;
-    Thread thd( DebugEv.dwThreadId, &_core );
+    Thread thd( DebugEv.dwThreadId, _core );
 
     if (_hooks.count( addr ))
     {
@@ -347,7 +357,7 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
         _CONTEXT32 ctx32;
         thd.GetContext( ctx64, CONTEXT64_FULL, true );
 
-        if (_memory.core().isWow64())
+        if (_core->isWow64())
         {
             thd.GetContext( ctx32, WOW64_CONTEXT_FULL, true );
             ip = ctx32.Eip;
@@ -363,7 +373,7 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
         std::vector<std::pair<ptr_t, ptr_t>> results;
         StackBacktrace( ip, sp, thd, results, 1 );
 
-        RemoteContext context( _memory, thd, ctx64, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
+        RemoteContext context( _memory, &thd, &ctx64, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
 
         // Execute user callback
         auto& hook = _hooks[addr];
@@ -383,9 +393,9 @@ DWORD RemoteHook::OnBreakpoint( const DEBUG_EVENT& DebugEv )
 
         // Resume execution
         DWORD flOld = 0;
-        _memory.Protect( addr, sizeof( hook.oldByte ), PAGE_EXECUTE_READWRITE, &flOld );
-        _memory.Write( addr, hook.oldByte );
-        _memory.Protect( addr, sizeof( hook.oldByte ), flOld, nullptr );
+        _memory->Protect( addr, sizeof( hook.oldByte ), PAGE_EXECUTE_READWRITE, &flOld );
+        _memory->Write( addr, hook.oldByte );
+        _memory->Protect( addr, sizeof( hook.oldByte ), flOld, nullptr );
 
         _repatch[addr] = true;
         
@@ -410,18 +420,18 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
     // Prevent highest bit extension.
     ptr_t addr = (uintptr_t)DebugEv.u.Exception.ExceptionRecord.ExceptionAddress;
     ptr_t ip = 0, sp = 0;
-    bool use64 = !_core.native()->GetWow64Barrier().x86OS;
-    _CONTEXT32 ctx32 = { 0 };
-    _CONTEXT64 ctx64 = { 0 };
+    bool use64 = !_core->native()->GetWow64Barrier().x86OS;
+    _CONTEXT32 ctx32 = { };
+    _CONTEXT64 ctx64 = { };
 
-    Thread thd( DebugEv.dwThreadId, &_core );
+    Thread thd( DebugEv.dwThreadId, _core );
 
     thd.GetContext( ctx64, CONTEXT64_ALL, true );
     ip = ctx64.Rip;
     sp = ctx64.Rsp;
 
     // Use 32 bit context if available
-    if (_memory.core().isWow64())
+    if (_core->isWow64())
     {
         thd.GetContext( ctx32, use64 ? WOW64_CONTEXT_ALL : CONTEXT_ALL, true );
         ip = ctx32.Eip;
@@ -448,7 +458,7 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
         std::vector<std::pair<ptr_t, ptr_t>> results;
         StackBacktrace( ip, sp, thd, results, 1 );
 
-        RemoteContext context( _memory, thd, ctx64, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
+        RemoteContext context( _memory, &thd, &ctx64, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
 
         // Execute user callback
         if(_hooks.count( addr ))
@@ -507,9 +517,9 @@ DWORD RemoteHook::OnSinglestep( const DEBUG_EVENT& DebugEv )
             else if (hook.type == int3)
             {
                 DWORD flOld = 0;
-                _memory.Protect( addr, sizeof( hook.oldByte ), PAGE_EXECUTE_READWRITE, &flOld );
-                _memory.Write( place.first, uint8_t( 0xCC ) );
-                _memory.Protect( addr, sizeof( hook.oldByte ), flOld, nullptr );
+                _memory->Protect( addr, sizeof( hook.oldByte ), PAGE_EXECUTE_READWRITE, &flOld );
+                _memory->Write( place.first, uint8_t( 0xCC ) );
+                _memory->Protect( addr, sizeof( hook.oldByte ), flOld, nullptr );
             }
 
             place.second = false;
@@ -533,14 +543,14 @@ DWORD RemoteHook::OnAccessViolation( const DEBUG_EVENT& DebugEv )
     _CONTEXT32 ctx32;
     _CONTEXT64 ctx64;
 
-    Thread thd( DebugEv.dwThreadId, &_core );
+    Thread thd( DebugEv.dwThreadId, _core );
 
     thd.GetContext( ctx64, CONTEXT64_ALL, true );
     ip = ctx64.Rip;
     sp = ctx64.Rsp;
 
     // Use 32 bit context if available
-    if(_memory.core().isWow64())
+    if(_core->isWow64())
     {
         thd.GetContext( ctx32, WOW64_CONTEXT_ALL, true );
         ip = ctx32.Eip;
@@ -551,7 +561,7 @@ DWORD RemoteHook::OnAccessViolation( const DEBUG_EVENT& DebugEv )
     std::vector<std::pair<ptr_t, ptr_t>> results;
     StackBacktrace( ip, sp, thd, results, 1 );
 
-    RemoteContext context( _memory, thd, ctx64, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
+    RemoteContext context( _memory, &thd, &ctx64, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
 
     // Under AMD64 exception is thrown before 'ret' gets executed
     // Return must be detected manually
@@ -566,14 +576,14 @@ DWORD RemoteHook::OnAccessViolation( const DEBUG_EVENT& DebugEv )
 
         if (hook.flags & returnHook)
         {
-            RemoteContext fixedContext( _memory, thd, hook.entryCtx, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
+            RemoteContext fixedContext( _memory, &thd, &hook.entryCtx, !results.empty() ? results.back().first : 0, _x64Target, _wordSize );
 
             if (hook.onReturn.classFn.classPtr && hook.onReturn.classFn.ptr != nullptr)
                 hook.onReturn.classFn.ptr( hook.onExecute.classFn.classPtr, fixedContext );
             else if (hook.onReturn.freeFn != nullptr)
                 hook.onReturn.freeFn( fixedContext );
 
-            hook.entryCtx = { 0 };
+            hook.entryCtx = { };
         }
 
         _retHooks.erase( addr );
@@ -620,9 +630,9 @@ DWORD RemoteHook::StackBacktrace( ptr_t ip, ptr_t sp, Thread& thd, std::vector<s
     uint64_t stack_base = 0;
 
     // Get stack base
-    if(_core.isWow64())
+    if(_core->isWow64())
     {
-        _TEB32 teb32 = { { 0 } };
+        _TEB32 teb32 = { };
         if (thd.teb( &teb32 ) == 0)
             return 0;
 
@@ -630,7 +640,7 @@ DWORD RemoteHook::StackBacktrace( ptr_t ip, ptr_t sp, Thread& thd, std::vector<s
     }
     else
     {
-        _TEB64 teb64 = { { 0 } };
+        _TEB64 teb64 = { };
         if (thd.teb( &teb64 ) == 0)
             return 0;
 
@@ -644,17 +654,17 @@ DWORD RemoteHook::StackBacktrace( ptr_t ip, ptr_t sp, Thread& thd, std::vector<s
     for (ptr_t stackPtr = sp; stackPtr < stack_base && i < depth; stackPtr += _wordSize)
     {
         ptr_t stack_val = 0;
-        _memory.Read( stackPtr, _wordSize, &stack_val );
-        MEMORY_BASIC_INFORMATION64 meminfo = { 0 };
+        _memory->Read( stackPtr, _wordSize, &stack_val );
+        MEMORY_BASIC_INFORMATION64 meminfo = { };
 
         ptr_t original = stack_val & 0x7FFFFFFFFFFFFFFF;
 
         // Invalid value
-        if (stack_val < _core.native()->minAddr() || original > _core.native()->maxAddr())
+        if (stack_val < _core->native()->minAddr() || original > _core->native()->maxAddr())
             continue;
 
         // Check if memory is executable
-        if (_core.native()->VirtualQueryExT( original, &meminfo ) != STATUS_SUCCESS)
+        if (!NT_SUCCESS( _core->native()->VirtualQueryExT( original, &meminfo ) ))
             continue;
 
         if ( meminfo.AllocationProtect != PAGE_EXECUTE_READ &&
@@ -665,7 +675,7 @@ DWORD RemoteHook::StackBacktrace( ptr_t ip, ptr_t sp, Thread& thd, std::vector<s
         }
 
         uint8_t codeChunk[6] = {0};
-        _memory.Read( original - 6, sizeof(codeChunk), codeChunk );
+        _memory->Read( original - 6, sizeof(codeChunk), codeChunk );
 
         // Detect 'call' instruction
         // TODO: Implement more reliable way to detect 'call'

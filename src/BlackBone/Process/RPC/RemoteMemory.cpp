@@ -23,7 +23,7 @@ RemoteMemory::~RemoteMemory()
 /// <returns>Status code</returns>
 NTSTATUS RemoteMemory::Map( bool mapSections )
 {
-    MapMemoryResult result = { 0 };
+    MapMemoryResult result = { };
 
     // IPC
     if (!_hPipe)
@@ -52,7 +52,7 @@ NTSTATUS RemoteMemory::Map( bool mapSections )
 /// <returns>Status code</returns>
 NTSTATUS RemoteMemory::Map( ptr_t base, uint32_t size )
 {
-    MapMemoryRegionResult memRes =  { 0 };
+    MapMemoryRegionResult memRes =  { };
 
     // IPC
     if (!_hPipe)
@@ -161,9 +161,6 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
 {
     static const char* procNames[] = { "NtAllocateVirtualMemory", "NtFreeVirtualMemory", "NtMapViewOfSection", "NtUnmapViewOfSection" };
 
-    uint8_t* pTranslated = nullptr;
-    ptr_t pProc = 0;
-
     // Can't setup hook without target pipe and shared data
     if (_targetPipe == NULL || !_pSharedData || !_targetShare)
         return STATUS_NONE_MAPPED;
@@ -180,10 +177,8 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
     auto& modules = _process->modules();
 
     // Local and remote process address
-    pProc = modules.GetExport( modules.GetModule( L"ntdll.dll" ), procNames[hkType] ).result( exportData() ).procAddress;
-    pTranslated = (uint8_t*)TranslateAddress( pProc );
-    if (!pTranslated)
-        return STATUS_INVALID_ADDRESS;
+    ptr_t pProc = modules.GetNtdllExport( procNames[hkType] ).procAddress;
+    uint8_t* pTranslated = reinterpret_cast<uint8_t*>(TranslateAddress( pProc ));
 
     // IPC
     if (!_hPipe)
@@ -214,8 +209,6 @@ NTSTATUS RemoteMemory::SetupHook( OperationType hkType )
 /// <returns>true on success</returns>
 bool RemoteMemory::RestoreHook( OperationType hkType )
 {
-    uint8_t* pTranslated = nullptr;
-    ptr_t pProc = 0;
     static const char* procNames[] = { "NtAllocateVirtualMemory", "NtFreeVirtualMemory", "NtMapViewOfSection", "NtUnmapViewOfSection" };
 
     // Not hooked
@@ -225,10 +218,8 @@ bool RemoteMemory::RestoreHook( OperationType hkType )
     auto& modules = _process->modules();
 
     // Local and remote proc address
-    pProc = modules.GetExport( modules.GetModule( L"ntdll.dll" ), procNames[hkType] ).result( exportData() ).procAddress;
-    pTranslated = (uint8_t*)TranslateAddress( pProc );
-    if (!pTranslated)
-        return false;
+    ptr_t pProc = modules.GetNtdllExport( procNames[hkType] ).procAddress;
+    uint8_t* pTranslated = reinterpret_cast<uint8_t*>(TranslateAddress( pProc ));
 
     // Restore bytes
     memcpy( pTranslated, (uint8_t*)_pSharedData + sizeof( HookData ) * hkType + FIELD_OFFSET( HookData, original_code ),
@@ -294,7 +285,7 @@ void RemoteMemory::HookThread()
 
     while (_active)
     {
-        OperationData opData = { 0 };
+        OperationData opData = { };
 
         // Target endpoint closed
         if (!ReadFile( _hPipe, &opData, sizeof( opData ), &bytes, NULL ))
@@ -343,9 +334,9 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
 
     auto& modules = _process->modules();
 
-    auto pEnterCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlEnterCriticalSection" ).result( exportData() );
-    auto pLeaveCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlLeaveCriticalSection" ).result( exportData() );
-    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).result( exportData() );
+    auto pEnterCS = modules.GetNtdllExport( "RtlEnterCriticalSection" );
+    auto pLeaveCS = modules.GetNtdllExport( "RtlLeaveCriticalSection" );
+    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" );
 
     a.GenPrologue();
     a.EnableX64CallStack( false );
@@ -468,9 +459,9 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
 
     auto& modules = _process->modules();
 
-    auto pEnterCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlEnterCriticalSection" ).result( exportData() ).procAddress;
-    auto pLeaveCS = modules.GetExport( modules.GetModule( L"ntdll.dll" ), "RtlLeaveCriticalSection" ).result( exportData() ).procAddress;
-    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).result( exportData() ).procAddress;
+    auto pEnterCS = modules.GetNtdllExport( "RtlEnterCriticalSection" ).procAddress;
+    auto pLeaveCS = modules.GetNtdllExport( "RtlLeaveCriticalSection" ).procAddress;
+    auto pWrite = modules.GetExport( modules.GetModule( L"kernel32.dll" ), "WriteFile" ).procAddress;
 
     a.GenPrologue();
     a->sub( asmjit::host::esp, sa.getTotalSize() );
@@ -494,7 +485,7 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     }
 
     // RtlEnterCriticalSection
-    a.GenCall( (uintptr_t)pEnterCS, { (uintptr_t)_targetShare + FIELD_OFFSET( PageContext, csLock ) } );
+    a.GenCall( static_cast<uintptr_t>(pEnterCS), { (uintptr_t)_targetShare + FIELD_OFFSET( PageContext, csLock ) } );
 
     // Storage pointer
     a->lea( asmjit::host::edx, data );
@@ -524,8 +515,8 @@ void RemoteMemory::BuildGenericHookFn( OperationType opType )
     // Operation type
     a->mov( asmjit::host::dword_ptr( asmjit::host::edx, FIELD_OFFSET( OperationData, allocType ) ), opType );
 
-    a.GenCall( (uintptr_t)pWrite, { (uintptr_t)_targetPipe, asmjit::host::edx, sizeof( OperationData ), &junk, 0 } );
-    a.GenCall( (uintptr_t)pLeaveCS, { (uintptr_t)_targetShare + FIELD_OFFSET( PageContext, csLock ) } );
+    a.GenCall( static_cast<uintptr_t>(pWrite), { (uintptr_t)_targetPipe, asmjit::host::edx, sizeof( OperationData ), &junk, 0 } );
+    a.GenCall( static_cast<uintptr_t>(pLeaveCS), { (uintptr_t)_targetShare + FIELD_OFFSET( PageContext, csLock ) } );
 
     // Ignore return value
     a->xor_( asmjit::host::eax, asmjit::host::eax );
