@@ -67,12 +67,12 @@ struct ExportData
         : name( name_ )
         , RVA( rva_ ) { }
 
-    bool operator == (const ExportData& other)
+    bool operator == (const ExportData& other) const
     {
         return name == other.name;
     }
 
-    bool operator < (const ExportData& other)
+    bool operator < (const ExportData& other) const
     {
         return name < other.name;
     }

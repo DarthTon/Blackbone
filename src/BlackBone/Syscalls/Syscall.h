@@ -29,6 +29,10 @@ namespace syscall
 
 #ifdef USE32
         return error( STATUS_NOT_SUPPORTED );
+#elif !defined(_MSC_VER)
+        // The Syscall*.asm files use MASM syntax, so they only work with MSVC.
+        // TODO: Port them for GCC/Clang
+        return error( STATUS_NOT_SUPPORTED );
 #else
         static_assert(sizeof( R ) <= sizeof( void* ), "Return types larger than void* aren't supported");
         if (index == -1)

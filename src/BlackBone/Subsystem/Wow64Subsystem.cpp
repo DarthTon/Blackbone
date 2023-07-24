@@ -202,7 +202,7 @@ NTSTATUS NativeWow64::CreateRemoteThreadT( HANDLE& hThread, ptr_t entry, ptr_t a
             return STATUS_ORDINAL_NOT_FOUND;
 
         // hThread can't be used directly because x64Call will zero stack space near variable
-        DWORD64 hThd2 = NULL;
+        DWORD64 hThd2 = 0;
 
         NTSTATUS status = static_cast<NTSTATUS>(X64Call(
             NtCreateThreadEx, 11, (DWORD64)&hThd2, (DWORD64)access, 0ull,

@@ -3,13 +3,14 @@
 #include <BlackBone/Process/RPC/RemoteFunction.hpp>
 #include <BlackBone/Syscalls/Syscall.h>
 #include <iostream>
+#include <thread>
 
 using namespace blackbone;
 
 void MapCalcFromFile();
 void MapCmdFromMem();
 
-int main( int /*argc*/, char* /*argv[]*/ )
+int main( int /*argc*/, char** /*argv[]*/ )
 {
     // List all process PIDs matching name
     auto pids = Process::EnumByName( L"explorer.exe" );
@@ -49,7 +50,7 @@ int main( int /*argc*/, char* /*argv[]*/ )
     {
         // do stuff...
         notepad.Resume();
-        std::this_thread::sleep_for( std::chrono::milliseconds( 100 ) );
+        Sleep(100);
     }
 
     // Process modules manipulation
